@@ -260,6 +260,7 @@ namespace datalog {
         m_preds.reset();
         m_preds_by_name.reset();
         reset_dealloc_values(m_sorts);
+        m_spacer = 0;
         m_pdr = 0;
         m_bmc = 0;
         m_rel = 0;
@@ -545,6 +546,9 @@ namespace datalog {
         switch(get_engine()) {
         case DATALOG_ENGINE:
             throw default_exception("get_num_levels is not supported for datalog engine");
+        case SPACER_ENGINE:
+            ensure_spacer ();
+            return m_spacer->get_num_levels (pred);
         case PDR_ENGINE:
         case QPDR_ENGINE:
             ensure_pdr();
@@ -565,6 +569,9 @@ namespace datalog {
         switch(get_engine()) {
         case DATALOG_ENGINE:
             throw default_exception("operation is not supported for datalog engine");
+        case SPACER_ENGINE:
+            ensure_spacer ();
+            return m_spacer->get_cover_delta (level, pred);
         case PDR_ENGINE:
         case QPDR_ENGINE:
             ensure_pdr();
@@ -585,6 +592,10 @@ namespace datalog {
         switch(get_engine()) {
         case DATALOG_ENGINE:
             throw default_exception("operation is not supported for datalog engine");
+        case SPACER_ENGINE:
+            ensure_spacer();
+            m_spacer->add_cover(level, pred, property);
+            break;
         case PDR_ENGINE:
         case QPDR_ENGINE:
             ensure_pdr();
@@ -705,6 +716,10 @@ namespace datalog {
             check_quantifier_free(r);
             check_uninterpreted_free(r);
             check_existential_tail(r); 
+            break;
+        case SPACER_ENGINE:
+            check_existential_tail(r);
+            check_positive_predicates(r);
             break;
         case PDR_ENGINE:
             check_existential_tail(r);
@@ -917,6 +932,7 @@ namespace datalog {
 
     void context::updt_params(params_ref const& p) {
         m_params_ref.copy(p);
+        if (m_spacer.get ()) m_spacer->updt_params ();
         if (m_pdr.get()) m_pdr->updt_params();        
     }
 
@@ -940,6 +956,7 @@ namespace datalog {
         m_cancel = true;
         m_last_status = CANCELED;
         m_transf.cancel();
+        if (m_spacer.get()) m_spacer->cancel();
         if (m_pdr.get()) m_pdr->cancel();
         if (m_bmc.get()) m_bmc->cancel();
         if (m_tab.get()) m_tab->cancel();
@@ -949,6 +966,7 @@ namespace datalog {
     void context::cleanup() {
         m_cancel = false;
         m_last_status = OK;
+        if (m_spacer.get()) m_spacer->cleanup();
         if (m_pdr.get()) m_pdr->cleanup();
         if (m_bmc.get()) m_bmc->cleanup();
         if (m_tab.get()) m_tab->cleanup();
@@ -989,27 +1007,39 @@ namespace datalog {
         
         if (e == symbol("datalog")) {
             m_engine = DATALOG_ENGINE;
+            TRACE("dl", tout << "dl engine\n";);
+        }
+        else if (e == symbol("spacer")) {
+            m_engine = SPACER_ENGINE;
+            TRACE("dl", tout << "spacer engine\n";);
         }
         else if (e == symbol("pdr")) {
             m_engine = PDR_ENGINE;
+            TRACE("dl", tout << "pdr engine\n";);
         }
         else if (e == symbol("qpdr")) {
             m_engine = QPDR_ENGINE;
+            TRACE("dl", tout << "qpdr engine\n";);
         }
         else if (e == symbol("bmc")) {
             m_engine = BMC_ENGINE;
+            TRACE("dl", tout << "bmc engine\n";);
         }
         else if (e == symbol("qbmc")) {
             m_engine = QBMC_ENGINE;
+            TRACE("dl", tout << "qbmc engine\n";);
         }
         else if (e == symbol("tab")) {
             m_engine = TAB_ENGINE;
+            TRACE("dl", tout << "tab engine\n";);
         }
         else if (e == symbol("clp")) {
             m_engine = CLP_ENGINE;
+            TRACE("dl", tout << "clp engine\n";);
         }
 
         if (m_engine == LAST_ENGINE) {
+            TRACE("dl", tout << "last engine\n";);
             expr_fast_mark1 mark;
             engine_type_proc proc(m);
             m_engine = DATALOG_ENGINE;            
@@ -1040,6 +1070,9 @@ namespace datalog {
         case DATALOG_ENGINE:
             flush_add_rules();
             return rel_query(query);
+        case SPACER_ENGINE:
+            flush_add_rules();
+            return spacer_query(query);
         case PDR_ENGINE:
         case QPDR_ENGINE:
             flush_add_rules();
@@ -1062,6 +1095,9 @@ namespace datalog {
 
     model_ref context::get_model() {
         switch(get_engine()) {
+        case SPACER_ENGINE:
+            ensure_spacer ();
+            return m_spacer->get_model ();
         case PDR_ENGINE:
         case QPDR_ENGINE:
             ensure_pdr();
@@ -1073,6 +1109,9 @@ namespace datalog {
 
     proof_ref context::get_proof() {
         switch(get_engine()) {
+        case SPACER_ENGINE:
+            ensure_spacer ();
+            return m_spacer->get_proof ();
         case PDR_ENGINE:
         case QPDR_ENGINE:
             ensure_pdr();
@@ -1082,10 +1121,21 @@ namespace datalog {
         }                
     }
 
+    void context::ensure_spacer () {
+        if (!m_spacer.get ()) {
+            m_spacer = alloc (spacer::dl_interface, *this);
+        }
+    }
+
     void context::ensure_pdr() {
         if (!m_pdr.get()) {
             m_pdr = alloc(pdr::dl_interface, *this);
         }
+    }
+
+    lbool context::spacer_query (expr* query) {
+        ensure_spacer ();
+        return m_spacer->query (query);
     }
 
     lbool context::pdr_query(expr* query) {
@@ -1148,6 +1198,10 @@ namespace datalog {
             return m_last_answer.get();
         }
         switch(get_engine()) {
+        case SPACER_ENGINE:
+            ensure_spacer ();
+            m_last_answer = m_spacer->get_answer ();
+            return m_last_answer.get();
         case PDR_ENGINE: 
         case QPDR_ENGINE:
             ensure_pdr();
@@ -1181,6 +1235,10 @@ namespace datalog {
         switch(get_engine()) {
         case DATALOG_ENGINE:            
             return false;
+        case SPACER_ENGINE:
+            ensure_spacer ();
+            m_spacer->display_certificate (out);
+            return true;
         case PDR_ENGINE: 
         case QPDR_ENGINE: 
             ensure_pdr();
@@ -1219,6 +1277,9 @@ namespace datalog {
     }
 
     void context::reset_statistics() {
+        if (m_spacer) {
+            m_spacer->reset_statistics ();
+        }
         if (m_pdr) {
             m_pdr->reset_statistics();
         }
@@ -1231,6 +1292,9 @@ namespace datalog {
     }
 
     void context::collect_statistics(statistics& st) const {
+        if (m_spacer) {
+            m_spacer->collect_statistics (st);
+        }
         if (m_pdr) {
             m_pdr->collect_statistics(st);
         }

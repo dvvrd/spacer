@@ -34,6 +34,7 @@ Revision History:
 #include"dl_relation_manager.h"
 #include"dl_rule_set.h"
 #include"pdr_dl_interface.h"
+#include"spacer_dl_interface.h"
 #include"dl_bmc_engine.h"
 #include"tab_context.h"
 #include"rel_context.h"
@@ -122,6 +123,7 @@ namespace datalog {
         proof_converter_ref m_pc;
 
         scoped_ptr<pdr::dl_interface>   m_pdr;
+        scoped_ptr<spacer::dl_interface>   m_spacer;
         scoped_ptr<bmc>                 m_bmc;
         scoped_ptr<rel_context>         m_rel;
         scoped_ptr<tab>                 m_tab;
@@ -414,14 +416,14 @@ namespace datalog {
         /**
            \brief retrieve model from inductive invariant that shows query is unsat.
            
-           \pre engine == 'pdr' - this option is only supported for PDR mode.
+           \pre engine == 'pdr' or 'spacer' - this option is only supported for PDR and SPACER modes.
          */
         model_ref get_model();
 
         /**
            \brief retrieve proof from derivation of the query.
            
-           \pre engine == 'pdr' - this option is only supported for PDR mode.
+           \pre engine == 'pdr' or 'spacer' - this option is only supported for PDR and SPACER modes.
          */
         proof_ref get_proof();
 
@@ -473,6 +475,8 @@ namespace datalog {
 
         void flush_add_rules();
 
+        void ensure_spacer();
+
         void ensure_pdr();
 
         void ensure_bmc();
@@ -486,6 +490,8 @@ namespace datalog {
         lbool rel_query(expr* query);
 
         lbool pdr_query(expr* query);
+
+        lbool spacer_query(expr* query);
 
         lbool bmc_query(expr* query);
 

@@ -47,8 +47,16 @@ namespace datalog {
         LAST_CACHE_MODE
     };
 
+    enum SPACER_CACHE_MODE {
+        SPACER_NO_CACHE,
+        SPACER_HASH_CACHE,
+        SPACER_CONSTRAINT_CACHE,
+        SPACER_LAST_CACHE_MODE
+    };
+
     enum DL_ENGINE {
         DATALOG_ENGINE,
+        SPACER_ENGINE,
         PDR_ENGINE,
         QPDR_ENGINE,
         BMC_ENGINE,
