@@ -169,6 +169,83 @@ namespace spacer {
     };
 
 
+
+    // instantiation of a rule's body during search;
+    // maintains model_nodes of children, their ordering, etc.
+    class rule_inst {
+        datalog::rule const&    r;
+        ptr_vector<model_node>  children;
+        model_node const* head;
+    public:
+        rule_inst (datalog::rule& r, ptr_vector<pred_transformer>& order, model_node* head):
+            r (r), head (head)
+        {
+            SASSERT (head);
+            SASSERT (head->level() > 0);
+            for (ptr_vector<model_node>::const_iterator it = order.begin ();
+                    it != order.end (); it++) {
+                children.push_back (alloc (model_node, head, *it, head->level()-1, this));
+            }
+        }
+
+        model_node& next (model_node& ch) {
+            for (ptr_vector<model_node>::iterator it = children.begin ();
+                    it != children.end (); it++) {
+                if (*it == ch) break;
+            }
+            if (it == children.end ())
+                throw default_exception ("illegal argument passed");
+            if (it+1 == children.end ())
+                throw default_exception ("no next child");
+            return *it;
+        }
+    };
+
+
+    enum MODEL_NODE_TYPE {
+        UNDER, OVER, RULES
+    };
+
+
+    // structure for counter-example search.
+    class model_node {
+        model_node const*           m_parent; // a list of them if we end up using DAGs
+        pred_transformer const&     m_pt;
+        ast_manager const&          m;
+        expr_ref const*             m_post;
+        expr_ref const*             m_post_ctx;
+        expr_ref                    m_pre;
+        unsigned const              m_level;       
+        bool                        m_open;
+        ptr_vector<rule_inst>       m_insts;
+        rule_inst const*            my_inst;
+        MODEL_NODE_TYPE             m_type; // use under-approx/over-approx/rules(default)
+    public:
+        model_node (model_node* parent, pred_transformer const& pt, unsigned level, rule_inst* inst):
+            m_parent (parent), m_pt (pt), m (m_pt.get_manager ()), m_post (m),
+            m_post_ctx (m), m_pre (m), m_level (level), m_open (true), my_inst (inst),
+            m_type (RULES)
+        { }
+
+        model_node* parent () const { return m_parent; }
+        pred_transformer const& pt () const { return m_pt; }
+        rule_inst const* my_inst () const { return my_inst; }
+        bool is_open () const { return m_open; }
+        expr_ref const& pre () const { return m_pre; }
+        unsigned level () { return m_level; }
+
+        void updt_parent (model_node* parent) { m_parent = parent; }
+        void updt_post (expr_ref* post, expr_ref* post_ctx) { m_post = post; m_post_ctx = post_ctx; }
+        void updt_type (MODEL_NODE_TYPE t) { m_type = t; }
+
+        // move into pdr::context
+        void check_local_reach ();
+        void report_pf (model_node& ch);
+        void report_pre (model_node& ch);
+    };
+
+
+/*
     // structure for counter-example search.
     class model_node {
         model_node*            m_parent;
@@ -228,6 +305,7 @@ namespace spacer {
 
         std::ostream& display(std::ostream& out, unsigned indent);
     };
+*/
 
     class model_search {
         bool               m_bfs;
