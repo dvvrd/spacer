@@ -423,18 +423,18 @@ namespace spacer {
     lbool pred_transformer::is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level) {
         TRACE("spacer", 
               tout << "is-reachable: " << head()->get_name() << " level: " << n.level() << "\n";
-              tout << mk_pp(n.state(), m) << "\n";);
+              tout << mk_pp(n.post(), m) << "\n";);
         ensure_level(n.level());        
         model_ref model;
         prop_solver::scoped_level _sl(m_solver, n.level());
         m_solver.set_core(core);
         m_solver.set_model(&model);
-        lbool is_sat = m_solver.check_conjunction_as_assumptions(n.state());
+        lbool is_sat = m_solver.check_conjunction_as_assumptions(n.post());
         if (is_sat == l_true && core) {            
             core->reset();
             TRACE("spacer", tout << "updating model\n"; 
                   model_smt2_pp(tout, m, *model, 0);
-                  tout << mk_pp(n.state(), m) << "\n";);
+                  tout << mk_pp(n.post(), m) << "\n";);
             n.set_model(model);
         }
         else if (is_sat == l_false) {
@@ -728,15 +728,13 @@ namespace spacer {
     // ----------------
     // model_node
 
-    void model_node::set_closed() {
-        pt().close(state());
-        m_closed = true; 
-    }
+    unsigned long long model_node::m_count;
 
     static bool is_ini(datalog::rule const& r) {
         return r.get_uninterpreted_tail_size() == 0;
     }
 
+/*
     datalog::rule* model_node::get_rule() {
         if (m_rule) {
             return const_cast<datalog::rule*>(m_rule);
@@ -835,6 +833,8 @@ namespace spacer {
         return 0;
     }
 
+*/
+
 
     // ----------------
     // model_search
@@ -848,31 +848,34 @@ namespace spacer {
         return result;
     }
 
+/*
     bool model_search::is_repeated(model_node& n) const {
         model_node* p = n.parent();
         while (p) {
-            if (p->state() == n.state()) {
+            if (p->post() == n.post()) {
                 return true;
             }
             p = p->parent();
         }
         return false;
     }
+*/
 
     void model_search::add_leaf(model_node& n) {
-        unsigned& count = cache(n).insert_if_not_there2(n.state(), 0)->get_data().m_value;
+        set_leaf (n);
+        /*unsigned& count = cache(n).insert_if_not_there2(n.post(), 0)->get_data().m_value;
         ++count;
         if (count == 1 || is_repeated(n)) {
             set_leaf(n);
         }
         else {
             n.set_pre_closed();
-        }
+        }*/
     }
 
     void model_search::set_leaf(model_node& n) {
-        erase_children(n);
-        SASSERT(n.is_open());      
+        //erase_children(n);
+        //SASSERT(n.is_open());      
         enqueue_leaf(n);
     }
 
@@ -888,12 +891,12 @@ namespace spacer {
     void model_search::set_root(model_node* root) {
         reset();
         m_root = root;
-        SASSERT(cache(*root).empty());        
-        cache(*root).insert(root->state(), 1);
+        //SASSERT(cache(*root).empty());        
+        //cache(*root).insert(root->post(), 1);
         set_leaf(*root);
     }
 
-    obj_map<expr, unsigned>& model_search::cache(model_node const& n) {
+/*    obj_map<expr, unsigned>& model_search::cache(model_node const& n) {
         unsigned l = n.orig_level();
         if (l >= m_cache.size()) {
             m_cache.resize(l + 1);
@@ -918,8 +921,8 @@ namespace spacer {
     }
 
     void model_search::remove_node(model_node& n) {
-        if (0 == --cache(n).find(n.state())) {
-            cache(n).remove(n.state());
+        if (0 == --cache(n).find(n.post())) {
+            cache(n).remove(n.post());
         }
     }
 
@@ -950,11 +953,15 @@ namespace spacer {
         }
         return out;
     }
+*/
+
 
     /**
        \brief Ensure that all nodes in the tree have associated models.
        get_trace and get_proof_trace rely on models to extract rules.
      */
+
+/*
     void model_search::update_models() {
         obj_map<expr, model*> models;
         ptr_vector<model_node> todo;
@@ -980,12 +987,14 @@ namespace spacer {
             todo.append(n->children().size(), n->children().c_ptr());
         }        
     }
+*/
 
     /**
        Extract trace comprising of constraints 
        and predicates that are satisfied from facts to the query.
        The resulting trace 
      */
+/*
     expr_ref model_search::get_trace(context const& ctx) {       
         pred_transformer& pt = get_root().pt();
         ast_manager& m = pt.get_manager();
@@ -1178,6 +1187,7 @@ namespace spacer {
         }
         return proof_ref(cache.find(m_root->state()), m);
     }
+*/
 
     model_search::~model_search() {
         TRACE("spacer", tout << "\n";);
@@ -1186,13 +1196,13 @@ namespace spacer {
 
     void model_search::reset() {
         if (m_root) {
-            erase_children(*m_root);
-            remove_node(*m_root);
+            //erase_children(*m_root);
+            //remove_node(*m_root);
             dealloc(m_root);
             m_root = 0;
         }
     }
-
+/*
     void model_search::backtrack_level(bool uses_level, model_node& n) {
         SASSERT(m_root);
         if (uses_level && m_root->level() > n.level()) {
@@ -1207,6 +1217,7 @@ namespace spacer {
             }               
         }     
     }
+*/
 
     // ----------------
     // context
@@ -1451,7 +1462,7 @@ namespace spacer {
             }
         }
     };
-
+/*
     void context::validate() {
         if (!m_params.validate_result()) {
             return;
@@ -1542,6 +1553,7 @@ namespace spacer {
             break;
         }
     }
+*/
 
     void context::reset_core_generalizers() {
         std::for_each(m_core_generalizers.begin(), m_core_generalizers.end(), delete_proc<core_generalizer>());
@@ -1614,15 +1626,15 @@ namespace spacer {
             UNREACHABLE();
         }
         catch (model_exception) {        
-            IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
+            //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
             m_last_result = l_true;
-            validate();
+            //validate();
             return l_true;
         }
         catch (inductive_exception) {
             simplify_formulas();
             m_last_result = l_false;
-            TRACE("spacer",  display_certificate(tout););      
+            //TRACE("spacer",  display_certificate(tout););      
             IF_VERBOSE(1, {
                     expr_ref_vector refs(m);
                     vector<relation_info> rs;
@@ -1639,7 +1651,7 @@ namespace spacer {
                     it->m_value->propagate_to_infinity (m_inductive_lvl);	
                 }
             }
-            validate();
+            //validate();
             return l_false;
         }
         catch (unknown_exception) {
@@ -1666,6 +1678,16 @@ namespace spacer {
     /**
        \brief retrieve answer.
     */
+    expr_ref context::get_answer () {
+        return expr_ref(m.mk_true(), m);
+    }
+    model_ref context::get_model () {
+        return model_ref ();
+    }
+    proof_ref context::get_proof () const {
+        return proof_ref (m);
+    }
+/*
     expr_ref context::get_answer() {
         switch(m_last_result) {
         case l_true: return mk_sat_answer();
@@ -1697,11 +1719,19 @@ namespace spacer {
         // TRACE("spacer", tout << "SPACER up: " << mk_pp(proof, m) << "\n";);
         return proof;
     }
+*/
 
 
     /**
         \brief Retrieve satisfying assignment with explanation.
     */
+    expr_ref context::mk_sat_answer () const {
+        return expr_ref(m.mk_true(), m);
+    }
+    expr_ref context::mk_unsat_answer () const {
+        return expr_ref(m.mk_true(), m);
+    }
+/*
     expr_ref context::mk_sat_answer() const {
         if (m_params.generate_proof_trace()) {
             proof_ref pr = get_proof();
@@ -1717,6 +1747,7 @@ namespace spacer {
         inductive_property ex(m, const_cast<model_converter_ref&>(m_mc), rs);
         return ex.to_expr();
     }
+*/
 
     void context::solve_impl() {
         if (!m_rels.find(m_query_pred, m_query)) {
@@ -1727,6 +1758,7 @@ namespace spacer {
         while (true) {
             checkpoint();
             m_expanded_lvl = lvl;
+            model_node::reset_count (); // fresh counter for node ids
             reachable = check_reachability(lvl);
             if (reachable) {
                 throw model_exception();
@@ -1749,8 +1781,10 @@ namespace spacer {
     // query state.
     //
     bool context::check_reachability(unsigned level) {
-        expr_ref state(m.mk_true(), m);
-        model_node* root = alloc(model_node, 0, state, *m_query, level);
+        expr_ref post (m.mk_true(), m), post_ctx (m.mk_true (), m);
+        model_node* root = alloc (model_node, 0, *m_query, level, 0);
+        root->updt_post (post, post_ctx);
+        //model_node* root = alloc(model_node, 0, post, *m_query, level);
         m_search.set_root(root);            
         
         while (model_node* node = m_search.next()) {
@@ -1758,14 +1792,14 @@ namespace spacer {
             checkpoint();
             expand_node(*node);   
         }
-        return root->is_closed();
+        return root->is_reachable ();
     }
 
-    void context::close_node(model_node& n) {
-        n.set_closed();
+/*  void context::close_node(model_node& n) {
+        n.close();
         model_node* p = n.parent();
         while (p && p->is_1closed()) {
-            p->set_closed();
+            p->close();
             p = p->parent();
         }
     }
@@ -1781,6 +1815,7 @@ namespace spacer {
             p = p->parent();
         }
     }
+*/
 
     void context::expand_node(model_node& n) {
         SASSERT(n.is_open());
@@ -1790,22 +1825,22 @@ namespace spacer {
             m_expanded_lvl = n.level();
         }
 
-        if (n.pt().is_reachable(n.state())) {
+        if (n.pt().is_reachable(n.post())) {
             TRACE("spacer", tout << "reachable\n";);
-            close_node(n);
+            //close_node(n);
         }
         else {
             bool uses_level = true;
             switch (expand_state(n, cube, uses_level)) {
             case l_true:
-                if (n.level() == 0) {
-                    TRACE("spacer", tout << "reachable at level 0\n";);
-                    close_node(n);
-                }
-                else {
+//                if (n.level() == 0) {
+//                    TRACE("spacer", tout << "reachable at level 0\n";);
+//                    close_node(n);
+//                }
+//                else {
                     TRACE("spacer", tout << "node: " << &n << "\n";); 
                     create_children(n);
-                }
+//                }
                 break;
             case l_false: {
                 core_generalizer::cores cores;
@@ -1830,7 +1865,9 @@ namespace spacer {
                     n.pt().add_property(ncore, uses_level?n.level():infty_level);
                 }
                 CASSERT("spacer",n.level() == 0 || check_invariant(n.level()-1));
-                m_search.backtrack_level(!found_invariant && m_params.flexible_trace(), n);
+                n.close ();
+                report_pf (n);
+                //m_search.backtrack_level(!found_invariant && m_params.flexible_trace(), n);
                 break;
             }
             case l_undef: {
@@ -1883,7 +1920,7 @@ namespace spacer {
        Introduce the shorthands:
 
        - T(x0,x1,x)   for transition
-       - phi(x)       for n.state()
+       - phi(x)       for n.post()
        - M(x0,x1,x)   for n.model()
 
        Assumptions:
@@ -1926,9 +1963,9 @@ namespace spacer {
         model_ref M = n.get_model_ptr();
         datalog::rule const& r = pt.find_rule(*M);
         expr* T   = pt.get_transition(r);
-        expr* phi = n.state();
+        expr* phi = n.post();
 
-        n.set_rule(&r);
+        //n.set_rule(&r);
 
         TRACE("spacer", 
               tout << "Model:\n";
@@ -1950,7 +1987,7 @@ namespace spacer {
             Phi.append(mev.minimize_literals(forms1, M));
         }
         ptr_vector<func_decl> preds;
-        pt.find_predecessors(r, preds);
+        pt.find_predecessors(r, preds); // TODO: (AK) also order the preds
         pt.remove_predecessors(Phi);
 
         app_ref_vector vars(m);
@@ -1997,8 +2034,43 @@ namespace spacer {
             TRACE("spacer", tout << "Projected:\n" << mk_pp(phi1, m) << "\n";);
         }
         Phi.reset();
-        datalog::flatten_and(phi1, Phi);
-        unsigned_vector indices;
+
+        // if no preds, update n.pre
+        if (preds.size () == 0) {
+            n.updt_pre (phi1);
+            n.close (); // n.m_pre -> <n.m_post, n.m_post_ctx> is concrete
+            report_pre (n);
+            return;
+        }
+
+        // create a new derivation for the model
+
+        // obtain pt for all preds in pred_pts
+        ptr_vector<pred_transformer> pred_pts;
+        // back_inserter needs svector::const_reference which is currently absent
+        //std::transform (preds.begin (), preds.end (), std::back_inserter (pred_pts), get_pred_transformer);
+        for (ptr_vector<func_decl>::iterator it = preds.begin ();
+                it != preds.end (); it++) {
+            pred_pts.push_back (&get_pred_transformer (*it));
+        }
+
+        derivation* deriv = alloc (derivation, &n, pred_pts);
+        n.add_deriv (deriv);
+        deriv->ghostify (phi1);
+
+        // create post for the first child and add to queue
+        SASSERT (deriv->has_next ());
+        model_node& ch = deriv->next ();
+
+        expr_ref post_ctx (m);
+        deriv->mk_post (phi1, post_ctx);
+
+        ch.updt_post (phi1, post_ctx);
+        m_search.add_leaf (ch);
+
+
+        //datalog::flatten_and(phi1, Phi);
+/*      unsigned_vector indices;
         vector<expr_ref_vector> child_states;
         child_states.resize(preds.size(), expr_ref_vector(m));
         for (unsigned i = 0; i < Phi.size(); ++i) {            
@@ -2048,6 +2120,68 @@ namespace spacer {
         }
         check_pre_closed(n);
         TRACE("spacer", m_search.display(tout););
+*/
+    }
+
+    void context::report_pre (model_node& ch) {
+        TRACE ("spacer",
+                tout << ch.pt ().head ()->get_name () << " : "
+                     << "post : " << mk_pp (ch.post (), m)
+                     << "; pre : " << mk_pp (ch.pre (), m) << "\n";);
+
+        model_node* par = ch.parent ();
+        derivation* deriv = ch.my_deriv ();
+
+        // ch == root
+        if (!deriv) {
+            SASSERT (ch.is_reachable ());
+            return;
+        }
+
+        if (deriv->is_last ()) {
+            // all premises of deriv have been explored
+            if (par) {
+                par->updt_pre (ch.pre ());
+                if (deriv->is_closed ()) {
+                    // TODO: check for par.m_post_ctx as well
+                    par->close ();
+                } // else ??
+            }
+        } else {
+            // create post for the next child
+            model_node& sib = deriv->next ();
+            sib.reset ();
+            expr_ref post = ch.pre (), post_ctx (m);
+            deriv->mk_post (post, post_ctx);
+            sib.updt_post (post, post_ctx);
+            m_search.add_leaf (sib);
+        }
+
+        if (ch.is_closed ()) ch.del_derivs ();
+
+        if (par && par->is_closed ()) report_pre (*par);
+    }
+
+    void context::report_pf (model_node& ch) {
+        TRACE ("spacer", tout << "unreachable\n";);
+
+        model_node* par = ch.parent ();
+        derivation* deriv = ch.my_deriv ();
+
+        // ch == root
+        if (!deriv) return;
+
+        if (deriv->is_first ()) {
+            // even the first premise fails
+            if (par) m_search.add_leaf (*par);
+        } else {
+            // create new post for ch, by asking for
+            //      new pre of its previous sibling
+            model_node& sib = deriv->prev ();
+            m_search.add_leaf (sib);
+        }
+
+        ch.del_derivs ();
     }
 
     void context::collect_statistics(statistics& st) const {
@@ -2080,7 +2214,7 @@ namespace spacer {
     }
 
 
-    std::ostream& context::display(std::ostream& out) const {
+/*    std::ostream& context::display(std::ostream& out) const {
         decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
         for (; it != end; ++it) {
             it->m_value->display(out);
@@ -2088,6 +2222,7 @@ namespace spacer {
         m_search.display(out);
         return out;
     }
+*/
 
     bool context::check_invariant(unsigned lvl) {
         decl2rel::iterator it = m_rels.begin(), end = m_rels.end();        
@@ -2115,7 +2250,9 @@ namespace spacer {
         return result == l_false;
     }
 
-    void context::display_certificate(std::ostream& strm) const {
+    void context::display_certificate (std::ostream& strm) const { }
+
+/*    void context::display_certificate(std::ostream& strm) const {
         switch(m_last_result) {
         case l_false: {
             expr_ref_vector refs(m);
@@ -2135,5 +2272,6 @@ namespace spacer {
         }
         }
     }
+*/
 
 }

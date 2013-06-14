@@ -40,6 +40,7 @@ namespace spacer {
 
     class pred_transformer;
     class model_node;
+    class derivation;
     class context;
 
     typedef obj_map<datalog::rule const, app_ref_vector*> rule2inst;
@@ -169,79 +170,256 @@ namespace spacer {
     };
 
 
-
-    // instantiation of a rule's body during search;
-    // maintains model_nodes of children, their ordering, etc.
-    class rule_inst {
-        datalog::rule const&    r;
-        ptr_vector<model_node>  children;
-        model_node const* head;
-    public:
-        rule_inst (datalog::rule& r, ptr_vector<pred_transformer>& order, model_node* head):
-            r (r), head (head)
-        {
-            SASSERT (head);
-            SASSERT (head->level() > 0);
-            for (ptr_vector<model_node>::const_iterator it = order.begin ();
-                    it != order.end (); it++) {
-                children.push_back (alloc (model_node, head, *it, head->level()-1, this));
-            }
-        }
-
-        model_node& next (model_node& ch) {
-            for (ptr_vector<model_node>::iterator it = children.begin ();
-                    it != children.end (); it++) {
-                if (*it == ch) break;
-            }
-            if (it == children.end ())
-                throw default_exception ("illegal argument passed");
-            if (it+1 == children.end ())
-                throw default_exception ("no next child");
-            return *it;
-        }
-    };
-
-
+    // type of derivation for a model node
     enum MODEL_NODE_TYPE {
-        UNDER, OVER, RULES
+        UNDER,  // use an under-approximating summary
+        OVER,   // use an over-approximating summary
+        EXPAND  // expand the search tree
     };
 
 
-    // structure for counter-example search.
+    // goal node (perhaps, rename to goal_node?)
+    //      find a pre(image), given a post and a post_ctx;
+    //      this is done by means of a derivation to <post,post_ctx>
     class model_node {
-        model_node const*           m_parent; // a list of them if we end up using DAGs
-        pred_transformer const&     m_pt;
-        ast_manager const&          m;
-        expr_ref const*             m_post;
-        expr_ref const*             m_post_ctx;
-        expr_ref                    m_pre;
-        unsigned const              m_level;       
-        bool                        m_open;
-        ptr_vector<rule_inst>       m_insts;
-        rule_inst const*            my_inst;
-        MODEL_NODE_TYPE             m_type; // use under-approx/over-approx/rules(default)
+        model_node*             m_parent; // a list of them if we end up using DAGs
+        pred_transformer&       m_pt;
+        ast_manager&            m;
+        expr_ref                m_post;
+        expr_ref                m_post_ctx;
+        expr_ref                m_pre;
+        unsigned const          m_level;       
+        bool                    m_open;     // whether a concrete answer to the goal is found
+        ptr_vector<derivation>  m_derivs;   // all derivations being tried out
+        derivation*             m_my_deriv; // the derivation which contains me as a premise
+        MODEL_NODE_TYPE         m_type;     // type of derivation
+
+        // unique id of this node and a global count of all goal nodes;
+        // count is expected to be reset at every level of query
+        unsigned long long const    m_id;
+        static unsigned long long   m_count;
+
+        // TODO: should keep the following in context, not here
+        model_ref               m_model;
     public:
-        model_node (model_node* parent, pred_transformer const& pt, unsigned level, rule_inst* inst):
-            m_parent (parent), m_pt (pt), m (m_pt.get_manager ()), m_post (m),
-            m_post_ctx (m), m_pre (m), m_level (level), m_open (true), my_inst (inst),
-            m_type (RULES)
-        { }
+        model_node (model_node* parent, pred_transformer& pt, unsigned level, derivation* deriv):
+            m_parent (parent), m_pt (pt), m (m_pt.get_manager ()),
+            m_post (m), m_post_ctx (m), m_pre (m),
+            m_level (level), m_open (true),
+            m_my_deriv (deriv), m_type (EXPAND), m_id (m_count+1)
+            , m_model (0)
+        { m_count++; }
+
+        static void reset_count () { m_count = 0; }
 
         model_node* parent () const { return m_parent; }
-        pred_transformer const& pt () const { return m_pt; }
-        rule_inst const* my_inst () const { return my_inst; }
-        bool is_open () const { return m_open; }
+        pred_transformer& pt () const { return m_pt; }
+        ast_manager& get_manager () const { return m; }
+        manager& get_spacer_manager () const { return m_pt.get_spacer_manager (); }
+        expr_ref const& post () const { return m_post; }
+        expr_ref const& post_ctx () const { return m_post_ctx; }
         expr_ref const& pre () const { return m_pre; }
-        unsigned level () { return m_level; }
+        derivation* my_deriv () const { return m_my_deriv; }
+        bool is_open () const { return m_open; }
+        bool is_closed () const { return !m_open; }
+        unsigned level () const { return m_level; }
 
+        void add_deriv (derivation* deriv) { m_derivs.push_back (deriv); }
         void updt_parent (model_node* parent) { m_parent = parent; }
-        void updt_post (expr_ref* post, expr_ref* post_ctx) { m_post = post; m_post_ctx = post_ctx; }
+        void updt_post (expr_ref const& post, expr_ref const& post_ctx)
+                { m_post = post; m_post_ctx = post_ctx; }
         void updt_type (MODEL_NODE_TYPE t) { m_type = t; }
+        void updt_pre (expr_ref const& pre) { m_pre = pre; }
 
-        // move into pdr::context
-        void check_local_reach ();
-        void report_pf (model_node& ch);
-        void report_pre (model_node& ch);
+        void reset () { SASSERT (m_derivs.empty ()); m_pre.reset (); m_open = true; }
+
+        void close () {
+            // TODO: update cache in m_pt
+            m_open = false;
+        }
+
+        // TODO (clean up memory; not necessary for soundness)
+        void del_derivs () { }
+
+        // is known to be concretely reachable or unreachable
+        bool is_reachable () { return is_closed () && m_pre; }
+        bool is_unreachable () { return is_closed () && !m_pre; }
+
+        // util
+
+        // one could have used the memory address of the object instead of a
+        // separate counter, but it might pose problems when an object is
+        // deleted and another one constructed at the same address, as the ids
+        // may persist beyond the lifetime of the object
+        unsigned long long id () const { return m_id; }
+
+        // given a var pred_pos_id, return pred_pos_id_g<n> where n is a unique
+        // id for the current object
+        app* mk_ghost (app const* var) const {
+            SASSERT (var->get_num_args () == 0); // it's a constant
+            func_decl* fd = var->get_decl ();
+            sort* s = fd->get_range ();
+            symbol const& old_sym = fd->get_name ();
+            std::stringstream new_name;
+            new_name << old_sym.str () << "_g" << id ();
+            return m.mk_const (symbol (new_name.str ().c_str ()), s);
+        }
+
+
+        // TODO: move the following (including the member m_model) into context
+        void set_model(model_ref& m) { m_model = m; }
+        model* get_model_ptr() const { return m_model.get(); }
+        model const&  get_model() const { return *m_model; }
+    };
+
+
+    // a derivation class for <m_concl.post, m_concl.post_ctx>
+    // prems are the premises needed to be derived (corresponding to a horn
+    // clause for m_concl.pt()) in order to reach concl.post
+    class derivation {
+        typedef obj_map<app, app*> app_map;
+
+        ptr_vector<model_node>              m_prems;// all premises which need to be derived
+        model_node*                         m_concl;// conclusion
+        ptr_vector<model_node>::iterator    m_curr; // the premise currently being processed
+
+        ptr_vector<app_map>                 m_ghosts;  // maps from formal params to ghosts
+        ast_manager&                        m;
+        manager const&                      sm;
+
+
+        // substitute formal params by ghosts
+        void mk_ghost_sub (expr_substitution& sub) const {
+            for (ptr_vector<app_map>::const_iterator it = m_ghosts.begin ();
+                    it != m_ghosts.end (); it++) {
+                for (app_map::iterator g_it = (*it)->begin ();
+                        g_it != (*it)->end (); g_it++) {
+                    sub.insert (g_it->m_key, g_it->m_value);
+                }
+            }
+        }
+
+        // substitute ghosts by n-versions of formal params for the pt at curr_pos ()
+        void mk_unghost_sub (expr_substitution& sub) const {
+            SASSERT (m_curr != m_prems.end ()); // points to something
+            app* n_arg;
+            app_map* g_map = m_ghosts[curr_pos ()];
+            for (app_map::iterator g_it = g_map->begin ();
+                    g_it != g_map->end (); g_it++) {
+                n_arg = m.mk_const (sm.o2n (g_it->m_key->get_decl (), curr_pos ()));
+                sub.insert (g_it->m_value, n_arg);
+            }
+        }
+
+    public:
+        derivation (model_node* concl,  ptr_vector<pred_transformer>& order):
+            m_concl (concl), m_curr (0), m (m_concl->get_manager ()), sm (m_concl->get_spacer_manager ())
+        {
+            SASSERT (m_concl); // non-null
+            SASSERT (m_concl->level() > 0);
+            app* arg;
+            // create model-nodes for premises, corresponding to PTs in order
+            for (ptr_vector<pred_transformer>::iterator it = order.begin ();
+                    it != order.end (); it++) {
+                pred_transformer& pt = **it;
+                // create model_node for premise
+                m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this));
+                // add a ghost map for PT
+                app_map* g_map = alloc (app_map);
+                for (unsigned i = 0; i < pt.sig_size (); i++) {
+                    arg = m.mk_const (sm.o2o (pt.sig (i), 0, it-order.begin ()));
+                    g_map->insert (arg, concl->mk_ghost (arg));
+                    TRACE("spacer", tout << mk_pp(arg,m) << " --ghost--> " << mk_pp(g_map->find (arg), m) << "\n";);
+                }
+                m_ghosts.push_back (g_map);
+            }
+            // initialize m_curr
+            m_curr = m_prems.end (); // points to nothing
+        }
+
+        bool has_next () const { return m_curr+1 != m_prems.end (); }
+        bool has_prev () const { return m_curr != m_prems.begin (); }
+        bool is_first () const { return !has_prev (); }
+        bool is_last () const { return !has_next (); }
+        unsigned curr_pos () const { return m_curr-m_prems.begin (); }
+        unsigned num_prems () const { return m_prems.size (); }
+
+        model_node& next () {
+            if (is_last ()) throw default_exception ("No next premise");
+            if (m_curr == m_prems.end ()) m_curr = m_prems.begin ();
+            else m_curr++;
+            return **m_curr;
+        }
+
+        model_node& prev () {
+            if (is_first ()) throw default_exception ("No prev premise");
+            m_curr--;
+            return **m_curr;
+        }
+
+        bool is_closed () const {
+            for (ptr_vector<model_node>::const_iterator it = m_prems.begin ();
+                    it != m_prems.end (); it++) {
+                if ((*it)->is_open ()) return false;
+            }
+            return true;
+        }
+
+        // replace all arguments by ghost vars
+        void ghostify (expr_ref& phi) const {
+            TRACE ("spacer", tout << "before ghostify: " << mk_pp(phi,m) << "\n";);
+            expr_substitution sub (m);
+            mk_ghost_sub (sub);
+            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+            rep->set_substitution (&sub);
+            (*rep) (phi);
+            TRACE ("spacer", tout << "after ghostify: " << mk_pp(phi,m) << "\n";);
+        }
+
+        void mk_post (expr_ref& phi, expr_ref& ctx) const {
+            TRACE ("spacer", tout << "input to post: " << mk_pp(phi,m) << "\n";);
+            expr_substitution sub (m);
+            mk_unghost_sub (sub);
+            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+            rep->set_substitution (&sub);
+            (*rep) (phi);
+            ctx = expr_ref (m.mk_true (), m);
+            TRACE ("spacer", tout << "output of post: " << mk_pp(phi,m) << "\n";);
+        }
+    };
+
+
+    // TODO: (AK) write a priority_queue class (extending std::priority_queue with
+    // more features to update priorities, ability to remove an arbitrary node,
+    // etc. The class below is limited to a bfs/dfs
+    class model_search {
+        bool               m_bfs;
+        model_node*        m_root;
+        std::deque<model_node*> m_leaves;
+        vector<obj_map<expr, unsigned> > m_cache;
+        
+        obj_map<expr, unsigned>& cache(model_node const& n);
+        //void erase_children(model_node& n);
+        void erase_leaf(model_node& n);
+        //void remove_node(model_node& n);
+        void enqueue_leaf(model_node& n); // add leaf to priority queue.
+        void update_models();
+    public:
+        model_search(bool bfs): m_bfs(bfs), m_root(0) {}
+        ~model_search();
+
+        void reset();
+        model_node* next();
+        bool is_repeated(model_node& n) const;
+        void add_leaf(model_node& n); // add fresh node.
+        void set_leaf(model_node& n); // Set node as leaf, remove children.
+
+        void set_root(model_node* n);
+        model_node& get_root() const { return *m_root; }
+        //std::ostream& display(std::ostream& out) const; 
+        //expr_ref get_trace(context const& ctx);
+        //proof_ref get_proof_trace(context const& ctx);
+        //void backtrack_level(bool uses_level, model_node& n);
     };
 
 
@@ -307,36 +485,6 @@ namespace spacer {
     };
 */
 
-    class model_search {
-        bool               m_bfs;
-        model_node*        m_root;
-        std::deque<model_node*> m_leaves;
-        vector<obj_map<expr, unsigned> > m_cache;
-        
-        obj_map<expr, unsigned>& cache(model_node const& n);
-        void erase_children(model_node& n);
-        void erase_leaf(model_node& n);
-        void remove_node(model_node& n);
-        void enqueue_leaf(model_node& n); // add leaf to priority queue.
-        void update_models();
-    public:
-        model_search(bool bfs): m_bfs(bfs), m_root(0) {}
-        ~model_search();
-
-        void reset();
-        model_node* next();
-        bool is_repeated(model_node& n) const;
-        void add_leaf(model_node& n); // add fresh node.
-        void set_leaf(model_node& n); // Set node as leaf, remove children.
-
-        void set_root(model_node* n);
-        model_node& get_root() const { return *m_root; }
-        std::ostream& display(std::ostream& out) const; 
-        expr_ref get_trace(context const& ctx);
-        proof_ref get_proof_trace(context const& ctx);
-        void backtrack_level(bool uses_level, model_node& n);
-    };
-
     struct model_exception { };
     struct inductive_exception {};
 
@@ -361,6 +509,8 @@ namespace spacer {
         virtual void reset_statistics() {}
     };
 
+
+    // AK: need to clean this up!
     class context {
 
         struct stats {
@@ -399,6 +549,9 @@ namespace spacer {
         void create_children(model_node& n);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;
+
+        void report_pf (model_node& ch);
+        void report_pre (model_node& ch);
         
         // Generate inductive property
         void get_level_property(unsigned lvl, expr_ref_vector& res, vector<relation_info> & rs) const;
@@ -419,7 +572,7 @@ namespace spacer {
 
         void reset_core_generalizers();
 
-        void validate();
+        //void validate();
 
     public:       
         
@@ -487,7 +640,6 @@ namespace spacer {
         proof_ref get_proof() const;
 
         model_node& get_root() const { return m_search.get_root(); }
-
     };
 
 };
