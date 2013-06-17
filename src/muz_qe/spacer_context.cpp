@@ -835,6 +835,108 @@ namespace spacer {
 
 */
 
+    // ----------------
+    // derivation
+
+    void derivation::mk_ghosts (ast_mark& mark, ptr_vector<expr>& todo, expr* e) {
+        todo.push_back(e);
+        while (!todo.empty()) {
+            e = todo.back();
+            todo.pop_back();
+            if (mark.is_marked(e)) {
+                continue;
+            }
+            mark.mark(e, true);
+            switch(e->get_kind()) {
+            case AST_QUANTIFIER: {
+                quantifier* q = to_quantifier(e);
+                ast_mark mark1;
+                ptr_vector<expr> todo1;
+                mk_ghosts (mark1, todo1, q->get_expr());
+                break;
+            }
+            case AST_VAR: {
+                // not handling variables for now;
+                break;
+            }
+            case AST_APP: {
+                app* a = to_app(e);
+                if (is_uninterp_const (a)) {
+                    unsigned idx; // store in this, the o-index of a
+                    m_sm.get_o_index (a->get_decl (), idx); // what if a is a ghost??
+                    SASSERT (m_ghosts.size () > idx); // m_ghosts is expected to be of the right size
+                    if (!m_ghosts[idx]) m_ghosts[idx] = alloc (ptr_vector<app_ref_ptr_pair>);
+                    app_ref* orig = alloc (app_ref, a, m);
+                    app_ref* ghost = m_concl->mk_ghost (*orig);
+                    m_ghosts[idx]->push_back (alloc (app_ref_ptr_pair, orig, ghost));
+                } else {
+                    for (unsigned i = 0; i < a->get_num_args(); ++i) {
+                        todo.push_back(a->get_arg(i));
+                    }
+                }
+                break;
+            }
+            default:
+                UNREACHABLE();
+            }
+        }
+    }
+
+    void derivation::mk_ghosts (expr_ref const& phi) {
+        m_ghosts.reset ();
+        m_ghosts.resize (num_prems ());
+        ast_mark mark;
+        ptr_vector<expr> todo;
+        mk_ghosts (mark, todo, phi.get ());
+    }
+
+    void derivation::mk_ghost_sub (expr_substitution& sub) const {
+        for (ptr_vector<ptr_vector<app_ref_ptr_pair> >::const_iterator it = m_ghosts.begin ();
+                it != m_ghosts.end (); it++) {
+            if (!(*it)) continue; // no ghosts for this idx
+            for (ptr_vector<app_ref_ptr_pair>::const_iterator g_it = (*it)->begin ();
+                    g_it != (*it)->end (); g_it++) {
+                app_ref* orig = (*g_it)->first;
+                app_ref* ghost = (*g_it)->second;
+                sub.insert (orig->get (), ghost->get ());
+            }
+        }
+    }
+
+    void derivation::mk_unghost_sub (expr_substitution& sub) const {
+        SASSERT (m_curr != m_prems.end ()); // points to something
+        ptr_vector<app_ref_ptr_pair>* curr_ghosts = m_ghosts[curr_pos ()];
+        if (!curr_ghosts) return; // no ghosts for curr_pos ()
+        for (ptr_vector<app_ref_ptr_pair>::const_iterator g_it = curr_ghosts->begin ();
+                g_it != curr_ghosts->end (); g_it++) {
+            app_ref* orig = (*g_it)->first;
+            app_ref* ghost = (*g_it)->second;
+            app* orig_n = m.mk_const (m_sm.o2n (orig->get ()->get_decl (), curr_pos ()));
+            sub.insert (ghost->get (), orig_n);
+        }
+    }
+
+    void derivation::ghostify (expr_ref& phi) {
+        mk_ghosts (phi);
+        TRACE ("spacer", tout << "before ghostify: " << mk_pp(phi,m) << "\n";);
+        expr_substitution sub (m);
+        mk_ghost_sub (sub);
+        scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+        rep->set_substitution (&sub);
+        (*rep) (phi);
+        TRACE ("spacer", tout << "after ghostify: " << mk_pp(phi,m) << "\n";);
+    }
+
+    void derivation::mk_post (expr_ref& phi, expr_ref& ctx) const {
+        TRACE ("spacer", tout << "input to post: " << mk_pp(phi,m) << "\n";);
+        expr_substitution sub (m);
+        mk_unghost_sub (sub);
+        scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+        rep->set_substitution (&sub);
+        (*rep) (phi);
+        ctx = expr_ref (m.mk_true (), m);
+        TRACE ("spacer", tout << "output of post: " << mk_pp(phi,m) << "\n";);
+    }
 
     // ----------------
     // model_search
@@ -1825,6 +1927,7 @@ namespace spacer {
             m_expanded_lvl = n.level();
         }
 
+        TRACE ("spacer", tout << "Checking cache\n";);
         if (n.pt().is_reachable(n.post())) {
             TRACE("spacer", tout << "reachable\n";);
             //close_node(n);
@@ -1955,7 +2058,7 @@ namespace spacer {
 
     */
     void context::create_children(model_node& n) {        
-        SASSERT(n.level() > 0);
+        //SASSERT(n.level() > 0);
         bool use_model_generalizer = m_params.use_model_generalizer();
         datalog::scoped_no_proof _sc(m);
  
@@ -2062,10 +2165,13 @@ namespace spacer {
         SASSERT (deriv->has_next ());
         model_node& ch = deriv->next ();
 
+        TRACE ("spacer", tout << "Making Post\n";);
         expr_ref post_ctx (m);
         deriv->mk_post (phi1, post_ctx);
 
+        TRACE ("spacer", tout << "Updating Post\n";);
         ch.updt_post (phi1, post_ctx);
+        TRACE ("spacer", tout << "Adding Leaf\n";);
         m_search.add_leaf (ch);
 
 

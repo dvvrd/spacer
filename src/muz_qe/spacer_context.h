@@ -170,7 +170,9 @@ namespace spacer {
     };
 
 
-    // type of derivation for a model node
+    /**
+     * type of derivation for a model node
+     */
     enum MODEL_NODE_TYPE {
         UNDER,  // use an under-approximating summary
         OVER,   // use an over-approximating summary
@@ -178,11 +180,13 @@ namespace spacer {
     };
 
 
-    // goal node (perhaps, rename to goal_node?)
-    //      find a pre(image), given a post and a post_ctx;
-    //      this is done by means of a derivation to <post,post_ctx>
+    /**
+     * goal node (perhaps, rename to goal_node?)
+     *      find a pre(image), given a post and a post_ctx;
+     *      this is done by means of a derivation to <post,post_ctx>
+     */
     class model_node {
-        model_node*             m_parent; // a list of them if we end up using DAGs
+        model_node*             m_parent;
         pred_transformer&       m_pt;
         ast_manager&            m;
         expr_ref                m_post;
@@ -200,6 +204,7 @@ namespace spacer {
         static unsigned long long   m_count;
 
         // TODO: should keep the following in context, not here
+        //      as different derivations in m_derivs have different models
         model_ref               m_model;
     public:
         model_node (model_node* parent, pred_transformer& pt, unsigned level, derivation* deriv):
@@ -231,7 +236,12 @@ namespace spacer {
         void updt_type (MODEL_NODE_TYPE t) { m_type = t; }
         void updt_pre (expr_ref const& pre) { m_pre = pre; }
 
-        void reset () { SASSERT (m_derivs.empty ()); m_pre.reset (); m_open = true; }
+        void reset () {
+            SASSERT (m_derivs.empty ());
+            m_pre.reset ();
+            m_model.reset ();
+            m_open = true;
+        }
 
         void close () {
             // TODO: update cache in m_pt
@@ -253,16 +263,20 @@ namespace spacer {
         // may persist beyond the lifetime of the object
         unsigned long long id () const { return m_id; }
 
-        // given a var pred_pos_id, return pred_pos_id_g<n> where n is a unique
+        // given pred_pos_id, return pred_pos_id_g<n> where n is a unique
         // id for the current object
-        app* mk_ghost (app const* var) const {
-            SASSERT (var->get_num_args () == 0); // it's a constant
-            func_decl* fd = var->get_decl ();
+        app_ref* mk_ghost (app_ref const& ar) const {
+            app* a = ar.get ();
+            SASSERT (a->get_num_args () == 0); // it's a constant
+            func_decl* fd = a->get_decl ();
             sort* s = fd->get_range ();
             symbol const& old_sym = fd->get_name ();
             std::stringstream new_name;
             new_name << old_sym.str () << "_g" << id ();
-            return m.mk_const (symbol (new_name.str ().c_str ()), s);
+            // AK: the following passes a reference to a local symbol object -
+            //  it seems to work, but a terrible thing to do! fix it!
+            app* a_ghost = m.mk_const (symbol (new_name.str ().c_str ()), s);
+            return alloc (app_ref, a_ghost, m);
         }
 
 
@@ -273,68 +287,47 @@ namespace spacer {
     };
 
 
-    // a derivation class for <m_concl.post, m_concl.post_ctx>
-    // prems are the premises needed to be derived (corresponding to a horn
-    // clause for m_concl.pt()) in order to reach concl.post
+    /**
+     * a derivation class for <m_concl.post, m_concl.post_ctx>
+     * prems are the premises needed to be derived (corresponding to a horn
+     * clause for m_concl.pt()) in order to reach concl.post
+     */
     class derivation {
-        typedef obj_map<app, app*> app_map;
+        typedef std::pair<app_ref*, app_ref*> app_ref_ptr_pair;
 
         ptr_vector<model_node>              m_prems;// all premises which need to be derived
         model_node*                         m_concl;// conclusion
         ptr_vector<model_node>::iterator    m_curr; // the premise currently being processed
-
-        ptr_vector<app_map>                 m_ghosts;  // maps from formal params to ghosts
         ast_manager&                        m;
-        manager const&                      sm;
+        manager const&                      m_sm;
+        ptr_vector<ptr_vector<app_ref_ptr_pair> >   m_ghosts;
+                        // vectors of (o_const, ghost) pairs, ordered by o_index
 
 
-        // substitute formal params by ghosts
-        void mk_ghost_sub (expr_substitution& sub) const {
-            for (ptr_vector<app_map>::const_iterator it = m_ghosts.begin ();
-                    it != m_ghosts.end (); it++) {
-                for (app_map::iterator g_it = (*it)->begin ();
-                        g_it != (*it)->end (); g_it++) {
-                    sub.insert (g_it->m_key, g_it->m_value);
-                }
-            }
-        }
+        // populate m_ghosts for phi
+        void mk_ghosts (expr_ref const& phi);
+        // utility method
+        void mk_ghosts (ast_mark& mark, ptr_vector<expr>& todo, expr* e);
 
-        // substitute ghosts by n-versions of formal params for the pt at curr_pos ()
-        void mk_unghost_sub (expr_substitution& sub) const {
-            SASSERT (m_curr != m_prems.end ()); // points to something
-            app* n_arg;
-            app_map* g_map = m_ghosts[curr_pos ()];
-            for (app_map::iterator g_it = g_map->begin ();
-                    g_it != g_map->end (); g_it++) {
-                n_arg = m.mk_const (sm.o2n (g_it->m_key->get_decl (), curr_pos ()));
-                sub.insert (g_it->m_value, n_arg);
-            }
-        }
+        // mk substitution based on m_ghosts
+        void mk_ghost_sub (expr_substitution& sub) const;
+        // mk substitution to replace ghosts by n-versions of o-consts for the pt at curr_pos ()
+        void mk_unghost_sub (expr_substitution& sub) const;
 
     public:
         derivation (model_node* concl,  ptr_vector<pred_transformer>& order):
-            m_concl (concl), m_curr (0), m (m_concl->get_manager ()), sm (m_concl->get_spacer_manager ())
+            m_concl (concl), m_curr (0), m (m_concl->get_manager ()), m_sm (m_concl->get_spacer_manager ())
         {
             SASSERT (m_concl); // non-null
             SASSERT (m_concl->level() > 0);
-            app* arg;
             // create model-nodes for premises, corresponding to PTs in order
             for (ptr_vector<pred_transformer>::iterator it = order.begin ();
                     it != order.end (); it++) {
                 pred_transformer& pt = **it;
-                // create model_node for premise
                 m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this));
-                // add a ghost map for PT
-                app_map* g_map = alloc (app_map);
-                for (unsigned i = 0; i < pt.sig_size (); i++) {
-                    arg = m.mk_const (sm.o2o (pt.sig (i), 0, it-order.begin ()));
-                    g_map->insert (arg, concl->mk_ghost (arg));
-                    TRACE("spacer", tout << mk_pp(arg,m) << " --ghost--> " << mk_pp(g_map->find (arg), m) << "\n";);
-                }
-                m_ghosts.push_back (g_map);
             }
-            // initialize m_curr
-            m_curr = m_prems.end (); // points to nothing
+            // initialize m_curr to point to nothing
+            m_curr = m_prems.end ();
         }
 
         bool has_next () const { return m_curr+1 != m_prems.end (); }
@@ -365,27 +358,11 @@ namespace spacer {
             return true;
         }
 
-        // replace all arguments by ghost vars
-        void ghostify (expr_ref& phi) const {
-            TRACE ("spacer", tout << "before ghostify: " << mk_pp(phi,m) << "\n";);
-            expr_substitution sub (m);
-            mk_ghost_sub (sub);
-            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
-            rep->set_substitution (&sub);
-            (*rep) (phi);
-            TRACE ("spacer", tout << "after ghostify: " << mk_pp(phi,m) << "\n";);
-        }
+        // substitute o-consts in phi by ghosts
+        void ghostify (expr_ref& phi);
 
-        void mk_post (expr_ref& phi, expr_ref& ctx) const {
-            TRACE ("spacer", tout << "input to post: " << mk_pp(phi,m) << "\n";);
-            expr_substitution sub (m);
-            mk_unghost_sub (sub);
-            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
-            rep->set_substitution (&sub);
-            (*rep) (phi);
-            ctx = expr_ref (m.mk_true (), m);
-            TRACE ("spacer", tout << "output of post: " << mk_pp(phi,m) << "\n";);
-        }
+        // make post (phi) and post_ctx (ctx) for the next premise
+        void mk_post (expr_ref& phi, expr_ref& ctx) const;
     };
 
 
@@ -422,68 +399,6 @@ namespace spacer {
         //void backtrack_level(bool uses_level, model_node& n);
     };
 
-
-/*
-    // structure for counter-example search.
-    class model_node {
-        model_node*            m_parent;
-        pred_transformer&      m_pt;
-        expr_ref               m_state;
-        model_ref              m_model;
-        ptr_vector<model_node> m_children;
-        unsigned               m_level;       
-        unsigned               m_orig_level;
-        unsigned               m_depth;
-        bool                   m_closed;
-        datalog::rule const*   m_rule;
-    public:
-        model_node(model_node* parent, expr_ref& state, pred_transformer& pt, unsigned level):
-            m_parent(parent), m_pt(pt), m_state(state), m_model(0), 
-                m_level(level), m_orig_level(level), m_depth(0), m_closed(false), m_rule(0) {
-            if (m_parent) {
-                m_parent->m_children.push_back(this);
-                SASSERT(m_parent->m_level == level+1);
-                SASSERT(m_parent->m_level > 0);
-                m_depth = m_parent->m_depth+1;
-            }
-        }
-        void set_model(model_ref& m) { m_model = m; }
-        unsigned level() const { return m_level; }
-        unsigned orig_level() const { return m_orig_level; }
-        unsigned depth() const { return m_depth; }
-        void     increase_level() { ++m_level; }
-        expr*    state() const { return m_state; }
-        ptr_vector<model_node> const& children() { return m_children; }
-        pred_transformer& pt() const { return m_pt; }
-        model_node* parent() const { return m_parent; }
-        model* get_model_ptr() const { return m_model.get(); }
-        model const&  get_model() const { return *m_model; }
-        unsigned index() const;
-
-        bool is_closed() const { return m_closed; }
-        bool is_open() const { return !is_closed(); }
-
-        bool is_1closed() {
-            if (is_closed()) return true;
-            if (m_children.empty()) return false;
-            for (unsigned i = 0; i < m_children.size(); ++i) {
-                if (m_children[i]->is_open()) return false;
-            }
-            return true;
-        }
-
-        void set_closed();     
-        void set_pre_closed() { m_closed = true; }
-        void reset() { m_children.reset(); }
-
-        void set_rule(datalog::rule const* r) { m_rule = r; }
-        datalog::rule* get_rule();
-
-        void mk_instantiate(datalog::rule_ref& r0, datalog::rule_ref& r1, expr_ref_vector& binding);
-
-        std::ostream& display(std::ostream& out, unsigned indent);
-    };
-*/
 
     struct model_exception { };
     struct inductive_exception {};

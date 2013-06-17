@@ -148,6 +148,11 @@ namespace spacer {
         bool is_o(func_decl * p, unsigned idx) const { 
             return m_mux.has_index(p, o_index(idx)); 
         }
+        void get_o_index (func_decl* p, unsigned& idx) const {
+            m_mux.try_get_index (p, idx);
+            SASSERT (idx != n_index ());
+            idx--;  // m_mux has indices starting at 1
+        }
         bool is_o(expr* e, unsigned idx) const {
             return is_app(e) && is_o(to_app(e)->get_decl(), idx);
         }
