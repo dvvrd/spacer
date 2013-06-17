@@ -224,6 +224,7 @@ namespace spacer {
         expr_ref const& post () const { return m_post; }
         expr_ref const& post_ctx () const { return m_post_ctx; }
         expr_ref const& pre () const { return m_pre; }
+        bool has_pre () const { return m_pre; }
         derivation* my_deriv () const { return m_my_deriv; }
         bool is_open () const { return m_open; }
         bool is_closed () const { return !m_open; }
@@ -252,8 +253,8 @@ namespace spacer {
         void del_derivs () { }
 
         // is known to be concretely reachable or unreachable
-        bool is_reachable () { return is_closed () && m_pre; }
-        bool is_unreachable () { return is_closed () && !m_pre; }
+        bool is_reachable () { return is_closed () && has_pre (); }
+        bool is_unreachable () { return is_closed () && !has_pre (); }
 
         // util
 
@@ -301,7 +302,9 @@ namespace spacer {
         ast_manager&                        m;
         manager const&                      m_sm;
         ptr_vector<ptr_vector<app_ref_ptr_pair> >   m_ghosts;
-                        // vectors of (o_const, ghost) pairs, ordered by o_index
+                        // vectors of (o_const, ghost) pairs, ordered by o_index;
+                        // a null pointer implies absence of ghosts for the
+                        //      corresponding index
 
 
         // populate m_ghosts for phi
@@ -350,6 +353,7 @@ namespace spacer {
             return **m_curr;
         }
 
+        // iff every premise is closed
         bool is_closed () const {
             for (ptr_vector<model_node>::const_iterator it = m_prems.begin ();
                     it != m_prems.end (); it++) {
@@ -358,7 +362,8 @@ namespace spacer {
             return true;
         }
 
-        // substitute o-consts in phi by ghosts
+        // substitute o-consts in phi by ghosts;
+        // resets m_ghosts and updates it for phi
         void ghostify (expr_ref& phi);
 
         // make post (phi) and post_ctx (ctx) for the next premise

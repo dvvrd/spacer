@@ -838,6 +838,11 @@ namespace spacer {
     // ----------------
     // derivation
 
+    /**
+     * traverse e to make ghosts for the uninterpreted leaves;
+     * handles quantifiers but we don't expect them in practice;
+     * for now, does not handle leaves which are AST_VARs
+     */
     void derivation::mk_ghosts (ast_mark& mark, ptr_vector<expr>& todo, expr* e) {
         todo.push_back(e);
         while (!todo.empty()) {
@@ -2058,7 +2063,7 @@ namespace spacer {
 
     */
     void context::create_children(model_node& n) {        
-        //SASSERT(n.level() > 0);
+        SASSERT(n.level() >= 0);
         bool use_model_generalizer = m_params.use_model_generalizer();
         datalog::scoped_no_proof _sc(m);
  
@@ -2090,7 +2095,7 @@ namespace spacer {
             Phi.append(mev.minimize_literals(forms1, M));
         }
         ptr_vector<func_decl> preds;
-        pt.find_predecessors(r, preds); // TODO: (AK) also order the preds
+        pt.find_predecessors(r, preds);
         pt.remove_predecessors(Phi);
 
         app_ref_vector vars(m);
@@ -2148,10 +2153,9 @@ namespace spacer {
 
         // create a new derivation for the model
 
-        // obtain pt for all preds in pred_pts
+        // obtain pts for all preds in pred_pts
         ptr_vector<pred_transformer> pred_pts;
-        // back_inserter needs svector::const_reference which is currently absent
-        //std::transform (preds.begin (), preds.end (), std::back_inserter (pred_pts), get_pred_transformer);
+        // TODO: find a good ordering
         for (ptr_vector<func_decl>::iterator it = preds.begin ();
                 it != preds.end (); it++) {
             pred_pts.push_back (&get_pred_transformer (*it));
@@ -2165,13 +2169,10 @@ namespace spacer {
         SASSERT (deriv->has_next ());
         model_node& ch = deriv->next ();
 
-        TRACE ("spacer", tout << "Making Post\n";);
         expr_ref post_ctx (m);
         deriv->mk_post (phi1, post_ctx);
 
-        TRACE ("spacer", tout << "Updating Post\n";);
         ch.updt_post (phi1, post_ctx);
-        TRACE ("spacer", tout << "Adding Leaf\n";);
         m_search.add_leaf (ch);
 
 
@@ -2248,28 +2249,32 @@ namespace spacer {
             // all premises of deriv have been explored
             if (par) {
                 par->updt_pre (ch.pre ());
-                if (deriv->is_closed ()) {
-                    // TODO: check for par.m_post_ctx as well
+                if (deriv->is_closed ()) { // found a concrete pre
                     par->close ();
-                } // else ??
+                } // else ?? -- this is when some node in the subtree has type=OVER
             }
         } else {
             // create post for the next child
             model_node& sib = deriv->next ();
             sib.reset ();
-            expr_ref post = ch.pre (), post_ctx (m);
+            expr_ref post (ch.pre ()),
+                     post_ctx (m);
             deriv->mk_post (post, post_ctx);
             sib.updt_post (post, post_ctx);
             m_search.add_leaf (sib);
         }
 
         if (ch.is_closed ()) ch.del_derivs ();
+        // else ?? -- this is when some node in the subtree has type=OVER
 
-        if (par && par->is_closed ()) report_pre (*par);
+        if (par && par->has_pre ()) report_pre (*par);
     }
 
     void context::report_pf (model_node& ch) {
         TRACE ("spacer", tout << "unreachable\n";);
+
+        // TODO: how does this new knowledge that ch has a proof
+        // affect any existing derivations?
 
         model_node* par = ch.parent ();
         derivation* deriv = ch.my_deriv ();
@@ -2278,11 +2283,21 @@ namespace spacer {
         if (!deriv) return;
 
         if (deriv->is_first ()) {
-            // even the first premise fails
+            // even the first premise fails;
+
+            // unlike report_pre (), there isn't a simple check to see if par.post
+            // has a proof; this is because of a possible model substitution for
+            // auxiliary variables coming from the interpreted part of the horn
+            // clause, in going from par.post to ch.post
+
+            // recheck parent's post
+            par.del_derivs ();
             if (par) m_search.add_leaf (*par);
+
+            // TODO: alternatively, we could find out what else ch needs to show
+            // unreachable, instead of deleting par's derivations
         } else {
-            // create new post for ch, by asking for
-            //      new pre of its previous sibling
+            // create new post for ch, by asking for new pre of its previous sibling
             model_node& sib = deriv->prev ();
             m_search.add_leaf (sib);
         }
