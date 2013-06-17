@@ -2291,7 +2291,7 @@ namespace spacer {
             // clause, in going from par.post to ch.post
 
             // recheck parent's post
-            par.del_derivs ();
+            par->del_derivs ();
             if (par) m_search.add_leaf (*par);
 
             // TODO: alternatively, we could find out what else ch needs to show
