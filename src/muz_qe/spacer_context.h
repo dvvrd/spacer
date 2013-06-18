@@ -216,6 +216,8 @@ namespace spacer {
         { m_count++; }
 
         static void reset_count () { m_count = 0; }
+        static bool is_ghost (func_decl const* d)
+            { return d && d->get_name ().str ().compare (0, 6, "ghost_") == 0; }
 
         model_node* parent () const { return m_parent; }
         pred_transformer& pt () const { return m_pt; }
@@ -273,7 +275,7 @@ namespace spacer {
             sort* s = fd->get_range ();
             symbol const& old_sym = fd->get_name ();
             std::stringstream new_name;
-            new_name << old_sym.str () << "_g" << id ();
+            new_name << "ghost_" << id () << old_sym.str ();
             // AK: the following passes a reference to a local symbol object -
             //  it seems to work, but a terrible thing to do! fix it!
             app* a_ghost = m.mk_const (symbol (new_name.str ().c_str ()), s);

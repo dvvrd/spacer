@@ -866,9 +866,10 @@ namespace spacer {
             }
             case AST_APP: {
                 app* a = to_app(e);
-                if (is_uninterp_const (a)) {
+                if (is_uninterp_const (a) && !model_node::is_ghost (a->get_decl ())) {
                     unsigned idx; // store in this, the o-index of a
-                    m_sm.get_o_index (a->get_decl (), idx); // what if a is a ghost??
+                    TRACE ("spacer", tout << "Leaf: " << mk_pp (a, m) << "\n";);
+                    m_sm.get_o_index (a->get_decl (), idx);
                     SASSERT (m_ghosts.size () > idx); // m_ghosts is expected to be of the right size
                     if (!m_ghosts[idx]) m_ghosts[idx] = alloc (ptr_vector<app_ref_ptr_pair>);
                     app_ref* orig = alloc (app_ref, a, m);
@@ -1941,14 +1942,18 @@ namespace spacer {
             bool uses_level = true;
             switch (expand_state(n, cube, uses_level)) {
             case l_true:
-//                if (n.level() == 0) {
-//                    TRACE("spacer", tout << "reachable at level 0\n";);
-//                    close_node(n);
-//                }
-//                else {
+                TRACE("spacer", tout << "node: " << &n << "\n";); 
+                create_children(n);
+                /*if (n.level() == 0) {
+                    TRACE("spacer", tout << "reachable at level 0\n";);
+                    n.updt_pre (expr_ref (m.mk_true (), m));
+                    n.close (); // n.m_pre -> <n.m_post, n.m_post_ctx> is concrete
+                    report_pre (n);
+                }
+                else {
                     TRACE("spacer", tout << "node: " << &n << "\n";); 
                     create_children(n);
-//                }
+                }*/
                 break;
             case l_false: {
                 core_generalizer::cores cores;
@@ -2299,6 +2304,7 @@ namespace spacer {
         } else {
             // create new post for ch, by asking for new pre of its previous sibling
             model_node& sib = deriv->prev ();
+            sib.reset ();
             m_search.add_leaf (sib);
         }
 
