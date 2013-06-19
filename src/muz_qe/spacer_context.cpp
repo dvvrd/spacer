@@ -944,6 +944,29 @@ namespace spacer {
         TRACE ("spacer", tout << "output of post: " << mk_pp(phi,m) << "\n";);
     }
 
+    derivation::~derivation () {
+        // destroy m_prems
+        while (!m_prems.empty ()) {
+            model_node* n = m_prems.back ();
+            m_prems.pop_back ();
+            dealloc (n);
+        }
+        // destroy m_ghosts
+        while (!m_ghosts.empty ()) {
+            ptr_vector<app_ref_ptr_pair>* vec = m_ghosts.back ();
+            m_ghosts.pop_back ();
+            if (!vec) continue;
+            while (!vec->empty ()) {
+                app_ref_ptr_pair* p = vec->back ();
+                vec->pop_back ();
+                dealloc (p->first);
+                dealloc (p->second);
+                dealloc (p);
+            }
+            dealloc (vec);
+        }
+    }
+
     // ----------------
     // model_search
 
@@ -1892,7 +1915,6 @@ namespace spacer {
         expr_ref post (m.mk_true(), m), post_ctx (m.mk_true (), m);
         model_node* root = alloc (model_node, 0, *m_query, level, 0);
         root->updt_post (post, post_ctx);
-        //model_node* root = alloc(model_node, 0, post, *m_query, level);
         m_search.set_root(root);            
         
         while (model_node* node = m_search.next()) {
@@ -2247,6 +2269,7 @@ namespace spacer {
         // ch == root
         if (!deriv) {
             SASSERT (ch.is_reachable ());
+            ch.del_derivs ();
             return;
         }
 
@@ -2254,10 +2277,10 @@ namespace spacer {
 
         if (deriv->is_last ()) {
             // all premises of deriv have been explored
-                if (deriv->is_closed ()) { // found a concrete pre
-                    par->close ();
-                } // else ?? -- this is when some node in the subtree has type=OVER
-            }
+            par->updt_pre (ch.pre ());
+            if (deriv->is_closed ()) { // found a concrete pre
+                par->close ();
+            } // else ?? -- this is when some node in the subtree has type=OVER
         } else {
             // create post for the next child
             model_node& sib = deriv->next ();
@@ -2269,7 +2292,10 @@ namespace spacer {
             m_search.add_leaf (sib);
         }
 
-        if (ch.is_closed ()) ch.del_derivs ();
+        if (ch.is_closed ()) {
+            TRACE ("spacer", tout << "Del child's derivations\n";);
+            ch.del_derivs ();
+        }
         // else ?? -- this is when some node in the subtree has type=OVER
 
         if (par->has_pre ()) report_pre (*par);
@@ -2284,6 +2310,10 @@ namespace spacer {
         model_node* par = ch.parent ();
         derivation* deriv = ch.my_deriv ();
 
+        // for now, assume that ch found a cocnrete proof
+        SASSERT (ch.is_closed ());
+        ch.del_derivs ();
+
         // ch == root
         if (!deriv) return;
 
@@ -2295,11 +2325,12 @@ namespace spacer {
             // unlike report_pre (), there isn't a simple check to see if par.post
             // has a proof; this is because of a possible model substitution for
             // auxiliary variables coming from the interpreted part of the horn
-            // clause, in going from par.post to ch.post
+            // clause, in going from par.post to ch.post;
+            //
+            // moreover, even if we don't have the issue with auxiliary variables,
+            // this only shows that this particular horn-clause is unsatisfiable
 
             // recheck parent's post
-            par->del_derivs ();
-            if (par) m_search.add_leaf (*par);
 
             // TODO: alternatively, we could find out what else ch needs to show
             // unreachable, instead of deleting par's derivations
@@ -2313,7 +2344,7 @@ namespace spacer {
 
         TRACE ("spacer", tout << "Del par's derivations\n";);
         par->del_derivs ();
-        ch.del_derivs ();
+        m_search.add_leaf (*par);
     }
 
     void context::collect_statistics(statistics& st) const {

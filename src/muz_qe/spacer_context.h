@@ -215,6 +215,11 @@ namespace spacer {
             , m_model (0)
         { m_count++; }
 
+        ~model_node () {
+            if (m_open) del_derivs ();
+            SASSERT (m_derivs.empty ());
+        }
+
         static void reset_count () { m_count = 0; }
         static bool is_ghost (func_decl const* d)
             { return d && d->get_name ().str ().compare (0, 6, "ghost_") == 0; }
@@ -251,8 +256,13 @@ namespace spacer {
             m_open = false;
         }
 
-        // TODO (clean up memory; not necessary for soundness)
-        void del_derivs () { }
+        void del_derivs () {
+            while (!m_derivs.empty ()) {
+                derivation* d = m_derivs.back ();
+                m_derivs.pop_back ();
+                dealloc (d);
+            }
+        }
 
         // is known to be concretely reachable or unreachable
         bool is_reachable () { return is_closed () && has_pre (); }
@@ -334,6 +344,8 @@ namespace spacer {
             // initialize m_curr to point to nothing
             m_curr = m_prems.end ();
         }
+
+        ~derivation ();
 
         bool has_next () const { return m_curr+1 != m_prems.end (); }
         bool has_prev () const { return m_curr != m_prems.begin (); }
