@@ -2250,10 +2250,10 @@ namespace spacer {
             return;
         }
 
+        SASSERT (par);
+
         if (deriv->is_last ()) {
             // all premises of deriv have been explored
-            if (par) {
-                par->updt_pre (ch.pre ());
                 if (deriv->is_closed ()) { // found a concrete pre
                     par->close ();
                 } // else ?? -- this is when some node in the subtree has type=OVER
@@ -2272,7 +2272,7 @@ namespace spacer {
         if (ch.is_closed ()) ch.del_derivs ();
         // else ?? -- this is when some node in the subtree has type=OVER
 
-        if (par && par->has_pre ()) report_pre (*par);
+        if (par->has_pre ()) report_pre (*par);
     }
 
     void context::report_pf (model_node& ch) {
@@ -2287,7 +2287,9 @@ namespace spacer {
         // ch == root
         if (!deriv) return;
 
-        if (deriv->is_first ()) {
+        SASSERT (par);
+
+        /*if (deriv->is_first ()) {
             // even the first premise fails;
 
             // unlike report_pre (), there isn't a simple check to see if par.post
@@ -2302,12 +2304,15 @@ namespace spacer {
             // TODO: alternatively, we could find out what else ch needs to show
             // unreachable, instead of deleting par's derivations
         } else {
-            // create new post for ch, by asking for new pre of its previous sibling
-            model_node& sib = deriv->prev ();
-            sib.reset ();
-            m_search.add_leaf (sib);
-        }
+            // need a new pre of its previous sibling;
+            // but simply adding the sibling to the queue might result in the
+            // same pre;
+            // to take the new lemma of ch into account, we simply add the
+            // parent to the queue
+        }*/
 
+        TRACE ("spacer", tout << "Del par's derivations\n";);
+        par->del_derivs ();
         ch.del_derivs ();
     }
 
