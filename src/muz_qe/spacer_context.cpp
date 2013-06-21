@@ -947,13 +947,13 @@ namespace spacer {
 
     void derivation::mk_unghost_sub (expr_substitution& sub) const {
         SASSERT (m_curr != m_prems.end ()); // points to something
-        ptr_vector<app_ref_ptr_pair>* curr_ghosts = m_ghosts[curr_pos ()];
-        if (!curr_ghosts) return; // no ghosts for curr_pos ()
+        ptr_vector<app_ref_ptr_pair>* curr_ghosts = m_ghosts[curr_o_idx ()];
+        if (!curr_ghosts) return; // no ghosts for curr_o_idx ()
         for (ptr_vector<app_ref_ptr_pair>::const_iterator g_it = curr_ghosts->begin ();
                 g_it != curr_ghosts->end (); g_it++) {
             app_ref* orig = (*g_it)->first;
             app_ref* ghost = (*g_it)->second;
-            app* orig_n = m.mk_const (m_sm.o2n (orig->get ()->get_decl (), curr_pos ()));
+            app* orig_n = m.mk_const (m_sm.o2n (orig->get ()->get_decl (), curr_o_idx ()));
             sub.insert (ghost->get (), orig_n);
         }
     }
@@ -2147,7 +2147,6 @@ namespace spacer {
                       
         ptr_vector<func_decl> preds;
         ptr_vector<pred_transformer> pred_pts;
-        // TODO: find a good ordering
         pt.find_predecessors(r, preds);
         for (ptr_vector<func_decl>::iterator it = preds.begin ();
                 it != preds.end (); it++) {
@@ -2160,7 +2159,6 @@ namespace spacer {
         forms.push_back(T);
         forms.push_back(phi);
         int pred_level = n.level ()-1;
-        expr_ref_vector::iterator test_it;
         for (ptr_vector<pred_transformer>::iterator it = pred_pts.begin ();
                 it != pred_pts.end (); it++) {
             (*it)->add_lemmas (pred_level, it-pred_pts.begin (), forms);
@@ -2233,7 +2231,14 @@ namespace spacer {
 
         // create a new derivation for the model
 
-        derivation* deriv = alloc (derivation, &n, pred_pts);
+        // order the pts -- for now, right to left
+        pred_pts.reset ();
+        for (ptr_vector<func_decl>::iterator it = preds.end ()-1;
+                it >= preds.begin (); it--) {
+            pred_pts.push_back (&get_pred_transformer (*it));
+        }
+
+        derivation* deriv = alloc (derivation, &n, pred_pts, preds);
         n.add_deriv (deriv);
         deriv->ghostify (phi1);
 
