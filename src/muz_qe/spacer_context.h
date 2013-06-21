@@ -116,15 +116,19 @@ namespace spacer {
 
         func_decl* head() const { return m_head; }
         ptr_vector<datalog::rule> const& rules() const { return m_rules; }
-        func_decl* sig(unsigned i) { init_sig(); return m_sig[i].get(); } // signature 
-        func_decl* const* sig() { init_sig(); return m_sig.c_ptr(); }
-        unsigned  sig_size() { init_sig(); return m_sig.size(); }
+        func_decl* sig(unsigned i) const { return m_sig[i]; } // signature 
+        func_decl* const* sig() { return m_sig.c_ptr(); }
+        unsigned  sig_size() const { return m_sig.size(); }
         expr*  transition() const { return m_transition; }
         expr*  initial_state() const { return m_initial_state; }
         expr*  rule2tag(datalog::rule const* r) { return m_rule2tag.find(r); }
         unsigned get_num_levels() { return m_levels.size(); }
         expr_ref get_cover_delta(func_decl* p_orig, int level);
         void     add_cover(unsigned level, expr* property);
+
+        // add all lemmas from level up to infty to forms;
+        // use the o-index idx while adding
+        void add_lemmas (int level, int idx, expr_ref_vector& forms) const;
 
         std::ostream& display(std::ostream& strm) const;
 

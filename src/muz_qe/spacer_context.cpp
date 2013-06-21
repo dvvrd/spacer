@@ -76,7 +76,8 @@ namespace spacer {
         ctx(ctx), m_head(head, m), 
         m_sig(m), m_solver(pm, head->get_name()),
         m_invariants(m), m_transition(m), m_initial_state(m), 
-        m_reachable(pm, pm.get_params()) {}
+        m_reachable(pm, pm.get_params())
+    { init_sig (); }
 
     pred_transformer::~pred_transformer() {
         rule2inst::iterator it2 = m_rule2inst.begin(), end2 = m_rule2inst.end();
@@ -116,15 +117,13 @@ namespace spacer {
     }
     
     void pred_transformer::init_sig() {
-        if (m_sig.empty()) {           
-            for (unsigned i = 0; i < m_head->get_arity(); ++i) {
-                sort * arg_sort = m_head->get_domain(i);
-                std::stringstream name_stm;
-                name_stm << m_head->get_name() << '_' << i;
-                func_decl_ref stm(m);
-                stm = m.mk_func_decl(symbol(name_stm.str().c_str()), 0, (sort*const*)0, arg_sort);
-                m_sig.push_back(pm.get_o_pred(stm, 0));       
-            }
+        for (unsigned i = 0; i < m_head->get_arity(); ++i) {
+            sort * arg_sort = m_head->get_domain(i);
+            std::stringstream name_stm;
+            name_stm << m_head->get_name() << '_' << i;
+            func_decl_ref stm(m);
+            stm = m.mk_func_decl(symbol(name_stm.str().c_str()), 0, (sort*const*)0, arg_sort);
+            m_sig.push_back(pm.get_o_pred(stm, 0));       
         }
     }
 
@@ -392,6 +391,43 @@ namespace spacer {
             result = md->get_func_interp(p_orig)->get_interp();
         }
         return result;        
+    }
+
+    void pred_transformer::add_lemmas (int level, int idx, expr_ref_vector& forms) const {
+        SASSERT (level >= -1);
+        SASSERT (idx >= 0);
+
+        // substitution to replace n-consts with idx-consts in lemmas
+        expr_substitution sub (m);
+        expr_ref c_n (m), c_o (m);
+        for (unsigned i = 0; i < sig_size (); i++) {
+            c_n = m.mk_const(pm.o2n(sig(i), 0));
+            c_o = m.mk_const(pm.o2o(sig(i), 0, idx));
+            sub.insert(c_n, c_o);
+        }
+        scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
+        rep->set_substitution(&sub);
+
+        expr_ref_vector::iterator it;
+        expr_ref lem_o (m);
+
+        // add invariants
+        for (it = m_invariants.begin (); it != m_invariants.end (); it++) {
+            (*rep) ((*it), lem_o);
+            forms.push_back (lem_o.get ());
+            TRACE ("spacer", tout << "Invariant: " << mk_pp (lem_o, m) << "\n";);
+        }
+
+        if (level == -1) return;
+
+        // add level lemmas
+        for (unsigned l = (unsigned)level; l < m_levels.size (); l++) {
+            for (it = m_levels[l].begin (); it != m_levels[l].end (); it++) {
+                (*rep) ((*it), lem_o);
+                forms.push_back (lem_o.get ());
+                TRACE ("spacer", tout << "Lemma: " << mk_pp (lem_o, m) << "\n";);
+            }
+        }
     }
 
     void pred_transformer::add_cover(unsigned level, expr* property) {
@@ -2109,20 +2145,37 @@ namespace spacer {
               tout << "Transition:\n" << mk_pp(T, m) << "\n";
               tout << "Phi:\n" << mk_pp(phi, m) << "\n";);
                       
-        model_evaluator mev(m);
+        ptr_vector<func_decl> preds;
+        ptr_vector<pred_transformer> pred_pts;
+        // TODO: find a good ordering
+        pt.find_predecessors(r, preds);
+        for (ptr_vector<func_decl>::iterator it = preds.begin ();
+                it != preds.end (); it++) {
+            pred_pts.push_back (&get_pred_transformer (*it));
+        }
+
         expr_ref_vector mdl(m), forms(m), Phi(m);
+
+        // obtain all formulas to consider for model generalization
         forms.push_back(T);
         forms.push_back(phi);
+        int pred_level = n.level ()-1;
+        expr_ref_vector::iterator test_it;
+        for (ptr_vector<pred_transformer>::iterator it = pred_pts.begin ();
+                it != pred_pts.end (); it++) {
+            (*it)->add_lemmas (pred_level, it-pred_pts.begin (), forms);
+        }
+
         datalog::flatten_and(forms);        
         ptr_vector<expr> forms1(forms.size(), forms.c_ptr());
+
+        model_evaluator mev(m);
         if (use_model_generalizer) {
             Phi.append(mev.minimize_model(forms1, M));
         }
         else {
             Phi.append(mev.minimize_literals(forms1, M));
         }
-        ptr_vector<func_decl> preds;
-        pt.find_predecessors(r, preds);
         pt.remove_predecessors(Phi);
 
         app_ref_vector vars(m);
@@ -2179,14 +2232,6 @@ namespace spacer {
         }
 
         // create a new derivation for the model
-
-        // obtain pts for all preds in pred_pts
-        ptr_vector<pred_transformer> pred_pts;
-        // TODO: find a good ordering
-        for (ptr_vector<func_decl>::iterator it = preds.begin ();
-                it != preds.end (); it++) {
-            pred_pts.push_back (&get_pred_transformer (*it));
-        }
 
         derivation* deriv = alloc (derivation, &n, pred_pts);
         n.add_deriv (deriv);
