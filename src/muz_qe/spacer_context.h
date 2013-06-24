@@ -200,6 +200,7 @@ namespace spacer {
         bool                    m_open;     // whether a concrete answer to the goal is found
         ptr_vector<derivation>  m_derivs;   // all derivations being tried out
         derivation*             m_my_deriv; // the derivation which contains me as a premise
+        derivation const*       m_closing_deriv; // the derivation which closes the node
         MODEL_NODE_TYPE         m_type;     // type of derivation
 
         // unique id of this node and a global count of all goal nodes;
@@ -215,13 +216,15 @@ namespace spacer {
             m_parent (parent), m_pt (pt), m (m_pt.get_manager ()),
             m_post (m), m_post_ctx (m), m_pre (m),
             m_level (level), m_open (true),
-            m_my_deriv (deriv), m_type (EXPAND), m_id (m_count+1)
+            m_my_deriv (deriv), m_closing_deriv (0),
+            m_type (EXPAND), m_id (m_count+1)
             , m_model (0)
         { m_count++; }
 
         ~model_node () {
-            if (m_open) del_derivs ();
-            SASSERT (m_derivs.empty ());
+            //if (m_open)
+            del_derivs ();
+            //SASSERT (m_derivs.empty ());
         }
 
         static void reset_count () { m_count = 0; }
@@ -252,13 +255,11 @@ namespace spacer {
             SASSERT (m_derivs.empty ());
             m_pre.reset ();
             m_model.reset ();
+            del_derivs ();
             m_open = true;
         }
 
-        void close () {
-            // TODO: update cache in m_pt
-            m_open = false;
-        }
+        void close (derivation const* d = 0);
 
         void del_derivs () {
             while (!m_derivs.empty ()) {
@@ -521,7 +522,7 @@ namespace spacer {
 
         void reset_core_generalizers();
 
-        //void validate();
+        void validate();
 
     public:       
         

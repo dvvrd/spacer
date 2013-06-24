@@ -764,10 +764,16 @@ namespace spacer {
     // ----------------
     // model_node
 
-    unsigned long long model_node::m_count;
-
     static bool is_ini(datalog::rule const& r) {
         return r.get_uninterpreted_tail_size() == 0;
+    }
+
+    unsigned long long model_node::m_count;
+
+    void model_node::close (derivation const* d) {
+        // TODO: update cache in m_pt
+        m_open = false;
+        m_closing_deriv = d;
     }
 
 /*
@@ -802,7 +808,7 @@ namespace spacer {
         datalog::rule const& rl2 = pt().find_rule(*mdl);
         SASSERT(is_ini(rl2));
         set_rule(&rl2);
-        return const_cast<datalog::rule*>(m_rule);                        
+        return const_cast<datalog::rule*>(m_rule);
     }
 
 
@@ -1041,8 +1047,6 @@ namespace spacer {
     }
 
     void model_search::set_leaf(model_node& n) {
-        //erase_children(n);
-        //SASSERT(n.is_open());      
         enqueue_leaf(n);
     }
 
@@ -1069,42 +1073,6 @@ namespace spacer {
             m_cache.resize(l + 1);
         }
         return m_cache[l];
-    }
-
-    void model_search::erase_children(model_node& n) {
-        ptr_vector<model_node> todo, nodes;
-        todo.append(n.children());
-        erase_leaf(n);
-        n.reset();
-        while (!todo.empty()) {
-            model_node* m = todo.back();
-            todo.pop_back();
-            nodes.push_back(m);
-            todo.append(m->children());
-            erase_leaf(*m);
-            remove_node(*m);
-        }
-        std::for_each(nodes.begin(), nodes.end(), delete_proc<model_node>());
-    }
-
-    void model_search::remove_node(model_node& n) {
-        if (0 == --cache(n).find(n.post())) {
-            cache(n).remove(n.post());
-        }
-    }
-
-    void model_search::erase_leaf(model_node& n) {
-        if (n.children().empty() && n.is_open()) {
-            std::deque<model_node*>::iterator 
-                it  = m_leaves.begin(), 
-                end = m_leaves.end();
-            for (; it != end; ++it) {
-                if (*it == &n) {
-                    m_leaves.erase(it);
-                    break;
-                }
-            }
-        }
     }
 
     std::ostream& model_search::display(std::ostream& out) const {
@@ -1363,8 +1331,6 @@ namespace spacer {
 
     void model_search::reset() {
         if (m_root) {
-            //erase_children(*m_root);
-            //remove_node(*m_root);
             dealloc(m_root);
             m_root = 0;
         }
@@ -1629,7 +1595,7 @@ namespace spacer {
             }
         }
     };
-/*
+
     void context::validate() {
         if (!m_params.validate_result()) {
             return;
@@ -1638,7 +1604,8 @@ namespace spacer {
 
         switch(m_last_result) {
         case l_true: {
-            proof_ref pr = get_proof();
+            IF_VERBOSE(0, verbose_stream() << "Unsupported" << "\n";);
+            /*proof_ref pr = get_proof();
             proof_checker checker(m);
             expr_ref_vector side_conditions(m);
             bool ok = checker.check(pr, side_conditions);
@@ -1660,7 +1627,7 @@ namespace spacer {
                     IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
                     throw default_exception(msg.str());
                 }                                
-            }
+            }*/
             break;
         }            
         case l_false: {
@@ -1676,8 +1643,11 @@ namespace spacer {
             var_subst vs(m, false);   
             for (; it != end; ++it) {
                 ptr_vector<datalog::rule> const& rules = it->m_value->rules();
+                TRACE ("spacer", tout << "PT: " << it->m_value->head ()->get_name ().str ()
+                                      << "\n";);
                 for (unsigned i = 0; i < rules.size(); ++i) {
                     datalog::rule& r = *rules[i];
+                    TRACE ("spacer", r.display_smt2(m, tout) << "\n";);
                     model->eval(r.get_head(), tmp);
                     expr_ref_vector fmls(m);
                     fmls.push_back(m.mk_not(tmp));
@@ -1714,13 +1684,14 @@ namespace spacer {
                     }
                 }
             }
+            TRACE ("spacer", tout << "Validation Succeeded\n";);
             break;
         }
         default:
             break;
         }
     }
-*/
+
 
     void context::reset_core_generalizers() {
         std::for_each(m_core_generalizers.begin(), m_core_generalizers.end(), delete_proc<core_generalizer>());
@@ -1795,7 +1766,7 @@ namespace spacer {
         catch (model_exception) {        
             //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
             m_last_result = l_true;
-            //validate();
+            validate();
             return l_true;
         }
         catch (inductive_exception) {
@@ -1818,7 +1789,7 @@ namespace spacer {
                     it->m_value->propagate_to_infinity (m_inductive_lvl);	
                 }
             }
-            //validate();
+            validate();
             return l_false;
         }
         catch (unknown_exception) {
@@ -2329,7 +2300,7 @@ namespace spacer {
             // all premises of deriv have been explored
             par->updt_pre (ch.pre ());
             if (deriv->is_closed ()) { // found a concrete pre
-                par->close ();
+                par->close (deriv);
             } // else ?? -- this is when some node in the subtree has type=OVER
         } else {
             // create post for the next child
@@ -2342,10 +2313,10 @@ namespace spacer {
             m_search.add_leaf (sib);
         }
 
-        if (ch.is_closed ()) {
+        /*if (ch.is_closed ()) {
             TRACE ("spacer", tout << "Del child's derivations\n";);
             ch.del_derivs ();
-        }
+        }*/
         // else ?? -- this is when some node in the subtree has type=OVER
 
         if (par->has_pre ()) report_pre (*par);
