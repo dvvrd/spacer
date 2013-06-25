@@ -20,6 +20,7 @@ def parseArgs (argv):
     p.add_argument ('--answer', help='Print answer', action='store_true',
                     default=False)
     p.add_argument ('--engine', help='Datalog Engine (pdr/spacer)', default='spacer')
+    p.add_argument ('--verbose', help='Z3 verbosity', default=0)
 
     return p.parse_args (argv)
 
@@ -28,6 +29,7 @@ def stat (key, val): stats.put (key, val)
 def main (argv):
     args = parseArgs (argv[1:])
     stat ('Result', 'UNKNOWN')
+    z3.set_option (verbose=args.verbose)
     ctx = z3.Context ()
     fp = z3.Fixedpoint (ctx=ctx)
     if not args.pp:
