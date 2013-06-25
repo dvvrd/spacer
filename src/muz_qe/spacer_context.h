@@ -313,9 +313,9 @@ namespace spacer {
     class derivation {
         typedef std::pair<app_ref*, app_ref*> app_ref_ptr_pair;
 
-        obj_map<func_decl, unsigned>        m_o_idx;// o-index map of decl's of premises
-        ptr_vector<model_node>              m_prems;// all premises which need to be derived
         model_node*                         m_concl;// conclusion
+        ptr_vector<model_node>              m_prems;// all premises which need to be derived
+        vector<unsigned>                    m_o_idx;// order of o-index's to be processed
         ptr_vector<model_node>::iterator    m_curr; // the premise currently being processed
         ast_manager&                        m;
         manager const&                      m_sm;
@@ -336,23 +336,25 @@ namespace spacer {
         void mk_unghost_sub (expr_substitution& sub) const;
 
     public:
-        derivation (model_node* concl,  ptr_vector<pred_transformer>& order, ptr_vector<func_decl> const& decls):
-            m_concl (concl), m_curr (0), m (m_concl->get_manager ()), m_sm (m_concl->get_spacer_manager ())
+        derivation (model_node* concl,
+                    ptr_vector<pred_transformer>& order_pts,
+                    vector<unsigned> order_o_idx):
+            m_concl (concl),
+            m_o_idx (order_o_idx),
+            m_curr (0),
+            m (m_concl->get_manager ()),
+            m_sm (m_concl->get_spacer_manager ())
         {
             SASSERT (m_concl); // non-null
             SASSERT (m_concl->level() > 0);
             // create model-nodes for premises, corresponding to PTs in order
-            for (ptr_vector<pred_transformer>::iterator it = order.begin ();
-                    it != order.end (); it++) {
+            for (ptr_vector<pred_transformer>::iterator it = order_pts.begin ();
+                    it != order_pts.end (); it++) {
                 pred_transformer& pt = **it;
                 m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this));
             }
             // initialize m_curr to point to nothing
             m_curr = m_prems.end ();
-            // populate m_o_idx
-            for (ptr_vector<func_decl>::const_iterator it = decls.begin (); it != decls.end (); it++) {
-                m_o_idx.insert ((*it), it-decls.begin ());
-            }
         }
 
         ~derivation ();
@@ -364,8 +366,7 @@ namespace spacer {
 
         // o_idx of the pt at m_curr
         unsigned curr_o_idx () const {
-            pred_transformer& curr_pt = (*m_curr)->pt ();
-            return m_o_idx.find (curr_pt.head ());
+            return m_o_idx [m_curr-m_prems.begin ()];
         }
 
         unsigned num_prems () const { return m_prems.size (); }
@@ -382,6 +383,8 @@ namespace spacer {
             m_curr--;
             return **m_curr;
         }
+
+        ptr_vector<model_node> const& prems () const { return m_prems; }
 
         // iff every premise is closed
         bool is_closed () const {

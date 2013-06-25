@@ -910,13 +910,15 @@ namespace spacer {
                 app* a = to_app(e);
                 if (is_uninterp_const (a) && !model_node::is_ghost (a->get_decl ())) {
                     unsigned idx; // store in this, the o-index of a
-                    TRACE ("spacer", tout << "Leaf: " << mk_pp (a, m) << "\n";);
                     m_sm.get_o_index (a->get_decl (), idx);
                     SASSERT (m_ghosts.size () > idx); // m_ghosts is expected to be of the right size
                     if (!m_ghosts[idx]) m_ghosts[idx] = alloc (ptr_vector<app_ref_ptr_pair>);
                     app_ref* orig = alloc (app_ref, a, m);
                     app_ref* ghost = m_concl->mk_ghost (*orig);
                     m_ghosts[idx]->push_back (alloc (app_ref_ptr_pair, orig, ghost));
+                    TRACE ("spacer", tout << "Orig: " << mk_pp (a, m) << "\n";);
+                    TRACE ("spacer", tout << "Ghost: " << mk_pp (ghost->get (), m) << "\n";);
+                    TRACE ("spacer", tout << "o-index: " << idx << "\n";);
                 } else {
                     for (unsigned i = 0; i < a->get_num_args(); ++i) {
                         todo.push_back(a->get_arg(i));
@@ -2203,13 +2205,15 @@ namespace spacer {
         // create a new derivation for the model
 
         // order the pts -- for now, right to left
+        vector<unsigned> o_idx;
         pred_pts.reset ();
         for (ptr_vector<func_decl>::iterator it = preds.end ()-1;
                 it >= preds.begin (); it--) {
             pred_pts.push_back (&get_pred_transformer (*it));
+            o_idx.push_back (it-preds.begin ());
         }
 
-        derivation* deriv = alloc (derivation, &n, pred_pts, preds);
+        derivation* deriv = alloc (derivation, &n, pred_pts, o_idx);
         n.add_deriv (deriv);
         deriv->ghostify (phi1);
 
