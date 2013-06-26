@@ -1561,7 +1561,7 @@ namespace pdr {
             m_fparams.m_arith_auto_config_simplex = true;
             m_fparams.m_arith_propagate_eqs = false;
             m_fparams.m_arith_eager_eq_axioms = false;
-            if (classify.is_dl()) {
+            /*if (classify.is_dl()) {
                 m_fparams.m_arith_mode = AS_DIFF_LOGIC;
                 m_fparams.m_arith_expand_eqs = true;
             }
@@ -1569,7 +1569,7 @@ namespace pdr {
                 IF_VERBOSE(1, verbose_stream() << "UTVPI\n";);
                 m_fparams.m_arith_mode = AS_UTVPI;
                 m_fparams.m_arith_expand_eqs = true;                
-            }
+            }*/
 
         }
         if (!use_mc && m_params.use_inductive_generalizer()) {
