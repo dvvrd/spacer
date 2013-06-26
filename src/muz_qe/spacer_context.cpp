@@ -774,6 +774,10 @@ namespace spacer {
         // TODO: update cache in m_pt
         m_open = false;
         m_closing_deriv = d;
+        // what to do with the remaining derivations (if any)?
+        // option 1: remove them
+        // option 2: keep them running, and we will end up having a map between
+        //           pre's and closing derivations -- currently, this is not supported
     }
 
 /*
@@ -810,7 +814,6 @@ namespace spacer {
         set_rule(&rl2);
         return const_cast<datalog::rule*>(m_rule);
     }
-
 
     void model_node::mk_instantiate(datalog::rule_ref& r0, datalog::rule_ref& r1, expr_ref_vector& binding) {
         ast_manager& m = pt().get_manager();
@@ -851,7 +854,6 @@ namespace spacer {
             r1.get_manager().substitute(r1, binding.size(), binding.c_ptr());
         }
     }
-
 
 
     std::ostream& model_node::display(std::ostream& out, unsigned indent) {
@@ -1014,12 +1016,12 @@ namespace spacer {
     // ----------------
     // model_search
 
-    model_node* model_search::next() {
-        if (m_leaves.empty()) {
+    model_node* model_search::next () {
+        if (m_leaves.empty ()) {
             return 0;
         }
-        model_node* result = m_leaves.back();
-        m_leaves.pop_back();
+        model_node* result = m_leaves.top ();
+        m_leaves.pop ();
         return result;
     }
 
@@ -1053,12 +1055,7 @@ namespace spacer {
     }
 
     void model_search::enqueue_leaf(model_node& n) {
-        if (m_bfs) {
-            m_leaves.push_front(&n);
-        }
-        else {
-            m_leaves.push_back(&n);
-        }
+        m_leaves.push (&n);
     }
 
     void model_search::set_root(model_node* root) {
@@ -1068,6 +1065,9 @@ namespace spacer {
         //cache(*root).insert(root->post(), 1);
         set_leaf(*root);
     }
+
+    void model_search::erase_leaf (model_node& n) { m_leaves.erase (&n); }
+
 
 /*    obj_map<expr, unsigned>& model_search::cache(model_node const& n) {
         unsigned l = n.orig_level();
@@ -1369,7 +1369,7 @@ namespace spacer {
           m_pm(m_fparams, params, m),
           m_query_pred(m),
           m_query(0),
-          m_search(m_params.bfs_model_search()),
+          m_search(),
           m_last_result(l_undef),
           m_inductive_lvl(0),
           m_expanded_lvl(0),
@@ -1818,16 +1818,13 @@ namespace spacer {
     /**
        \brief retrieve answer.
     */
-    expr_ref context::get_answer () {
-        return expr_ref(m.mk_true(), m);
-    }
     model_ref context::get_model () {
         return model_ref ();
     }
     proof_ref context::get_proof () const {
         return proof_ref (m);
     }
-/*
+
     expr_ref context::get_answer() {
         switch(m_last_result) {
         case l_true: return mk_sat_answer();
@@ -1836,6 +1833,7 @@ namespace spacer {
         }
     }
 
+/*
     model_ref context::get_model() {
         SASSERT(m_last_result == l_false);        
         expr_ref_vector refs(m);
@@ -1846,7 +1844,7 @@ namespace spacer {
         ex.to_model(md);
         return md;
     }
-    
+
     proof_ref context::get_proof() const {
         datalog::scoped_proof _sc(m);
         proof_ref proof(m);
@@ -1868,9 +1866,6 @@ namespace spacer {
     expr_ref context::mk_sat_answer () const {
         return expr_ref(m.mk_true(), m);
     }
-    expr_ref context::mk_unsat_answer () const {
-        return expr_ref(m.mk_true(), m);
-    }
 /*
     expr_ref context::mk_sat_answer() const {
         if (m_params.generate_proof_trace()) {
@@ -1879,6 +1874,7 @@ namespace spacer {
         }
         return m_search.get_trace(*this);
     }
+*/
 
     expr_ref context::mk_unsat_answer() const {
         expr_ref_vector refs(m);
@@ -1887,7 +1883,6 @@ namespace spacer {
         inductive_property ex(m, const_cast<model_converter_ref&>(m_mc), rs);
         return ex.to_expr();
     }
-*/
 
     void context::solve_impl() {
         if (!m_rels.find(m_query_pred, m_query)) {
@@ -2212,6 +2207,11 @@ namespace spacer {
             pred_pts.push_back (&get_pred_transformer (*it));
             o_idx.push_back (it-preds.begin ());
         }
+        // left to right
+        /*for (ptr_vector<func_decl>::iterator it = preds.begin ();
+                it != preds.end (); it++) {
+            pred_pts.push_back (&get_pred_transformer (*it));
+        }*/
 
         derivation* deriv = alloc (derivation, &n, pred_pts, o_idx);
         n.add_deriv (deriv);
@@ -2294,7 +2294,6 @@ namespace spacer {
         // ch == root
         if (!deriv) {
             SASSERT (ch.is_reachable ());
-            ch.del_derivs ();
             return;
         }
 

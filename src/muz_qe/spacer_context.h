@@ -24,7 +24,8 @@ Revision History:
 #undef min
 #undef max
 #endif
-#include <deque>
+//#include <deque>
+#include <queue>
 #include "spacer_manager.h"
 #include "dl_base.h"
 #include "spacer_prop_solver.h"
@@ -221,11 +222,12 @@ namespace spacer {
             , m_model (0)
         { m_count++; }
 
-        ~model_node () {
-            //if (m_open)
-            del_derivs ();
-            //SASSERT (m_derivs.empty ());
-        }
+        ~model_node () { del_derivs (); }
+
+        // TODO: for nodes at the same level, consider shortest path distance of
+        // m_pt from a pt with init rule
+        bool operator< (model_node const& x) const { return level () < x.level (); }
+        bool operator> (model_node const& x) const { return level () > x.level (); }
 
         static void reset_count () { m_count = 0; }
         static bool is_ghost (func_decl const* d)
@@ -404,30 +406,54 @@ namespace spacer {
     };
 
 
-    // TODO: (AK) write a priority_queue class (extending std::priority_queue with
-    // more features to update priorities, ability to remove an arbitrary node,
-    // etc. The class below is limited to a bfs/dfs
+    /**
+     * to be used to order model_nodes in priority queue
+     */
+    struct model_node_ptr_greater : std::greater<model_node const*> {
+        bool operator () (model_node const* n1, model_node const* n2) const { return n1 > n2; }
+    };
+
+    /**
+     * priority queue is a max-heap; so, use > relation to order nodes
+     *
+     * we need an erase method to remove arbitrary nodes from the queue
+     */
+    class model_node_ptr_queue :
+        public std::priority_queue <model_node*,
+                                    std::vector<model_node*>,
+                                    model_node_ptr_greater> {
+        public:
+            void erase (model_node* n) {
+                for (std::vector<model_node*>::iterator it = c.begin (); it != c.end (); it++) {
+                    if (*it == n) {
+                        c.erase (it);
+                        break;
+                    }
+                }
+            }
+    };
+
+
+    // TODO: this is just a wrapper around model_node_ptr_queue -- get rid off it?
     class model_search {
-        bool               m_bfs;
-        model_node*        m_root;
-        std::deque<model_node*> m_leaves;
-        vector<obj_map<expr, unsigned> > m_cache;
-        
-        obj_map<expr, unsigned>& cache(model_node const& n);
-        //void erase_children(model_node& n);
-        void erase_leaf(model_node& n);
-        //void remove_node(model_node& n);
+        model_node*             m_root;
+        model_node_ptr_queue    m_leaves;
+        //vector<obj_map<expr, unsigned> > m_cache;
+
+        //obj_map<expr, unsigned>& cache(model_node const& n);
         void enqueue_leaf(model_node& n); // add leaf to priority queue.
-        void update_models();
+        //void update_models();
     public:
-        model_search(bool bfs): m_bfs(bfs), m_root(0) {}
+        model_search(): m_root(0) {}
         ~model_search();
 
         void reset();
         model_node* next();
-        bool is_repeated(model_node& n) const;
+        //bool is_repeated(model_node& n) const;
         void add_leaf(model_node& n); // add fresh node.
+        // do we really need set_leaf?
         void set_leaf(model_node& n); // Set node as leaf, remove children.
+        void erase_leaf(model_node& n);
 
         void set_root(model_node* n);
         model_node& get_root() const { return *m_root; }
