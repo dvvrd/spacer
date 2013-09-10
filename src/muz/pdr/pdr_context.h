@@ -268,6 +268,7 @@ namespace pdr {
         model_node& get_root() const { return *m_root; }
         std::ostream& display(std::ostream& out) const; 
         expr_ref get_trace(context const& ctx);
+        void get_rules_along_trace(context const& ctx, datalog::rule_ref_vector& rules);
         proof_ref get_proof_trace(context const& ctx);
         void backtrack_level(bool uses_level, model_node& n);
     };
@@ -382,6 +383,7 @@ namespace pdr {
         pred_transformer& get_pred_transformer(func_decl* p) const { return *m_rels.find(p); }
         datalog::context& get_context() const { SASSERT(m_context); return *m_context; }
         expr_ref          get_answer();
+        void              get_rules_along_trace (datalog::rule_ref_vector& rules);
 
         bool              is_dl() const { return m_fparams.m_arith_mode == AS_DIFF_LOGIC; }
         bool              is_utvpi() const { return m_fparams.m_arith_mode == AS_UTVPI; }

@@ -1031,6 +1031,24 @@ namespace datalog {
         return m_last_answer.get();
     }
 
+    void context::get_rules_along_trace (rule_ref_vector& rules) {
+        ensure_engine ();
+        m_engine->get_rules_along_trace (rules);
+    }
+
+    void context::get_rules_along_trace_as_formulas (expr_ref_vector& rules, svector<symbol>& names) {
+        rule_manager& rm = get_rule_manager ();
+        rule_ref_vector rv (rm);
+        get_rules_along_trace (rv);
+        expr_ref fml (m);
+        rule_ref_vector::iterator it = rv.begin (), end = rv.end ();
+        for (; it != end; it++) {
+            (*it)->to_formula (fml);
+            rules.push_back (fml);
+            names.push_back ((*it)->name ());
+        }
+    }
+
     void context::display_certificate(std::ostream& out) {
         ensure_engine();
         m_engine->display_certificate(out);

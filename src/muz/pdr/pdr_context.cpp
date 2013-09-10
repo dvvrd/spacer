@@ -991,6 +991,32 @@ namespace pdr {
         }        
     }
 
+    void model_search::get_rules_along_trace(context const& ctx, datalog::rule_ref_vector& rules) {
+        rules.reset ();
+        datalog::context& dctx = ctx.get_context();
+        datalog::rule_manager& rm = dctx.get_rule_manager();
+        ptr_vector<model_node> children;
+        datalog::rule_ref rule(rm);
+        model_node* n = m_root;
+        children.push_back(n);
+        update_models();
+
+        while (!children.empty()) {
+            n = children.back();
+            children.pop_back();
+            TRACE("pdr", n->display(tout, 0););
+            rule = n->get_rule();
+            rules.push_back (rule.get ());
+            if (n->children().empty()) {
+                // nodes whose states are repeated 
+                // in the search tree do not have children.
+                continue;
+            }
+            SASSERT(n->children().size() == rule->get_uninterpreted_tail_size());
+            children.append(n->children());
+        }            
+    }
+
     /**
        Extract trace comprising of constraints 
        and predicates that are satisfied from facts to the query.
@@ -1779,6 +1805,14 @@ namespace pdr {
         case l_true: return mk_sat_answer();
         case l_false: return mk_unsat_answer();
         default: return expr_ref(m.mk_true(), m);
+        }
+    }
+
+    void context::get_rules_along_trace (datalog::rule_ref_vector& rules) {
+        if (m_last_result == l_true) {
+            m_search.get_rules_along_trace (*this, rules);
+        } else {
+            std::cout << "Trace unavailable when result is false\n";
         }
     }
 

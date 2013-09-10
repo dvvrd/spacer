@@ -1032,6 +1032,7 @@ namespace datalog {
   
     void rule::display(context & ctx, std::ostream & out) const {
         ast_manager & m = ctx.get_manager();
+        out << m_name.str () << ":\n";
         //out << mk_pp(m_head, m);
         output_predicate(ctx, m_head, out);
         if (m_tail_size == 0) {

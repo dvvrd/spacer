@@ -80,6 +80,10 @@ void dl_interface::check_reset() {
 lbool dl_interface::query(expr * query) {
     //we restore the initial state in the datalog context
     m_ctx.ensure_opened();
+    TRACE("pdr",
+          tout << "rules:\n";
+          m_ctx.display_rules(tout);
+          );
     m_refs.reset();
     m_pred2slice.reset();
     ast_manager& m =                      m_ctx.get_manager();
@@ -164,6 +168,10 @@ lbool dl_interface::query(expr * query) {
         return l_false;
     }
         
+    TRACE("pdr",
+          tout << "rules:\n";
+          m_ctx.display_rules(tout);
+          );
     return m_context->solve();
 
 }
@@ -293,6 +301,10 @@ void dl_interface::display_certificate(std::ostream& out) const {
 
 expr_ref dl_interface::get_answer() {
     return m_context->get_answer();
+}
+
+void dl_interface::get_rules_along_trace (datalog::rule_ref_vector& rules) {
+    m_context->get_rules_along_trace (rules);
 }
 
 void dl_interface::cancel() {

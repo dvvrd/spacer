@@ -526,6 +526,13 @@ namespace datalog {
         */
         expr* get_answer_as_formula();
 
+        /**
+         * \brief obtain the sequence of rules along the counterexample trace
+         */
+        void get_rules_along_trace (rule_ref_vector& rules);
+
+        void get_rules_along_trace_as_formulas (expr_ref_vector& rules, svector<symbol>& names);
+
 
         void collect_statistics(statistics& st) const;
 

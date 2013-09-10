@@ -35,6 +35,7 @@ namespace datalog {
 
     class context;
     class rule;
+    class rule_manager;
     class relation_base;
     class relation_manager;
     class table_base;
@@ -49,6 +50,8 @@ namespace datalog {
         verbose_action(char const* msg, unsigned lvl = 1);
         ~verbose_action();
     };
+
+    typedef ref_vector<rule, rule_manager> rule_ref_vector;
 
     enum PDR_CACHE_MODE {
         NO_CACHE,
