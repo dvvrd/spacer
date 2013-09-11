@@ -998,7 +998,7 @@ namespace pdr {
         ptr_vector<model_node> children;
         datalog::rule_ref rule(rm);
         model_node* n = m_root;
-        children.push_back(n);
+        children.append(n->children()); // discard the query rule
         update_models();
 
         while (!children.empty()) {
