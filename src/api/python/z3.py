@@ -6178,6 +6178,18 @@ class Fixedpoint(Z3PPObject):
         r = Z3_fixedpoint_get_answer(self.ctx.ref(), self.fixedpoint)
         return _to_expr_ref(r, self.ctx)
 
+    def get_rules_along_trace(self):
+        """retrieve rules along the counterexample trace"""
+        return AstVector(Z3_fixedpoint_get_rules_along_trace(self.ctx.ref(), self.fixedpoint), self.ctx)
+
+    def get_rule_names_along_trace(self):
+        """retrieve rule names along the counterexample trace"""
+        # this is a hack as I don't know how to return a list of symbols from C++;
+        # obtain names as a single string separated by semicolons
+        names = _symbol2py (self.ctx, Z3_fixedpoint_get_rule_names_along_trace(self.ctx.ref(), self.fixedpoint))
+        # split into individual names
+        return names.split (';')
+
     def get_num_levels(self, predicate):
         """Retrieve number of levels used for predicate in PDR engine"""
         return Z3_fixedpoint_get_num_levels(self.ctx.ref(), self.fixedpoint, predicate.ast)

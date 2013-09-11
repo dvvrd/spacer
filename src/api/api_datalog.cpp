@@ -361,6 +361,47 @@ extern "C" {
         Z3_CATCH_RETURN(0);
     }
 
+    Z3_ast_vector Z3_API Z3_fixedpoint_get_rules_along_trace(
+        Z3_context c,
+        Z3_fixedpoint d)
+    {
+        Z3_TRY;
+        LOG_Z3_fixedpoint_get_rules_along_trace(c, d);
+        ast_manager& m = mk_c(c)->m();
+        Z3_ast_vector_ref* v = alloc(Z3_ast_vector_ref, m);
+        mk_c(c)->save_object(v);
+        expr_ref_vector rules(m);
+        svector<symbol> names;
+        
+        to_fixedpoint_ref(d)->ctx().get_rules_along_trace_as_formulas(rules, names);
+        for (unsigned i = 0; i < rules.size(); ++i) {
+            v->m_ast_vector.push_back(rules[i].get());
+        }
+        RETURN_Z3(of_ast_vector(v));
+        Z3_CATCH_RETURN(0);
+    }
+
+    Z3_symbol Z3_API Z3_fixedpoint_get_rule_names_along_trace(
+        Z3_context c,
+        Z3_fixedpoint d)
+    {
+        Z3_TRY;
+        LOG_Z3_fixedpoint_get_rule_names_along_trace(c, d);
+        ast_manager& m = mk_c(c)->m();
+        Z3_ast_vector_ref* v = alloc(Z3_ast_vector_ref, m);
+        mk_c(c)->save_object(v);
+        expr_ref_vector rules(m);
+        svector<symbol> names;
+        std::stringstream ss;
+        
+        to_fixedpoint_ref(d)->ctx().get_rules_along_trace_as_formulas(rules, names);
+        for (unsigned i = 0; i < names.size(); ++i) {
+            ss << ";" << names[i].str();
+        }
+        RETURN_Z3(of_symbol(symbol(ss.str().substr(1).c_str())));
+        Z3_CATCH_RETURN(0);
+    }
+
     Z3_string Z3_API Z3_fixedpoint_get_reason_unknown(Z3_context c,Z3_fixedpoint d) {
         Z3_TRY;
         LOG_Z3_fixedpoint_get_reason_unknown(c, d);

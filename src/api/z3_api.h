@@ -5679,6 +5679,20 @@ END_MLAPI_EXCLUDE
     Z3_ast Z3_API Z3_fixedpoint_get_answer(__in Z3_context c,__in Z3_fixedpoint d);
 
     /**
+       \brief Obtain the list of rules along the counterexample trace.
+
+       def_API('Z3_fixedpoint_get_rules_along_trace', AST_VECTOR, (_in(CONTEXT), _in(FIXEDPOINT)))
+    */
+    Z3_ast_vector Z3_API Z3_fixedpoint_get_rules_along_trace(__in Z3_context c,__in Z3_fixedpoint d);
+
+    /**
+       \brief Obtain the list of rules along the counterexample trace.
+
+       def_API('Z3_fixedpoint_get_rule_names_along_trace', SYMBOL, (_in(CONTEXT), _in(FIXEDPOINT)))
+    */
+    Z3_symbol Z3_API Z3_fixedpoint_get_rule_names_along_trace(__in Z3_context c,__in Z3_fixedpoint d);
+
+    /**
        \brief Retrieve a string that describes the last status returned by #Z3_fixedpoint_query.
 
        Use this method when #Z3_fixedpoint_query returns Z3_L_UNDEF.
