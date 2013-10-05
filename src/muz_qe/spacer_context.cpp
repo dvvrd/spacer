@@ -947,8 +947,7 @@ namespace spacer {
 
     /**
      * traverse e to make ghosts for the uninterpreted leaves;
-     * handles quantifiers but we don't expect them in practice;
-     * for now, does not handle leaves which are AST_VARs
+     * for now, does not handle quantifiers and de-bruijn variables
      */
     void derivation::mk_ghosts (ast_mark& mark, ptr_vector<expr>& todo, expr* e) {
         todo.push_back(e);
@@ -961,14 +960,13 @@ namespace spacer {
             mark.mark(e, true);
             switch(e->get_kind()) {
             case AST_QUANTIFIER: {
-                quantifier* q = to_quantifier(e);
-                ast_mark mark1;
-                ptr_vector<expr> todo1;
-                mk_ghosts (mark1, todo1, q->get_expr());
+                // not handling quantifiers for now
+                UNREACHABLE();
                 break;
             }
             case AST_VAR: {
                 // not handling variables for now;
+                UNREACHABLE();
                 break;
             }
             case AST_APP: {
@@ -1006,6 +1004,7 @@ namespace spacer {
     }
 
     void derivation::mk_ghost_sub (expr_substitution& sub) const {
+        sub.reset ();
         for (ptr_vector<ptr_vector<app_ref_ptr_pair> >::const_iterator it = m_ghosts.begin ();
                 it != m_ghosts.end (); it++) {
             if (!(*it)) continue; // no ghosts for this idx
@@ -1019,7 +1018,8 @@ namespace spacer {
     }
 
     void derivation::mk_unghost_sub (expr_substitution& sub) const {
-        SASSERT (m_curr != m_prems.end ()); // points to something
+        sub.reset ();
+        SASSERT (m_curr_it != m_prems.end ()); // points to something
         ptr_vector<app_ref_ptr_pair>* curr_ghosts = m_ghosts[curr_o_idx ()];
         if (!curr_ghosts) return; // no ghosts for curr_o_idx ()
         for (ptr_vector<app_ref_ptr_pair>::const_iterator g_it = curr_ghosts->begin ();

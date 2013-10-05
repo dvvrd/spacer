@@ -204,7 +204,7 @@ namespace spacer {
         derivation*             m_my_deriv; // the derivation which contains me as a premise
         derivation const*       m_closing_deriv; // the derivation which closes the node
         MODEL_NODE_TYPE         m_type;     // type of derivation
-        bool                    m_in_q;      // iff this node is currently in the search queue
+        bool                    m_in_q;     // iff this node is currently in the search queue
         model_search&           m_search;
 
         // unique id of this node and a global count of all goal nodes;
@@ -296,8 +296,8 @@ namespace spacer {
         // may persist beyond the lifetime of the object
         unsigned long long id () const { return m_id; }
 
-        // given pred_pos_id, return pred_pos_id_g<n> where n is a unique
-        // id for the current object
+        // return a constant with name 'ghost_<n><str>' where n is a unique id
+        // for (this) and str is the name of the given app
         app_ref* mk_ghost (app_ref const& ar) const {
             app* a = ar.get ();
             SASSERT (a->get_num_args () == 0); // it's a constant
@@ -325,7 +325,7 @@ namespace spacer {
         model_node*                         m_concl;// conclusion
         ptr_vector<model_node>              m_prems;// all premises which need to be derived
         vector<unsigned>                    m_o_idx;// order of o-index's to be processed
-        ptr_vector<model_node>::iterator    m_curr; // the premise currently being processed
+        ptr_vector<model_node>::iterator    m_curr_it; // the premise currently being processed
         ast_manager&                        m;
         manager const&                      m_sm;
         ptr_vector<ptr_vector<app_ref_ptr_pair> >   m_ghosts;
@@ -346,68 +346,68 @@ namespace spacer {
 
     public:
         derivation (model_node* concl,
-                    ptr_vector<pred_transformer>& order_pts,
-                    vector<unsigned> order_o_idx,
+                    ptr_vector<pred_transformer>& pred_pts,
+                    vector<unsigned> pred_o_idx,
                     model_search& search):
             m_concl (concl),
-            m_o_idx (order_o_idx),
-            m_curr (0),
+            m_o_idx (pred_o_idx),
+            m_curr_it (0),
             m (m_concl->get_manager ()),
             m_sm (m_concl->get_spacer_manager ())
         {
             SASSERT (m_concl); // non-null
             SASSERT (m_concl->level() > 0);
-            // create model-nodes for premises, corresponding to PTs in order
-            for (ptr_vector<pred_transformer>::iterator it = order_pts.begin ();
-                    it != order_pts.end (); it++) {
+            // create model-nodes for premises, corresponding to pred_pts, in order
+            for (ptr_vector<pred_transformer>::iterator it = pred_pts.begin ();
+                    it != pred_pts.end (); it++) {
                 pred_transformer& pt = **it;
                 m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this, search));
             }
-            // initialize m_curr to point to nothing
-            m_curr = m_prems.end ();
+            // initialize m_curr_it to point to nothing
+            m_curr_it = m_prems.end ();
         }
 
         ~derivation ();
 
-        bool has_next () const { return m_curr+1 != m_prems.end (); }
-        bool has_prev () const { return m_curr != m_prems.begin (); }
+        bool has_next () const { return m_curr_it+1 != m_prems.end (); }
+        bool has_prev () const { return m_curr_it != m_prems.begin (); }
         bool is_first () const { return !has_prev (); }
         bool is_last () const { return !has_next (); }
 
-        // o_idx of the pt at m_curr
+        // o_idx of the pt at m_curr_it
         unsigned curr_o_idx () const {
-            return m_o_idx [m_curr-m_prems.begin ()];
+            return m_o_idx [m_curr_it-m_prems.begin ()];
         }
 
         unsigned num_prems () const { return m_prems.size (); }
 
         model_node& next () {
             if (is_last ()) throw default_exception ("No next premise");
-            if (m_curr == m_prems.end ()) m_curr = m_prems.begin ();
-            else m_curr++;
-            return **m_curr;
+            if (m_curr_it == m_prems.end ()) m_curr_it = m_prems.begin ();
+            else m_curr_it++;
+            return **m_curr_it;
         }
 
         model_node& prev () {
             if (is_first ()) throw default_exception ("No prev premise");
-            m_curr--;
-            return **m_curr;
+            m_curr_it--;
+            return **m_curr_it;
         }
 
-        model_node& curr () const { return **m_curr; }
+        model_node& curr () const { return **m_curr_it; }
 
         ptr_vector<model_node> const& prems () const { return m_prems; }
 
-        // iff every premise (up to and including m_curr) is closed
+        // iff every premise (up to and including m_curr_it) is closed
         bool is_closed () const {
             for (ptr_vector<model_node>::const_iterator it = m_prems.begin ();
-                    it <= m_curr; it++) {
+                    it <= m_curr_it; it++) {
                 if ((*it)->is_open ()) return false;
             }
             return true;
         }
 
-        // has a premise whose pt and level are the same as the arguments
+        // has a premise with given pt and level
         bool has_prem (pred_transformer const& pt, unsigned level) const {
             for (ptr_vector<model_node>::const_iterator it = m_prems.begin ();
                     it != m_prems.end (); it++) {
