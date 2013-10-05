@@ -471,7 +471,7 @@ namespace spacer {
             TRACE("spacer", tout << "updating model\n"; 
                   model_smt2_pp(tout, m, *model, 0);
                   tout << mk_pp(n.post(), m) << "\n";);
-            n.set_model(model);
+            ctx.set_curr_model(model);
         }
         else if (is_sat == l_false) {
             uses_level = m_solver.assumes_level();
@@ -1373,7 +1373,8 @@ namespace spacer {
           m_last_result(l_undef),
           m_inductive_lvl(0),
           m_expanded_lvl(0),
-          m_cancel(false)
+          m_cancel(false),
+          m_curr_model (0)
     {
     }
 
@@ -1966,6 +1967,7 @@ namespace spacer {
         }
         else {
             bool uses_level = true;
+            reset_curr_model ();
             switch (expand_state(n, cube, uses_level)) {
             case l_true:
                 TRACE("spacer", tout << "node: " << &n << "\n";); 
@@ -2099,7 +2101,7 @@ namespace spacer {
         datalog::scoped_no_proof _sc(m);
  
         pred_transformer& pt = n.pt();
-        model_ref M = n.get_model_ptr();
+        model_ref M = get_curr_model_ptr();
         datalog::rule const& r = pt.find_rule(*M);
         expr* T   = pt.get_transition(r);
         expr* phi = n.post();

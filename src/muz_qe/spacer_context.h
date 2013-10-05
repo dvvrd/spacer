@@ -209,9 +209,6 @@ namespace spacer {
         unsigned long long const    m_id;
         static unsigned long long   m_count;
 
-        // TODO: should keep the following in context, not here
-        //      as different derivations in m_derivs have different models
-        model_ref               m_model;
     public:
         model_node (model_node* parent, pred_transformer& pt, unsigned level, derivation* deriv):
             m_parent (parent), m_pt (pt), m (m_pt.get_manager ()),
@@ -219,7 +216,6 @@ namespace spacer {
             m_level (level), m_open (true),
             m_my_deriv (deriv), m_closing_deriv (0),
             m_type (EXPAND), m_id (m_count+1)
-            , m_model (0)
         { m_count++; }
 
         ~model_node () { del_derivs (); }
@@ -298,12 +294,6 @@ namespace spacer {
             app* a_ghost = m.mk_const (symbol (new_name.str ().c_str ()), s);
             return alloc (app_ref, a_ghost, m);
         }
-
-
-        // TODO: move the following (including the member m_model) into context
-        void set_model(model_ref& m) { m_model = m; }
-        model* get_model_ptr() const { return m_model.get(); }
-        model const&  get_model() const { return *m_model; }
     };
 
 
@@ -516,6 +506,7 @@ namespace spacer {
         volatile bool        m_cancel;
         model_converter_ref  m_mc;
         proof_converter_ref  m_pc;
+        model_ref            m_curr_model; // sat model for the current model_node whose reachability is being checked
         
         // Functions used by search.
         void solve_impl();
@@ -619,6 +610,10 @@ namespace spacer {
         proof_ref get_proof() const;
 
         model_node& get_root() const { return m_search.get_root(); }
+
+        void set_curr_model (model_ref& m) { m_curr_model = m; }
+        void reset_curr_model () { m_curr_model.reset (); }
+        model* get_curr_model_ptr () const { return m_curr_model.get(); }
     };
 
 };
