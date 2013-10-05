@@ -329,9 +329,11 @@ namespace spacer {
         }
 
         if (result == l_false && m_core && m.proofs_enabled() && !m_subset_based_core) {
+            TRACE ("spacer", tout << "theory core\n";);
             extract_theory_core(safe);
         }
         else if (result == l_false && m_core) {
+            TRACE ("spacer", tout << "subset core\n";);
             extract_subset_core(safe);    
             SASSERT(expr_atoms.size() >= m_core->size());
         }
@@ -384,7 +386,7 @@ namespace spacer {
         safe.elim_proxies(lemmas);
         fl.simplify_lemmas(lemmas); // redundant?
 
-        bool outside_of_logic = 
+        bool outside_of_logic =
             (m_fparams.m_arith_mode == AS_DIFF_LOGIC &&
              !is_difference_logic(m, lemmas.size(), lemmas.c_ptr())) ||
             (m_fparams.m_arith_mode == AS_UTVPI &&
@@ -396,6 +398,11 @@ namespace spacer {
                        for (unsigned i = 0; i < lemmas.size(); ++i) {
                            verbose_stream() << mk_pp(lemmas[i].get(), m) << "\n";
                        });
+            TRACE ("spacer", 
+                       tout << "not diff\n";
+                       for (unsigned i = 0; i < lemmas.size(); ++i) {
+                           tout << mk_pp(lemmas[i].get(), m) << "\n";
+                       });
             extract_subset_core(safe);
         }        
         else {
@@ -404,6 +411,11 @@ namespace spacer {
                        verbose_stream() << "Lemmas\n";            
                        for (unsigned i = 0; i < lemmas.size(); ++i) {
                            verbose_stream() << mk_pp(lemmas[i].get(), m) << "\n";
+                       });
+            TRACE ("spacer", 
+                       tout << "Lemmas\n";            
+                       for (unsigned i = 0; i < lemmas.size(); ++i) {
+                           tout << mk_pp(lemmas[i].get(), m) << "\n";
                        });
 
             m_core->reset();

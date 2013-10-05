@@ -2258,6 +2258,9 @@ namespace spacer {
 
         // if no preds, update n.pre
         if (preds.size () == 0) {
+            // to be uniform, we can create a dummy derivation with no premises
+            // and call report_pre (<with-no-child>) to essentially execute the
+            // following sequence of statements with n.close (<dummy_deriv>)
             n.updt_pre (phi1);
             n.close (); // n.m_pre -> <n.m_post, n.m_post_ctx> is concrete
             report_pre (n);
