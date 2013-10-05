@@ -394,12 +394,14 @@ namespace spacer {
             return **m_curr;
         }
 
+        model_node& curr () const { return **m_curr; }
+
         ptr_vector<model_node> const& prems () const { return m_prems; }
 
-        // iff every premise is closed
+        // iff every premise (up to and including m_curr) is closed
         bool is_closed () const {
             for (ptr_vector<model_node>::const_iterator it = m_prems.begin ();
-                    it != m_prems.end (); it++) {
+                    it <= m_curr; it++) {
                 if ((*it)->is_open ()) return false;
             }
             return true;
