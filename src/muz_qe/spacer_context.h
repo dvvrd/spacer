@@ -42,6 +42,7 @@ namespace spacer {
     class pred_transformer;
     class model_node;
     class derivation;
+    class model_search;
     class context;
 
     typedef obj_map<datalog::rule const, app_ref_vector*> rule2inst;
@@ -197,12 +198,14 @@ namespace spacer {
         expr_ref                m_post;
         expr_ref                m_post_ctx;
         expr_ref                m_pre;
-        unsigned const          m_level;       
+        unsigned                m_level;       
         bool                    m_open;     // whether a concrete answer to the goal is found
         ptr_vector<derivation>  m_derivs;   // all derivations being tried out
         derivation*             m_my_deriv; // the derivation which contains me as a premise
         derivation const*       m_closing_deriv; // the derivation which closes the node
         MODEL_NODE_TYPE         m_type;     // type of derivation
+        bool                    m_in_q;      // iff this node is currently in the search queue
+        model_search&           m_search;
 
         // unique id of this node and a global count of all goal nodes;
         // count is expected to be reset at every level of query
@@ -210,15 +213,17 @@ namespace spacer {
         static unsigned long long   m_count;
 
     public:
-        model_node (model_node* parent, pred_transformer& pt, unsigned level, derivation* deriv):
+        model_node (model_node* parent, pred_transformer& pt, unsigned level, derivation* deriv, model_search& search):
             m_parent (parent), m_pt (pt), m (m_pt.get_manager ()),
             m_post (m), m_post_ctx (m), m_pre (m),
             m_level (level), m_open (true),
             m_my_deriv (deriv), m_closing_deriv (0),
-            m_type (EXPAND), m_id (m_count+1)
+            m_type (EXPAND), m_in_q (false),
+            m_search (search),
+            m_id (m_count+1)
         { m_count++; }
 
-        ~model_node () { del_derivs (); }
+        ~model_node ();
 
         // TODO: for nodes at the same level, consider shortest path distance of
         // m_pt from a pt with init rule
@@ -242,6 +247,8 @@ namespace spacer {
         bool is_closed () const { return !m_open; }
         unsigned level () const { return m_level; }
 
+        void incr_level () { m_level++;}
+
         void add_deriv (derivation* deriv) { m_derivs.push_back (deriv); }
         void updt_parent (model_node* parent) { m_parent = parent; }
         void updt_post (expr_ref const& post, expr_ref const& post_ctx)
@@ -250,22 +257,32 @@ namespace spacer {
         void updt_pre (expr_ref const& pre) { m_pre = pre; }
 
         void reset () {
-            SASSERT (m_derivs.empty ());
             m_pre.reset ();
-            m_model.reset ();
             del_derivs ();
-            m_open = true;
+            open ();
         }
 
-        void close (derivation const* d = 0);
+        // close this node by setting d as the closing derivation
+        void close (derivation* d = 0);
+        void open () { m_open = true; }
 
-        void del_derivs () {
-            while (!m_derivs.empty ()) {
-                derivation* d = m_derivs.back ();
-                m_derivs.pop_back ();
-                dealloc (d);
-            }
-        }
+        void inq () { m_in_q = true; }
+        void outq () { m_in_q = false; }
+        bool is_inq () const { return m_in_q; }
+
+        void del_derivs ();
+        // delete only those derivations containing pt at level
+        void del_derivs (pred_transformer const& pt, unsigned level);
+        // delete just the given derivation
+        void del_derivs (derivation* d);
+        // delete all derivations except the given one
+        void del_derivs_except (derivation* d);
+
+        bool has_derivs () const { return !m_derivs.empty (); }
+        // has any derivation with curr premise at level
+        bool has_derivs (unsigned level) const;
+
+        unsigned num_derivs () const { return m_derivs.size (); }
 
         // is known to be concretely reachable or unreachable
         bool is_reachable () { return is_closed () && has_pre (); }
@@ -330,7 +347,8 @@ namespace spacer {
     public:
         derivation (model_node* concl,
                     ptr_vector<pred_transformer>& order_pts,
-                    vector<unsigned> order_o_idx):
+                    vector<unsigned> order_o_idx,
+                    model_search& search):
             m_concl (concl),
             m_o_idx (order_o_idx),
             m_curr (0),
@@ -343,7 +361,7 @@ namespace spacer {
             for (ptr_vector<pred_transformer>::iterator it = order_pts.begin ();
                     it != order_pts.end (); it++) {
                 pred_transformer& pt = **it;
-                m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this));
+                m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this, search));
             }
             // initialize m_curr to point to nothing
             m_curr = m_prems.end ();
@@ -387,6 +405,17 @@ namespace spacer {
             return true;
         }
 
+        // has a premise whose pt and level are the same as the arguments
+        bool has_prem (pred_transformer const& pt, unsigned level) const {
+            for (ptr_vector<model_node>::const_iterator it = m_prems.begin ();
+                    it != m_prems.end (); it++) {
+                if ((*it)->level () == level &&
+                        (*it)->pt ().head () == pt.head ())
+                    return true;
+            }
+            return false;
+        }
+
         // substitute o-consts in phi by ghosts;
         // resets m_ghosts and updates it for phi
         void ghostify (expr_ref& phi);
@@ -417,6 +446,7 @@ namespace spacer {
                 for (std::vector<model_node*>::iterator it = c.begin (); it != c.end (); it++) {
                     if (*it == n) {
                         c.erase (it);
+                        TRACE ("spacer", tout << "Erasing node from queue\n";);
                         break;
                     }
                 }

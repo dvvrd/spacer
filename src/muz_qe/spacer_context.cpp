@@ -770,14 +770,77 @@ namespace spacer {
 
     unsigned long long model_node::m_count;
 
-    void model_node::close (derivation const* d) {
+    void model_node::close (derivation* d) {
         // TODO: update cache in m_pt
         m_open = false;
         m_closing_deriv = d;
-        // what to do with the remaining derivations (if any)?
-        // option 1: remove them
-        // option 2: keep them running, and we will end up having a map between
-        //           pre's and closing derivations -- currently, this is not supported
+
+        if (has_pre ()) {
+            // option 1: delete all derivations except d
+            if (d) {
+                TRACE ("spacer", tout << "Deleting all derivations except the closing one\n";);
+                del_derivs_except (d);
+            } else {
+                TRACE ("spacer", tout << "Deleting all derivations\n";);
+                del_derivs ();
+            }
+            // option 2: keep them running, and we will end up having a map between
+            //           pre's and closing derivations
+
+            if (is_inq ()) m_search.erase_leaf (*this);
+        } // else, decided later on
+    }
+
+    void model_node::del_derivs () {
+        // deallocate every deriv
+        for (ptr_vector<derivation>::iterator it = m_derivs.begin ();
+                it != m_derivs.end (); it++) {
+            dealloc (*it);
+        }
+        // empty the vector
+        m_derivs.reset ();
+    }
+
+    void model_node::del_derivs (pred_transformer const& pt, unsigned level) {
+        ptr_vector<derivation>::iterator it = m_derivs.begin ();
+        while (it != m_derivs.end ()) {
+            TRACE ("spacer", tout << (*it) << "\n";);
+            if ((*it)->has_prem (pt, level)) {
+                TRACE ("spacer", tout << "Deleting " << (*it) << "\n";);
+                dealloc (*it);
+                m_derivs.erase (it);
+            } else it++;
+        }
+    }
+
+    void model_node::del_derivs (derivation* d) {
+        m_derivs.erase (d);
+        dealloc (d);
+    }
+
+    void model_node::del_derivs_except (derivation* d) {
+        SASSERT (d);
+        // deallocate every deriv except d
+        for (ptr_vector<derivation>::iterator it = m_derivs.begin ();
+                it != m_derivs.end (); it++) {
+            if ((*it) != d) dealloc (*it);
+        }
+        // empty the vector and add d
+        m_derivs.reset ();
+        add_deriv (d);
+    }
+
+    bool model_node::has_derivs (unsigned level) const {
+        for (ptr_vector<derivation>::const_iterator it = m_derivs.begin ();
+                it != m_derivs.end (); it++) {
+            if ((*it)->curr ().level () == level) return true;
+        }
+        return false;
+    }
+
+    model_node::~model_node () {
+        if (is_inq ()) m_search.erase_leaf (*this);
+        del_derivs ();
     }
 
 /*
@@ -1022,6 +1085,7 @@ namespace spacer {
         }
         model_node* result = m_leaves.top ();
         m_leaves.pop ();
+        result->outq ();
         return result;
     }
 
@@ -1056,6 +1120,7 @@ namespace spacer {
 
     void model_search::enqueue_leaf(model_node& n) {
         m_leaves.push (&n);
+        n.inq ();
     }
 
     void model_search::set_root(model_node* root) {
@@ -1066,7 +1131,7 @@ namespace spacer {
         set_leaf(*root);
     }
 
-    void model_search::erase_leaf (model_node& n) { m_leaves.erase (&n); }
+    void model_search::erase_leaf (model_node& n) { m_leaves.erase (&n); n.outq (); }
 
 
 /*    obj_map<expr, unsigned>& model_search::cache(model_node const& n) {
@@ -1918,7 +1983,7 @@ namespace spacer {
     //
     bool context::check_reachability(unsigned level) {
         expr_ref post (m.mk_true(), m), post_ctx (m.mk_true (), m);
-        model_node* root = alloc (model_node, 0, *m_query, level, 0);
+        model_node* root = alloc (model_node, 0, *m_query, level, 0, m_search);
         root->updt_post (post, post_ctx);
         m_search.set_root(root);            
         
@@ -2215,7 +2280,7 @@ namespace spacer {
             pred_pts.push_back (&get_pred_transformer (*it));
         }*/
 
-        derivation* deriv = alloc (derivation, &n, pred_pts, o_idx);
+        derivation* deriv = alloc (derivation, &n, pred_pts, o_idx, m_search);
         n.add_deriv (deriv);
         deriv->ghostify (phi1);
 
@@ -2338,12 +2403,28 @@ namespace spacer {
 
         // for now, assume that ch found a cocnrete proof
         SASSERT (ch.is_closed ());
-        ch.del_derivs ();
 
         // ch == root
-        if (!deriv) return;
+        if (!deriv) {
+            ch.del_derivs ();
+            return;
+        }
 
         SASSERT (par);
+
+        pred_transformer const& ch_pt = ch.pt ();
+        unsigned ch_level = ch.level ();
+
+        // try ch at higher level?
+        if (redo_at_higher_level (ch, deriv, *par)) {
+            TRACE ("spacer", tout << "Redo child at higher level\n";);
+            ch.open ();
+            ch.incr_level ();
+            m_search.add_leaf (ch);
+        } else {
+            TRACE ("spacer", tout << "No Redo. Deleting derivation...\n";);
+            par->del_derivs (deriv);
+        }
 
         /*if (deriv->is_first ()) {
             // even the first premise fails;
