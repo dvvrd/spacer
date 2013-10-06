@@ -2449,9 +2449,25 @@ namespace spacer {
             // parent to the queue
         }*/
 
-        TRACE ("spacer", tout << "Del par's derivations\n";);
-        par->del_derivs ();
-        m_search.add_leaf (*par);
+        TRACE ("spacer", tout << "Del par's affected derivations\n";);
+        // ch_pt has new lemmas at ch_level; delete all affected derivations
+        // TODO: ch_pt could have learnt lemmas at a level higher than ch_level
+        // -- check for that??
+        par->del_derivs (ch_pt, ch_level);
+
+        if (!par->has_derivs (par->level ()-1)) {
+            TRACE ("spacer", tout << "No more normal derivations\n";);
+            m_search.add_leaf (*par);
+        }
+        // o.w. there are other running derivations...
+    }
+
+    // TODO: better check?
+    bool context::redo_at_higher_level (model_node const& ch, derivation const* d, model_node const& par) const {
+        unsigned ch_level = ch.level ();
+        unsigned root_level = m_search.get_root ().level ();
+        return (ch_level < root_level && // level can be increased
+                d->is_closed ());        // all premises up to (and incl.) ch are closed
     }
 
     void context::collect_statistics(statistics& st) const {

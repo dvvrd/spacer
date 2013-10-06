@@ -550,8 +550,9 @@ namespace spacer {
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;
 
-        void report_pf (model_node& ch);
-        void report_pre (model_node& ch);
+        void report_pf (model_node& ch); // ch's post is unreachable
+        void report_pre (model_node& ch); // a pre has been found for ch's post
+        bool redo_at_higher_level (model_node const& ch, derivation const* d, model_node const& par) const;
         
         // Generate inductive property
         void get_level_property(unsigned lvl, expr_ref_vector& res, vector<relation_info> & rs) const;
