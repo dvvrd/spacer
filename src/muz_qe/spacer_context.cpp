@@ -2460,7 +2460,7 @@ namespace spacer {
 
         if (!par->has_derivs (par->level ()-1)) {
             TRACE ("spacer", tout << "No more normal derivations\n";);
-            m_search.add_leaf (*par);
+            if (!par->is_inq ()) m_search.add_leaf (*par);
         }
         // o.w. there are other running derivations...
     }

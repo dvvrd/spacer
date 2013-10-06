@@ -24,7 +24,6 @@ Revision History:
 #undef min
 #undef max
 #endif
-//#include <deque>
 #include <queue>
 #include "spacer_manager.h"
 #include "dl_base.h"
