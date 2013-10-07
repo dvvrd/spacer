@@ -295,20 +295,16 @@ namespace spacer {
         // may persist beyond the lifetime of the object
         unsigned long long id () const { return m_id; }
 
-        // return a constant with name 'ghost_<n><str>' where n is a unique id
+        // return a constant with name 'ghost_<n>_<str>' where n is a unique id
         // for (this) and str is the name of the given app
-        app_ref* mk_ghost (app_ref const& ar) const {
-            app* a = ar.get ();
+        app* mk_ghost (app* a) const {
             SASSERT (a->get_num_args () == 0); // it's a constant
             func_decl* fd = a->get_decl ();
             sort* s = fd->get_range ();
             symbol const& old_sym = fd->get_name ();
             std::stringstream new_name;
-            new_name << "ghost_" << id () << old_sym.str ();
-            // AK: the following passes a reference to a local symbol object -
-            //  it seems to work, but a terrible thing to do! fix it!
-            app* a_ghost = m.mk_const (symbol (new_name.str ().c_str ()), s);
-            return alloc (app_ref, a_ghost, m);
+            new_name << "ghost_" << id () << "_" << old_sym.str ();
+            return m.mk_const (symbol (new_name.str ().c_str ()), s);
         }
     };
 
@@ -327,10 +323,8 @@ namespace spacer {
         ptr_vector<model_node>::iterator    m_curr_it; // the premise currently being processed
         ast_manager&                        m;
         manager const&                      m_sm;
-        ptr_vector<ptr_vector<app_ref_ptr_pair> >   m_ghosts;
-                        // vectors of (o_const, ghost) pairs, ordered by o_index;
-                        // a null pointer implies absence of ghosts for the
-                        //      corresponding index
+        vector<vector<app_ref_vector> >    m_ghosts;
+                        // for each o_index, vector of (o_const, ghost) pairs
 
 
         // populate m_ghosts for phi

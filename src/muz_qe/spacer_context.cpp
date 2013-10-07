@@ -975,12 +975,13 @@ namespace spacer {
                     unsigned idx; // store in this, the o-index of a
                     m_sm.get_o_index (a->get_decl (), idx);
                     SASSERT (m_ghosts.size () > idx); // m_ghosts is expected to be of the right size
-                    if (!m_ghosts[idx]) m_ghosts[idx] = alloc (ptr_vector<app_ref_ptr_pair>);
-                    app_ref* orig = alloc (app_ref, a, m);
-                    app_ref* ghost = m_concl->mk_ghost (*orig);
-                    m_ghosts[idx]->push_back (alloc (app_ref_ptr_pair, orig, ghost));
+                    app* ghost = m_concl->mk_ghost (a);
+                    app_ref_vector vec (m);
+                    vec.push_back (a);
+                    vec.push_back (ghost);
+                    m_ghosts[idx].push_back (vec);
                     TRACE ("spacer", tout << "Orig: " << mk_pp (a, m) << "\n";);
-                    TRACE ("spacer", tout << "Ghost: " << mk_pp (ghost->get (), m) << "\n";);
+                    TRACE ("spacer", tout << "Ghost: " << mk_pp (ghost, m) << "\n";);
                     TRACE ("spacer", tout << "o-index: " << idx << "\n";);
                 } else {
                     for (unsigned i = 0; i < a->get_num_args(); ++i) {
@@ -997,7 +998,7 @@ namespace spacer {
 
     void derivation::mk_ghosts (expr_ref const& phi) {
         m_ghosts.reset ();
-        m_ghosts.resize (num_prems ());
+        m_ghosts.resize (num_prems (), vector<app_ref_vector>());
         ast_mark mark;
         ptr_vector<expr> todo;
         mk_ghosts (mark, todo, phi.get ());
@@ -1005,14 +1006,14 @@ namespace spacer {
 
     void derivation::mk_ghost_sub (expr_substitution& sub) const {
         sub.reset ();
-        for (ptr_vector<ptr_vector<app_ref_ptr_pair> >::const_iterator it = m_ghosts.begin ();
+        for (vector<vector<app_ref_vector> >::const_iterator it = m_ghosts.begin ();
                 it != m_ghosts.end (); it++) {
-            if (!(*it)) continue; // no ghosts for this idx
-            for (ptr_vector<app_ref_ptr_pair>::const_iterator g_it = (*it)->begin ();
-                    g_it != (*it)->end (); g_it++) {
-                app_ref* orig = (*g_it)->first;
-                app_ref* ghost = (*g_it)->second;
-                sub.insert (orig->get (), ghost->get ());
+            if ((*it).empty ()) continue; // no ghosts for this idx
+            for (vector<app_ref_vector>::const_iterator g_it = it->begin ();
+                    g_it != it->end (); g_it++) {
+                app_ref_vector const& vec = *g_it;
+                SASSERT (vec.size () == 2); // it's a pair
+                sub.insert (vec[0], vec[1]);
             }
         }
     }
@@ -1020,14 +1021,15 @@ namespace spacer {
     void derivation::mk_unghost_sub (expr_substitution& sub) const {
         sub.reset ();
         SASSERT (m_curr_it != m_prems.end ()); // points to something
-        ptr_vector<app_ref_ptr_pair>* curr_ghosts = m_ghosts[curr_o_idx ()];
-        if (!curr_ghosts) return; // no ghosts for curr_o_idx ()
-        for (ptr_vector<app_ref_ptr_pair>::const_iterator g_it = curr_ghosts->begin ();
-                g_it != curr_ghosts->end (); g_it++) {
-            app_ref* orig = (*g_it)->first;
-            app_ref* ghost = (*g_it)->second;
-            app* orig_n = m.mk_const (m_sm.o2n (orig->get ()->get_decl (), curr_o_idx ()));
-            sub.insert (ghost->get (), orig_n);
+        vector<app_ref_vector> const& curr_ghosts = m_ghosts[curr_o_idx ()];
+        if (curr_ghosts.empty ()) return; // no ghosts for curr_o_idx ()
+        for (vector<app_ref_vector>::const_iterator g_it = curr_ghosts.begin ();
+                g_it != curr_ghosts.end (); g_it++) {
+            app_ref_vector const& vec = *g_it;
+            app* orig_o = vec[0];
+            app* ghost = vec[1];
+            app* orig_n = m.mk_const (m_sm.o2n (orig_o->get_decl (), curr_o_idx ()));
+            sub.insert (ghost, orig_n);
         }
     }
 
@@ -1059,20 +1061,6 @@ namespace spacer {
             model_node* n = m_prems.back ();
             m_prems.pop_back ();
             dealloc (n);
-        }
-        // destroy m_ghosts
-        while (!m_ghosts.empty ()) {
-            ptr_vector<app_ref_ptr_pair>* vec = m_ghosts.back ();
-            m_ghosts.pop_back ();
-            if (!vec) continue;
-            while (!vec->empty ()) {
-                app_ref_ptr_pair* p = vec->back ();
-                vec->pop_back ();
-                dealloc (p->first);
-                dealloc (p->second);
-                dealloc (p);
-            }
-            dealloc (vec);
         }
     }
 
