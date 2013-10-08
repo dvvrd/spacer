@@ -224,9 +224,6 @@ namespace spacer {
 
         ~model_node ();
 
-        // TODO: for nodes at the same level, consider shortest path distance of
-        // m_pt from a pt with init rule
-        bool operator< (model_node const& x) const { return level () < x.level (); }
         bool operator> (model_node const& x) const { return level () > x.level (); }
 
         static void reset_count () { m_count = 0; }
@@ -420,11 +417,15 @@ namespace spacer {
     };
 
 
-    /**
-     * to be used to order model_nodes in priority queue
-     */
-    struct model_node_ptr_greater : std::greater<model_node const*> {
-        bool operator () (model_node const* n1, model_node const* n2) const { return n1 > n2; }
+    class model_node_comparison {
+    public:
+        model_node_comparison () {}
+
+        // TODO: for nodes at the same level, consider shortest path distance of
+        // m_pt from a pt with init rule
+        bool operator () (model_node const* n1, model_node const* n2) const {
+            return (*n1) > (*n2);
+        }
     };
 
     /**
@@ -435,7 +436,7 @@ namespace spacer {
     class model_node_ptr_queue :
         public std::priority_queue <model_node*,
                                     std::vector<model_node*>,
-                                    model_node_ptr_greater> {
+                                    model_node_comparison> {
         public:
             void erase (model_node* n) {
                 for (std::vector<model_node*>::iterator it = c.begin (); it != c.end (); it++) {
