@@ -768,7 +768,7 @@ namespace spacer {
         return r.get_uninterpreted_tail_size() == 0;
     }
 
-    unsigned long long model_node::m_count;
+    unsigned model_node::m_count;
 
     void model_node::close (derivation* d) {
         // TODO: update cache in m_pt
@@ -1044,7 +1044,12 @@ namespace spacer {
         TRACE ("spacer", tout << "after ghostify: " << mk_pp(phi,m) << "\n";);
     }
 
-    void derivation::mk_post (expr_ref& phi, expr_ref& ctx) const {
+    void derivation::setup (expr_ref& phi) {
+        m_post = phi;
+        ghostify (phi);
+    }
+
+    void derivation::mk_prem_post (expr_ref& phi, expr_ref& ctx) const {
         TRACE ("spacer", tout << "input to post: " << mk_pp(phi,m) << "\n";);
         expr_substitution sub (m);
         mk_unghost_sub (sub);
@@ -1053,6 +1058,81 @@ namespace spacer {
         (*rep) (phi);
         ctx = expr_ref (m.mk_true (), m);
         TRACE ("spacer", tout << "output of post: " << mk_pp(phi,m) << "\n";);
+    }
+
+    void derivation::get_trace (expr_ref_vector& trace_conjs) const {
+        expr_substitution sub (m);
+        expr* c1;
+        expr* c2;
+        // obtain traces of m_prems in reverse order
+        if (m_prems.size () > 0) {
+            for (unsigned i = 0; i < m_prems.size (); i++) {
+                unsigned idx = m_prems.size ()-i-1;
+                model_node* prem = m_prems [idx];
+                SASSERT (prem->closing_deriv ());
+                prem->closing_deriv ()->get_trace (trace_conjs);
+                // version all the o-consts
+                pred_transformer const& pt = prem->pt ();
+                unsigned sig_size = pt.sig_size ();
+                for (unsigned j = 0; j < sig_size; j++) {
+                    c1 = m.mk_const (m_sm.o2o (pt.sig (j), 0, m_o_idx [idx]));
+                    c2 = m.mk_const (m_sm.o2o (pt.sig (j), 0, prem->id ()));
+                    sub.insert (c1, c2);
+                }
+            }
+        }
+        // version n-consts and the auxiliaries
+        pred_transformer& concl_pt = m_concl->pt ();
+        unsigned sig_size = concl_pt.sig_size ();
+        for (unsigned j = 0; j < sig_size; j++) {
+            c1 = m.mk_const (m_sm.o2n (concl_pt.sig (j), 0));
+            c2 = m.mk_const (m_sm.o2o (concl_pt.sig (j), 0, m_concl->id ()));
+            sub.insert (c1, c2);
+        }
+        ptr_vector<app>& aux_vars = concl_pt.get_aux_vars (m_rule);
+        for (unsigned j = 0; j < aux_vars.size (); j++) {
+            app* var = aux_vars [j];
+            sort* s = var->get_decl ()->get_range ();
+            std::stringstream new_name;
+            new_name << var->get_decl ()->get_name () << "_" << m_concl->id ();
+            app* new_var = m.mk_const (symbol (new_name.str ().c_str ()), s);
+            sub.insert (var, new_var);
+        }
+
+        scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
+        rep->set_substitution(&sub);
+
+        // add transition relation
+        expr* T = concl_pt.get_transition (m_rule);
+        expr_ref T_v (m);
+        (*rep) (T, T_v);
+        trace_conjs.push_back (T_v);
+
+        /*// add post
+        expr_ref post (m);
+        (*rep) (m_concl->post (), post);
+        trace_conjs.push_back (post);
+
+        // unghostify ghosts local to this derivation from all trace_conjs
+        expr_substitution unghost (m);
+        for (unsigned i = 0; i < m_prems.size (); i++) {
+            unsigned o_idx = m_o_idx [i];
+            model_node const* prem = m_prems [i];
+            vector<app_ref_vector> const& curr_ghosts = m_ghosts [o_idx];
+            for (vector<app_ref_vector>::const_iterator g_it = curr_ghosts.begin ();
+                    g_it != curr_ghosts.end (); g_it++) {
+                app_ref_vector const& vec = *g_it;
+                app* orig_o = vec[0];
+                app* ghost = vec[1];
+                unghost.insert (ghost, m.mk_const (m_sm.o2o (orig_o->get_decl (), o_idx, prem->id ())));
+            }
+        }
+        rep->set_substitution(&unghost);
+        for (unsigned i = 0; i < trace_conjs.size (); i++) {
+            expr_ref new_conj (m);
+            (*rep) (trace_conjs.get (i), new_conj);
+            trace_conjs.set (i, new_conj);
+        }*/
     }
 
     derivation::~derivation () {
@@ -1184,6 +1264,18 @@ namespace spacer {
        and predicates that are satisfied from facts to the query.
        The resulting trace 
      */
+    expr_ref model_search::get_trace(context const& ctx) {
+        SASSERT (m_root->closing_deriv ());
+        ast_manager& m = ctx.get_manager ();
+        expr_ref_vector trace_conjs (m);
+        m_root->closing_deriv ()->get_trace (trace_conjs);
+        TRACE ("spacer",
+                tout << "Trace:" << "\n";
+                tout << mk_pp (m.mk_and (trace_conjs.size (), trace_conjs.c_ptr ()), m) << "\n";
+              );
+        expr_ref result (m.mk_and (trace_conjs.size (), trace_conjs.c_ptr ()), m);
+        return result;
+    }
 /*
     expr_ref model_search::get_trace(context const& ctx) {       
         pred_transformer& pt = get_root().pt();
@@ -1660,7 +1752,18 @@ namespace spacer {
 
         switch(m_last_result) {
         case l_true: {
-            IF_VERBOSE(0, verbose_stream() << "Unsupported" << "\n";);
+            datalog::scoped_no_proof _sc(m);
+            expr_ref const& cex = get_answer ();
+            smt::kernel solver (m, get_fparams());
+            solver.assert_expr (cex);
+            lbool res = solver.check ();
+            if (res == l_true) {
+                TRACE ("spacer", tout << "Validation Succeeded\n";);
+            } else {
+                msg << "proof validation failed";
+                IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
+                throw default_exception(msg.str());
+            }
             /*proof_ref pr = get_proof();
             proof_checker checker(m);
             expr_ref_vector side_conditions(m);
@@ -1917,18 +2020,16 @@ namespace spacer {
     /**
         \brief Retrieve satisfying assignment with explanation.
     */
-    expr_ref context::mk_sat_answer () const {
-        return expr_ref(m.mk_true(), m);
-    }
-/*
     expr_ref context::mk_sat_answer() const {
         if (m_params.generate_proof_trace()) {
-            proof_ref pr = get_proof();
-            return expr_ref(pr.get(), m);
+            IF_VERBOSE(0, verbose_stream() << "Unsupported" << "\n";);
+            return expr_ref(m.mk_true(), m);
+            //proof_ref pr = get_proof();
+            //return expr_ref(pr.get(), m);
         }
         return m_search.get_trace(*this);
     }
-*/
+
 
     expr_ref context::mk_unsat_answer() const {
         expr_ref_vector refs(m);
@@ -2244,46 +2345,50 @@ namespace spacer {
         }
         Phi.reset();
 
-        // if no preds, update n.pre
-        if (preds.size () == 0) {
-            // to be uniform, we can create a dummy derivation with no premises
-            // and call report_pre (<with-no-child>) to essentially execute the
-            // following sequence of statements with n.close (<dummy_deriv>)
-            n.updt_pre (phi1);
-            n.close (); // n.m_pre -> <n.m_post, n.m_post_ctx> is concrete
-            report_pre (n);
-            return;
-        }
-
         // create a new derivation for the model
 
         // order the pts -- for now, right to left
         vector<unsigned> o_idx;
         pred_pts.reset ();
-        for (ptr_vector<func_decl>::iterator it = preds.end ()-1;
-                it >= preds.begin (); it--) {
-            pred_pts.push_back (&get_pred_transformer (*it));
-            o_idx.push_back (it-preds.begin ());
+        // ideally, I should be using a reverse-iterator, but it isn't available
+        if (preds.size () > 0) {
+            ptr_vector<func_decl>::iterator it;
+            for (ptr_vector<func_decl>::iterator fwd_it = preds.begin ();
+                    fwd_it != preds.end (); fwd_it++) {
+                //it = fwd_it;
+                it = preds.begin () + (preds.end () - fwd_it - 1);
+                pred_pts.push_back (&get_pred_transformer (*it));
+                o_idx.push_back (it-preds.begin ());
+            }
         }
-        // left to right
-        /*for (ptr_vector<func_decl>::iterator it = preds.begin ();
-                it != preds.end (); it++) {
-            pred_pts.push_back (&get_pred_transformer (*it));
-        }*/
 
-        derivation* deriv = alloc (derivation, &n, pred_pts, o_idx, m_search);
+        derivation* deriv = alloc (derivation, &n, pred_pts, o_idx, r, m_search);
         n.add_deriv (deriv);
-        deriv->ghostify (phi1);
+        deriv->setup (phi1);
 
-        // create post for the first child and add to queue
-        SASSERT (deriv->has_next ());
-        model_node& ch = deriv->next ();
+        if (deriv->has_next ()) {
+            // create post for the first child and add to queue
 
-        expr_ref post_ctx (m);
-        deriv->mk_post (phi1, post_ctx);
+            model_node& ch = deriv->next ();
 
-        ch.updt_post (phi1, post_ctx);
-        m_search.add_leaf (ch);
+            expr_ref post_ctx (m);
+            deriv->mk_prem_post (phi1, post_ctx);
+
+            ch.updt_post (phi1, post_ctx);
+            m_search.add_leaf (ch);
+
+        } else {
+
+            // no preds; phi1 is the pre
+
+            SASSERT (preds.size () == 0);
+
+            n.updt_pre (phi1);
+            n.close (deriv); // n.m_pre -> <n.m_post, n.m_post_ctx> is concrete
+            report_pre (n);
+            return;
+
+        }
 
 
         //datalog::flatten_and(phi1, Phi);
@@ -2369,7 +2474,7 @@ namespace spacer {
             sib.reset ();
             expr_ref post (ch.pre ()),
                      post_ctx (m);
-            deriv->mk_post (post, post_ctx);
+            deriv->mk_prem_post (post, post_ctx);
             sib.updt_post (post, post_ctx);
             m_search.add_leaf (sib);
         }

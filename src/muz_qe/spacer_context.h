@@ -208,8 +208,8 @@ namespace spacer {
 
         // unique id of this node and a global count of all goal nodes;
         // count is expected to be reset at every level of query
-        unsigned long long const    m_id;
-        static unsigned long long   m_count;
+        unsigned                m_id;
+        static unsigned         m_count;
 
     public:
         model_node (model_node* parent, pred_transformer& pt, unsigned level, derivation* deriv, model_search& search):
@@ -239,6 +239,7 @@ namespace spacer {
         expr_ref const& pre () const { return m_pre; }
         bool has_pre () const { return m_pre; }
         derivation* my_deriv () const { return m_my_deriv; }
+        derivation const* closing_deriv () const { return m_closing_deriv; }
         bool is_open () const { return m_open; }
         bool is_closed () const { return !m_open; }
         unsigned level () const { return m_level; }
@@ -290,7 +291,7 @@ namespace spacer {
         // separate counter, but it might pose problems when an object is
         // deleted and another one constructed at the same address, as the ids
         // may persist beyond the lifetime of the object
-        unsigned long long id () const { return m_id; }
+        unsigned id () const { return m_id; }
 
         // return a constant with name 'ghost_<n>_<str>' where n is a unique id
         // for (this) and str is the name of the given app
@@ -317,12 +318,17 @@ namespace spacer {
         model_node*                         m_concl;// conclusion
         ptr_vector<model_node>              m_prems;// all premises which need to be derived
         vector<unsigned>                    m_o_idx;// order of o-index's to be processed
+        datalog::rule const&                m_rule; // the rule from m_prems to m_concl
         ptr_vector<model_node>::iterator    m_curr_it; // the premise currently being processed
         ast_manager&                        m;
         manager const&                      m_sm;
-        vector<vector<app_ref_vector> >    m_ghosts;
+        vector<vector<app_ref_vector> >     m_ghosts;
                         // for each o_index, vector of (o_const, ghost) pairs
+        expr_ref                            m_post; // combined goal for m_prems
 
+        // substitute o-consts in phi by ghosts;
+        // resets m_ghosts and updates it for phi
+        void ghostify (expr_ref& phi);
 
         // populate m_ghosts for phi
         void mk_ghosts (expr_ref const& phi);
@@ -338,15 +344,17 @@ namespace spacer {
         derivation (model_node* concl,
                     ptr_vector<pred_transformer>& pred_pts,
                     vector<unsigned> pred_o_idx,
+                    datalog::rule const& rule,
                     model_search& search):
             m_concl (concl),
             m_o_idx (pred_o_idx),
+            m_rule (rule),
             m_curr_it (0),
             m (m_concl->get_manager ()),
-            m_sm (m_concl->get_spacer_manager ())
+            m_sm (m_concl->get_spacer_manager ()),
+            m_post (m)
         {
             SASSERT (m_concl); // non-null
-            SASSERT (m_concl->level() > 0);
             // create model-nodes for premises, corresponding to pred_pts, in order
             for (ptr_vector<pred_transformer>::iterator it = pred_pts.begin ();
                     it != pred_pts.end (); it++) {
@@ -359,7 +367,7 @@ namespace spacer {
 
         ~derivation ();
 
-        bool has_next () const { return m_curr_it+1 != m_prems.end (); }
+        bool has_next () const { return (m_prems.size () > 0 && m_curr_it+1 != m_prems.end ()); }
         bool has_prev () const { return m_curr_it != m_prems.begin (); }
         bool is_first () const { return !has_prev (); }
         bool is_last () const { return !has_next (); }
@@ -408,12 +416,17 @@ namespace spacer {
             return false;
         }
 
-        // substitute o-consts in phi by ghosts;
-        // resets m_ghosts and updates it for phi
-        void ghostify (expr_ref& phi);
+        // we need to check if phi is reachable by m_prems;
+        //   we already know that phi can reach m_concl.post
+        void setup (expr_ref& phi);
+
+        expr_ref const& post () const { return m_post; }
 
         // make post (phi) and post_ctx (ctx) for the next premise
-        void mk_post (expr_ref& phi, expr_ref& ctx) const;
+        void mk_prem_post (expr_ref& phi, expr_ref& ctx) const;
+
+        // get symbolic cex for the derivation to m_concl.post
+        void get_trace (expr_ref_vector& trace_conjs) const;
     };
 
 
@@ -474,7 +487,7 @@ namespace spacer {
         void set_root(model_node* n);
         model_node& get_root() const { return *m_root; }
         //std::ostream& display(std::ostream& out) const; 
-        //expr_ref get_trace(context const& ctx);
+        expr_ref get_trace(context const& ctx);
         //proof_ref get_proof_trace(context const& ctx);
         //void backtrack_level(bool uses_level, model_node& n);
     };
