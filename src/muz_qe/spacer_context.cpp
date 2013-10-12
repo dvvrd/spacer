@@ -839,6 +839,9 @@ namespace spacer {
     }
 
     model_node::~model_node () {
+        TRACE ("spacer",
+                tout << "Deleting model node:" << this << "\n";
+              );
         if (is_inq ()) m_search.erase_leaf (*this);
         del_derivs ();
     }
@@ -1136,6 +1139,9 @@ namespace spacer {
     }
 
     derivation::~derivation () {
+        TRACE ("spacer",
+                tout << "Destroying deriv:" << this << "\n";
+              );
         // destroy m_prems
         while (!m_prems.empty ()) {
             model_node* n = m_prems.back ();
@@ -1154,6 +1160,11 @@ namespace spacer {
         model_node* result = m_leaves.top ();
         m_leaves.pop ();
         result->outq ();
+        TRACE ("spacer",
+                tout << "Popping node for PT:" << result->pt().head()->get_name().str()
+                     << " " << result
+                     << " at level:" << result->level() << "\n";
+              );
         return result;
     }
 
@@ -1189,6 +1200,11 @@ namespace spacer {
     void model_search::enqueue_leaf(model_node& n) {
         m_leaves.push (&n);
         n.inq ();
+        TRACE ("spacer",
+                tout << "Enqueuing node for PT:" << n.pt().head()->get_name().str()
+                     << " " << &n
+                     << " at level:" << n.level() << "\n";
+              );
     }
 
     void model_search::set_root(model_node* root) {
@@ -1199,7 +1215,13 @@ namespace spacer {
         set_leaf(*root);
     }
 
-    void model_search::erase_leaf (model_node& n) { m_leaves.erase (&n); n.outq (); }
+    void model_search::erase_leaf (model_node& n) { m_leaves.erase (&n); n.outq ();
+        TRACE ("spacer",
+                tout << "Erasing node for PT:" << n.pt().head()->get_name().str()
+                     << " " << &n
+                     << " at level:" << n.level() << "\n";
+              );
+    }
 
 
 /*    obj_map<expr, unsigned>& model_search::cache(model_node const& n) {
@@ -2515,6 +2537,7 @@ namespace spacer {
         if (redo_at_higher_level (ch, deriv, *par)) {
             TRACE ("spacer", tout << "Redo child at higher level\n";);
             ch.open ();
+            TRACE ("spacer", tout << "Incrementing level for child:" << &ch << "\n";);
             ch.incr_level ();
             m_search.add_leaf (ch);
         } else {
