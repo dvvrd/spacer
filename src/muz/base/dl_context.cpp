@@ -679,6 +679,10 @@ namespace datalog {
             check_uninterpreted_free(r);
             check_existential_tail(r); 
             break;
+        case SPACER_ENGINE:
+            check_existential_tail(r);
+            check_positive_predicates(r);
+            break;
         case PDR_ENGINE:
             check_existential_tail(r);
             check_positive_predicates(r);

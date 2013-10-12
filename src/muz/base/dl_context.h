@@ -492,14 +492,14 @@ namespace datalog {
         /**
            \brief retrieve model from inductive invariant that shows query is unsat.
            
-           \pre engine == 'pdr' - this option is only supported for PDR mode.
+           \pre engine == 'pdr' or 'spacer' - this option is only supported for PDR and SPACER modes.
          */
         model_ref get_model();
 
         /**
            \brief retrieve proof from derivation of the query.
            
-           \pre engine == 'pdr' - this option is only supported for PDR mode.
+           \pre engine == 'pdr' or 'spacer' - this option is only supported for PDR and SPACER modes.
          */
         proof_ref get_proof();
 

@@ -57,6 +57,12 @@ namespace datalog {
         LAST_CACHE_MODE
     };
 
+    enum SPACER_CACHE_MODE {
+        SPACER_NO_CACHE,
+        SPACER_HASH_CACHE,
+        SPACER_CONSTRAINT_CACHE,
+        SPACER_LAST_CACHE_MODE
+    };
 
     struct std_string_hash_proc { 
         unsigned operator()(const std::string & s) const 
