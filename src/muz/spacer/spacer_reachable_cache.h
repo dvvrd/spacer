@@ -47,7 +47,7 @@ namespace spacer {
         void add_disjuncted_formula(expr * f);
         
     public:
-        reachable_cache(spacer::manager & pm, fixedpoint_params const& params);
+        reachable_cache(spacer::manager & pm, datalog::SPACER_CACHE_MODE cm);
         
         void add_init(app * f)   { add_disjuncted_formula(f); }
         

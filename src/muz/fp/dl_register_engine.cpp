@@ -22,6 +22,7 @@ Revision History:
 #include "tab_context.h"
 #include "rel_context.h"
 #include "pdr_dl_interface.h"
+#include "spacer_dl_interface.h"
 
 namespace datalog {
     register_engine::register_engine(): m_ctx(0) {}
@@ -31,6 +32,8 @@ namespace datalog {
         case PDR_ENGINE:
         case QPDR_ENGINE:
             return alloc(pdr::dl_interface, *m_ctx);
+        case SPACER_ENGINE:
+            return alloc(spacer::dl_interface, *m_ctx);
         case DATALOG_ENGINE:
             return alloc(rel_context, *m_ctx);
         case BMC_ENGINE:

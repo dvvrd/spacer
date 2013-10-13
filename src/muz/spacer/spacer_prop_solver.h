@@ -31,6 +31,8 @@ Revision History:
 #include "spacer_manager.h"
 #include "spacer_smt_context_manager.h"
 
+struct fixedpoint_params;
+
 namespace spacer {
     class prop_solver {
     
@@ -71,7 +73,7 @@ namespace spacer {
         
         
     public:
-        prop_solver(spacer::manager& pm, symbol const& name);
+        prop_solver(spacer::manager& pm, fixedpoint_params const& p, symbol const& name);
         
         /** return true is s is a symbol introduced by prop_solver */
         bool is_aux_symbol(func_decl * s) const { 

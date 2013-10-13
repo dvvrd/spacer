@@ -26,9 +26,9 @@ Revision History:
 #endif
 #include <queue>
 #include "spacer_manager.h"
-#include "dl_base.h"
 #include "spacer_prop_solver.h"
 #include "spacer_reachable_cache.h"
+#include "fixedpoint_params.hpp"
 
 
 namespace datalog {

@@ -906,6 +906,9 @@ namespace datalog {
         if (e == symbol("datalog")) {
             m_engine_type = DATALOG_ENGINE;
         }
+        else if (e == symbol("spacer")) {
+            m_engine_type = SPACER_ENGINE;
+        }
         else if (e == symbol("pdr")) {
             m_engine_type = PDR_ENGINE;
         }
@@ -954,6 +957,7 @@ namespace datalog {
         m_last_answer = 0;
         switch (get_engine()) {
         case DATALOG_ENGINE:
+        case SPACER_ENGINE:
         case PDR_ENGINE:
         case QPDR_ENGINE:
         case BMC_ENGINE:

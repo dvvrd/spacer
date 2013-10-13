@@ -37,11 +37,11 @@ Notes:
 #include "rewriter_def.h"
 #include "util.h"
 #include "spacer_manager.h"
-#include "spacer_prop_solver.h"
 #include "spacer_util.h"
 #include "arith_decl_plugin.h"
 #include "expr_replacer.h"
 #include "model_smt2_pp.h"
+#include "scoped_proof.h"
 
 
 namespace spacer {
@@ -950,7 +950,7 @@ namespace spacer {
     void reduce_disequalities(model& model, unsigned threshold, expr_ref& fml) {
         ast_manager& m = fml.get_manager();
         expr_ref_vector conjs(m);
-        datalog::flatten_and(fml, conjs);
+        qe::flatten_and(fml, conjs);
         obj_map<expr, unsigned> diseqs;
         expr* n, *lhs, *rhs;
         for (unsigned i = 0; i < conjs.size(); ++i) {
@@ -1068,7 +1068,7 @@ namespace spacer {
 
     void hoist_non_bool_if(expr_ref& fml) {
         ast_manager& m = fml.get_manager();
-        datalog::scoped_no_proof _sp(m);
+        scoped_no_proof _sp(m);
         params_ref p;
         ite_hoister_star ite_rw(m, p);
         expr_ref tmp(m);

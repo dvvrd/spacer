@@ -23,6 +23,7 @@ Revision History:
 #include "lbool.h"
 #include "dl_rule.h"
 #include "dl_rule_set.h"
+#include "dl_engine_base.h"
 #include "statistics.h"
 
 namespace datalog {
@@ -33,7 +34,7 @@ namespace spacer {
 
     class context;
 
-    class dl_interface {
+    class dl_interface : public datalog::engine_base {
         datalog::context& m_ctx;
         datalog::rule_set m_spacer_rules;
         datalog::rule_set m_old_rules;

@@ -44,6 +44,7 @@ Notes:
 #include "proof_checker.h"
 #include "smt_value_sort.h"
 #include "proof_utils.h"
+#include "scoped_proof.h"
 
 namespace spacer {
 
@@ -74,9 +75,9 @@ namespace spacer {
     pred_transformer::pred_transformer(context& ctx, manager& pm, func_decl* head): 
         pm(pm), m(pm.get_manager()),
         ctx(ctx), m_head(head, m), 
-        m_sig(m), m_solver(pm, head->get_name()),
+        m_sig(m), m_solver(pm, ctx.get_params(), head->get_name()),
         m_invariants(m), m_transition(m), m_initial_state(m), 
-        m_reachable(pm, pm.get_params())
+        m_reachable(pm, (datalog::SPACER_CACHE_MODE)ctx.get_params().cache_mode())
     { init_sig (); }
 
     pred_transformer::~pred_transformer() {
@@ -340,7 +341,7 @@ namespace spacer {
 
     void pred_transformer::add_property(expr* lemma, unsigned lvl) {
         expr_ref_vector lemmas(m);
-        datalog::flatten_and(lemma, lemmas);
+        qe::flatten_and(lemma, lemmas);
         for (unsigned i = 0; i < lemmas.size(); ++i) {
             expr* lemma_i = lemmas[i].get();
             if (add_property1(lemma_i, lvl)) {
@@ -622,7 +623,7 @@ namespace spacer {
         for (unsigned i = ut_size; i < t_size; ++i) {
             tail.push_back(rule.get_tail(i));
         }        
-        datalog::flatten_and(tail);
+        qe::flatten_and(tail);
         for (unsigned i = 0; i < tail.size(); ++i) {
             expr_ref tmp(m);
             var_subst(m, false)(tail[i].get(), var_reprs.size(), (expr*const*)var_reprs.c_ptr(), tmp);
@@ -885,7 +886,7 @@ namespace spacer {
         ast_manager& m = pt().get_manager();
         expr_ref_vector conjs(m);
         obj_map<expr,expr*> model;
-        datalog::flatten_and(state(), conjs);
+        qe::flatten_and(state(), conjs);
         for (unsigned i = 0; i < conjs.size(); ++i) {
             expr* e = conjs[i].get(), *e1, *e2;
             if (m.is_eq(e, e1, e2) || m.is_iff(e, e1, e2)) {
@@ -1533,7 +1534,7 @@ namespace spacer {
           m_params(params),
           m(m),
           m_context(0),
-          m_pm(m_fparams, params, m),
+          m_pm(m_fparams, params.max_num_contexts(), m),
           m_query_pred(m),
           m_query(0),
           m_search(),
@@ -1774,7 +1775,7 @@ namespace spacer {
 
         switch(m_last_result) {
         case l_true: {
-            datalog::scoped_no_proof _sc(m);
+            scoped_no_proof _sc(m);
             expr_ref const& cex = get_answer ();
             smt::kernel solver (m, get_fparams());
             solver.assert_expr (cex);
@@ -1892,16 +1893,17 @@ namespace spacer {
             m_fparams.m_arith_auto_config_simplex = true;
             m_fparams.m_arith_propagate_eqs = false;
             m_fparams.m_arith_eager_eq_axioms = false;
-            /*if (classify.is_dl()) {
-                m_fparams.m_arith_mode = AS_DIFF_LOGIC;
-                m_fparams.m_arith_expand_eqs = true;
+            if (m_params.use_utvpi()) {
+                if (classify.is_dl()) {
+                    m_fparams.m_arith_mode = AS_DIFF_LOGIC;
+                    m_fparams.m_arith_expand_eqs = true;
+                }
+                else if (classify.is_utvpi() && m_params.use_utvpi()) {
+                    IF_VERBOSE(1, verbose_stream() << "UTVPI\n";);
+                    m_fparams.m_arith_mode = AS_UTVPI;
+                    m_fparams.m_arith_expand_eqs = true;                
+                }
             }
-            else if (classify.is_utvpi() && m_params.use_utvpi()) {
-                IF_VERBOSE(1, verbose_stream() << "UTVPI\n";);
-                m_fparams.m_arith_mode = AS_UTVPI;
-                m_fparams.m_arith_expand_eqs = true;                
-            }*/
-
         }
         if (!use_mc && m_params.use_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_bool_inductive_generalizer, *this, 0));
@@ -2274,7 +2276,7 @@ namespace spacer {
     void context::create_children(model_node& n) {        
         SASSERT(n.level() >= 0);
         bool use_model_generalizer = m_params.use_model_generalizer();
-        datalog::scoped_no_proof _sc(m);
+        scoped_no_proof _sc(m);
  
         pred_transformer& pt = n.pt();
         model_ref M = get_curr_model_ptr();
@@ -2310,7 +2312,7 @@ namespace spacer {
             (*it)->add_lemmas (pred_level, it-pred_pts.begin (), forms);
         }
 
-        datalog::flatten_and(forms);        
+        qe::flatten_and(forms);        
         ptr_vector<expr> forms1(forms.size(), forms.c_ptr());
 
         model_evaluator mev(m);
@@ -2413,7 +2415,7 @@ namespace spacer {
         }
 
 
-        //datalog::flatten_and(phi1, Phi);
+        //qe::flatten_and(phi1, Phi);
 /*      unsigned_vector indices;
         vector<expr_ref_vector> child_states;
         child_states.resize(preds.size(), expr_ref_vector(m));

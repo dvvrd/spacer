@@ -137,7 +137,7 @@ namespace spacer {
             C = pm.mk_or(Bs);
             TRACE("spacer", tout << "prop:\n" << mk_pp(A,m) << "\ngen:" << mk_pp(B, m) << "\nto: " << mk_pp(C, m) << "\n";);
             core.reset();
-            datalog::flatten_and(C, core);    
+            qe::flatten_and(C, core);    
             uses_level = true;
         }    
     }

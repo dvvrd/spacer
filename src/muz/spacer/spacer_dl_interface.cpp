@@ -17,7 +17,6 @@ Revision History:
 
 --*/
 
-#include "dl_cmds.h"
 #include "dl_context.h"
 #include "dl_mk_coi_filter.h"
 #include "dl_mk_interp_tail_simplifier.h"
@@ -33,10 +32,12 @@ Revision History:
 #include "dl_mk_unfold.h"
 #include "dl_mk_coalesce.h"
 #include "model_smt2_pp.h"
+#include "scoped_proof.h"
 
 using namespace spacer;
 
 dl_interface::dl_interface(datalog::context& ctx) : 
+    engine_base(ctx.get_manager(), "spacer"),
     m_ctx(ctx), 
     m_spacer_rules(ctx), 
     m_old_rules(ctx),
@@ -148,7 +149,7 @@ lbool dl_interface::query(expr * query) {
     m_ctx.reopen();
     m_ctx.replace_rules(old_rules);
     
-    datalog::scoped_restore_proof _sc(m); // update_rules may overwrite the proof mode.
+    scoped_restore_proof _sc(m); // update_rules may overwrite the proof mode.
 
     m_context->set_proof_converter(m_ctx.get_proof_converter());
     m_context->set_model_converter(m_ctx.get_model_converter());
