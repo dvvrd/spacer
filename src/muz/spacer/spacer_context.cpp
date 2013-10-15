@@ -559,11 +559,13 @@ namespace spacer {
         expr_ref_vector transitions(m);
         ptr_vector<datalog::rule const> tr_rules;
         datalog::rule const* rule;
-        expr_ref_vector disj(m);
+        expr_ref_vector disj(m), init_conds (m);
         app_ref pred(m);
+        vector<bool> is_init;
         for (unsigned i = 0; i < rules().size(); ++i) {
-            init_rule(pts, *rules()[i], init, tr_rules, transitions);
+            init_rule(pts, *rules()[i], is_init, tr_rules, transitions);
         }
+        SASSERT (is_init.size () == transitions.size ());
         switch(transitions.size()) {
         case 0:
             transition = m.mk_false(); 
@@ -576,6 +578,10 @@ namespace spacer {
             m_rule2tag.insert(rule, pred.get());            
             transitions.push_back(pred);
             transition = pm.mk_and(transitions);
+            // mk init condition
+            if (!is_init[0]) {
+                init_conds.push_back (m.mk_not (pred));
+            }
             break;
         default:
             for (unsigned i = 0; i < transitions.size(); ++i) {
@@ -585,17 +591,23 @@ namespace spacer {
                 m_rule2tag.insert(rule, pred);                
                 disj.push_back(pred);
                 transitions[i] = m.mk_implies(pred, transitions[i].get());
+                // update init conds
+                if (!is_init[i]) {
+                    init_conds.push_back (m.mk_not (pred));
+                }
             }
             transitions.push_back(m.mk_or(disj.size(), disj.c_ptr()));
             transition = pm.mk_and(transitions);
             break;                 
         }
+        // mk init condition
+        init = pm.mk_and (init_conds);
     }
 
     void pred_transformer::init_rule(
         decl2rel const&      pts,
         datalog::rule const& rule, 
-        expr_ref&            init, 
+        vector<bool>&     is_init, 
         ptr_vector<datalog::rule const>& rules,
         expr_ref_vector&     transitions) 
     {
@@ -643,9 +655,7 @@ namespace spacer {
             // no-op.
         }
         else {
-            if (ut_size == 0) {
-                init = m.mk_or(init, fml);
-            }
+            is_init.push_back (ut_size == 0);
             transitions.push_back(fml);            
             m.inc_ref(fml);
             m_rule2transition.insert(&rule, fml.get());
