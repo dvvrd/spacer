@@ -1059,7 +1059,7 @@ namespace spacer {
     }
 
     void derivation::setup (expr_ref& phi) {
-        m_post = phi;
+        //m_post = phi;
         ghostify (phi);
     }
 
@@ -2595,6 +2595,7 @@ namespace spacer {
 
     // TODO: better check?
     bool context::redo_at_higher_level (model_node const& ch, derivation const* d, model_node const& par) const {
+        return false;
         unsigned ch_level = ch.level ();
         unsigned root_level = m_search.get_root ().level ();
         return (ch_level < root_level && // level can be increased

@@ -191,7 +191,7 @@ namespace pdr {
             
             res = extract_consequence(0, m_coeffs.size());
 
-#if 1
+#if 0
             // partition equalities into variable disjoint sets.
             // take the conjunction of these instead of the
             // linear combination.

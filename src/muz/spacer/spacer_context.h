@@ -324,7 +324,7 @@ namespace spacer {
         manager const&                      m_sm;
         vector<vector<app_ref_vector> >     m_ghosts;
                         // for each o_index, vector of (o_const, ghost) pairs
-        expr_ref                            m_post; // combined goal for m_prems
+        //expr_ref                            m_post; // combined goal for m_prems
 
         // substitute o-consts in phi by ghosts;
         // resets m_ghosts and updates it for phi
@@ -351,8 +351,8 @@ namespace spacer {
             m_rule (rule),
             m_curr_it (0),
             m (m_concl->get_manager ()),
-            m_sm (m_concl->get_spacer_manager ()),
-            m_post (m)
+            m_sm (m_concl->get_spacer_manager ())
+            //m_post (m)
         {
             SASSERT (m_concl); // non-null
             // create model-nodes for premises, corresponding to pred_pts, in order
@@ -420,7 +420,7 @@ namespace spacer {
         //   we already know that phi can reach m_concl.post
         void setup (expr_ref& phi);
 
-        expr_ref const& post () const { return m_post; }
+        //expr_ref const& post () const { return m_post; }
 
         // make post (phi) and post_ctx (ctx) for the next premise
         void mk_prem_post (expr_ref& phi, expr_ref& ctx) const;
