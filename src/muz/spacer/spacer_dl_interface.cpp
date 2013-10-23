@@ -33,6 +33,7 @@ Revision History:
 #include "dl_mk_coalesce.h"
 #include "model_smt2_pp.h"
 #include "scoped_proof.h"
+#include "dl_transforms.h"
 
 using namespace spacer;
 
@@ -102,7 +103,7 @@ lbool dl_interface::query(expr * query) {
           );
 
 
-    m_ctx.apply_default_transformation();
+    apply_default_transformation(m_ctx);
 
     if (m_ctx.get_params().slice()) {
         datalog::rule_transformer transformer(m_ctx);
