@@ -2381,15 +2381,18 @@ namespace spacer {
         // create a new derivation for the model
 
         // order the pts -- for now, right to left
+        bool r_to_l = true;
         vector<unsigned> o_idx;
         pred_pts.reset ();
-        // ideally, I should be using a reverse-iterator, but it isn't available
+        // preds is ordered by o-idx and is right-to-left
         if (preds.size () > 0) {
             ptr_vector<func_decl>::iterator it;
             for (ptr_vector<func_decl>::iterator fwd_it = preds.begin ();
                     fwd_it != preds.end (); fwd_it++) {
-                //it = fwd_it;
-                it = preds.begin () + (preds.end () - fwd_it - 1);
+
+                if (r_to_l) { it = fwd_it; }
+                else { it = preds.begin () + (preds.end () - fwd_it - 1); }
+
                 pred_pts.push_back (&get_pred_transformer (*it));
                 o_idx.push_back (it-preds.begin ());
             }
