@@ -21,7 +21,7 @@ def parseArgs (argv):
                     default=False)
     p.add_argument ('--engine', help='Datalog Engine (pdr/spacer)', default='spacer')
     p.add_argument ('--verbose', help='Z3 verbosity', default=0)
-    p.add_argument ('--use-utvpi', dest=use_utvpi, help='Z3 verbosity',
+    p.add_argument ('--use-utvpi', dest='use_utvpi', help='Z3 verbosity',
                     action='store_true', default=False)
 
     return p.parse_args (argv)
