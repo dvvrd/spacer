@@ -1907,8 +1907,7 @@ namespace spacer {
                 if (classify.is_dl()) {
                     m_fparams.m_arith_mode = AS_DIFF_LOGIC;
                     m_fparams.m_arith_expand_eqs = true;
-                }
-                else if (classify.is_utvpi() && m_params.use_utvpi()) {
+                } else if (classify.is_utvpi()) {
                     IF_VERBOSE(1, verbose_stream() << "UTVPI\n";);
                     m_fparams.m_arith_mode = AS_UTVPI;
                     m_fparams.m_arith_expand_eqs = true;                
