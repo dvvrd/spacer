@@ -2381,7 +2381,7 @@ namespace spacer {
         // create a new derivation for the model
 
         // order the pts -- for now, right to left
-        bool r_to_l = true;
+        bool r_to_l = (m_params.order_children() == 0);
         vector<unsigned> o_idx;
         pred_pts.reset ();
         // preds is ordered by o-idx and is right-to-left
