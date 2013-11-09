@@ -135,19 +135,20 @@ namespace qe {
                 expr_ref t(m);
                 bool is_strict;
                 if (is_linear(lits[i].get(), c, t, is_strict)) {
-                    m_ineq_coeffs.push_back(c);
-                    m_ineq_terms.push_back(t);
-                    m_ineq_strict.push_back(is_strict);
                     if (c.is_zero()) {
                         m_rw(lits[i].get(), t);
                         new_lits.push_back(t);
+                    } else {
+                        m_ineq_coeffs.push_back(c);
+                        m_ineq_terms.push_back(t);
+                        m_ineq_strict.push_back(is_strict);
+                        if (c.is_pos()) {
+                            ++num_pos;
+                        }
+                        else {
+                            ++num_neg;
+                        }                    
                     }
-                    else if (c.is_pos()) {
-                        ++num_pos;
-                    }
-                    else {
-                        ++num_neg;
-                    }                    
                 }
                 else {
                     new_lits.push_back(lits[i].get());
