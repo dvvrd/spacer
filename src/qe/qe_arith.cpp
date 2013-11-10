@@ -149,10 +149,10 @@ namespace qe {
                         if (is_diseq) {
                             // c*x + t != 0
                             // find out whether c*x + t < 0, or c*x + t > 0
-                            expr* cx = mk_mul (c, m_var->x());
-                            expr* cxt = mk_add (cx, t);
-                            expr_ref val (m);
+                            expr_ref cx (m), cxt (m), val (m);
                             rational r;
+                            cx = mk_mul (c, m_var->x());
+                            cxt = mk_add (cx, t);
                             VERIFY(model.eval(cxt, val));
                             VERIFY(a.is_numeral(val, r));
                             SASSERT (r > rational::zero () || r < rational::zero ());
@@ -181,10 +181,10 @@ namespace qe {
                 // substitute eq_term for x everywhere
                 for (unsigned i = 0; i < m_ineq_terms.size(); ++i) {
                     // c*x + t <= 0
-                    expr* cx = mk_mul (m_ineq_coeffs[i], eq_term);
-                    expr* cxt = mk_add (cx, m_ineq_terms.get(i));
-                    expr* z  = a.mk_numeral(rational(0), m.get_sort(eq_term));
-                    expr_ref result (m);
+                    expr_ref cx (m), cxt (m), z (m), result (m);
+                    cx = mk_mul (m_ineq_coeffs[i], eq_term);
+                    cxt = mk_add (cx, m_ineq_terms.get(i));
+                    z = a.mk_numeral(rational(0), m.get_sort(eq_term));
                     if (m_ineq_strict[i]) {
                         result = a.mk_lt (cxt, z);
                     } else {
@@ -251,12 +251,13 @@ namespace qe {
             rational const& bc = m_ineq_coeffs[j];
             SASSERT(ac.is_pos() != bc.is_pos());
             SASSERT(ac.is_neg() != bc.is_neg());
+            expr_ref bt (m), as (m), ts (m), z (m);
             expr* t = m_ineq_terms[i].get();
             expr* s = m_ineq_terms[j].get();
-            expr* bt = mk_mul(abs(bc), t);
-            expr* as = mk_mul(abs(ac), s);
-            expr* ts = mk_add(bt, as);
-            expr*    z  = a.mk_numeral(rational(0), m.get_sort(t));
+            bt = mk_mul(abs(bc), t);
+            as = mk_mul(abs(ac), s);
+            ts = mk_add(bt, as);
+            z  = a.mk_numeral(rational(0), m.get_sort(t));
             expr_ref result1(m), result2(m);
             if (m_ineq_strict[i] || m_ineq_strict[j]) {
                 result1 = a.mk_lt(ts, z);
@@ -278,10 +279,11 @@ namespace qe {
             rational const& bc = m_ineq_coeffs[j];
             SASSERT(ac.is_pos() == bc.is_pos());
             SASSERT(ac.is_neg() == bc.is_neg());
+            expr_ref bt (m), as (m);
             expr* t = m_ineq_terms[i].get();
             expr* s = m_ineq_terms[j].get();
-            expr* bt = mk_mul(abs(bc), t);
-            expr* as = mk_mul(abs(ac), s);
+            bt = mk_mul(abs(bc), t);
+            as = mk_mul(abs(ac), s);
             expr_ref result1(m), result2(m);
             if (m_ineq_strict[j] && !m_ineq_strict[i]) {
                 result1 = a.mk_lt(bt, as);
