@@ -9,6 +9,7 @@
 #include "qe_util.h"
 #include "smt_context.h"
 #include "expr_abstract.h"
+#include "model_smt2_pp.h"
 
 static expr_ref parse_fml(ast_manager& m, char const* str) {
     expr_ref result(m);
@@ -45,6 +46,10 @@ static char const* example6 = "(and (<= 0 (+ x z))\
      (>= x 0.0)\
      (<= x 1.0))";
 
+static char const* example7 = "(and (= y x) (<= z x) (<= x u) (<= x v) (<= x t))";
+static char const* example8 = "(and (= x y) (< x 5.0))";
+static char const* example9 = "(and (not (= x y)) (< x 5.0))";
+static char const* example10 = "(and (not (= x y)) (< x 5.0) (> x z) (> x 0.0))";
 
 static void test(char const *ex) {
     smt_params params;
@@ -67,7 +72,9 @@ static void test(char const *ex) {
     expr_ref pr = qe::arith_project(*md, vars, lits);
     
     std::cout << mk_pp(fml, m) << "\n";
+    model_smt2_pp (std::cout, m, *md, 0);
     std::cout << mk_pp(pr, m) << "\n";
+    std::cout << "\n";
     
 }
 
@@ -121,15 +128,20 @@ static void test2(char const *ex) {
     VERIFY(l_false == ctx.check());
     ctx.pop(1);
     
+    std::cout << "\n";
     
 }
 
 void tst_qe_arith() {
     test2(example6);
-    return;
+    //return;
     test(example1);
     test(example2);
     test(example3);
     test(example4);
     test(example5);
+    test(example7);
+    test(example8);
+    test(example9);
+    test(example10);
 }
