@@ -20,13 +20,31 @@ Revision History:
 
 #include "qe_arith.h"
 #include "qe_util.h"
+#include "qe.h"
 #include "arith_decl_plugin.h"
 #include "ast_pp.h"
 #include "th_rewriter.h"
 #include "expr_functors.h"
+#include "expr_substitution.h"
+#include "expr_replacer.h"
 
 namespace qe {
-    
+
+    class is_relevant_default : public i_expr_pred {
+    public:
+        bool operator()(expr* e) {
+            return true;
+        }
+    };
+
+    class mk_atom_default : public i_nnf_atom {
+    public:
+        virtual void operator()(expr* e, bool pol, expr_ref& result) {
+            if (pol) result = e; 
+            else result = result.get_manager().mk_not(e);
+        }
+    };
+
     class arith_project_util {
         ast_manager& m;
         arith_util   a;
@@ -244,6 +262,132 @@ namespace qe {
             }
         }
 
+        void project(model& mdl, app_ref_vector const& lits, expr_map& map) {
+            unsigned num_pos = 0;
+            unsigned num_neg = 0;
+            bool use_eq = false;
+
+            m_lits.reset ();
+            m_terms.reset();
+            m_coeffs.reset();
+            m_strict.reset();
+            m_eq.reset ();
+
+            for (unsigned i = 0; i < lits.size(); ++i) {
+                rational c(0);
+                expr_ref t(m);
+                bool is_strict = false;
+                bool is_eq = false;
+                bool is_diseq = false;
+                if (is_linear(lits.get (i), c, t, is_strict, is_eq, is_diseq)) {
+                    if (c.is_zero()) {
+                        continue;
+                    }
+                    if (is_eq) {
+                        // c*x + t = 0  <=>  x = -t/c
+                        // check if the equality is true in the mdl
+                        if (!use_eq) {
+                            expr_ref cx (m), cxt (m), val (m);
+                            rational r;
+                            cx = mk_mul (c, m_var->x());
+                            cxt = mk_add (cx, t);
+                            VERIFY(mdl.eval(cxt, val));
+                            VERIFY(a.is_numeral(val, r));
+                            if (r == rational::zero ()) {
+                                expr_ref eq_term (mk_mul (-(rational::one ()/c), t), m);
+                                m_rw (eq_term);
+                                map.insert (m_var->x (), eq_term, 0);
+                                use_eq = true;
+                                TRACE ("qe",
+                                        tout << "Using equality term: " << mk_pp (eq_term, m) << "\n";
+                                      );
+                            }
+                        }
+                        m_lits.push_back (lits.get (i));
+                        m_coeffs.push_back(c);
+                        m_terms.push_back(t);
+                        m_strict.push_back(false);
+                        m_eq.push_back (true);
+                    } else {
+                        if (is_diseq) {
+                            // c*x + t != 0
+                            // find out whether c*x + t < 0, or c*x + t > 0
+                            expr_ref cx (m), cxt (m), val (m);
+                            rational r;
+                            cx = mk_mul (c, m_var->x());
+                            cxt = mk_add (cx, t);
+                            VERIFY(mdl.eval(cxt, val));
+                            VERIFY(a.is_numeral(val, r));
+                            SASSERT (r > rational::zero () || r < rational::zero ());
+                            if (r > rational::zero ()) {
+                                c = -c;
+                                t = mk_mul (-(rational::one()), t);
+                            }
+                            is_strict = true;
+                        }
+                        m_lits.push_back (lits.get (i));
+                        m_coeffs.push_back(c);
+                        m_terms.push_back(t);
+                        m_strict.push_back(is_strict);
+                        m_eq.push_back (false);
+                        if (c.is_pos()) {
+                            ++num_pos;
+                        }
+                        else {
+                            ++num_neg;
+                        }                    
+                    }
+                }
+            }
+
+            if (use_eq) return;
+            
+            expr_ref new_lit (m);
+
+            if (num_pos == 0 || num_neg == 0) {
+                // make all equalities false and inequalities true
+                for (unsigned i = 0; i < m_lits.size (); i++) {
+                    if (m_eq[i]) {
+                        new_lit = m.mk_false ();
+                    } else {
+                        new_lit = m.mk_true ();
+                    }
+                    map.insert (m_lits.get (i), new_lit, 0);
+                    TRACE ("qe",
+                            tout << "Old literal: " << mk_pp (m_lits.get (i), m) << "\n";
+                            tout << "New literal: " << mk_pp (new_lit, m) << "\n";
+                          );
+                }
+                return;
+            }
+
+            bool use_pos = num_pos < num_neg;
+            unsigned max_t = find_max(mdl, use_pos);
+
+            for (unsigned i = 0; i < m_lits.size(); ++i) {
+                if (i != max_t) {
+                    if (m_eq[i]) {
+                       if (!m_strict[max_t]) {
+                           new_lit = mk_eq (i, max_t);
+                       } else {
+                           new_lit = m.mk_false ();
+                       }
+                    } else if (m_coeffs[i].is_pos() == use_pos) {
+                        new_lit = mk_le (i, max_t);
+                    } else {
+                        new_lit = mk_lt (i, max_t);
+                    }
+                } else {
+                    new_lit = m.mk_true ();
+                }
+                map.insert (m_lits.get (i), new_lit, 0);
+                TRACE ("qe",
+                        tout << "Old literal: " << mk_pp (m_lits.get (i), m) << "\n";
+                        tout << "New literal: " << mk_pp (new_lit, m) << "\n";
+                      );
+            }
+        }
+
         unsigned find_max(model& mdl, bool do_pos) {
             unsigned result;
             bool found = false;
@@ -327,6 +471,19 @@ namespace qe {
             m_rw(result1, result2);
             return result2;
         }
+        
+        // ax + t = 0
+        // bx + s <= 0
+        // replace equality by (-t/a == -s/b), or, as = bt
+        expr_ref mk_eq (unsigned i, unsigned j) {
+            expr_ref as (m), bt (m);
+            as = mk_mul (m_coeffs[i], m_terms.get (j));
+            bt = mk_mul (m_coeffs[j], m_terms.get (i));
+            expr_ref result (m);
+            result = m.mk_eq (as, bt);
+            m_rw (result);
+            return result;
+        }
 
 
         expr* mk_add(expr* t1, expr* t2) {
@@ -335,6 +492,56 @@ namespace qe {
         expr* mk_mul(rational const& r, expr* t2) {
             expr* t1 = a.mk_numeral(r, m.get_sort(t2));
             return a.mk_mul(t1, t2);
+        }
+
+        void collect_lits (expr* fml, app_ref_vector& lits) {
+            expr_ref_vector todo (m);
+            ast_mark visited;
+            todo.push_back(fml);
+            while (!todo.empty()) {
+                expr* e = todo.back();
+                todo.pop_back();
+                if (visited.is_marked(e)) {
+                    continue;
+                }
+                visited.mark(e, true);
+                if (!is_app(e)) {
+                    continue;
+                }
+                app* a = to_app(e);
+                if (m.is_and(a) || m.is_or(a)) {
+                    for (unsigned i = 0; i < a->get_num_args(); ++i) {
+                        todo.push_back(a->get_arg(i));
+                    }
+                } else {
+                    lits.push_back (a);
+                }
+            }
+            SASSERT(todo.empty());
+            visited.reset();
+        }
+
+        void substitute (expr_ref& fml, app_ref_vector& lits, expr_map& map) {
+            expr_substitution sub (m);
+            // literals
+            for (unsigned i = 0; i < lits.size (); i++) {
+                expr* new_lit = 0; proof* pr = 0;
+                app* old_lit = lits.get (i);
+                map.get (old_lit, new_lit, pr);
+                if (new_lit) {
+                    sub.insert (old_lit, new_lit);
+                }
+            }
+            // equality term
+            expr* eq_term = 0; proof* pr = 0;
+            map.get (m_var->x (), eq_term, pr);
+            if (eq_term) {
+                sub.insert (m_var->x (), eq_term);
+            }
+            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+            rep->set_substitution (&sub);
+            (*rep)(fml);
+            m_rw (fml);
         }
 
     public:
@@ -362,7 +569,34 @@ namespace qe {
             vars.reset();
             vars.append(new_vars);
             return qe::mk_and(result);
-        }  
+        }
+
+        void operator()(model& mdl, app_ref_vector& vars, expr_ref& fml) {
+            app_ref_vector new_vars(m);
+            app_ref_vector lits (m);
+            expr_map map (m);
+            for (unsigned i = 0; i < vars.size(); ++i) {
+                app* v = vars.get (i);
+                m_var = alloc(contains_app, m, v);
+                try {
+                    map.reset ();
+                    lits.reset ();
+                    collect_lits (fml, lits);
+                    project (mdl, lits, map);
+                    substitute (fml, lits, map);
+                    TRACE("qe",
+                            tout << "projected: " << mk_pp(v, m) << " "
+                                 << mk_pp(fml, m) << "\n";
+                         );
+                }
+                catch (cant_project) {
+                    IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
+                    new_vars.push_back(v);
+                }
+            }
+            vars.reset();
+            vars.append(new_vars);
+        }
     };
 
     expr_ref arith_project(model& mdl, app_ref_vector& vars, expr_ref_vector const& lits) {
@@ -371,12 +605,15 @@ namespace qe {
         return ap(mdl, vars, lits);
     }
 
-    expr_ref arith_project(model& model, app_ref_vector& vars, expr* fml) {
+    expr_ref arith_project(model& mdl, app_ref_vector& vars, expr* fml) {
         ast_manager& m = vars.get_manager();
         arith_project_util ap(m);
-        expr_ref_vector lits(m);
-        qe::flatten_and(fml, lits);
-        return ap(model, vars, lits);
+        expr_ref result (fml, m);
+        atom_set pos_lits, neg_lits;
+        is_relevant_default is_relevant;
+        mk_atom_default mk_atom;
+        get_nnf (result, is_relevant, mk_atom, pos_lits, neg_lits);
+        ap(mdl, vars, result);
+        return result;
     }
-
 }
