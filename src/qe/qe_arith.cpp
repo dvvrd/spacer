@@ -31,9 +31,11 @@ namespace qe {
         ast_manager& m;
         arith_util   a;
         th_rewriter  m_rw;
-        expr_ref_vector  m_ineq_terms;
-        vector<rational> m_ineq_coeffs;
-        svector<bool>    m_ineq_strict;
+        expr_ref_vector  m_lits;
+        expr_ref_vector  m_terms;
+        vector<rational> m_coeffs;
+        svector<bool>    m_strict;
+        svector<bool>    m_eq;
         scoped_ptr<contains_app> m_var;
 
         struct cant_project {};
@@ -124,27 +126,40 @@ namespace qe {
             return true;
         }
 
-        void project(model& model, expr_ref_vector& lits) {
+        void project(model& mdl, expr_ref_vector& lits) {
             unsigned num_pos = 0;
             unsigned num_neg = 0;
-            expr_ref eq_term (m);
-            m_ineq_terms.reset();
-            m_ineq_coeffs.reset();
-            m_ineq_strict.reset();
+            bool use_eq = false;
             expr_ref_vector new_lits(m);
+            expr_ref eq_term (m);
+
+            m_lits.reset ();
+            m_terms.reset();
+            m_coeffs.reset();
+            m_strict.reset();
+            m_eq.reset ();
+
             for (unsigned i = 0; i < lits.size(); ++i) {
                 rational c(0);
                 expr_ref t(m);
                 bool is_strict = false;
                 bool is_eq = false;
                 bool is_diseq = false;
-                if (is_linear(lits[i].get(), c, t, is_strict, is_eq, is_diseq)) {
+                if (is_linear(lits.get (i), c, t, is_strict, is_eq, is_diseq)) {
                     if (c.is_zero()) {
-                        m_rw(lits[i].get(), t);
+                        m_rw(lits.get (i), t);
                         new_lits.push_back(t);
                     } else if (is_eq) {
-                        // c*x + t = 0  <=>  x = -t/c
-                        eq_term = mk_mul (-(rational::one ()/c), t);
+                        if (!use_eq) {
+                            // c*x + t = 0  <=>  x = -t/c
+                            eq_term = mk_mul (-(rational::one ()/c), t);
+                            use_eq = true;
+                        }
+                        m_lits.push_back (lits.get (i));
+                        m_coeffs.push_back(c);
+                        m_terms.push_back(t);
+                        m_strict.push_back(false);
+                        m_eq.push_back (true);
                     } else {
                         if (is_diseq) {
                             // c*x + t != 0
@@ -153,7 +168,7 @@ namespace qe {
                             rational r;
                             cx = mk_mul (c, m_var->x());
                             cxt = mk_add (cx, t);
-                            VERIFY(model.eval(cxt, val));
+                            VERIFY(mdl.eval(cxt, val));
                             VERIFY(a.is_numeral(val, r));
                             SASSERT (r > rational::zero () || r < rational::zero ());
                             if (r > rational::zero ()) {
@@ -162,9 +177,11 @@ namespace qe {
                             }
                             is_strict = true;
                         }
-                        m_ineq_coeffs.push_back(c);
-                        m_ineq_terms.push_back(t);
-                        m_ineq_strict.push_back(is_strict);
+                        m_lits.push_back (lits.get (i));
+                        m_coeffs.push_back(c);
+                        m_terms.push_back(t);
+                        m_strict.push_back(is_strict);
+                        m_eq.push_back (false);
                         if (c.is_pos()) {
                             ++num_pos;
                         }
@@ -174,20 +191,27 @@ namespace qe {
                     }
                 }
                 else {
-                    new_lits.push_back(lits[i].get());
+                    new_lits.push_back(lits.get (i));
                 }
             }
-            if (eq_term) {
+            if (use_eq) {
+                TRACE ("qe",
+                        tout << "Using equality term: " << mk_pp (eq_term, m) << "\n";
+                      );
                 // substitute eq_term for x everywhere
-                for (unsigned i = 0; i < m_ineq_terms.size(); ++i) {
-                    // c*x + t <= 0
+                for (unsigned i = 0; i < m_lits.size(); ++i) {
                     expr_ref cx (m), cxt (m), z (m), result (m);
-                    cx = mk_mul (m_ineq_coeffs[i], eq_term);
-                    cxt = mk_add (cx, m_ineq_terms.get(i));
+                    cx = mk_mul (m_coeffs[i], eq_term);
+                    cxt = mk_add (cx, m_terms.get(i));
                     z = a.mk_numeral(rational(0), m.get_sort(eq_term));
-                    if (m_ineq_strict[i]) {
+                    if (m_eq[i]) {
+                        // c*x + t = 0
+                        result = a.mk_eq (cxt, z);
+                    } else if (m_strict[i]) {
+                        // c*x + t < 0
                         result = a.mk_lt (cxt, z);
                     } else {
+                        // c*x + t <= 0
                         result = a.mk_le (cxt, z);
                     }
                     m_rw (result);
@@ -196,20 +220,26 @@ namespace qe {
             }
             lits.reset();
             lits.append(new_lits);
-            if (eq_term || num_pos == 0 || num_neg == 0) {
+            if (use_eq || num_pos == 0 || num_neg == 0) {
                 return;
             }
             bool use_pos = num_pos < num_neg;
-            unsigned max_t = find_max(model, use_pos);
+            unsigned max_t = find_max(mdl, use_pos);
 
-            for (unsigned i = 0; i < m_ineq_terms.size(); ++i) {
+            expr_ref new_lit (m);
+            for (unsigned i = 0; i < m_lits.size(); ++i) {
                 if (i != max_t) {
-                    if (m_ineq_coeffs[i].is_pos() == use_pos) {
-                        lits.push_back(mk_le(i, max_t));
+                    if (m_coeffs[i].is_pos() == use_pos) {
+                        new_lit = mk_le(i, max_t);
                     }
                     else {
-                        lits.push_back(mk_lt(i, max_t));
+                        new_lit = mk_lt(i, max_t);
                     }
+                    lits.push_back(new_lit);
+                    TRACE ("qe",
+                            tout << "Old literal: " << mk_pp (m_lits.get (i), m) << "\n";
+                            tout << "New literal: " << mk_pp (new_lit, m) << "\n";
+                          );
                 }
             }
         }
@@ -217,20 +247,23 @@ namespace qe {
         unsigned find_max(model& mdl, bool do_pos) {
             unsigned result;
             bool found = false;
+            bool found_strict = false;
             rational found_val(0), r, found_c;
             expr_ref val(m);
-            for (unsigned i = 0; i < m_ineq_terms.size(); ++i) {
-                rational const& ac = m_ineq_coeffs[i];
-                if (ac.is_pos() == do_pos) {
-                    VERIFY(mdl.eval(m_ineq_terms[i].get(), val));
+            for (unsigned i = 0; i < m_terms.size(); ++i) {
+                rational const& ac = m_coeffs[i];
+                if (!m_eq[i] && ac.is_pos() == do_pos) {
+                    VERIFY(mdl.eval(m_terms.get (i), val));
                     VERIFY(a.is_numeral(val, r));
                     r /= abs(ac);
-                    IF_VERBOSE(1, verbose_stream() << "max: " << mk_pp(m_ineq_terms[i].get(), m) << " " << r << " " << (!found || r > found_val) << "\n";);
-                    if (!found || r > found_val) {
+                    IF_VERBOSE(1, verbose_stream() << "max: " << mk_pp(m_terms.get (i), m) << " " << r << " " <<
+                                (!found || r > found_val || (r == found_val && !found_strict && m_strict[i])) << "\n";);
+                    if (!found || r > found_val || (r == found_val && !found_strict && m_strict[i])) {
                         result = i;
                         found_val = r;
                         found_c = ac;
                         found = true;
+                        found_strict = m_strict[i];
                     }
                 }
             }
@@ -247,19 +280,19 @@ namespace qe {
         // Infer: a|b|x + |b|t + |a|bx + |a|s <= 0
         // e.g.   |b|t + |a|s <= 0
         expr_ref mk_lt(unsigned i, unsigned j) {
-            rational const& ac = m_ineq_coeffs[i];
-            rational const& bc = m_ineq_coeffs[j];
+            rational const& ac = m_coeffs[i];
+            rational const& bc = m_coeffs[j];
             SASSERT(ac.is_pos() != bc.is_pos());
             SASSERT(ac.is_neg() != bc.is_neg());
             expr_ref bt (m), as (m), ts (m), z (m);
-            expr* t = m_ineq_terms[i].get();
-            expr* s = m_ineq_terms[j].get();
+            expr* t = m_terms.get (i);
+            expr* s = m_terms.get (j);
             bt = mk_mul(abs(bc), t);
             as = mk_mul(abs(ac), s);
             ts = mk_add(bt, as);
             z  = a.mk_numeral(rational(0), m.get_sort(t));
             expr_ref result1(m), result2(m);
-            if (m_ineq_strict[i] || m_ineq_strict[j]) {
+            if (m_strict[i] || m_strict[j]) {
                 result1 = a.mk_lt(ts, z);
             }
             else {
@@ -275,17 +308,17 @@ namespace qe {
         // encode:// t/|a| <= s/|b|
         // e.g.   |b|t <= |a|s
         expr_ref mk_le(unsigned i, unsigned j) {
-            rational const& ac = m_ineq_coeffs[i];
-            rational const& bc = m_ineq_coeffs[j];
+            rational const& ac = m_coeffs[i];
+            rational const& bc = m_coeffs[j];
             SASSERT(ac.is_pos() == bc.is_pos());
             SASSERT(ac.is_neg() == bc.is_neg());
             expr_ref bt (m), as (m);
-            expr* t = m_ineq_terms[i].get();
-            expr* s = m_ineq_terms[j].get();
+            expr* t = m_terms.get (i);
+            expr* s = m_terms.get (j);
             bt = mk_mul(abs(bc), t);
             as = mk_mul(abs(ac), s);
             expr_ref result1(m), result2(m);
-            if (m_ineq_strict[j] && !m_ineq_strict[i]) {
+            if (!m_strict[j] && m_strict[i]) {
                 result1 = a.mk_lt(bt, as);
             }
             else {
@@ -306,19 +339,19 @@ namespace qe {
 
     public:
         arith_project_util(ast_manager& m): 
-            m(m), a(m), m_rw(m), m_ineq_terms(m) {}
+            m(m), a(m), m_rw(m), m_lits (m), m_terms (m) {}
 
-        expr_ref operator()(model& model, app_ref_vector& vars, expr_ref_vector const& lits) {
+        expr_ref operator()(model& mdl, app_ref_vector& vars, expr_ref_vector const& lits) {
             app_ref_vector new_vars(m);
             expr_ref_vector result(lits);
             for (unsigned i = 0; i < vars.size(); ++i) {
-                app* v = vars[i].get();
+                app* v = vars.get (i);
                 m_var = alloc(contains_app, m, v);
                 try {
-                    project(model, result);
+                    project(mdl, result);
                     TRACE("qe", tout << "projected: " << mk_pp(v, m) << " ";
                           for (unsigned i = 0; i < result.size(); ++i) {
-                              tout << mk_pp(result[i].get(), m) << "\n";
+                              tout << mk_pp(result.get (i), m) << "\n";
                           });
                 }
                 catch (cant_project) {
@@ -332,10 +365,10 @@ namespace qe {
         }  
     };
 
-    expr_ref arith_project(model& model, app_ref_vector& vars, expr_ref_vector const& lits) {
+    expr_ref arith_project(model& mdl, app_ref_vector& vars, expr_ref_vector const& lits) {
         ast_manager& m = vars.get_manager();
         arith_project_util ap(m);
-        return ap(model, vars, lits);
+        return ap(mdl, vars, lits);
     }
 
     expr_ref arith_project(model& model, app_ref_vector& vars, expr* fml) {
