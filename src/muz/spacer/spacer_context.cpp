@@ -143,10 +143,15 @@ namespace spacer {
         expr_ref_vector assumps (m);
         if (!assert_all_reach_facts (assumps))
             return false;
-        // state is a cube; treat its lits as assumptions
-        assumps.push_back (state);
-        qe::flatten_and (assumps);
+
+        m_reach_ctx->push ();
+        expr_ref_vector state_lits (m);
+        qe::flatten_and (state, state_lits);
+        for (unsigned i = 0; i < state_lits.size (); i++) {
+            m_reach_ctx->assert_expr (state_lits.get (i));
+        }
         lbool res = m_reach_ctx->check (assumps);
+        m_reach_ctx->pop ();
         return (res == l_true);
     }
 
