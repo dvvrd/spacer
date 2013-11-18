@@ -142,7 +142,6 @@ namespace spacer {
        Assumption: the model satisfies the conjunctions.       
      */
     void reduce_disequalities(model& model, unsigned threshold, expr_ref& fml);
-    
 
     /**
        \brief hoist non-boolean if expressions.
@@ -153,6 +152,13 @@ namespace spacer {
 
     bool is_utvpi_logic(ast_manager& m, unsigned num_fmls, expr* const* fmls);
 
+    /**
+     * do the following in sequence
+     * 1. use qe_lite to cheaply eliminate vars
+     * 2. for remaining boolean vars, substitute using M
+     * 3. for remaining arith vars, use LW projection
+     */
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M);
 }
 
 #endif

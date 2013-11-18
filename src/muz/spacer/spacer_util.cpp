@@ -42,6 +42,8 @@ Notes:
 #include "expr_replacer.h"
 #include "model_smt2_pp.h"
 #include "scoped_proof.h"
+#include "qe_lite.h"
+#include "qe_arith.h"
 
 
 namespace spacer {
@@ -1277,6 +1279,59 @@ namespace spacer {
         } 
         return test.is_dl();
     }  
+
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M) {
+        th_rewriter rw (m);
+
+        // qe-lite; TODO: use qe_lite aggressively
+        qe_lite qe (m);
+        qe (vars, fml);
+        rw (fml);
+
+        TRACE ("spacer",
+                tout << "After qe_lite:\n";
+                tout << mk_pp (fml, m) << "\n";
+                tout << "Vars:\n";
+                for (unsigned i = 0; i < vars.size(); ++i) {
+                    tout << mk_pp(vars.get (i), m) << "\n";
+                }
+              );
+
+        // substitute model values for booleans and
+        // use LW projection for arithmetic variables
+        if (!vars.empty ()) {
+            app_ref_vector arith_vars (m);
+            model_evaluator mev (m);
+            expr_substitution sub (m);
+            expr_ref bval (m);
+            for (unsigned i = 0; i < vars.size (); i++) {
+                if (m.is_bool (vars.get (i))) {
+                    bval = mev.eval (M, vars.get (i));
+                    sub.insert (vars.get (i), bval);
+                }
+                else {
+                    arith_vars.push_back (vars.get (i));
+                    // only handle reals for now
+                    SASSERT (vars.get (i)->get_decl ()->get_range ()->get_decl_kind () == REAL_SORT);
+                }
+            }
+            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+            rep->set_substitution (&sub);
+            (*rep)(fml);
+            rw (fml);
+            TRACE ("spacer",
+                    tout << "Projected Boolean vars:\n" << mk_pp (fml, m) << "\n";
+                  );
+            // project using LW
+            if (!arith_vars.empty ()) {
+                qe::arith_project (*M, arith_vars, fml);
+                SASSERT (arith_vars.empty ());
+                TRACE ("spacer",
+                        tout << "Projected arith vars:\n" << mk_pp (fml, m) << "\n";
+                      );
+            }
+        }
+    }
 
 }
 
