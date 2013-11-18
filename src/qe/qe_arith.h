@@ -12,7 +12,7 @@ namespace qe {
      */
     expr_ref arith_project(model& model, app_ref_vector& vars, expr_ref_vector const& lits);
 
-    expr_ref arith_project(model& model, app_ref_vector& vars, expr* fml);
+    void arith_project(model& model, app_ref_vector& vars, expr_ref& fml);
 };
 
 #endif

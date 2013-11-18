@@ -605,15 +605,13 @@ namespace qe {
         return ap(mdl, vars, lits);
     }
 
-    expr_ref arith_project(model& mdl, app_ref_vector& vars, expr* fml) {
+    void arith_project(model& mdl, app_ref_vector& vars, expr_ref& fml) {
         ast_manager& m = vars.get_manager();
         arith_project_util ap(m);
-        expr_ref result (fml, m);
         atom_set pos_lits, neg_lits;
         is_relevant_default is_relevant;
         mk_atom_default mk_atom;
-        get_nnf (result, is_relevant, mk_atom, pos_lits, neg_lits);
-        ap(mdl, vars, result);
-        return result;
+        get_nnf (fml, is_relevant, mk_atom, pos_lits, neg_lits);
+        ap(mdl, vars, fml);
     }
 }

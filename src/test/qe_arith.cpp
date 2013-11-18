@@ -24,6 +24,7 @@ static expr_ref parse_fml(ast_manager& m, char const* str) {
            << "(declare-const t Real)\n"
            << "(declare-const a Real)\n"
            << "(declare-const b Real)\n"
+           << "(declare-const b1 Bool)\n"
            << "(assert " << str << ")\n";
     std::istringstream is(buffer.str());
     VERIFY(parse_smt2_commands(ctx, is));
@@ -31,6 +32,9 @@ static expr_ref parse_fml(ast_manager& m, char const* str) {
     result = *ctx.begin_assertions();
     return result;
 }
+
+static char const* exampleb1 = "(and (= b1 true) (and (> x 0.0) (< y 2.0)))";
+static char const* answerb1 = "(and b1 (< y 2.0))";
 
 static char const* example1 = "(and (<= x 3.0) (<= (* 3.0 x) y) (<= z y))";
 static char const* answer1 = "(<= z y)";
@@ -106,8 +110,8 @@ static void test(char const *ex, char const *ans) {
     SASSERT(result == l_true);
     ref<model> md;
     ctx.get_model(md);    
-    //expr_ref pr = qe::arith_project(*md, vars, lits);
-    expr_ref pr = qe::arith_project(*md, vars, fml);
+    expr_ref pr (fml, m);
+    qe::arith_project(*md, vars, pr);
     
     std::cout << "Input: " << mk_pp(fml, m) << "\n";
     std::cout << "Model:" << "\n";
@@ -192,4 +196,5 @@ void tst_qe_arith() {
     test(example15, answer15);
     test(example16, answer16);
     test(example17, answer17);
+    test (exampleb1, answerb1);
 }
