@@ -95,13 +95,13 @@ namespace spacer {
         reachable_cache              m_reachable; 
         ptr_vector<func_decl>        m_predicates;
         stats                        m_stats;
-        expr_ref_vector              m_reach_assump_vars; // aux vars for asserting reach facts in m_reach_ctx and children's m_solver's incrementally
+        expr_ref_vector              m_reach_case_assumps; // aux vars for asserting reach facts in m_reach_ctx and children's m_solver's incrementally
 
         void init_sig();
         void ensure_level(unsigned level);
         bool add_property1(expr * lemma, unsigned lvl);  // add property 'p' to state at level lvl.
-        void add_child_property(pred_transformer& child, expr* lemma, unsigned lvl); 
-        void mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result);
+        void add_child_property(pred_transformer& child, expr* lemma, unsigned lvl, bool is_reach_fact = false); 
+        void mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result, bool is_reach_fact = false);
 
         // Initialization
         void init_rules(decl2rel const& pts, expr_ref& init, expr_ref& transition);
@@ -115,6 +115,8 @@ namespace spacer {
         bool check_filled(app_ref_vector const& v) const;
         
         void add_premises(decl2rel const& pts, unsigned lvl, datalog::rule& rule, expr_ref_vector& r);
+
+        expr* mk_fresh_reach_case_assump () const;
 
     public:
         pred_transformer(context& ctx, manager& pm, func_decl* head);
@@ -158,6 +160,10 @@ namespace spacer {
         bool propagate_to_next_level(unsigned level);
         void propagate_to_infinity(unsigned level);
         void add_property(expr * lemma, unsigned lvl);  // add property 'p' to state at level.
+        expr* mk_o_reach_case_assump (expr_ref const& reach_case, unsigned oidx) const;
+        expr* get_reach_case_assump (unsigned idx) const;
+        unsigned get_num_reach_cases () const;
+
         void add_reach_fact (expr* fact);  // add reachability fact
         bool assert_all_reach_facts (expr_ref_vector& assumps) const;
         void assert_no_reach_facts (expr_ref_vector& assumps) const;

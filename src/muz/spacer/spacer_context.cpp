@@ -78,7 +78,7 @@ namespace spacer {
         m_reach_ctx (pm.mk_fresh ()),
         m_reach_facts (m), m_invariants(m), m_transition(m), m_initial_state(m), 
         m_reachable(pm, (datalog::SPACER_CACHE_MODE)ctx.get_params().cache_mode()),
-        m_reach_assump_vars (m)
+        m_reach_case_assumps (m)
     { init_sig (); }
 
     pred_transformer::~pred_transformer() {
@@ -377,10 +377,10 @@ namespace spacer {
         }
     }
 
-    void pred_transformer::add_child_property(pred_transformer& child, expr* lemma, unsigned lvl) {
+    void pred_transformer::add_child_property(pred_transformer& child, expr* lemma, unsigned lvl, bool is_reach_fact) {
         ensure_level(lvl);
         expr_ref_vector fmls(m);
-        mk_assumptions(child.head(), lemma, fmls);
+        mk_assumptions(child.head(), lemma, fmls, is_reach_fact);
         for (unsigned i = 0; i < fmls.size(); ++i) {
             TRACE("spacer", tout << "child property: " << mk_pp(fmls[i].get(), m) << "\n";);
             if (is_infty_level(lvl)) {
@@ -406,43 +406,67 @@ namespace spacer {
         }
     }
 
+    expr* pred_transformer::mk_fresh_reach_case_assump () const {
+        std::stringstream name;
+        name << head ()->get_name () << "#reach_case_" << m_reach_case_assumps.size ();
+        return m.mk_fresh_const (name.str ().c_str (), m.mk_bool_sort());
+    }
+
+    expr* pred_transformer::mk_o_reach_case_assump (expr_ref const& reach_case, unsigned oidx) const {
+        std::stringstream name;
+        name << to_app (reach_case)->get_decl ()->get_name () << "#" << oidx;
+        symbol sname (name.str ().c_str ());
+        return m.mk_const (sname, m.mk_bool_sort());
+    }
+
+    expr* pred_transformer::get_reach_case_assump (unsigned idx) const {
+        SASSERT (idx < m_reach_case_assumps.size ());
+        return m_reach_case_assumps.get (idx);
+    }
+
+    unsigned pred_transformer::get_num_reach_cases () const {
+        return m_reach_case_assumps.size ();
+    }
+
     void pred_transformer::add_reach_fact (expr* fact) {
         m_reach_facts.push_back (fact);
         TRACE ("spacer",
                 tout << "add_reach_fact: " << head()->get_name() << " " << mk_pp(fact, m) << "\n";);
 
         // update m_reach_ctx
-        std::stringstream name;
-        name << head ()->get_name ().str () << "#reach_case_" << m_reach_assump_vars.size ();
-        expr_ref new_case (m.mk_fresh_const(name.str ().c_str (), m.mk_bool_sort()), m);
+        expr_ref new_case (m);
+        new_case = mk_fresh_reach_case_assump ();
         expr_ref fml (m);
-        if (m_reach_assump_vars.empty ()) {
+        if (m_reach_case_assumps.empty ()) {
             fml = m.mk_or (fact, new_case);
         } else {
-            expr_ref last_case (m_reach_assump_vars.back (), m);
+            expr_ref last_case (m_reach_case_assumps.back (), m);
             fml = m.mk_or (m.mk_not (last_case), fact, new_case);
         }
-        m_reach_assump_vars.push_back (new_case);
+        m_reach_case_assumps.push_back (new_case);
         m_reach_ctx->assert_expr (fml);
         TRACE ("spacer",
                 tout << "updating reach ctx: " << mk_pp(fml, m) << "\n";);
 
         // update users; reach facts are independent of levels
         for (unsigned i = 0; i < m_use.size(); ++i) {
-            m_use[i]->add_child_property (*this, fml, infty_level);
+            m_use[i]->add_child_property (*this, fml, infty_level, true);
         }
     }
 
     expr* pred_transformer::get_reach () {
+        if (m_reach_facts.empty ()) {
+            return m.mk_false ();
+        }
         return m.mk_or (m_reach_facts.size (), m_reach_facts.c_ptr ());
     }
 
     bool pred_transformer::assert_all_reach_facts (expr_ref_vector& assumps) const {
         assumps.reset ();
         // assert reach facts by assuming that the last case is false
-        if (m_reach_assump_vars.empty ())
+        if (m_reach_case_assumps.empty ())
             return false;
-        assumps.push_back (m.mk_not (m_reach_assump_vars.back ()));
+        assumps.push_back (m.mk_not (m_reach_case_assumps.back ()));
         return true;
     }
 
@@ -450,7 +474,7 @@ namespace spacer {
         assumps.reset ();
         // assert no reach facts by assuming that only the last case is true;
         // in the encoding this amounts to choosing the "other case" from every clause
-        assumps.append (m_reach_assump_vars);
+        assumps.append (m_reach_case_assumps);
     }
 
     expr_ref pred_transformer::get_cover_delta(func_decl* p_orig, int level) {
@@ -561,7 +585,7 @@ namespace spacer {
 
         lbool is_sat;
         expr_ref_vector assumps (m);
-        expr_ref_vector pred_assumps (m);
+        expr_ref_vector pred_assumps (m), o_pred_assumps (m);
         ptr_vector<func_decl> preds;
 
         // find all preds of all rules
@@ -574,11 +598,27 @@ namespace spacer {
             for (unsigned i = 0; i < preds.size (); i++) {
                 pred_transformer const& pred_pt = ctx.get_pred_transformer (preds[i]);
                 pred_assumps.reset ();
+                o_pred_assumps.reset ();
                 if (!pred_pt.assert_all_reach_facts (pred_assumps)) {
                     no_reach_facts = true;
                     break;
                 }
-                assumps.append (pred_assumps);
+                expr_ref reach_case (m), o_reach_case (m);
+                for (unsigned j = 0; j < pred_assumps.size (); j++) {
+                    bool is_not = false;
+                    reach_case = pred_assumps.get (j);
+                    if (m.is_not (reach_case)) {
+                        is_not = true;
+                        reach_case = to_app (reach_case)->get_arg (0);
+                    }
+                    o_reach_case = pred_pt.mk_o_reach_case_assump (reach_case, i);
+                    if (is_not) {
+                        o_pred_assumps.push_back (m.mk_not (o_reach_case));
+                    } else {
+                        o_pred_assumps.push_back (o_reach_case);
+                    }
+                }
+                assumps.append (o_pred_assumps);
             }
         }
         if (!no_reach_facts) {
@@ -668,8 +708,9 @@ namespace spacer {
         return res == l_false;
     }
 
-    void pred_transformer::mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result) {
+    void pred_transformer::mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result, bool is_reach_fact) {
         expr_ref tmp1(m), tmp2(m);
+        expr_substitution sub (m);
         obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
         for (; it != end; ++it) {
             expr* pred = it->m_key;
@@ -681,6 +722,31 @@ namespace spacer {
                 if (d == head) {
                     tmp1 = m.mk_implies(pred, fml);
                     pm.formula_n2o(tmp1, tmp2, i);
+
+                    if (is_reach_fact) {
+                        // replace reach case assumps with o-versions;
+                        // only need to care about the last two assumps
+                        pred_transformer& pt = ctx.get_pred_transformer (head);
+                        unsigned num_cases = pt.get_num_reach_cases ();
+                        sub.reset ();
+                        expr_ref case1 (m), case2 (m);
+                        expr_ref ocase1 (m), ocase2 (m);
+
+                        case1 = pt.get_reach_case_assump (num_cases-1);
+                        ocase1 = pt.mk_o_reach_case_assump (case1, i);
+                        sub.insert (case1, ocase1);
+                        if (num_cases > 1) {
+                            case2 = pt.get_reach_case_assump (num_cases-2);
+                            ocase2 = pt.mk_o_reach_case_assump (case2, i);
+                            sub.insert (case2, ocase2);
+                        }
+
+                        scoped_no_proof _sc (m);
+                        scoped_ptr<expr_replacer> rep = mk_default_expr_replacer (m);
+                        rep->set_substitution (&sub);
+                        (*rep) (tmp2);
+                    }
+
                     result.push_back(tmp2);
                 }
             }                  
@@ -2511,12 +2577,17 @@ namespace spacer {
               );
 
         qe_project (m, vars, result, M);
-        SASSERT (vars.empty ());
 
         TRACE ("spacer",
                 tout << "Reach fact, after QE project:\n";
                 tout << mk_pp (result, m) << "\n";
+                tout << "Vars:\n";
+                for (unsigned i = 0; i < vars.size(); ++i) {
+                    tout << mk_pp(vars.get (i), m) << "\n";
+                }
               );
+
+        SASSERT (vars.empty ());
     }
 
 
