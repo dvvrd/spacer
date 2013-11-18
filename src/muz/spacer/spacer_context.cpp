@@ -398,24 +398,13 @@ namespace spacer {
         SASSERT (level >= -1);
         SASSERT (idx >= 0);
 
-        // substitution to replace n-consts with idx-consts in lemmas
-        expr_substitution sub (m);
-        expr_ref c_n (m), c_o (m);
-        for (unsigned i = 0; i < sig_size (); i++) {
-            c_n = m.mk_const(pm.o2n(sig(i), 0));
-            c_o = m.mk_const(pm.o2o(sig(i), 0, idx));
-            sub.insert(c_n, c_o);
-        }
-        scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
-        rep->set_substitution(&sub);
-
         expr_ref_vector::iterator it;
         expr_ref lem_o (m);
 
         // add invariants
         for (it = m_invariants.begin (); it != m_invariants.end (); it++) {
-            (*rep) ((*it), lem_o);
-            forms.push_back (lem_o.get ());
+            pm.formula_n2o (*it, lem_o, idx);
+            forms.push_back (lem_o);
             TRACE ("spacer", tout << "Invariant: " << mk_pp (lem_o, m) << "\n";);
         }
 
@@ -424,8 +413,8 @@ namespace spacer {
         // add level lemmas
         for (unsigned l = (unsigned)level; l < m_levels.size (); l++) {
             for (it = m_levels[l].begin (); it != m_levels[l].end (); it++) {
-                (*rep) ((*it), lem_o);
-                forms.push_back (lem_o.get ());
+                pm.formula_n2o (*it, lem_o, idx);
+                forms.push_back (lem_o);
                 TRACE ("spacer", tout << "Lemma: " << mk_pp (lem_o, m) << "\n";);
             }
         }
