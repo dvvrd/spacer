@@ -1330,6 +1330,8 @@ namespace spacer {
                         tout << "Projected arith vars:\n" << mk_pp (fml, m) << "\n";
                       );
             }
+            vars.reset ();
+            vars.append (arith_vars);
         }
     }
 
