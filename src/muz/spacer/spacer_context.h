@@ -47,6 +47,12 @@ namespace spacer {
     typedef obj_map<datalog::rule const, app_ref_vector*> rule2inst;
     typedef obj_map<func_decl, pred_transformer*> decl2rel;
 
+    enum LOCAL_REACH_RESULT {
+        REACH,
+        UNREACH,
+        ABS_REACH,
+        UNKN
+    };
 
     // 
     // Predicate transformer state.
@@ -74,7 +80,9 @@ namespace spacer {
         ptr_vector<pred_transformer> m_use;     // places where 'this' is referenced.
         ptr_vector<datalog::rule>    m_rules;   // rules used to derive transformer
         prop_solver                  m_solver;  // solver context
+        scoped_ptr<smt_context>      m_reach_ctx; // context for reachability facts
         vector<expr_ref_vector>      m_levels;  // level formulas
+        expr_ref_vector              m_reach_facts; // reach facts
         expr_ref_vector              m_invariants;      // properties that are invariant.
         obj_map<expr, unsigned>      m_prop2level;      // map property to level where it occurs.
         obj_map<expr, datalog::rule const*> m_tag2rule; // map tag predicate to rule. 
@@ -87,6 +95,7 @@ namespace spacer {
         reachable_cache              m_reachable; 
         ptr_vector<func_decl>        m_predicates;
         stats                        m_stats;
+        expr_ref_vector              m_reach_assump_vars; // aux vars for asserting reach facts in m_reach_ctx and children's m_solver's incrementally
 
         void init_sig();
         void ensure_level(unsigned level);
@@ -126,6 +135,7 @@ namespace spacer {
         unsigned get_num_levels() { return m_levels.size(); }
         expr_ref get_cover_delta(func_decl* p_orig, int level);
         void     add_cover(unsigned level, expr* property);
+        expr* get_reach ();
 
         // add all lemmas from level up to infty to forms;
         // use the o-index idx while adding
@@ -136,18 +146,23 @@ namespace spacer {
         void collect_statistics(statistics& st) const;
         void reset_statistics();
 
-        bool is_reachable(expr* state);
+        bool is_reachable_known (expr* state);
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
+        void find_predecessors(ptr_vector<func_decl>& predicates) const;
         datalog::rule const& find_rule(model_core const& model) const;
+        void find_rules (model_core const& model, svector<datalog::rule const*>& rules) const;
         expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
         ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }
 
         bool propagate_to_next_level(unsigned level);
         void propagate_to_infinity(unsigned level);
         void add_property(expr * lemma, unsigned lvl);  // add property 'p' to state at level.
+        void add_reach_fact (expr* fact);  // add reachability fact
+        bool assert_all_reach_facts (expr_ref_vector& assumps) const;
+        void assert_no_reach_facts (expr_ref_vector& assumps) const;
 
-        lbool is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level);
+        LOCAL_REACH_RESULT is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level);
         bool is_invariant(unsigned level, expr* co_state, bool inductive, bool& assumes_level, expr_ref_vector* core = 0);
         bool check_inductive(unsigned level, expr_ref_vector& state, bool& assumes_level);
 
@@ -259,8 +274,7 @@ namespace spacer {
             open ();
         }
 
-        // close this node by setting d as the closing derivation
-        void close (derivation* d = 0);
+        void close ();
         void open () { m_open = true; }
 
         void inq () { m_in_q = true; }
@@ -321,49 +335,47 @@ namespace spacer {
         datalog::rule const&                m_rule; // the rule from m_prems to m_concl
         ptr_vector<model_node>::iterator    m_curr_it; // the premise currently being processed
         ast_manager&                        m;
-        manager const&                      m_sm;
-        vector<vector<app_ref_vector> >     m_ghosts;
+        manager&                            m_sm;
+        //vector<vector<app_ref_vector> >     m_ghosts;
                         // for each o_index, vector of (o_const, ghost) pairs
-        //expr_ref                            m_post; // combined goal for m_prems
+        expr_ref                            m_post; // combined goal for m_prems
+        vector<app_ref_vector>              m_vars;
+        scoped_ptr<smt_context>             m_reach_ctx; // for checking consistency of reach facts of prems
+        model_ref                           M;
 
         // substitute o-consts in phi by ghosts;
         // resets m_ghosts and updates it for phi
-        void ghostify (expr_ref& phi);
+        //void ghostify (expr_ref& phi);
 
         // populate m_ghosts for phi
-        void mk_ghosts (expr_ref const& phi);
+        //void mk_ghosts (expr_ref const& phi);
         // utility method
-        void mk_ghosts (ast_mark& mark, ptr_vector<expr>& todo, expr* e);
+        //void mk_ghosts (ast_mark& mark, ptr_vector<expr>& todo, expr* e);
 
         // mk substitution based on m_ghosts
-        void mk_ghost_sub (expr_substitution& sub) const;
+        //void mk_ghost_sub (expr_substitution& sub) const;
         // mk substitution to replace ghosts by n-versions of o-consts for the pt at curr_o_idx ()
-        void mk_unghost_sub (expr_substitution& sub) const;
+        //void mk_unghost_sub (expr_substitution& sub) const;
+
+        model_node& next () {
+            if (is_last ()) throw default_exception ("No next premise");
+            if (m_curr_it == m_prems.end ()) m_curr_it = m_prems.begin ();
+            else m_curr_it++;
+            return **m_curr_it;
+        }
+
+        model_node& prev () {
+            if (is_first ()) throw default_exception ("No prev premise");
+            m_curr_it--;
+            return **m_curr_it;
+        }
 
     public:
         derivation (model_node* concl,
                     ptr_vector<pred_transformer>& pred_pts,
                     vector<unsigned> pred_o_idx,
                     datalog::rule const& rule,
-                    model_search& search):
-            m_concl (concl),
-            m_o_idx (pred_o_idx),
-            m_rule (rule),
-            m_curr_it (0),
-            m (m_concl->get_manager ()),
-            m_sm (m_concl->get_spacer_manager ())
-            //m_post (m)
-        {
-            SASSERT (m_concl); // non-null
-            // create model-nodes for premises, corresponding to pred_pts, in order
-            for (ptr_vector<pred_transformer>::iterator it = pred_pts.begin ();
-                    it != pred_pts.end (); it++) {
-                pred_transformer& pt = **it;
-                m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this, search));
-            }
-            // initialize m_curr_it to point to nothing
-            m_curr_it = m_prems.end ();
-        }
+                    model_search& search);
 
         ~derivation ();
 
@@ -378,19 +390,6 @@ namespace spacer {
         }
 
         unsigned num_prems () const { return m_prems.size (); }
-
-        model_node& next () {
-            if (is_last ()) throw default_exception ("No next premise");
-            if (m_curr_it == m_prems.end ()) m_curr_it = m_prems.begin ();
-            else m_curr_it++;
-            return **m_curr_it;
-        }
-
-        model_node& prev () {
-            if (is_first ()) throw default_exception ("No prev premise");
-            m_curr_it--;
-            return **m_curr_it;
-        }
 
         model_node& curr () const { return **m_curr_it; }
 
@@ -418,15 +417,16 @@ namespace spacer {
 
         // we need to check if phi is reachable by m_prems;
         //   we already know that phi can reach m_concl.post
-        void setup (expr_ref& phi);
+        void setup (expr_ref& phi, model_ref& M);
 
         //expr_ref const& post () const { return m_post; }
 
         // make post (phi) and post_ctx (ctx) for the next premise
-        void mk_prem_post (expr_ref& phi, expr_ref& ctx) const;
+        //void mk_prem_post (expr_ref& phi, expr_ref& ctx) const;
+        model_node& mk_next (expr_ref& post, expr_ref& post_ctx);
 
         // get symbolic cex for the derivation to m_concl.post
-        void get_trace (expr_ref_vector& trace_conjs) const;
+        //void get_trace (expr_ref_vector& trace_conjs) const;
     };
 
 
@@ -554,13 +554,14 @@ namespace spacer {
         void close_node(model_node& n);
         void check_pre_closed(model_node& n);
         void expand_node(model_node& n);
-        lbool expand_state(model_node& n, expr_ref_vector& cube, bool& uses_level);
+        LOCAL_REACH_RESULT expand_state(model_node& n, expr_ref_vector& cube, bool& uses_level);
+        void mk_reach_fact (model_node& n, expr_ref& result);
         void create_children(model_node& n);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;
 
-        void report_pf (model_node& ch); // ch's post is unreachable
-        void report_pre (model_node& ch); // a pre has been found for ch's post
+        void report_unreach (model_node& ch); // ch's post is unreachable
+        void report_reach (model_node& ch); // ch's post is concretely reachable
         bool redo_at_higher_level (model_node const& ch, derivation const* d, model_node const& par) const;
         
         // Generate inductive property

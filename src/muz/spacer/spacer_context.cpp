@@ -39,7 +39,6 @@ Notes:
 #include "model_smt2_pp.h"
 #include "dl_mk_rule_inliner.h"
 #include "ast_smt2_pp.h"
-#include "qe_lite.h"
 #include "ast_ll_pp.h"
 #include "proof_checker.h"
 #include "smt_value_sort.h"
@@ -76,8 +75,10 @@ namespace spacer {
         pm(pm), m(pm.get_manager()),
         ctx(ctx), m_head(head, m), 
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name()),
-        m_invariants(m), m_transition(m), m_initial_state(m), 
-        m_reachable(pm, (datalog::SPACER_CACHE_MODE)ctx.get_params().cache_mode())
+        m_reach_ctx (pm.mk_fresh ()),
+        m_reach_facts (m), m_invariants(m), m_transition(m), m_initial_state(m), 
+        m_reachable(pm, (datalog::SPACER_CACHE_MODE)ctx.get_params().cache_mode()),
+        m_reach_assump_vars (m)
     { init_sig (); }
 
     pred_transformer::~pred_transformer() {
@@ -138,8 +139,43 @@ namespace spacer {
         }
     }
 
-    bool pred_transformer::is_reachable(expr* state) {
-        return m_reachable.is_reachable(state);
+    bool pred_transformer::is_reachable_known (expr* state) {
+        expr_ref_vector assumps (m);
+        if (!assert_all_reach_facts (assumps))
+            return false;
+        // state is a cube; treat its lits as assumptions
+        assumps.push_back (state);
+        qe::flatten_and (assumps);
+        lbool res = m_reach_ctx->check (assumps);
+        return (res == l_true);
+    }
+
+    void pred_transformer::find_rules (model_core const& model, svector<datalog::rule const*>& rules) const {
+        obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
+        TRACE("spacer_verbose",
+              for (; it != end; ++it) {
+                  expr* pred = it->m_key;
+                  tout << mk_pp(pred, m) << ":\n";
+                  if (it->m_value) it->m_value->display_smt2(m, tout) << "\n";                  
+              }
+        );
+        
+        it = m_tag2rule.begin();
+        if (m_tag2rule.size() == 1) {
+            rules.push_back (it->m_value);
+            return;
+        }
+
+        expr_ref vl(m);
+        unsigned cnt = 0;
+        for (; it != end; ++it) {
+            expr* pred = it->m_key;
+            if (model.eval(to_app(pred)->get_decl(), vl) && m.is_true(vl)) {
+                rules.push_back (it->m_value);
+                cnt++;
+            }
+        }
+        SASSERT (cnt > 0);
     }
 
     datalog::rule const& pred_transformer::find_rule(model_core const& model) const {
@@ -173,6 +209,18 @@ namespace spacer {
         unsigned tail_sz = r.get_uninterpreted_tail_size();
         for (unsigned ti = 0; ti < tail_sz; ti++) {
             preds.push_back(r.get_tail(ti)->get_decl());
+        }
+    }
+
+    void pred_transformer::find_predecessors(ptr_vector<func_decl>& preds) const {
+        preds.reset();
+        obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
+        for (; it != end; it++) {
+            datalog::rule const& r = *it->m_value;
+            unsigned tail_sz = r.get_uninterpreted_tail_size();
+            for (unsigned ti = 0; ti < tail_sz; ti++) {
+                preds.push_back(r.get_tail(ti)->get_decl());
+            }
         }
     }
 
@@ -353,6 +401,53 @@ namespace spacer {
         }
     }
 
+    void pred_transformer::add_reach_fact (expr* fact) {
+        m_reach_facts.push_back (fact);
+        TRACE ("spacer",
+                tout << "add_reach_fact: " << head()->get_name() << " " << mk_pp(fact, m) << "\n";);
+
+        // update m_reach_ctx
+        std::stringstream name;
+        name << head ()->get_name ().str () << "#reach_case_" << m_reach_assump_vars.size ();
+        expr_ref new_case (m.mk_fresh_const(name.str ().c_str (), m.mk_bool_sort()), m);
+        expr_ref fml (m);
+        if (m_reach_assump_vars.empty ()) {
+            fml = m.mk_or (fact, new_case);
+        } else {
+            expr_ref last_case (m_reach_assump_vars.back (), m);
+            fml = m.mk_or (m.mk_not (last_case), fact, new_case);
+        }
+        m_reach_assump_vars.push_back (new_case);
+        m_reach_ctx->assert_expr (fml);
+        TRACE ("spacer",
+                tout << "updating reach ctx: " << mk_pp(fml, m) << "\n";);
+
+        // update users; reach facts are independent of levels
+        for (unsigned i = 0; i < m_use.size(); ++i) {
+            m_use[i]->add_child_property (*this, fml, infty_level);
+        }
+    }
+
+    expr* pred_transformer::get_reach () {
+        return m.mk_or (m_reach_facts.size (), m_reach_facts.c_ptr ());
+    }
+
+    bool pred_transformer::assert_all_reach_facts (expr_ref_vector& assumps) const {
+        assumps.reset ();
+        // assert reach facts by assuming that the last case is false
+        if (m_reach_assump_vars.empty ())
+            return false;
+        assumps.push_back (m.mk_not (m_reach_assump_vars.back ()));
+        return true;
+    }
+
+    void pred_transformer::assert_no_reach_facts (expr_ref_vector& assumps) const {
+        assumps.reset ();
+        // assert no reach facts by assuming that only the last case is true;
+        // in the encoding this amounts to choosing the "other case" from every clause
+        assumps.append (m_reach_assump_vars);
+    }
+
     expr_ref pred_transformer::get_cover_delta(func_decl* p_orig, int level) {
         expr_ref result(m.mk_true(), m), v(m), c(m);
         if (level == -1) {
@@ -446,27 +541,87 @@ namespace spacer {
         }
     }
 
-    lbool pred_transformer::is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level) {
+    LOCAL_REACH_RESULT pred_transformer::is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level) {
         TRACE("spacer", 
               tout << "is-reachable: " << head()->get_name() << " level: " << n.level() << "\n";
               tout << mk_pp(n.post(), m) << "\n";);
+
         ensure_level(n.level());        
+
+        // prepare the solver
         model_ref model;
         prop_solver::scoped_level _sl(m_solver, n.level());
         m_solver.set_core(core);
         m_solver.set_model(&model);
-        lbool is_sat = m_solver.check_conjunction_as_assumptions(n.post());
-        if (is_sat == l_true && core) {            
-            core->reset();
-            TRACE("spacer", tout << "updating model\n"; 
-                  model_smt2_pp(tout, m, *model, 0);
-                  tout << mk_pp(n.post(), m) << "\n";);
-            ctx.set_curr_model(model);
+
+        lbool is_sat;
+        expr_ref_vector assumps (m);
+        expr_ref_vector pred_assumps (m);
+        ptr_vector<func_decl> preds;
+
+        // find all preds of all rules
+        find_predecessors (preds);
+
+        // check using reach facts of body preds
+        bool no_reach_facts = false;
+        assumps.push_back (n.post ());
+        if (n.level () > 0) {
+            for (unsigned i = 0; i < preds.size (); i++) {
+                pred_transformer const& pred_pt = ctx.get_pred_transformer (preds[i]);
+                pred_assumps.reset ();
+                if (!pred_pt.assert_all_reach_facts (pred_assumps)) {
+                    no_reach_facts = true;
+                    break;
+                }
+                assumps.append (pred_assumps);
+            }
         }
-        else if (is_sat == l_false) {
+        if (!no_reach_facts) {
+            is_sat = m_solver.check_assumptions (assumps);
+            if (is_sat == l_true && core) {            
+                core->reset();
+                TRACE ("spacer", tout << "reachable using reach facts\n"; 
+                        model_smt2_pp (tout, m, *model, 0);
+                      );
+                ctx.set_curr_model (model);
+                return REACH;
+            }
+            TRACE ("spacer", tout << "unreachable using reach facts\n";);
+        }
+
+        if (n.level () > 0) {
+            core->reset ();
+            m_solver.set_core(core);
+            model.reset ();
+            m_solver.set_model(&model);
+
+            // check without reach facts of body preds
+            assumps.reset ();
+            assumps.push_back (n.post ());
+            for (unsigned i = 0; i < preds.size (); i++) {
+                pred_transformer const& pred_pt = ctx.get_pred_transformer (preds[i]);
+                pred_assumps.reset ();
+                pred_pt.assert_no_reach_facts (pred_assumps);
+                assumps.append (pred_assumps);
+            }
+            is_sat = m_solver.check_assumptions (assumps);
+            if (is_sat == l_true && core) {
+                core->reset();
+                TRACE ("spacer", tout << "reachable using lemmas\n"; 
+                        model_smt2_pp (tout, m, *model, 0);
+                      );
+                ctx.set_curr_model (model);
+                return ABS_REACH;
+            }
+        }
+
+        if (is_sat == l_false) {
+            TRACE ("spacer", tout << "unreachable with lemmas\n";);
             uses_level = m_solver.assumes_level();
+            return UNREACH;
         }
-        return is_sat;
+
+        return UNKN;
     }
 
     bool pred_transformer::is_invariant(unsigned level, expr* states, bool inductive, bool& assumes_level, expr_ref_vector* core) {
@@ -770,25 +925,10 @@ namespace spacer {
 
     unsigned model_node::m_count;
 
-    void model_node::close (derivation* d) {
-        // TODO: update cache in m_pt
+    void model_node::close () {
         m_open = false;
-        m_closing_deriv = d;
-
-        if (has_pre ()) {
-            // option 1: delete all derivations except d
-            if (d) {
-                TRACE ("spacer", tout << "Deleting all derivations except the closing one\n";);
-                del_derivs_except (d);
-            } else {
-                TRACE ("spacer", tout << "Deleting all derivations\n";);
-                del_derivs ();
-            }
-            // option 2: keep them running, and we will end up having a map between
-            //           pre's and closing derivations
-
-            if (is_inq ()) m_search.erase_leaf (*this);
-        } // else, decided later on
+        del_derivs ();
+        if (is_inq ()) m_search.erase_leaf (*this);
     }
 
     void model_node::del_derivs () {
@@ -948,11 +1088,43 @@ namespace spacer {
     // ----------------
     // derivation
 
+    derivation::derivation (model_node* concl,
+                            ptr_vector<pred_transformer>& pred_pts,
+                            vector<unsigned> pred_o_idx,
+                            datalog::rule const& rule,
+                            model_search& search):
+        m_concl (concl),
+        m_o_idx (pred_o_idx),
+        m_rule (rule),
+        m_curr_it (0),
+        m (m_concl->get_manager ()),
+        m_sm (m_concl->get_spacer_manager ()),
+        m_post (m),
+        m_reach_ctx (m_sm.mk_fresh ()),
+        M (0)
+    {
+        SASSERT (m_concl); // non-null
+        for (unsigned i = 0; i < pred_pts.size (); i++) {
+            pred_transformer& pt = *(pred_pts [i]);
+            // create model node for the premise
+            m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this, search));
+            // populate o-vars of pt
+            m_vars.push_back (app_ref_vector (m));
+            app_ref_vector& pt_vars = m_vars.back ();
+            unsigned sig_size = pt.head()->get_arity();
+            for (unsigned j = 0; j < sig_size; ++j) {
+                pt_vars.push_back (m.mk_const (m_sm.o2o (pt.sig (j), 0, m_o_idx [i])));
+            }
+        }
+        // initialize m_curr_it to point to nothing
+        m_curr_it = m_prems.end ();
+    }
+
     /**
      * traverse e to make ghosts for the uninterpreted leaves;
      * for now, does not handle quantifiers and de-bruijn variables
      */
-    void derivation::mk_ghosts (ast_mark& mark, ptr_vector<expr>& todo, expr* e) {
+    /*void derivation::mk_ghosts (ast_mark& mark, ptr_vector<expr>& todo, expr* e) {
         todo.push_back(e);
         while (!todo.empty()) {
             e = todo.back();
@@ -1045,14 +1217,16 @@ namespace spacer {
         rep->set_substitution (&sub);
         (*rep) (phi);
         TRACE ("spacer", tout << "after ghostify: " << mk_pp(phi,m) << "\n";);
+    }*/
+
+    void derivation::setup (expr_ref& phi, model_ref& mdl) {
+        m_post = phi;
+        m_reach_ctx->assert_expr (phi);
+        M = mdl;
+        //ghostify (phi);
     }
 
-    void derivation::setup (expr_ref& phi) {
-        //m_post = phi;
-        ghostify (phi);
-    }
-
-    void derivation::mk_prem_post (expr_ref& phi, expr_ref& ctx) const {
+    /*void derivation::mk_prem_post (expr_ref& phi, expr_ref& ctx) const {
         TRACE ("spacer", tout << "input to post: " << mk_pp(phi,m) << "\n";);
         expr_substitution sub (m);
         mk_unghost_sub (sub);
@@ -1061,9 +1235,93 @@ namespace spacer {
         (*rep) (phi);
         ctx = expr_ref (m.mk_true (), m);
         TRACE ("spacer", tout << "output of post: " << mk_pp(phi,m) << "\n";);
+    }*/
+
+    model_node& derivation::mk_next (expr_ref& post, expr_ref& post_ctx) {
+        SASSERT (has_next ());
+
+        expr_ref_vector impl (m);
+
+        if (m_curr_it != m_prems.end ()) {
+            expr_ref_vector cons (m);
+            cons.push_back (m_post);
+            // obtain new post by taking pre over reach facts
+            pred_transformer& pt = curr ().pt ();
+            expr_ref curr_reach_formal (pt.get_reach (), m);
+            expr_ref curr_reach_actual (m);
+            m_sm.formula_n2o (curr_reach_formal, curr_reach_actual, curr_o_idx ());
+            cons.push_back (curr_reach_actual);
+            // obtain a model consistent with reach facts up to this point
+            TRACE ("spacer",
+                    tout << "Updated under-approx of " << curr ().pt ().head ()->get_name () << "\n"
+                         << mk_pp (curr_reach_actual, m) << "\n";
+                  );
+            m_reach_ctx->assert_expr (curr_reach_actual);
+            expr_ref_vector assumps (m);
+            lbool res = m_reach_ctx->check (assumps);
+            SASSERT (res == l_true);
+            M.reset ();
+            m_reach_ctx->get_model (M);
+            TRACE ("spacer",
+                    tout << "Model with new under-approx:\n";
+                    model_smt2_pp (tout, m, *M, 0);
+                  );
+            // pick an implicant
+            qe::flatten_and (cons);
+            ptr_vector<expr> cons1 (cons.size (), cons.c_ptr ());
+            model_evaluator mev (m);
+            impl.append (mev.minimize_literals (cons1, M));
+        }
+        else {
+            impl.push_back (m_post);
+        }
+
+        app_ref_vector vars (m);
+        unsigned idx = 1;
+
+        if (m_curr_it != m_prems.end ()) {
+            // project vars of current pt and update m_post
+            idx = (m_curr_it - m_prems.begin ());
+            vars.append (m_vars[idx]);
+            m_post = m_sm.mk_and (impl);
+            qe_project (m, vars, m_post, M);
+            TRACE ("spacer",
+                    tout << "Updated post of derivation:\n"
+                         << mk_pp (m_post, m) << "\n";
+                  );
+            idx += 2;
+        }
+
+        // project all variables except those of the next premise
+        for (; idx < m_prems.size (); idx++) {
+            vars.append (m_vars[idx]);
+        }
+        expr_ref post_actual (m);
+        post_actual = m_post;
+        qe_project (m, vars, post_actual, M);
+
+        // next sibling; this updates local bookkeeping info about o-indices, etc.
+        model_node& sib = next ();
+        sib.reset ();
+
+        TRACE ("spacer",
+                tout << "post on actual params:\n"
+                     << mk_pp (post_actual, m) << "\n";
+                tout << "o-idx: " << curr_o_idx () << "\n";
+              );
+
+        // replace actuals by formals
+        m_sm.formula_o2n (post_actual, post, curr_o_idx ());
+        TRACE ("spacer",
+                tout << "Post of next sibling:\n"
+                << mk_pp (post, m) << "\n";
+              );
+        post_ctx = m.mk_true ();
+
+        return sib;
     }
 
-    void derivation::get_trace (expr_ref_vector& trace_conjs) const {
+    /*void derivation::get_trace (expr_ref_vector& trace_conjs) const {
         expr_substitution sub (m);
         expr* c1;
         expr* c2;
@@ -1110,33 +1368,7 @@ namespace spacer {
         expr_ref T_v (m);
         (*rep) (T, T_v);
         trace_conjs.push_back (T_v);
-
-        /*// add post
-        expr_ref post (m);
-        (*rep) (m_concl->post (), post);
-        trace_conjs.push_back (post);
-
-        // unghostify ghosts local to this derivation from all trace_conjs
-        expr_substitution unghost (m);
-        for (unsigned i = 0; i < m_prems.size (); i++) {
-            unsigned o_idx = m_o_idx [i];
-            model_node const* prem = m_prems [i];
-            vector<app_ref_vector> const& curr_ghosts = m_ghosts [o_idx];
-            for (vector<app_ref_vector>::const_iterator g_it = curr_ghosts.begin ();
-                    g_it != curr_ghosts.end (); g_it++) {
-                app_ref_vector const& vec = *g_it;
-                app* orig_o = vec[0];
-                app* ghost = vec[1];
-                unghost.insert (ghost, m.mk_const (m_sm.o2o (orig_o->get_decl (), o_idx, prem->id ())));
-            }
-        }
-        rep->set_substitution(&unghost);
-        for (unsigned i = 0; i < trace_conjs.size (); i++) {
-            expr_ref new_conj (m);
-            (*rep) (trace_conjs.get (i), new_conj);
-            trace_conjs.set (i, new_conj);
-        }*/
-    }
+    }*/
 
     derivation::~derivation () {
         TRACE ("spacer",
@@ -1161,7 +1393,7 @@ namespace spacer {
         m_leaves.pop ();
         result->outq ();
         TRACE ("spacer",
-                tout << "Popping node for PT:" << result->pt().head()->get_name().str()
+                tout << "Popping node for PT:" << result->pt().head()->get_name()
                      << " " << result
                      << " at level:" << result->level() << "\n";
               );
@@ -1201,7 +1433,7 @@ namespace spacer {
         m_leaves.push (&n);
         n.inq ();
         TRACE ("spacer",
-                tout << "Enqueuing node for PT:" << n.pt().head()->get_name().str()
+                tout << "Enqueuing node for PT:" << n.pt().head()->get_name()
                      << " " << &n
                      << " at level:" << n.level() << "\n";
               );
@@ -1217,7 +1449,7 @@ namespace spacer {
 
     void model_search::erase_leaf (model_node& n) { m_leaves.erase (&n); n.outq ();
         TRACE ("spacer",
-                tout << "Erasing node for PT:" << n.pt().head()->get_name().str()
+                tout << "Erasing node for PT:" << n.pt().head()->get_name()
                      << " " << &n
                      << " at level:" << n.level() << "\n";
               );
@@ -1287,8 +1519,9 @@ namespace spacer {
        The resulting trace 
      */
     expr_ref model_search::get_trace(context const& ctx) {
-        SASSERT (m_root->closing_deriv ());
         ast_manager& m = ctx.get_manager ();
+        return expr_ref (m.mk_true (), m);
+        /*SASSERT (m_root->closing_deriv ());
         expr_ref_vector trace_conjs (m);
         m_root->closing_deriv ()->get_trace (trace_conjs);
         TRACE ("spacer",
@@ -1296,7 +1529,7 @@ namespace spacer {
                 tout << mk_pp (m.mk_and (trace_conjs.size (), trace_conjs.c_ptr ()), m) << "\n";
               );
         expr_ref result (m.mk_and (trace_conjs.size (), trace_conjs.c_ptr ()), m);
-        return result;
+        return result;*/
     }
 /*
     expr_ref model_search::get_trace(context const& ctx) {       
@@ -2136,30 +2369,30 @@ namespace spacer {
             m_expanded_lvl = n.level();
         }
 
-        TRACE ("spacer", tout << "Checking cache\n";);
-        if (n.pt().is_reachable(n.post())) {
-            TRACE("spacer", tout << "reachable\n";);
-            //close_node(n);
-        }
-        else {
+        if (n.pt().is_reachable_known (n.post())) {
+            TRACE("spacer", tout << "known to be reachable\n";);
+            n.close ();
+            report_reach (n);
+        } else {
             bool uses_level = true;
             reset_curr_model ();
             switch (expand_state(n, cube, uses_level)) {
-            case l_true:
-                TRACE("spacer", tout << "node: " << &n << "\n";); 
-                create_children(n);
-                /*if (n.level() == 0) {
-                    TRACE("spacer", tout << "reachable at level 0\n";);
-                    n.updt_pre (expr_ref (m.mk_true (), m));
-                    n.close (); // n.m_pre -> <n.m_post, n.m_post_ctx> is concrete
-                    report_pre (n);
-                }
-                else {
-                    TRACE("spacer", tout << "node: " << &n << "\n";); 
-                    create_children(n);
-                }*/
+            case REACH: {
+                // concretely reachable; infer new reachability fact
+                expr_ref reach_fact (m);
+                mk_reach_fact (n, reach_fact);
+                n.pt ().add_reach_fact (reach_fact);
+                n.close ();
+                report_reach (n);
+
                 break;
-            case l_false: {
+            }
+            case ABS_REACH: {
+                TRACE ("spacer", tout << "node: " << &n << "\n";); 
+                create_children (n);
+                break;
+            }
+            case UNREACH: {
                 core_generalizer::cores cores;
                 cores.push_back(std::make_pair(cube, uses_level));
                 TRACE("spacer", tout << "cube:\n"; 
@@ -2183,11 +2416,11 @@ namespace spacer {
                 }
                 CASSERT("spacer",n.level() == 0 || check_invariant(n.level()-1));
                 n.close ();
-                report_pf (n);
+                report_unreach (n);
                 //m_search.backtrack_level(!found_invariant && m_params.flexible_trace(), n);
                 break;
             }
-            case l_undef: {
+            case UNKN: {
                 TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
                 throw unknown_exception();
             }
@@ -2201,7 +2434,7 @@ namespace spacer {
     // return a property that blocks state and is implied by the 
     // predicate transformer (or some unfolding of it).
     // 
-    lbool context::expand_state(model_node& n, expr_ref_vector& result, bool& uses_level) {
+    LOCAL_REACH_RESULT context::expand_state(model_node& n, expr_ref_vector& result, bool& uses_level) {
         return n.pt().is_reachable(n, &result, uses_level);
     }
 
@@ -2228,6 +2461,57 @@ namespace spacer {
         if (m_params.simplify_formulas_post()) {            
             simplify_formulas();
         }
+    }
+
+    void context::mk_reach_fact (model_node& n, expr_ref& result) {
+        pred_transformer& pt = n.pt ();
+        model_ref M = get_curr_model_ptr();
+
+        // pick a rule consistent with the model
+        // TODO: use all rules consistent with the model to get a better fact
+        datalog::rule const& r = pt.find_rule (*M);
+        ptr_vector<func_decl> preds;
+        pt.find_predecessors (r, preds);
+
+        expr_ref_vector path_cons (m);
+        path_cons.push_back (pt.get_transition (r));
+        app_ref_vector vars (m);
+
+        for (unsigned i = 0; i < preds.size (); i++) {
+            func_decl* pred = preds[i];
+            pred_transformer& ch_pt = get_pred_transformer (pred);
+            // add reach facts of body preds
+            expr_ref ch_reach_formal (ch_pt.get_reach (), m);
+            expr_ref ch_reach_actual (m);
+            m_pm.formula_n2o (ch_reach_formal, ch_reach_actual, i);
+            path_cons.push_back (ch_reach_actual);
+            // collect o-vars to eliminate
+            for (unsigned j = 0; j < pred->get_arity (); j++) {
+                vars.push_back (m.mk_const (m_pm.o2o (ch_pt.sig (j), 0, i)));
+            }
+        }
+        // collect aux vars to eliminate
+        ptr_vector<app>& aux_vars = pt.get_aux_vars (r);
+        vars.append (aux_vars.size (), aux_vars.c_ptr ());
+
+        result = m_pm.mk_and (path_cons);
+
+        TRACE ("spacer",
+                tout << "Reach fact, before QE:\n";
+                tout << mk_pp (result, m) << "\n";
+                tout << "Vars:\n";
+                for (unsigned i = 0; i < vars.size(); ++i) {
+                    tout << mk_pp(vars.get (i), m) << "\n";
+                }
+              );
+
+        qe_project (m, vars, result, M);
+        SASSERT (vars.empty ());
+
+        TRACE ("spacer",
+                tout << "Reach fact, after QE project:\n";
+                tout << mk_pp (result, m) << "\n";
+              );
     }
 
 
@@ -2271,18 +2555,16 @@ namespace spacer {
        - Create sub-goals for L0 and L1.
 
     */
-    void context::create_children(model_node& n) {        
-        SASSERT(n.level() >= 0);
+    void context::create_children(model_node& n) {
+        SASSERT(n.level() > 0);
         bool use_model_generalizer = m_params.use_model_generalizer();
-        scoped_no_proof _sc(m);
+        //scoped_no_proof _sc(m);
  
         pred_transformer& pt = n.pt();
         model_ref M = get_curr_model_ptr();
         datalog::rule const& r = pt.find_rule(*M);
         expr* T   = pt.get_transition(r);
         expr* phi = n.post();
-
-        //n.set_rule(&r);
 
         TRACE("spacer", 
               tout << "Model:\n";
@@ -2294,12 +2576,13 @@ namespace spacer {
         ptr_vector<func_decl> preds;
         ptr_vector<pred_transformer> pred_pts;
         pt.find_predecessors(r, preds);
+        SASSERT (preds.size () > 0);
         for (ptr_vector<func_decl>::iterator it = preds.begin ();
                 it != preds.end (); it++) {
             pred_pts.push_back (&get_pred_transformer (*it));
         }
 
-        expr_ref_vector mdl(m), forms(m), Phi(m);
+        expr_ref_vector forms(m), Phi(m);
 
         // obtain all formulas to consider for model generalization
         forms.push_back(T);
@@ -2320,7 +2603,7 @@ namespace spacer {
         else {
             Phi.append(mev.minimize_literals(forms1, M));
         }
-        pt.remove_predecessors(Phi);
+        pt.remove_predecessors (Phi);
 
         app_ref_vector vars(m);
         unsigned sig_size = pt.head()->get_arity();
@@ -2330,42 +2613,17 @@ namespace spacer {
         ptr_vector<app>& aux_vars = pt.get_aux_vars(r);
         vars.append(aux_vars.size(), aux_vars.c_ptr());
 
-        scoped_ptr<expr_replacer> rep;
-        qe_lite qe(m);
-        expr_ref phi1 = m_pm.mk_and(Phi);
-        qe(vars, phi1);
-        TRACE("spacer", tout << "Eliminated\n" << mk_pp(phi1, m) << "\n";);
-        if (!use_model_generalizer) {
-            reduce_disequalities(*M, 3, phi1);
-            TRACE("spacer", tout  << "Reduced-eq\n" << mk_pp(phi1, m) << "\n";);
-        }
-        get_context().get_rewriter()(phi1);
+        expr_ref phi1 = m_pm.mk_and (Phi);
+        qe_project (m, vars, phi1, M);
+        SASSERT (vars.empty ());
 
-        TRACE("spacer", 
-              tout << "Vars:\n";
-              for (unsigned i = 0; i < vars.size(); ++i) {
-                  tout << mk_pp(vars[i].get(), m) << "\n";
-              }
-              tout << "Literals\n";
-              tout << mk_pp(m_pm.mk_and(Phi), m) << "\n";
-              tout << "Reduced\n" << mk_pp(phi1, m) << "\n";);
-        
-        if (!vars.empty()) {
-            // also fresh names for auxiliary variables in body?
-            expr_substitution sub(m);
-            expr_ref tmp(m);
-            proof_ref pr(m);
-            pr = m.mk_asserted(m.mk_true());
-            for (unsigned i = 0; i < vars.size(); ++i) {    
-                tmp = mev.eval(M, vars[i].get());
-                sub.insert(vars[i].get(), tmp, pr);
-            }
-            if (!rep) rep = mk_expr_simp_replacer(m);
-            rep->set_substitution(&sub);
-            (*rep)(phi1);
-            TRACE("spacer", tout << "Projected:\n" << mk_pp(phi1, m) << "\n";);
-        }
-        Phi.reset();
+        TRACE ("spacer",
+                tout << "Literals\n";
+                tout << mk_pp (m_pm.mk_and (Phi), m) << "\n";
+                tout << "Reduced\n" << mk_pp (phi1, m) << "\n";
+              );
+
+        //Phi.reset();
 
         // create a new derivation for the model
 
@@ -2389,32 +2647,14 @@ namespace spacer {
 
         derivation* deriv = alloc (derivation, &n, pred_pts, o_idx, r, m_search);
         n.add_deriv (deriv);
-        deriv->setup (phi1);
+        deriv->setup (phi1, M);
+        SASSERT (deriv->has_next ());
 
-        if (deriv->has_next ()) {
-            // create post for the first child and add to queue
-
-            model_node& ch = deriv->next ();
-
-            expr_ref post_ctx (m);
-            deriv->mk_prem_post (phi1, post_ctx);
-
-            ch.updt_post (phi1, post_ctx);
-            m_search.add_leaf (ch);
-
-        } else {
-
-            // no preds; phi1 is the pre
-
-            SASSERT (preds.size () == 0);
-
-            n.updt_pre (phi1);
-            n.close (deriv); // n.m_pre -> <n.m_post, n.m_post_ctx> is concrete
-            report_pre (n);
-            return;
-
-        }
-
+        // create post for the first child and add to queue
+        expr_ref post (m), post_ctx (m);
+        model_node& ch = deriv->mk_next (post, post_ctx);
+        ch.updt_post (post, post_ctx);
+        m_search.add_leaf (ch);
 
         //qe::flatten_and(phi1, Phi);
 /*      unsigned_vector indices;
@@ -2470,59 +2710,16 @@ namespace spacer {
 */
     }
 
-    void context::report_pre (model_node& ch) {
+    void context::report_reach (model_node& ch) {
         TRACE ("spacer",
                 tout << ch.pt ().head ()->get_name () << " : "
                      << "post : " << mk_pp (ch.post (), m)
-                     << "; pre : " << mk_pp (ch.pre (), m) << "\n";);
+                     << " is reachable\n";
+              );
 
         model_node* par = ch.parent ();
         derivation* deriv = ch.my_deriv ();
 
-        // ch == root
-        if (!deriv) {
-            SASSERT (ch.is_reachable ());
-            return;
-        }
-
-        SASSERT (par);
-
-        if (deriv->is_last ()) {
-            // all premises of deriv have been explored
-            par->updt_pre (ch.pre ());
-            if (deriv->is_closed ()) { // found a concrete pre
-                par->close (deriv);
-            } // else ?? -- this is when some node in the subtree has type=OVER
-        } else {
-            // create post for the next child
-            model_node& sib = deriv->next ();
-            sib.reset ();
-            expr_ref post (ch.pre ()),
-                     post_ctx (m);
-            deriv->mk_prem_post (post, post_ctx);
-            sib.updt_post (post, post_ctx);
-            m_search.add_leaf (sib);
-        }
-
-        /*if (ch.is_closed ()) {
-            TRACE ("spacer", tout << "Del child's derivations\n";);
-            ch.del_derivs ();
-        }*/
-        // else ?? -- this is when some node in the subtree has type=OVER
-
-        if (par->has_pre ()) report_pre (*par);
-    }
-
-    void context::report_pf (model_node& ch) {
-        TRACE ("spacer", tout << "unreachable\n";);
-
-        // TODO: how does this new knowledge that ch has a proof
-        // affect any existing derivations?
-
-        model_node* par = ch.parent ();
-        derivation* deriv = ch.my_deriv ();
-
-        // for now, assume that ch found a cocnrete proof
         SASSERT (ch.is_closed ());
 
         // ch == root
@@ -2533,49 +2730,52 @@ namespace spacer {
 
         SASSERT (par);
 
-        pred_transformer const& ch_pt = ch.pt ();
-        unsigned ch_level = ch.level ();
-
-        // try ch at higher level?
-        if (redo_at_higher_level (ch, deriv, *par)) {
-            TRACE ("spacer", tout << "Redo child at higher level\n";);
-            ch.open ();
-            TRACE ("spacer", tout << "Incrementing level for child:" << &ch << "\n";);
-            ch.incr_level ();
-            m_search.add_leaf (ch);
-        } else {
-            TRACE ("spacer", tout << "No Redo. Deleting derivation...\n";);
+        if (deriv->is_last ()) {
+            // all premises of deriv have been explored
+            // add par as a leaf
             par->del_derivs (deriv);
+            if (!par->is_inq ()) m_search.add_leaf (*par);
+        } else {
+            // create post for the next child
+            expr_ref post (m), post_ctx (m);
+            model_node& sib = deriv->mk_next (post, post_ctx);
+            sib.updt_post (post, post_ctx);
+            m_search.add_leaf (sib);
+        }
+    }
+
+    void context::report_unreach (model_node& ch) {
+        TRACE ("spacer",
+                tout << ch.pt ().head ()->get_name () << " : "
+                     << "post : " << mk_pp (ch.post (), m)
+                     << " is unreachable\n";
+              );
+
+        // TODO: how does this new knowledge that ch has a proof
+        // affect any existing derivations?
+
+        model_node* par = ch.parent ();
+        derivation* deriv = ch.my_deriv ();
+
+        SASSERT (ch.is_closed ());
+
+        // ch == root
+        if (!deriv) {
+            ch.del_derivs ();
+            return;
         }
 
-        /*if (deriv->is_first ()) {
-            // even the first premise fails;
+        SASSERT (par);
 
-            // unlike report_pre (), there isn't a simple check to see if par.post
-            // has a proof; this is because of a possible model substitution for
-            // auxiliary variables coming from the interpreted part of the horn
-            // clause, in going from par.post to ch.post;
-            //
-            // moreover, even if we don't have the issue with auxiliary variables,
-            // this only shows that this particular horn-clause is unsatisfiable
+        par->del_derivs (deriv);
 
-            // recheck parent's post
-
-            // TODO: alternatively, we could find out what else ch needs to show
-            // unreachable, instead of deleting par's derivations
-        } else {
-            // need a new pre of its previous sibling;
-            // but simply adding the sibling to the queue might result in the
-            // same pre;
-            // to take the new lemma of ch into account, we simply add the
-            // parent to the queue
-        }*/
-
-        TRACE ("spacer", tout << "Del par's affected derivations\n";);
+        // an aggressive step
         // ch_pt has new lemmas at ch_level; delete all affected derivations
         // TODO: ch_pt could have learnt lemmas at a level higher than ch_level
         // -- check for that??
-        par->del_derivs (ch_pt, ch_level);
+        //pred_transformer const& ch_pt = ch.pt ();
+        //unsigned ch_level = ch.level ();
+        //par->del_derivs (ch_pt, ch_level);
 
         if (!par->has_derivs (par->level ()-1)) {
             TRACE ("spacer", tout << "No more normal derivations\n";);
