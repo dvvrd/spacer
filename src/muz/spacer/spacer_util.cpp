@@ -1301,13 +1301,13 @@ namespace spacer {
         // use LW projection for arithmetic variables
         if (!vars.empty ()) {
             app_ref_vector arith_vars (m);
-            model_evaluator mev (m);
             expr_substitution sub (m);
             proof_ref pr (m.mk_asserted (m.mk_true ()), m);
             expr_ref bval (m);
             for (unsigned i = 0; i < vars.size (); i++) {
                 if (m.is_bool (vars.get (i))) {
-                    bval = mev.eval (M, vars.get (i));
+                    // obtain the interpretation of the ith var using model completion
+                    VERIFY (M->eval (vars.get (i), bval, true));
                     sub.insert (vars.get (i), bval, pr);
                 }
                 else {

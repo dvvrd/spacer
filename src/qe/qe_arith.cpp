@@ -186,7 +186,7 @@ namespace qe {
                             rational r;
                             cx = mk_mul (c, m_var->x());
                             cxt = mk_add (cx, t);
-                            VERIFY(mdl.eval(cxt, val));
+                            VERIFY(mdl.eval(cxt, val, true));
                             VERIFY(a.is_numeral(val, r));
                             SASSERT (r > rational::zero () || r < rational::zero ());
                             if (r > rational::zero ()) {
@@ -291,7 +291,7 @@ namespace qe {
                             rational r;
                             cx = mk_mul (c, m_var->x());
                             cxt = mk_add (cx, t);
-                            VERIFY(mdl.eval(cxt, val));
+                            VERIFY(mdl.eval(cxt, val, true));
                             VERIFY(a.is_numeral(val, r));
                             if (r == rational::zero ()) {
                                 expr_ref eq_term (mk_mul (-(rational::one ()/c), t), m);
@@ -316,7 +316,7 @@ namespace qe {
                             rational r;
                             cx = mk_mul (c, m_var->x());
                             cxt = mk_add (cx, t);
-                            VERIFY(mdl.eval(cxt, val));
+                            VERIFY(mdl.eval(cxt, val, true));
                             VERIFY(a.is_numeral(val, r));
                             SASSERT (r > rational::zero () || r < rational::zero ());
                             if (r > rational::zero ()) {
@@ -397,7 +397,7 @@ namespace qe {
             for (unsigned i = 0; i < m_terms.size(); ++i) {
                 rational const& ac = m_coeffs[i];
                 if (!m_eq[i] && ac.is_pos() == do_pos) {
-                    VERIFY(mdl.eval(m_terms.get (i), val));
+                    VERIFY(mdl.eval(m_terms.get (i), val, true));
                     VERIFY(a.is_numeral(val, r));
                     r /= abs(ac);
                     IF_VERBOSE(1, verbose_stream() << "max: " << mk_pp(m_terms.get (i), m) << " " << r << " " <<
