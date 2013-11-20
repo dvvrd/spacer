@@ -1315,13 +1315,15 @@ namespace spacer {
                     SASSERT (vars.get (i)->get_decl ()->get_range ()->get_decl_kind () == REAL_SORT);
                 }
             }
-            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
-            rep->set_substitution (&sub);
-            (*rep)(fml);
-            rw (fml);
-            TRACE ("spacer",
-                    tout << "Projected Boolean vars:\n" << mk_pp (fml, m) << "\n";
-                  );
+            if (!sub.empty ()) {
+                scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+                rep->set_substitution (&sub);
+                (*rep)(fml);
+                rw (fml);
+                TRACE ("spacer",
+                        tout << "Projected Boolean vars:\n" << mk_pp (fml, m) << "\n";
+                      );
+            }
             // project using LW
             if (!arith_vars.empty ()) {
                 qe::arith_project (*M, arith_vars, fml);
