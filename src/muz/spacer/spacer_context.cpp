@@ -711,6 +711,7 @@ namespace spacer {
     void pred_transformer::mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result, bool is_reach_fact) {
         expr_ref tmp1(m), tmp2(m);
         expr_substitution sub (m);
+        proof_ref pr (m.mk_asserted (m.mk_true ()), m);
         obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
         for (; it != end; ++it) {
             expr* pred = it->m_key;
@@ -734,14 +735,13 @@ namespace spacer {
 
                         case1 = pt.get_reach_case_assump (num_cases-1);
                         ocase1 = pt.mk_o_reach_case_assump (case1, i);
-                        sub.insert (case1, ocase1);
+                        sub.insert (case1, ocase1, pr);
                         if (num_cases > 1) {
                             case2 = pt.get_reach_case_assump (num_cases-2);
                             ocase2 = pt.mk_o_reach_case_assump (case2, i);
-                            sub.insert (case2, ocase2);
+                            sub.insert (case2, ocase2, pr);
                         }
 
-                        scoped_no_proof _sc (m);
                         scoped_ptr<expr_replacer> rep = mk_default_expr_replacer (m);
                         rep->set_substitution (&sub);
                         (*rep) (tmp2);
@@ -2634,7 +2634,6 @@ namespace spacer {
     void context::create_children(model_node& n) {
         SASSERT(n.level() > 0);
         bool use_model_generalizer = m_params.use_model_generalizer();
-        //scoped_no_proof _sc(m);
  
         pred_transformer& pt = n.pt();
         model_ref M = get_curr_model_ptr();

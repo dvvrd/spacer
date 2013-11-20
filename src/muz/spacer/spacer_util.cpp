@@ -1303,11 +1303,12 @@ namespace spacer {
             app_ref_vector arith_vars (m);
             model_evaluator mev (m);
             expr_substitution sub (m);
+            proof_ref pr (m.mk_asserted (m.mk_true ()), m);
             expr_ref bval (m);
             for (unsigned i = 0; i < vars.size (); i++) {
                 if (m.is_bool (vars.get (i))) {
                     bval = mev.eval (M, vars.get (i));
-                    sub.insert (vars.get (i), bval);
+                    sub.insert (vars.get (i), bval, pr);
                 }
                 else {
                     arith_vars.push_back (vars.get (i));
