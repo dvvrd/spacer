@@ -149,6 +149,7 @@ namespace spacer {
         void reset_statistics();
 
         bool is_reachable_known (expr* state);
+        void get_reach_explanation (model_ref& M, expr_ref& reach_fact);
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(ptr_vector<func_decl>& predicates) const;
@@ -345,8 +346,8 @@ namespace spacer {
         //vector<vector<app_ref_vector> >     m_ghosts;
                         // for each o_index, vector of (o_const, ghost) pairs
         expr_ref                            m_post; // combined goal for m_prems
-        vector<app_ref_vector>              m_vars;
-        scoped_ptr<smt_context>             m_reach_ctx; // for checking consistency of reach facts of prems
+        vector<app_ref_vector>              m_ovars;
+        vector<app_ref_vector>              m_nvars;
         model_ref                           M;
 
         // substitute o-consts in phi by ghosts;

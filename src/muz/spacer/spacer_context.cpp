@@ -140,19 +140,32 @@ namespace spacer {
     }
 
     bool pred_transformer::is_reachable_known (expr* state) {
+        SASSERT (state);
         expr_ref_vector assumps (m);
         if (!assert_all_reach_facts (assumps))
             return false;
-
         m_reach_ctx->push ();
-        expr_ref_vector state_lits (m);
-        qe::flatten_and (state, state_lits);
-        for (unsigned i = 0; i < state_lits.size (); i++) {
-            m_reach_ctx->assert_expr (state_lits.get (i));
-        }
+        m_reach_ctx->assert_expr (state);
         lbool res = m_reach_ctx->check (assumps);
         m_reach_ctx->pop ();
         return (res == l_true);
+    }
+
+    void pred_transformer::get_reach_explanation (model_ref& M, expr_ref& reach_fact) {
+        m_reach_ctx->get_model (M);
+        SASSERT (M);
+        expr_ref bval (m);
+        expr_ref_vector reach_facts (m);
+        SASSERT (m_reach_case_assumps.size () == m_reach_facts.size ());
+        for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
+            // evaluate using model completion
+            VERIFY (M->eval (m_reach_case_assumps.get (i), bval, true));
+            if (m.is_false (bval)) {
+                reach_facts.push_back (m_reach_facts.get (i));
+            }
+        }
+        reach_fact = m.mk_or (reach_facts.size (), reach_facts.c_ptr ());
+        SASSERT (M->eval (reach_fact, bval, true) && m.is_true (bval));
     }
 
     void pred_transformer::find_rules (model_core const& model, svector<datalog::rule const*>& rules) const {
@@ -1171,7 +1184,6 @@ namespace spacer {
         m (m_concl->get_manager ()),
         m_sm (m_concl->get_spacer_manager ()),
         m_post (m),
-        m_reach_ctx (m_sm.mk_fresh ()),
         M (0)
     {
         SASSERT (m_concl); // non-null
@@ -1179,12 +1191,15 @@ namespace spacer {
             pred_transformer& pt = *(pred_pts [i]);
             // create model node for the premise
             m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this, search));
-            // populate o-vars of pt
-            m_vars.push_back (app_ref_vector (m));
-            app_ref_vector& pt_vars = m_vars.back ();
+            // populate n-vars and o-vars of pt
+            m_ovars.push_back (app_ref_vector (m));
+            m_nvars.push_back (app_ref_vector (m));
+            app_ref_vector& pt_ovars = m_ovars.back ();
+            app_ref_vector& pt_nvars = m_nvars.back ();
             unsigned sig_size = pt.head()->get_arity();
             for (unsigned j = 0; j < sig_size; ++j) {
-                pt_vars.push_back (m.mk_const (m_sm.o2o (pt.sig (j), 0, m_o_idx [i])));
+                pt_ovars.push_back (m.mk_const (m_sm.o2o (pt.sig (j), 0, m_o_idx [i])));
+                pt_nvars.push_back (m.mk_const (m_sm.o2n (pt.sig (j), 0)));
             }
         }
         // initialize m_curr_it to point to nothing
@@ -1292,7 +1307,6 @@ namespace spacer {
 
     void derivation::setup (expr_ref& phi, model_ref& mdl) {
         m_post = phi;
-        m_reach_ctx->assert_expr (phi);
         M = mdl;
         //ghostify (phi);
     }
@@ -1314,30 +1328,28 @@ namespace spacer {
         expr_ref_vector impl (m);
 
         if (m_curr_it != m_prems.end ()) {
-            expr_ref_vector cons (m);
-            cons.push_back (m_post);
-            // obtain new post by taking pre over reach facts
             pred_transformer& pt = curr ().pt ();
-            expr_ref curr_reach_formal (pt.get_reach (), m);
-            expr_ref curr_reach_actual (m);
-            m_sm.formula_n2o (curr_reach_formal, curr_reach_actual, curr_o_idx ());
-            cons.push_back (curr_reach_actual);
-            // obtain a model consistent with reach facts up to this point
+            // o2n for current idx; m_post has multiple indices, so non-homogeneous
+            expr_ref post (m);
+            m_sm.formula_o2n (m_post, post, curr_o_idx (), false);
+            m_post = post;
+            // m_post is consistent with reach facts of pt;
+            // obtain a model and a subset of reach facts used to show consistency
+            VERIFY (pt.is_reachable_known (m_post));
+            expr_ref reach_fact (m);
+            pt.get_reach_explanation (M, reach_fact);
             TRACE ("spacer",
-                    tout << "Updated under-approx of " << curr ().pt ().head ()->get_name () << "\n"
-                         << mk_pp (curr_reach_actual, m) << "\n";
-                  );
-            m_reach_ctx->assert_expr (curr_reach_actual);
-            expr_ref_vector assumps (m);
-            lbool res = m_reach_ctx->check (assumps);
-            SASSERT (res == l_true);
-            M.reset ();
-            m_reach_ctx->get_model (M);
-            TRACE ("spacer",
-                    tout << "Model with new under-approx:\n";
+                    tout << "Post of derivation with n-vars for current index:\n"
+                         << mk_pp (m_post, m) << "\n";
+                    tout << "Using reach fact of " << curr ().pt ().head ()->get_name () << ":\n"
+                         << mk_pp (reach_fact, m) << "\n";
+                    tout << "Model:\n";
                     model_smt2_pp (tout, m, *M, 0);
                   );
             // pick an implicant
+            expr_ref_vector cons (m);
+            cons.push_back (reach_fact);
+            cons.push_back (m_post);
             qe::flatten_and (cons);
             ptr_vector<expr> cons1 (cons.size (), cons.c_ptr ());
             model_evaluator mev (m);
@@ -1348,12 +1360,13 @@ namespace spacer {
         }
 
         app_ref_vector vars (m);
-        unsigned idx = 1;
+        app_ref ovar (m), nvar (m);
+        unsigned idx = 1; // start idx of ovars to be eliminated to make the next post
 
         if (m_curr_it != m_prems.end ()) {
             // project vars of current pt and update m_post
             idx = (m_curr_it - m_prems.begin ());
-            vars.append (m_vars[idx]);
+            vars.append (m_nvars[idx]);
             m_post = m_sm.mk_and (impl);
             qe_project (m, vars, m_post, M);
             TRACE ("spacer",
@@ -1365,7 +1378,7 @@ namespace spacer {
 
         // project all variables except those of the next premise
         for (; idx < m_prems.size (); idx++) {
-            vars.append (m_vars[idx]);
+            vars.append (m_ovars[idx]);
         }
         expr_ref post_actual (m);
         post_actual = m_post;
@@ -2697,8 +2710,6 @@ namespace spacer {
                 tout << mk_pp (m_pm.mk_and (Phi), m) << "\n";
                 tout << "Reduced\n" << mk_pp (phi1, m) << "\n";
               );
-
-        //Phi.reset();
 
         // create a new derivation for the model
 
