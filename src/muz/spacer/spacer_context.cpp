@@ -244,14 +244,14 @@ namespace spacer {
         }
     }
 
-    void pred_transformer::find_predecessors(ptr_vector<func_decl>& preds) const {
+    void pred_transformer::find_predecessors(vector<std::pair<func_decl*, unsigned> >& preds) const {
         preds.reset();
         obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
         for (; it != end; it++) {
             datalog::rule const& r = *it->m_value;
             unsigned tail_sz = r.get_uninterpreted_tail_size();
             for (unsigned ti = 0; ti < tail_sz; ti++) {
-                preds.push_back(r.get_tail(ti)->get_decl());
+                preds.push_back(std::make_pair (r.get_tail(ti)->get_decl(), ti));
             }
         }
     }
@@ -626,7 +626,7 @@ namespace spacer {
         lbool is_sat;
         expr_ref_vector assumps (m);
         expr_ref_vector pred_assumps (m);
-        ptr_vector<func_decl> preds;
+        vector<std::pair<func_decl*, unsigned> > preds;
 
         // find all preds of all rules
         find_predecessors (preds);
@@ -636,9 +636,10 @@ namespace spacer {
         assumps.push_back (n.post ());
         if (n.level () > 0) {
             for (unsigned i = 0; i < preds.size (); i++) {
-                pred_transformer const& pred_pt = ctx.get_pred_transformer (preds[i]);
+                pred_transformer const& pred_pt = ctx.get_pred_transformer (preds[i].first);
+                unsigned oidx = preds[i].second;
                 pred_assumps.reset ();
-                if (!pred_pt.assert_o_reach_facts (pred_assumps, i)) {
+                if (!pred_pt.assert_o_reach_facts (pred_assumps, oidx)) {
                     no_reach_facts = true;
                     break;
                 }
@@ -2094,7 +2095,9 @@ namespace spacer {
 
         switch(m_last_result) {
         case l_true: {
-            scoped_no_proof _sc(m);
+            TRACE ("spacer", tout << "Unsupported\n";);
+            break;
+            /*scoped_no_proof _sc(m);
             expr_ref const& cex = get_answer ();
             smt::kernel solver (m, get_fparams());
             solver.assert_expr (cex);
@@ -2105,7 +2108,7 @@ namespace spacer {
                 msg << "proof validation failed";
                 IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
                 throw default_exception(msg.str());
-            }
+            }*/
             /*proof_ref pr = get_proof();
             proof_checker checker(m);
             expr_ref_vector side_conditions(m);

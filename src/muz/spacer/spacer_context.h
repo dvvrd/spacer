@@ -159,7 +159,7 @@ namespace spacer {
         expr* get_used_reach_facts (model_ref const& M, unsigned oidx) const;
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
-        void find_predecessors(ptr_vector<func_decl>& predicates) const;
+        void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
         datalog::rule const& find_rule(model_core const& model) const;
         void find_rules (model_core const& model, svector<datalog::rule const*>& rules) const;
         expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
