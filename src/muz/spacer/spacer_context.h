@@ -156,6 +156,7 @@ namespace spacer {
 
         bool is_reachable_known (expr* state);
         void get_reach_explanation (model_ref& M, expr_ref& reach_fact);
+        expr* get_used_reach_facts (model_ref const& M, unsigned oidx) const;
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(ptr_vector<func_decl>& predicates) const;

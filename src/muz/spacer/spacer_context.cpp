@@ -167,6 +167,21 @@ namespace spacer {
         SASSERT (M->eval (reach_fact, bval) && m.is_true (bval));
     }
 
+    expr* pred_transformer::get_used_reach_facts (model_ref const& M, unsigned oidx) const {
+        expr_ref_vector facts (m);
+        expr_ref bval (m);
+        for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
+            u_map<expr*> const& omap = m_o_reach_case_maps.get (i);
+            expr* oassump;
+            VERIFY (omap.find (oidx, oassump));
+            if (M->eval (oassump, bval) && m.is_false (bval)) {
+                facts.push_back (m_reach_facts.get (i));
+            }
+        }
+        expr_ref result (m);
+        return m.mk_or (facts.size (), facts.c_ptr ());
+    }
+
     void pred_transformer::find_rules (model_core const& model, svector<datalog::rule const*>& rules) const {
         obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
         TRACE("spacer_verbose",
@@ -2553,9 +2568,13 @@ namespace spacer {
             func_decl* pred = preds[i];
             pred_transformer& ch_pt = get_pred_transformer (pred);
             // add reach facts of body preds
-            expr_ref ch_reach_formal (ch_pt.get_reach (), m);
-            expr_ref ch_reach_actual (m);
+            expr_ref ch_reach_formal (m), ch_reach_actual (m);
+            ch_reach_formal = ch_pt.get_used_reach_facts (M, i);
             m_pm.formula_n2o (ch_reach_formal, ch_reach_actual, i);
+            DEBUG_CODE (
+                expr_ref bval (m);
+                SASSERT (M->eval (ch_reach_actual, bval) && m.is_true (bval));
+            );
             path_cons.push_back (ch_reach_actual);
             // collect o-vars to eliminate
             for (unsigned j = 0; j < pred->get_arity (); j++) {
