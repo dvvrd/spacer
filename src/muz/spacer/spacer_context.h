@@ -96,6 +96,12 @@ namespace spacer {
         ptr_vector<func_decl>        m_predicates;
         stats                        m_stats;
         expr_ref_vector              m_reach_case_assumps; // aux vars for asserting reach facts in m_reach_ctx and children's m_solver's incrementally
+        vector<u_map<expr*> >        m_o_reach_case_maps;
+                                        // maps from o-idx to o-versions of the assumptions;
+                                        // #o-indices = max number of times this
+                                        // predicate appears as a body predicate
+                                        // in any rule
+        expr_ref_vector              _o_reach_case_assumps; // dummy to have references to the o-versions
 
         void init_sig();
         void ensure_level(unsigned level);
@@ -161,13 +167,13 @@ namespace spacer {
         bool propagate_to_next_level(unsigned level);
         void propagate_to_infinity(unsigned level);
         void add_property(expr * lemma, unsigned lvl);  // add property 'p' to state at level.
-        expr* mk_o_reach_case_assump (expr_ref const& reach_case, unsigned oidx) const;
+        expr* mk_o_reach_case_assump (unsigned idx, unsigned oidx);
         expr* get_reach_case_assump (unsigned idx) const;
         unsigned get_num_reach_cases () const;
 
         void add_reach_fact (expr* fact);  // add reachability fact
-        bool assert_all_reach_facts (expr_ref_vector& assumps) const;
-        void assert_no_reach_facts (expr_ref_vector& assumps) const;
+        bool assert_reach_facts (expr_ref_vector& assumps) const;
+        bool assert_o_reach_facts (expr_ref_vector& assumps, unsigned oidx) const;
 
         LOCAL_REACH_RESULT is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level);
         bool is_invariant(unsigned level, expr* co_state, bool inductive, bool& assumes_level, expr_ref_vector* core = 0);
