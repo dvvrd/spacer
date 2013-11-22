@@ -77,6 +77,7 @@ namespace spacer {
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name()),
         m_reach_ctx (pm.mk_fresh ()),
         m_reach_facts (m), m_invariants(m), m_transition(m), m_initial_state(m), 
+        m_all_init (false),
         //m_reachable(pm, (datalog::SPACER_CACHE_MODE)ctx.get_params().cache_mode()),
         m_reach_case_assumps (m),
         _o_reach_case_assumps (m)
@@ -625,45 +626,49 @@ namespace spacer {
 
         lbool is_sat;
         expr_ref_vector assumps (m);
-        expr_ref_vector pred_assumps (m);
-        vector<std::pair<func_decl*, unsigned> > preds;
-
         LOCAL_REACH_RESULT reach_result; // REACH vs. ABS_REACH
 
-        // find all preds of all rules
-        find_predecessors (preds);
-
-        // check using reach facts of body preds
-        bool no_reach_facts = false;
         assumps.push_back (n.post ());
-        if (n.level () > 0 && !preds.empty ()) {
-            for (unsigned i = 0; i < preds.size (); i++) {
-                pred_transformer const& pred_pt = ctx.get_pred_transformer (preds[i].first);
-                unsigned oidx = preds[i].second;
-                pred_assumps.reset ();
-                if (!pred_pt.assert_o_reach_facts (pred_assumps, oidx)) {
-                    no_reach_facts = true;
-                    break;
+
+        if (n.level () > 0 && !m_all_init) {
+            obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin (),
+                                                          end = m_tag2rule.end ();
+            for (; it != end; ++it) {
+                expr* r_tag = it->m_key;
+                datalog::rule const* r = it->m_value;
+                if (!r) continue;
+                find_predecessors(*r, m_predicates);
+                if (m_predicates.empty ()) continue;
+                expr_ref_vector pred_assumps (m);
+                for (unsigned i = 0; i < m_predicates.size(); i++) {
+                    func_decl* d = m_predicates[i];
+                    pred_transformer const& pt = ctx.get_pred_transformer (d);
+                    expr_ref_vector tmp (m);
+                    if (!pt.assert_o_reach_facts (tmp, i)) {
+                        // some predecessor has no reach facts; disable the rule
+                        pred_assumps.reset ();
+                        pred_assumps.push_back (m.mk_not (r_tag));
+                        break;
+                    }
+                    pred_assumps.append (tmp);
                 }
                 assumps.append (pred_assumps);
             }
-            if (!no_reach_facts) {
-                is_sat = m_solver.check_assumptions (assumps);
-                if (is_sat == l_true && core) {            
-                    core->reset();
-                    TRACE ("spacer", tout << "reachable using reach facts\n"; 
-                            model_smt2_pp (tout, m, *model, 0);
-                          );
-                    ctx.set_curr_model (model);
-                    return REACH;
-                }
-                TRACE ("spacer", tout << "unreachable using reach facts\n";);
+            is_sat = m_solver.check_assumptions (assumps);
+            if (is_sat == l_true && core) {            
+                core->reset();
+                TRACE ("spacer", tout << "reachable using reach facts\n"; 
+                        model_smt2_pp (tout, m, *model, 0);
+                      );
+                ctx.set_curr_model (model);
+                return REACH;
             }
+            TRACE ("spacer", tout << "unreachable using reach facts\n";);
             // subsequent reachability is abstract
             reach_result = ABS_REACH;
         }
         else {
-            // level 0 or no preds -- subsequent reachability is concrete
+            // level 0 or no uninterpreted preds -- subsequent reachability is concrete
             reach_result = REACH;
         }
 
@@ -839,6 +844,9 @@ namespace spacer {
         }
         // mk init condition
         init = pm.mk_and (init_conds);
+        if (init_conds.empty ()) { // no rule has uninterpreted tail
+            m_all_init = true;
+        }
     }
 
     void pred_transformer::init_rule(
