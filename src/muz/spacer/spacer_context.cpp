@@ -77,7 +77,7 @@ namespace spacer {
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name()),
         m_reach_ctx (pm.mk_fresh ()),
         m_reach_facts (m), m_invariants(m), m_transition(m), m_initial_state(m), 
-        m_reachable(pm, (datalog::SPACER_CACHE_MODE)ctx.get_params().cache_mode()),
+        //m_reachable(pm, (datalog::SPACER_CACHE_MODE)ctx.get_params().cache_mode()),
         m_reach_case_assumps (m),
         _o_reach_case_assumps (m)
     { init_sig (); }
@@ -104,7 +104,7 @@ namespace spacer {
 
     void pred_transformer::collect_statistics(statistics& st) const {
         m_solver.collect_statistics(st);
-        m_reachable.collect_statistics(st);
+        //m_reachable.collect_statistics(st);
         st.update("SPACER num propagations", m_stats.m_num_propagations);
         unsigned np = m_invariants.size();
         for (unsigned i = 0; i < m_levels.size(); ++i) {
@@ -115,7 +115,7 @@ namespace spacer {
 
     void pred_transformer::reset_statistics() {
         m_solver.reset_statistics();
-        m_reachable.reset_statistics();
+        //m_reachable.reset_statistics();
         m_stats.reset();
     }
     
@@ -784,7 +784,7 @@ namespace spacer {
               tout << "Initial state: " << mk_pp(m_initial_state, m) << "\n";
               tout << "Transition:    " << mk_pp(m_transition,  m) << "\n";);
         SASSERT(is_app(m_initial_state));
-        m_reachable.add_init(to_app(m_initial_state));
+        //m_reachable.add_init(to_app(m_initial_state));
     }
 
     void pred_transformer::init_rules(decl2rel const& pts, expr_ref& init, expr_ref& transition) {
@@ -978,7 +978,7 @@ namespace spacer {
     }
 
     void pred_transformer::close(expr* e) {
-        m_reachable.add_reachable(e);
+        //m_reachable.add_reachable(e);
     }
 
     void pred_transformer::add_premises(decl2rel const& pts, unsigned lvl, datalog::rule& rule, expr_ref_vector& r) {        

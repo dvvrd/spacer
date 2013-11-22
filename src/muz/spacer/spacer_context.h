@@ -92,7 +92,7 @@ namespace spacer {
         rule2apps                    m_rule2vars;       // map rule to auxiliary variables
         expr_ref                     m_transition;      // transition relation.
         expr_ref                     m_initial_state;   // initial state.
-        reachable_cache              m_reachable; 
+        //reachable_cache              m_reachable; 
         ptr_vector<func_decl>        m_predicates;
         stats                        m_stats;
         expr_ref_vector              m_reach_case_assumps; // aux vars for asserting reach facts in m_reach_ctx and children's m_solver's incrementally
