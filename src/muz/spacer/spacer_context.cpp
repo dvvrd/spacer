@@ -628,13 +628,15 @@ namespace spacer {
         expr_ref_vector pred_assumps (m);
         vector<std::pair<func_decl*, unsigned> > preds;
 
+        LOCAL_REACH_RESULT reach_result; // REACH vs. ABS_REACH
+
         // find all preds of all rules
         find_predecessors (preds);
 
         // check using reach facts of body preds
         bool no_reach_facts = false;
         assumps.push_back (n.post ());
-        if (n.level () > 0) {
+        if (n.level () > 0 && !preds.empty ()) {
             for (unsigned i = 0; i < preds.size (); i++) {
                 pred_transformer const& pred_pt = ctx.get_pred_transformer (preds[i].first);
                 unsigned oidx = preds[i].second;
@@ -645,39 +647,42 @@ namespace spacer {
                 }
                 assumps.append (pred_assumps);
             }
-        }
-        if (!no_reach_facts) {
-            is_sat = m_solver.check_assumptions (assumps);
-            if (is_sat == l_true && core) {            
-                core->reset();
-                TRACE ("spacer", tout << "reachable using reach facts\n"; 
-                        model_smt2_pp (tout, m, *model, 0);
-                      );
-                ctx.set_curr_model (model);
-                return REACH;
+            if (!no_reach_facts) {
+                is_sat = m_solver.check_assumptions (assumps);
+                if (is_sat == l_true && core) {            
+                    core->reset();
+                    TRACE ("spacer", tout << "reachable using reach facts\n"; 
+                            model_smt2_pp (tout, m, *model, 0);
+                          );
+                    ctx.set_curr_model (model);
+                    return REACH;
+                }
+                TRACE ("spacer", tout << "unreachable using reach facts\n";);
             }
-            TRACE ("spacer", tout << "unreachable using reach facts\n";);
+            // subsequent reachability is abstract
+            reach_result = ABS_REACH;
+        }
+        else {
+            // level 0 or no preds -- subsequent reachability is concrete
+            reach_result = REACH;
         }
 
-        if (n.level () > 0) {
-            core->reset ();
-            m_solver.set_core(core);
-            model.reset ();
-            m_solver.set_model(&model);
+        core->reset ();
+        m_solver.set_core(core);
+        model.reset ();
+        m_solver.set_model(&model);
 
-            // check without reach facts of body preds
-            is_sat = m_solver.check_conjunction_as_assumptions (n.post ());
-            if (is_sat == l_true && core) {
-                core->reset();
-                TRACE ("spacer", tout << "reachable using lemmas\n"; 
-                        model_smt2_pp (tout, m, *model, 0);
-                      );
-                ctx.set_curr_model (model);
-                return ABS_REACH;
-            }
+        // check without reach facts of body preds
+        is_sat = m_solver.check_conjunction_as_assumptions (n.post ());
+        if (is_sat == l_true && core) {
+            core->reset();
+            TRACE ("spacer", tout << "reachable using lemmas\n"; 
+                    model_smt2_pp (tout, m, *model, 0);
+                  );
+            ctx.set_curr_model (model);
+            return reach_result;
         }
-
-        if (is_sat == l_false) {
+        else if (is_sat == l_false) {
             TRACE ("spacer", tout << "unreachable with lemmas\n";);
             uses_level = m_solver.assumes_level();
             return UNREACH;
@@ -2458,6 +2463,11 @@ namespace spacer {
         if (n.level() < m_expanded_lvl) {
             m_expanded_lvl = n.level();
         }
+
+        TRACE ("spacer", 
+                tout << "expand-node: " << n.pt().head()->get_name() << " level: " << n.level() << "\n";
+                tout << mk_pp(n.post(), m) << "\n";);
+
 
         if (n.pt().is_reachable_known (n.post())) {
             TRACE("spacer", tout << "known to be reachable\n";);
