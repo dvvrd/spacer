@@ -156,6 +156,7 @@ namespace spacer {
         void reset_statistics();
 
         bool is_reachable_known (expr* state);
+        bool is_reachable_with_reach_facts (model_node& n, datalog::rule const& r);
         void get_reach_explanation (model_ref& M, expr_ref& reach_fact);
         expr* get_used_reach_facts (model_ref const& M, unsigned oidx) const;
         void remove_predecessors(expr_ref_vector& literals);
@@ -440,6 +441,8 @@ namespace spacer {
         //void mk_prem_post (expr_ref& phi, expr_ref& ctx) const;
         model_node& mk_next (expr_ref& post, expr_ref& post_ctx);
 
+        datalog::rule const& get_rule () const { return m_rule; }
+
         // get symbolic cex for the derivation to m_concl.post
         //void get_trace (expr_ref_vector& trace_conjs) const;
     };
@@ -577,6 +580,7 @@ namespace spacer {
 
         void report_unreach (model_node& ch); // ch's post is unreachable
         void report_reach (model_node& ch); // ch's post is concretely reachable
+        void updt_as_reachable (model_node& n);
         bool redo_at_higher_level (model_node const& ch, derivation const* d, model_node const& par) const;
         
         // Generate inductive property

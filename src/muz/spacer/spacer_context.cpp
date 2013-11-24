@@ -611,6 +611,38 @@ namespace spacer {
         }
     }
 
+    bool pred_transformer::is_reachable_with_reach_facts (model_node& n, datalog::rule const& r) {
+        expr_ref_vector assumps (m);
+        assumps.push_back (n.post ());
+        expr* r_tag = rule2tag (&r);
+        assumps.push_back (r_tag);
+
+        find_predecessors(r, m_predicates);
+        for (unsigned i = 0; i < m_predicates.size(); i++) {
+            func_decl* d = m_predicates[i];
+            pred_transformer const& pt = ctx.get_pred_transformer (d);
+            expr_ref_vector tmp (m);
+            VERIFY (pt.assert_o_reach_facts (tmp, i));
+            assumps.append (tmp);
+        }
+
+        prop_solver::scoped_level _sl(m_solver, n.level());
+        expr_ref_vector core (m);
+        m_solver.set_core (&core);
+        model_ref model;
+        m_solver.set_model(&model);
+        lbool is_sat = m_solver.check_assumptions (assumps);
+        core.reset();
+        if (is_sat == l_true) {            
+            TRACE ("spacer", tout << "reachable using reach facts\n"; 
+                    model_smt2_pp (tout, m, *model, 0);
+                  );
+            ctx.set_curr_model (model);
+            return true;
+        }
+        return false;
+    }
+
     LOCAL_REACH_RESULT pred_transformer::is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level) {
         TRACE("spacer", 
               tout << "is-reachable: " << head()->get_name() << " level: " << n.level() << "\n";
@@ -2846,16 +2878,30 @@ namespace spacer {
 
         if (deriv->is_last ()) {
             // all premises of deriv have been explored
-            // add par as a leaf
             par->del_derivs (deriv);
-            if (!par->is_inq ()) m_search.add_leaf (*par);
-        } else {
+
+            // compute reach fact for parent
+            pred_transformer& par_pt = par->pt ();
+            datalog::rule const& r = deriv->get_rule ();
+            VERIFY (par_pt.is_reachable_with_reach_facts (*par, r));
+            updt_as_reachable (*par);
+        }
+        else {
             // create post for the next child
             expr_ref post (m), post_ctx (m);
             model_node& sib = deriv->mk_next (post, post_ctx);
             sib.updt_post (post, post_ctx);
             m_search.add_leaf (sib);
         }
+    }
+
+    void context::updt_as_reachable (model_node& n) {
+        expr_ref reach_fact (m);
+        mk_reach_fact (n, reach_fact);
+        n.pt ().add_reach_fact (reach_fact);
+        if (n.is_inq ()) m_search.erase_leaf (n);
+        n.close ();
+        report_reach (n);
     }
 
     void context::report_unreach (model_node& ch) {
