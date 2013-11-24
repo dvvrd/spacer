@@ -658,56 +658,66 @@ namespace spacer {
 
         lbool is_sat;
         expr_ref_vector assumps (m);
-        LOCAL_REACH_RESULT reach_result; // REACH vs. ABS_REACH
+        LOCAL_REACH_RESULT reach_result = ABS_REACH; // REACH vs. ABS_REACH
 
-        assumps.push_back (n.post ());
+        if (ctx.get_params ().eager_reach_check ()) {
+            assumps.push_back (n.post ());
 
-        if (n.level () > 0 && !m_all_init) {
-            obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin (),
-                                                          end = m_tag2rule.end ();
-            for (; it != end; ++it) {
-                expr* r_tag = it->m_key;
-                datalog::rule const* r = it->m_value;
-                if (!r) continue;
-                find_predecessors(*r, m_predicates);
-                if (m_predicates.empty ()) continue;
-                expr_ref_vector pred_assumps (m);
-                for (unsigned i = 0; i < m_predicates.size(); i++) {
-                    func_decl* d = m_predicates[i];
-                    pred_transformer const& pt = ctx.get_pred_transformer (d);
-                    expr_ref_vector tmp (m);
-                    if (!pt.assert_o_reach_facts (tmp, i)) {
-                        // some predecessor has no reach facts; disable the rule
-                        pred_assumps.reset ();
-                        pred_assumps.push_back (m.mk_not (r_tag));
-                        break;
+            if (n.level () > 0 && !m_all_init) {
+                obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin (),
+                    end = m_tag2rule.end ();
+                for (; it != end; ++it) {
+                    expr* r_tag = it->m_key;
+                    datalog::rule const* r = it->m_value;
+                    if (!r) continue;
+                    find_predecessors(*r, m_predicates);
+                    if (m_predicates.empty ()) continue;
+                    expr_ref_vector pred_assumps (m);
+                    for (unsigned i = 0; i < m_predicates.size(); i++) {
+                        func_decl* d = m_predicates[i];
+                        pred_transformer const& pt = ctx.get_pred_transformer (d);
+                        expr_ref_vector tmp (m);
+                        if (!pt.assert_o_reach_facts (tmp, i)) {
+                            // some predecessor has no reach facts; disable the rule
+                            pred_assumps.reset ();
+                            pred_assumps.push_back (m.mk_not (r_tag));
+                            break;
+                        }
+                        pred_assumps.append (tmp);
                     }
-                    pred_assumps.append (tmp);
+                    assumps.append (pred_assumps);
                 }
-                assumps.append (pred_assumps);
-            }
-            is_sat = m_solver.check_assumptions (assumps);
-            if (is_sat == l_true && core) {            
-                core->reset();
-                TRACE ("spacer", tout << "reachable using reach facts\n"; 
-                        model_smt2_pp (tout, m, *model, 0);
+                is_sat = m_solver.check_assumptions (assumps);
+                if (is_sat == l_true && core) {            
+                    core->reset();
+                    TRACE ("spacer", tout << "reachable using reach facts\n"; 
+                            model_smt2_pp (tout, m, *model, 0);
+                          );
+                    ctx.set_curr_model (model);
+                    return REACH;
+                }
+                TRACE ("spacer", tout << "unreachable using reach facts\n";);
+                TRACE ("spacer",
+                        if (core) {
+                            tout << "Core:\n";
+                            for (unsigned i = 0; i < core->size (); i++) {
+                                tout << mk_pp (core->get(i), m) << "\n";
+                            }
+                        }
                       );
-                ctx.set_curr_model (model);
-                return REACH;
+                // subsequent reachability is abstract
+                reach_result = ABS_REACH;
             }
-            TRACE ("spacer", tout << "unreachable using reach facts\n";);
-            // subsequent reachability is abstract
-            reach_result = ABS_REACH;
-        }
-        else {
-            // level 0 or no uninterpreted preds -- subsequent reachability is concrete
-            reach_result = REACH;
-        }
+            else {
+                // level 0 or no uninterpreted preds -- subsequent reachability is concrete
+                reach_result = REACH;
+            }
 
-        core->reset ();
-        m_solver.set_core(core);
-        model.reset ();
-        m_solver.set_model(&model);
+            core->reset ();
+            m_solver.set_core(core);
+            model.reset ();
+            m_solver.set_model(&model);
+        }
 
         // check without reach facts of body preds
         is_sat = m_solver.check_conjunction_as_assumptions (n.post ());
@@ -2705,7 +2715,6 @@ namespace spacer {
 
     */
     void context::create_children(model_node& n) {
-        SASSERT(n.level() > 0);
         bool use_model_generalizer = m_params.use_model_generalizer();
  
         pred_transformer& pt = n.pt();
@@ -2724,7 +2733,6 @@ namespace spacer {
         ptr_vector<func_decl> preds;
         ptr_vector<pred_transformer> pred_pts;
         pt.find_predecessors(r, preds);
-        SASSERT (preds.size () > 0);
         for (ptr_vector<func_decl>::iterator it = preds.begin ();
                 it != preds.end (); it++) {
             pred_pts.push_back (&get_pred_transformer (*it));
@@ -2771,14 +2779,12 @@ namespace spacer {
                 tout << "Reduced\n" << mk_pp (phi1, m) << "\n";
               );
 
-        // create a new derivation for the model
-
-        // order the pts -- for now, right to left
-        bool r_to_l = (m_params.order_children() == 0);
-        vector<unsigned> o_idx;
-        pred_pts.reset ();
-        // preds is ordered by o-idx and is right-to-left
         if (preds.size () > 0) {
+            // create a new derivation for the model
+            // order the pts -- for now, right to left
+            bool r_to_l = (m_params.order_children() == 0);
+            vector<unsigned> o_idx;
+            pred_pts.reset ();
             ptr_vector<func_decl>::iterator it;
             for (ptr_vector<func_decl>::iterator fwd_it = preds.begin ();
                     fwd_it != preds.end (); fwd_it++) {
@@ -2789,18 +2795,22 @@ namespace spacer {
                 pred_pts.push_back (&get_pred_transformer (*it));
                 o_idx.push_back (it-preds.begin ());
             }
+            derivation* deriv = alloc (derivation, &n, pred_pts, o_idx, r, m_search);
+            n.add_deriv (deriv);
+            deriv->setup (phi1, M);
+            SASSERT (deriv->has_next ());
+
+            // create post for the first child and add to queue
+            expr_ref post (m), post_ctx (m);
+            model_node& ch = deriv->mk_next (post, post_ctx);
+            ch.updt_post (post, post_ctx);
+            m_search.add_leaf (ch);
+        }
+        else {
+            VERIFY (n.pt ().is_reachable_with_reach_facts (n, r));
+            updt_as_reachable (n);
         }
 
-        derivation* deriv = alloc (derivation, &n, pred_pts, o_idx, r, m_search);
-        n.add_deriv (deriv);
-        deriv->setup (phi1, M);
-        SASSERT (deriv->has_next ());
-
-        // create post for the first child and add to queue
-        expr_ref post (m), post_ctx (m);
-        model_node& ch = deriv->mk_next (post, post_ctx);
-        ch.updt_post (post, post_ctx);
-        m_search.add_leaf (ch);
 
         //qe::flatten_and(phi1, Phi);
 /*      unsigned_vector indices;
