@@ -1066,7 +1066,7 @@ namespace spacer {
         return r.get_uninterpreted_tail_size() == 0;
     }
 
-    unsigned model_node::m_count;
+    //unsigned model_node::m_count;
 
     void model_node::close () {
         m_open = false;
@@ -1381,7 +1381,7 @@ namespace spacer {
         TRACE ("spacer", tout << "output of post: " << mk_pp(phi,m) << "\n";);
     }*/
 
-    model_node& derivation::mk_next (expr_ref& post, expr_ref& post_ctx) {
+    model_node& derivation::mk_next (expr_ref& post) {
         SASSERT (has_next ());
 
         expr_ref_vector impl (m);
@@ -1459,7 +1459,6 @@ namespace spacer {
                 tout << "Post of next sibling:\n"
                 << mk_pp (post, m) << "\n";
               );
-        post_ctx = m.mk_true ();
 
         return sib;
     }
@@ -2448,7 +2447,7 @@ namespace spacer {
         while (true) {
             checkpoint();
             m_expanded_lvl = lvl;
-            model_node::reset_count (); // fresh counter for node ids
+            //model_node::reset_count (); // fresh counter for node ids
             reachable = check_reachability(lvl);
             if (reachable) {
                 throw model_exception();
@@ -2471,9 +2470,9 @@ namespace spacer {
     // query state.
     //
     bool context::check_reachability(unsigned level) {
-        expr_ref post (m.mk_true(), m), post_ctx (m.mk_true (), m);
+        expr_ref post (m.mk_true(), m);
         model_node* root = alloc (model_node, 0, *m_query, level, 0, m_search);
-        root->updt_post (post, post_ctx);
+        root->updt_post (post);
         m_search.set_root(root);            
         
         while (model_node* node = m_search.next()) {
@@ -2529,11 +2528,12 @@ namespace spacer {
             switch (expand_state(n, cube, uses_level)) {
             case REACH: {
                 // concretely reachable; infer new reachability fact
-                expr_ref reach_fact (m);
+                updt_as_reachable (n);
+                /*expr_ref reach_fact (m);
                 mk_reach_fact (n, reach_fact);
                 n.pt ().add_reach_fact (reach_fact);
                 n.close ();
-                report_reach (n);
+                report_reach (n);*/
 
                 break;
             }
@@ -2801,9 +2801,9 @@ namespace spacer {
             SASSERT (deriv->has_next ());
 
             // create post for the first child and add to queue
-            expr_ref post (m), post_ctx (m);
-            model_node& ch = deriv->mk_next (post, post_ctx);
-            ch.updt_post (post, post_ctx);
+            expr_ref post (m);
+            model_node& ch = deriv->mk_next (post);
+            ch.updt_post (post);
             m_search.add_leaf (ch);
         }
         else {
@@ -2900,9 +2900,9 @@ namespace spacer {
         }
         else {
             // create post for the next child
-            expr_ref post (m), post_ctx (m);
-            model_node& sib = deriv->mk_next (post, post_ctx);
-            sib.updt_post (post, post_ctx);
+            expr_ref post (m);
+            model_node& sib = deriv->mk_next (post);
+            sib.updt_post (post);
             m_search.add_leaf (sib);
         }
     }

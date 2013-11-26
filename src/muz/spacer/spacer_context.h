@@ -209,11 +209,11 @@ namespace spacer {
     /**
      * type of derivation for a model node
      */
-    enum MODEL_NODE_TYPE {
+    /*enum MODEL_NODE_TYPE {
         UNDER,  // use an under-approximating summary
         OVER,   // use an over-approximating summary
         EXPAND  // expand the search tree
-    };
+    };*/
 
 
     /**
@@ -226,53 +226,55 @@ namespace spacer {
         pred_transformer&       m_pt;
         ast_manager&            m;
         expr_ref                m_post;
-        expr_ref                m_post_ctx;
-        expr_ref                m_pre;
+        //expr_ref                m_pre;
         unsigned                m_level;       
         bool                    m_open;     // whether a concrete answer to the goal is found
         ptr_vector<derivation>  m_derivs;   // all derivations being tried out
         derivation*             m_my_deriv; // the derivation which contains me as a premise
-        derivation const*       m_closing_deriv; // the derivation which closes the node
-        MODEL_NODE_TYPE         m_type;     // type of derivation
+        //derivation const*       m_closing_deriv; // the derivation which closes the node
+        //MODEL_NODE_TYPE         m_type;     // type of derivation
         bool                    m_in_q;     // iff this node is currently in the search queue
         model_search&           m_search;
         bool                    m_reachable;
 
         // unique id of this node and a global count of all goal nodes;
         // count is expected to be reset at every level of query
-        unsigned                m_id;
-        static unsigned         m_count;
+        //unsigned                m_id;
+        //static unsigned         m_count;
 
     public:
         model_node (model_node* parent, pred_transformer& pt, unsigned level, derivation* deriv, model_search& search):
             m_parent (parent), m_pt (pt), m (m_pt.get_manager ()),
-            m_post (m), m_post_ctx (m), m_pre (m),
+            m_post (m),
+            //m_post_ctx (m), m_pre (m),
             m_level (level), m_open (true),
-            m_my_deriv (deriv), m_closing_deriv (0),
-            m_type (EXPAND), m_in_q (false),
+            m_my_deriv (deriv),
+            //m_closing_deriv (0),
+            //m_type (EXPAND),
+            m_in_q (false),
             m_search (search),
-            m_reachable (false),
-            m_id (m_count+1)
-        { m_count++; }
+            m_reachable (false)
+            //m_id (m_count+1)
+        { //m_count++;
+        }
 
         ~model_node ();
 
         bool operator> (model_node const& x) const { return level () > x.level (); }
 
-        static void reset_count () { m_count = 0; }
-        static bool is_ghost (func_decl const* d)
-            { return d && d->get_name ().str ().compare (0, 6, "ghost_") == 0; }
+        //static void reset_count () { m_count = 0; }
+        /*static bool is_ghost (func_decl const* d)
+            { return d && d->get_name ().str ().compare (0, 6, "ghost_") == 0; }*/
 
         model_node* parent () const { return m_parent; }
         pred_transformer& pt () const { return m_pt; }
         ast_manager& get_manager () const { return m; }
         manager& get_spacer_manager () const { return m_pt.get_spacer_manager (); }
         expr_ref const& post () const { return m_post; }
-        expr_ref const& post_ctx () const { return m_post_ctx; }
-        expr_ref const& pre () const { return m_pre; }
-        bool has_pre () const { return m_pre; }
+        //expr_ref const& pre () const { return m_pre; }
+        //bool has_pre () const { return m_pre; }
         derivation* my_deriv () const { return m_my_deriv; }
-        derivation const* closing_deriv () const { return m_closing_deriv; }
+        //derivation const* closing_deriv () const { return m_closing_deriv; }
         bool is_open () const { return m_open; }
         bool is_closed () const { return !m_open; }
         unsigned level () const { return m_level; }
@@ -281,13 +283,12 @@ namespace spacer {
 
         void add_deriv (derivation* deriv) { m_derivs.push_back (deriv); }
         void updt_parent (model_node* parent) { m_parent = parent; }
-        void updt_post (expr_ref const& post, expr_ref const& post_ctx)
-                { m_post = post; m_post_ctx = post_ctx; }
-        void updt_type (MODEL_NODE_TYPE t) { m_type = t; }
-        void updt_pre (expr_ref const& pre) { m_pre = pre; }
+        void updt_post (expr_ref const& post) { m_post = post; }
+        //void updt_type (MODEL_NODE_TYPE t) { m_type = t; }
+        //void updt_pre (expr_ref const& pre) { m_pre = pre; }
 
         void reset () {
-            m_pre.reset ();
+            //m_pre.reset ();
             del_derivs ();
             open ();
         }
@@ -324,11 +325,11 @@ namespace spacer {
         // separate counter, but it might pose problems when an object is
         // deleted and another one constructed at the same address, as the ids
         // may persist beyond the lifetime of the object
-        unsigned id () const { return m_id; }
+        //unsigned id () const { return m_id; }
 
         // return a constant with name 'ghost_<n>_<str>' where n is a unique id
         // for (this) and str is the name of the given app
-        app* mk_ghost (app* a) const {
+        /*app* mk_ghost (app* a) const {
             SASSERT (a->get_num_args () == 0); // it's a constant
             func_decl* fd = a->get_decl ();
             sort* s = fd->get_range ();
@@ -336,7 +337,7 @@ namespace spacer {
             std::stringstream new_name;
             new_name << "ghost_" << id () << "_" << old_sym.str ();
             return m.mk_const (symbol (new_name.str ().c_str ()), s);
-        }
+        }*/
     };
 
 
@@ -442,7 +443,7 @@ namespace spacer {
 
         // make post (phi) and post_ctx (ctx) for the next premise
         //void mk_prem_post (expr_ref& phi, expr_ref& ctx) const;
-        model_node& mk_next (expr_ref& post, expr_ref& post_ctx);
+        model_node& mk_next (expr_ref& post);
 
         datalog::rule const& get_rule () const { return m_rule; }
 
