@@ -236,6 +236,7 @@ namespace spacer {
         MODEL_NODE_TYPE         m_type;     // type of derivation
         bool                    m_in_q;     // iff this node is currently in the search queue
         model_search&           m_search;
+        bool                    m_reachable;
 
         // unique id of this node and a global count of all goal nodes;
         // count is expected to be reset at every level of query
@@ -250,6 +251,7 @@ namespace spacer {
             m_my_deriv (deriv), m_closing_deriv (0),
             m_type (EXPAND), m_in_q (false),
             m_search (search),
+            m_reachable (false),
             m_id (m_count+1)
         { m_count++; }
 
@@ -311,9 +313,10 @@ namespace spacer {
 
         unsigned num_derivs () const { return m_derivs.size (); }
 
-        // is known to be concretely reachable or unreachable
-        bool is_reachable () { return is_closed () && has_pre (); }
-        bool is_unreachable () { return is_closed () && !has_pre (); }
+        bool is_reachable () const { return is_closed () && m_reachable; }
+        bool is_unreachable () const { return is_closed () && !m_reachable; }
+        void set_reachable () { m_reachable = true; }
+        void set_unreachable () { m_reachable = false; }
 
         // util
 

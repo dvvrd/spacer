@@ -2873,6 +2873,8 @@ namespace spacer {
                      << " is reachable\n";
               );
 
+        ch.set_reachable ();
+
         model_node* par = ch.parent ();
         derivation* deriv = ch.my_deriv ();
 
@@ -2923,6 +2925,8 @@ namespace spacer {
 
         // TODO: how does this new knowledge that ch has a proof
         // affect any existing derivations?
+
+        ch.set_unreachable ();
 
         model_node* par = ch.parent ();
         derivation* deriv = ch.my_deriv ();
