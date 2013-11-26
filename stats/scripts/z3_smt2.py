@@ -42,12 +42,12 @@ def main (argv):
     print 'Engine: ', args.engine
 
     if (args.validate):
-	z3_args += ' fixedpoint.validate_result=true'
+        z3_args += ' fixedpoint.validate_result=true'
     else:
-	z3_args += ' fixedpoint.validate_result=false'
+        z3_args += ' fixedpoint.validate_result=false'
 
     if (args.answer):
-	z3_args += ' fixedpoint.print_answer=true'
+        z3_args += ' fixedpoint.print_answer=true'
 
     z3_args += ' fixedpoint.engine='
     z3_args += args.engine
@@ -66,7 +66,7 @@ def main (argv):
         print 'Enable trace: ',
         for t in args.trace.split (':'):
             print t,
-	    z3_args += ' -tr:{}'.format (t)
+            z3_args += ' -tr:{}'.format (t)
         print 
         stats.put ('Trace', args.trace)
 
