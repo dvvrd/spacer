@@ -657,13 +657,12 @@ namespace spacer {
         m_solver.set_model(&model);
 
         lbool is_sat;
-        expr_ref_vector assumps (m);
-        LOCAL_REACH_RESULT reach_result = ABS_REACH; // REACH vs. ABS_REACH
+        LOCAL_REACH_RESULT abs_reach_result; // result if reach check without reach facts is sat
+        if (n.level () > 0 && !m_all_init) {
+            if (ctx.get_params ().eager_reach_check ()) {
+                expr_ref_vector assumps (m);
+                assumps.push_back (n.post ());
 
-        if (ctx.get_params ().eager_reach_check ()) {
-            assumps.push_back (n.post ());
-
-            if (n.level () > 0 && !m_all_init) {
                 obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin (),
                     end = m_tag2rule.end ();
                 for (; it != end; ++it) {
@@ -705,18 +704,17 @@ namespace spacer {
                             }
                         }
                       );
-                // subsequent reachability is abstract
-                reach_result = ABS_REACH;
-            }
-            else {
-                // level 0 or no uninterpreted preds -- subsequent reachability is concrete
-                reach_result = REACH;
-            }
 
-            core->reset ();
-            m_solver.set_core(core);
-            model.reset ();
-            m_solver.set_model(&model);
+                core->reset ();
+                m_solver.set_core(core);
+                model.reset ();
+                m_solver.set_model(&model);
+            }
+            abs_reach_result = ABS_REACH;
+        }
+        else {
+            // level 0 or no predecessors
+            abs_reach_result = REACH;
         }
 
         // check without reach facts of body preds
@@ -727,7 +725,7 @@ namespace spacer {
                     model_smt2_pp (tout, m, *model, 0);
                   );
             ctx.set_curr_model (model);
-            return reach_result;
+            return abs_reach_result;
         }
         else if (is_sat == l_false) {
             TRACE ("spacer", tout << "unreachable with lemmas\n";);
