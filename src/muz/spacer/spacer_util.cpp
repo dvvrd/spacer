@@ -1327,7 +1327,16 @@ namespace spacer {
             }
             // project using LW
             if (!arith_vars.empty ()) {
-                qe::arith_project (*M, arith_vars, fml);
+                TRACE ("spacer",
+                        tout << "Arith vars:\n";
+                        for (unsigned i = 0; i < arith_vars.size (); ++i) {
+                            tout << mk_pp (arith_vars.get (i), m) << "\n";
+                        }
+                      );
+                {
+                    scoped_no_proof _sp (m);
+                    qe::arith_project (*M, arith_vars, fml);
+                }
                 SASSERT (arith_vars.empty ());
                 TRACE ("spacer",
                         tout << "Projected arith vars:\n" << mk_pp (fml, m) << "\n";
