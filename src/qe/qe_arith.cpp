@@ -263,8 +263,8 @@ namespace qe {
         }
 
         void project(model& mdl, app_ref_vector const& lits, expr_map& map) {
-            unsigned num_pos = 0;
-            unsigned num_neg = 0;
+            unsigned num_pos = 0; // number of positive literals true in the model
+            unsigned num_neg = 0; // number of negative literals true in the model
 
             m_lits.reset ();
             m_terms.reset();
@@ -279,18 +279,31 @@ namespace qe {
                 bool is_eq = false;
                 bool is_diseq = false;
                 if (is_linear(lits.get (i), c, t, is_strict, is_eq, is_diseq)) {
+                    TRACE ("qe",
+                            tout << "Literal: " << mk_pp (lits.get (i), m) << "\n";
+                          );
+
                     if (c.is_zero()) {
+                        TRACE ("qe",
+                                tout << "independent of variable\n";
+                              );
                         continue;
                     }
+
+                    // evaluate c*x + t in the model
+                    expr_ref cx (m), cxt (m), val (m);
+                    rational r;
+                    cx = mk_mul (c, m_var->x());
+                    cxt = mk_add (cx, t);
+                    VERIFY(mdl.eval(cxt, val, true));
+                    VERIFY(a.is_numeral(val, r));
+
                     if (is_eq) {
+                        TRACE ("qe",
+                                tout << "equality term\n";
+                              );
                         // c*x + t = 0  <=>  x = -t/c
                         // check if the equality is true in the mdl
-                        expr_ref cx (m), cxt (m), val (m);
-                        rational r;
-                        cx = mk_mul (c, m_var->x());
-                        cxt = mk_add (cx, t);
-                        VERIFY(mdl.eval(cxt, val, true));
-                        VERIFY(a.is_numeral(val, r));
                         if (r == rational::zero ()) {
                             expr_ref eq_term (mk_mul (-(rational::one ()/c), t), m);
                             m_rw (eq_term);
@@ -306,20 +319,19 @@ namespace qe {
                         m_strict.push_back(false);
                         m_eq.push_back (true);
                     } else {
+                        TRACE ("qe",
+                                tout << "not an equality term\n";
+                              );
                         if (is_diseq) {
                             // c*x + t != 0
                             // find out whether c*x + t < 0, or c*x + t > 0
-                            expr_ref cx (m), cxt (m), val (m);
-                            rational r;
-                            cx = mk_mul (c, m_var->x());
-                            cxt = mk_add (cx, t);
-                            VERIFY(mdl.eval(cxt, val, true));
-                            VERIFY(a.is_numeral(val, r));
-                            SASSERT (r > rational::zero () || r < rational::zero ());
                             if (r > rational::zero ()) {
                                 c = -c;
                                 t = mk_mul (-(rational::one()), t);
+                                r = -r;
                             }
+                            // note: if the disequality is false in the model,
+                            // r==0 and we end up choosing c*x + t < 0
                             is_strict = true;
                         }
                         m_lits.push_back (lits.get (i));
@@ -327,22 +339,36 @@ namespace qe {
                         m_terms.push_back(t);
                         m_strict.push_back(is_strict);
                         m_eq.push_back (false);
-                        if (c.is_pos()) {
-                            ++num_pos;
+                        if ((is_strict && r < rational::zero ()) ||
+                                (!is_strict && r <= rational::zero ())) { // literal true in the model
+                            if (c.is_pos()) {
+                                ++num_pos;
+                            }
+                            else {
+                                ++num_neg;
+                            }
                         }
-                        else {
-                            ++num_neg;
-                        }                    
                     }
+                    TRACE ("qe",
+                            tout << "c: " << c << "\n";
+                            tout << "t: " << mk_pp (t, m) << "\n";
+                          );
                 }
             }
-            
+
             expr_ref new_lit (m);
 
             if (num_pos == 0 || num_neg == 0) {
-                // make all equalities false and inequalities true
+                TRACE ("qe",
+                        tout << "virtual substitution of infinity\n";
+                      );
+                // make all equalities false;
+                // if num_pos = 0 (num_neg = 0), make all positive (negative) inequalities false;
+                // make the rest true
                 for (unsigned i = 0; i < m_lits.size (); i++) {
-                    if (m_eq[i]) {
+                    if (m_eq[i] ||
+                        (num_pos == 0 && m_coeffs[i].is_pos ()) ||
+                        (num_neg == 0 && m_coeffs[i].is_neg ())) {
                         new_lit = m.mk_false ();
                     } else {
                         new_lit = m.mk_true ();
@@ -356,8 +382,12 @@ namespace qe {
                 return;
             }
 
-            bool use_pos = num_pos < num_neg;
+            bool use_pos = num_pos < num_neg; // pick a side; both are sound
             unsigned max_t = find_max(mdl, use_pos);
+
+            TRACE ("qe",
+                    tout << "test point: " << mk_pp (m_lits.get (max_t), m) << "\n";
+                  );
 
             for (unsigned i = 0; i < m_lits.size(); ++i) {
                 if (i != max_t) {
@@ -387,14 +417,27 @@ namespace qe {
             unsigned result;
             bool found = false;
             bool found_strict = false;
-            rational found_val(0), r, found_c;
+            rational found_val(0), r, r_plus_x, found_c;
             expr_ref val(m);
+
+            // evaluate x in mdl
+            rational r_x;
+            VERIFY(mdl.eval(m_var->x (), val, true));
+            VERIFY(a.is_numeral (val, r_x));
+
             for (unsigned i = 0; i < m_terms.size(); ++i) {
                 rational const& ac = m_coeffs[i];
                 if (!m_eq[i] && ac.is_pos() == do_pos) {
                     VERIFY(mdl.eval(m_terms.get (i), val, true));
                     VERIFY(a.is_numeral(val, r));
                     r /= abs(ac);
+                    // skip the literal if false in the model
+                    if (do_pos) { r_plus_x = r + r_x; }
+                    else { r_plus_x = r - r_x; }
+                    if (!((m_strict[i] && r_plus_x < rational::zero ()) ||
+                            (!m_strict[i] && r_plus_x <= rational::zero ()))) {
+                        continue;
+                    }
                     IF_VERBOSE(1, verbose_stream() << "max: " << mk_pp(m_terms.get (i), m) << " " << r << " " <<
                                 (!found || r > found_val || (r == found_val && !found_strict && m_strict[i])) << "\n";);
                     if (!found || r > found_val || (r == found_val && !found_strict && m_strict[i])) {

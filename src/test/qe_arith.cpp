@@ -25,6 +25,18 @@ static expr_ref parse_fml(ast_manager& m, char const* str) {
            << "(declare-const a Real)\n"
            << "(declare-const b Real)\n"
            << "(declare-const b1 Bool)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_0_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_1_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_2_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_3_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_4_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_5_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_6_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_7_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_8_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_9_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_10_n Real)\n"
+           << "(declare-const E_cp-rel-bb_cp-rel-bb_11_n Real)\n"
            << "(assert " << str << ")\n";
     std::istringstream is(buffer.str());
     VERIFY(parse_smt2_commands(ctx, is));
@@ -49,15 +61,16 @@ static char const* example4 = "(and (<= z x) (<= x 3.0) (not (>= (* 3.0 x) y)) (
 static char const* answer4 = "(and (<= z y) (<= z 3.0) (< (* 3.0 z) y))";
 
 static char const* example5 = "(and (<= y x) (<= z x) (<= x u) (<= x v) (<= x t))";
-static char const* answer5 = "(and (<= z y) (<= y t) (<= y u) (<= y v))";
+static char const* answer5 = "(and (<= y z) (<= z t) (<= z u) (<= z v))";
 
-static char const* example6 = "(and (<= 0 (+ x z))\
+static char const* example6 = "(and (<= 0.0 (+ x z))\
      (>= y x) \
      (<= y x)\
      (<= (- u y) 0.0)\
      (>= x (+ v z))\
      (>= x 0.0)\
      (<= x 1.0))";
+static char const* answer6 = "(and (<= y 1.0) (<= u y) (>= (+ y z) 0.0) (<= (+ v z) y) (<= 0 y))";
 
 static char const* example7 = "(and (= y x) (<= z x) (<= x u) (<= x v) (<= x t))";
 static char const* answer7 = "(and (<= z y) (<= y u) (<= y v) (<= y t))";
@@ -91,6 +104,10 @@ static char const* answer16 = "true";
 
 static char const* example17 = "(not (and (not (< x 3.0)) (not (= x 5.0)) (not (> x 10.0))))";
 static char const* answer17 = "true";
+
+static char const* example18 = "(and (or (< x y) (< x z)) (> x 5.0) (> x 0.0) (> x 1.0)\
+                                     (= y 5.0) (= z 6.0))";
+static char const* answer18 = "(and (> z 5.0) (> z 0.0) (> z 1.0) (= y 5.0) (= z 6.0))";
 
 static void test(char const *ex, char const *ans) {
     smt_params params;
@@ -185,6 +202,7 @@ void tst_qe_arith() {
     test(example3, answer3);
     test(example4, answer4);
     test(example5, answer5);
+    test(example6, answer6);
     test(example7, answer7);
     test(example8, answer8);
     test(example9, answer9);
@@ -197,4 +215,5 @@ void tst_qe_arith() {
     test(example16, answer16);
     test(example17, answer17);
     test (exampleb1, answerb1);
+    test (example18, answer18);
 }
