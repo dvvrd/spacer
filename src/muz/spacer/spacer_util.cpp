@@ -1342,6 +1342,7 @@ namespace spacer {
                         tout << "Projected arith vars:\n" << mk_pp (fml, m) << "\n";
                       );
             }
+            SASSERT (M->eval (fml, bval, true) && m.is_true (bval)); // M |= fml
             vars.reset ();
             vars.append (arith_vars);
         }
