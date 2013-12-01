@@ -265,7 +265,6 @@ namespace qe {
         void project(model& mdl, app_ref_vector const& lits, expr_map& map) {
             unsigned num_pos = 0;
             unsigned num_neg = 0;
-            bool use_eq = false;
 
             m_lits.reset ();
             m_terms.reset();
@@ -286,22 +285,20 @@ namespace qe {
                     if (is_eq) {
                         // c*x + t = 0  <=>  x = -t/c
                         // check if the equality is true in the mdl
-                        if (!use_eq) {
-                            expr_ref cx (m), cxt (m), val (m);
-                            rational r;
-                            cx = mk_mul (c, m_var->x());
-                            cxt = mk_add (cx, t);
-                            VERIFY(mdl.eval(cxt, val, true));
-                            VERIFY(a.is_numeral(val, r));
-                            if (r == rational::zero ()) {
-                                expr_ref eq_term (mk_mul (-(rational::one ()/c), t), m);
-                                m_rw (eq_term);
-                                map.insert (m_var->x (), eq_term, 0);
-                                use_eq = true;
-                                TRACE ("qe",
-                                        tout << "Using equality term: " << mk_pp (eq_term, m) << "\n";
-                                      );
-                            }
+                        expr_ref cx (m), cxt (m), val (m);
+                        rational r;
+                        cx = mk_mul (c, m_var->x());
+                        cxt = mk_add (cx, t);
+                        VERIFY(mdl.eval(cxt, val, true));
+                        VERIFY(a.is_numeral(val, r));
+                        if (r == rational::zero ()) {
+                            expr_ref eq_term (mk_mul (-(rational::one ()/c), t), m);
+                            m_rw (eq_term);
+                            map.insert (m_var->x (), eq_term, 0);
+                            TRACE ("qe",
+                                    tout << "Using equality term: " << mk_pp (eq_term, m) << "\n";
+                                  );
+                            return;
                         }
                         m_lits.push_back (lits.get (i));
                         m_coeffs.push_back(c);
@@ -339,8 +336,6 @@ namespace qe {
                     }
                 }
             }
-
-            if (use_eq) return;
             
             expr_ref new_lit (m);
 
