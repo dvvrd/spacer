@@ -21,7 +21,6 @@ def parseArgs (argv):
     p.add_argument ('--answer', help='Print answer', action='store_true',
                     default=False)
     p.add_argument ('--engine', help='Datalog Engine (pdr/spacer)', default='spacer')
-    p.add_argument ('--order-children', type=int, dest='order_children', help='Order of processing children in non-linear rules', default=0)
 
     return p.parse_args (argv)
 
@@ -56,8 +55,6 @@ def main (argv):
     z3_args += ' fixedpoint.use_farkas=true'
     z3_args += ' fixedpoint.generate_proof_trace=false'
     z3_args += ' fixedpoint.use_utvpi=false'
-
-    z3_args += ' fixedpoint.order_children=' + str(args.order_children)
 
     z3_args += ' ' + args.file
 
