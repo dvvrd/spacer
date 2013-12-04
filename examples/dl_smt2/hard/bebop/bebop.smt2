@@ -64,8 +64,7 @@
 
 (rule (=> (and (Lvl g1 g2 N N)
                (Lvl g2 g3 N N)
-               ;(> N 0)
-               (= N 100)
+               (> N 0)
                (not (= g1 g3)))
           E))
 
