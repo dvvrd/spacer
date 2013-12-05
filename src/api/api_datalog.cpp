@@ -303,6 +303,29 @@ extern "C" {
         Z3_CATCH_RETURN(Z3_L_UNDEF);
     }
 
+    Z3_lbool Z3_API Z3_fixedpoint_query_from_lvl (Z3_context c, Z3_fixedpoint d, Z3_ast q, unsigned lvl) {
+        Z3_TRY;
+        LOG_Z3_fixedpoint_query_from_lvl (c, d, q, lvl);
+        RESET_ERROR_CODE();
+        lbool r = l_undef;
+        cancel_eh<api::fixedpoint_context> eh(*to_fixedpoint_ref(d));
+        unsigned timeout = to_fixedpoint(d)->m_params.get_uint("timeout", mk_c(c)->get_timeout());
+        api::context::set_interruptable si(*(mk_c(c)), eh);        
+        {
+            scoped_timer timer(timeout, &eh);
+            try {
+                r = to_fixedpoint_ref(d)->ctx().query_from_lvl (to_expr(q), lvl);
+            }
+            catch (z3_exception& ex) {
+                mk_c(c)->handle_exception(ex);
+                r = l_undef;
+            }
+            to_fixedpoint_ref(d)->ctx().cleanup();
+        }
+        return of_lbool(r);
+        Z3_CATCH_RETURN(Z3_L_UNDEF);
+    }
+
     Z3_lbool Z3_API Z3_fixedpoint_query_relations(
         __in Z3_context c,__in Z3_fixedpoint d, 
         __in unsigned num_relations, Z3_func_decl const relations[]) {

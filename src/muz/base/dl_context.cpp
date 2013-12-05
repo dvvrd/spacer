@@ -973,6 +973,28 @@ namespace datalog {
         return m_engine->query(query);
     }
 
+    lbool context::query_from_lvl (expr* query, unsigned lvl) {
+        m_mc = mk_skip_model_converter();
+        m_last_status = OK;
+        m_last_answer = 0;
+        switch (get_engine()) {
+        case DATALOG_ENGINE:
+        case SPACER_ENGINE:
+        case PDR_ENGINE:
+        case QPDR_ENGINE:
+        case BMC_ENGINE:
+        case QBMC_ENGINE:
+        case TAB_ENGINE:
+        case CLP_ENGINE:
+            flush_add_rules();
+            break;
+        default:
+            UNREACHABLE();
+        }
+        ensure_engine();
+        return m_engine->query_from_lvl (query, lvl);
+    }
+
     model_ref context::get_model() {
         ensure_engine();
         return m_engine->get_model();

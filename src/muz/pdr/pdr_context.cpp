@@ -1683,6 +1683,54 @@ namespace pdr {
         return l_undef;
     }
 
+    lbool context::solve_from_lvl (unsigned lvl) {
+        m_last_result = l_undef;
+        try {
+            solve_impl_from_lvl (lvl);
+            UNREACHABLE();
+        }
+        catch (model_exception) {        
+            IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
+            m_last_result = l_true;
+            validate();
+
+            IF_VERBOSE(1, 
+                       if (m_params.print_boogie_certificate()) {
+                           display_certificate(verbose_stream());
+                       });
+
+            return l_true;
+        }
+        catch (inductive_exception) {
+            simplify_formulas();
+            m_last_result = l_false;
+            TRACE("pdr",  display_certificate(tout););      
+            IF_VERBOSE(1, {
+                    expr_ref_vector refs(m);
+                    vector<relation_info> rs;
+                    get_level_property(m_inductive_lvl, refs, rs);    
+                    model_converter_ref mc;
+                    inductive_property ex(m, mc, rs);
+                    verbose_stream() << ex.to_string();
+                });
+            
+            // upgrade invariants that are known to be inductive.
+            decl2rel::iterator it = m_rels.begin (), end = m_rels.end ();
+            for (; m_inductive_lvl > 0 && it != end; ++it) {
+                if (it->m_value->head() != m_query_pred) {
+                    it->m_value->propagate_to_infinity (m_inductive_lvl);	
+                }
+            }
+            validate();
+            return l_false;
+        }
+        catch (unknown_exception) {
+            return l_undef;
+        }
+        UNREACHABLE();
+        return l_undef;
+    }
+
     void context::cancel() {
         m_cancel = true;
     }
@@ -1757,6 +1805,28 @@ namespace pdr {
             throw inductive_exception();            
         }
         unsigned lvl = 0;
+        bool reachable;
+        while (true) {
+            checkpoint();
+            m_expanded_lvl = lvl;
+            reachable = check_reachability(lvl);
+            if (reachable) {
+                throw model_exception();
+            }
+            if (lvl != 0) {
+                propagate(lvl);
+            }
+            lvl++;
+            m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
+            IF_VERBOSE(1,verbose_stream() << "Entering level "<<lvl << "\n";);
+        }
+    }
+
+    void context::solve_impl_from_lvl (unsigned l) {
+        if (!m_rels.find(m_query_pred, m_query)) {
+            throw inductive_exception();            
+        }
+        unsigned lvl = l;
         bool reachable;
         while (true) {
             checkpoint();

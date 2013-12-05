@@ -489,6 +489,8 @@ namespace datalog {
 
         lbool query(expr* q);
 
+        lbool query_from_lvl (expr* q, unsigned lvl);
+
         /**
            \brief retrieve model from inductive invariant that shows query is unsat.
            

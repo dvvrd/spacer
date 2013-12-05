@@ -51,6 +51,8 @@ namespace pdr {
         
         virtual lbool query(expr* query);
 
+        virtual lbool query_from_lvl (expr* query, unsigned lvl);
+
         virtual void cancel();
 
         virtual void cleanup();

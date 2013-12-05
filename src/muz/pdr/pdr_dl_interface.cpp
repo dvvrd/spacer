@@ -168,6 +168,97 @@ lbool dl_interface::query(expr * query) {
 
 }
 
+lbool dl_interface::query_from_lvl (expr * query, unsigned lvl) {
+    //we restore the initial state in the datalog context
+    m_ctx.ensure_opened();
+    m_refs.reset();
+    m_pred2slice.reset();
+    ast_manager& m =                      m_ctx.get_manager();
+    datalog::rule_manager& rm = m_ctx.get_rule_manager();
+
+    datalog::rule_set        old_rules(m_ctx.get_rules());
+    func_decl_ref            query_pred(m);
+    rm.mk_query(query, m_ctx.get_rules());
+    expr_ref bg_assertion = m_ctx.get_background_assertion();
+
+    check_reset();
+
+    TRACE("pdr",
+          if (!m.is_true(bg_assertion)) {
+              tout << "axioms:\n";
+              tout << mk_pp(bg_assertion, m) << "\n";
+          }
+          tout << "query: " << mk_pp(query, m) << "\n";
+          tout << "rules:\n";
+          m_ctx.display_rules(tout);
+          );
+
+
+    apply_default_transformation(m_ctx);
+
+    if (m_ctx.get_params().slice()) {
+        datalog::rule_transformer transformer(m_ctx);
+        datalog::mk_slice* slice = alloc(datalog::mk_slice, m_ctx);
+        transformer.register_plugin(slice);
+        m_ctx.transform_rules(transformer);
+        
+        // track sliced predicates.
+        obj_map<func_decl, func_decl*> const& preds = slice->get_predicates();
+        obj_map<func_decl, func_decl*>::iterator it  = preds.begin();
+        obj_map<func_decl, func_decl*>::iterator end = preds.end();
+        for (; it != end; ++it) {
+            m_pred2slice.insert(it->m_key, it->m_value);
+            m_refs.push_back(it->m_key);
+            m_refs.push_back(it->m_value);
+        }
+    }
+
+    if (m_ctx.get_params().unfold_rules() > 0) {
+        unsigned num_unfolds = m_ctx.get_params().unfold_rules();
+        datalog::rule_transformer transf1(m_ctx), transf2(m_ctx);        
+        transf1.register_plugin(alloc(datalog::mk_coalesce, m_ctx));
+        transf2.register_plugin(alloc(datalog::mk_unfold, m_ctx));
+        if (m_ctx.get_params().coalesce_rules()) {
+            m_ctx.transform_rules(transf1);
+        }
+        while (num_unfolds > 0) {
+            m_ctx.transform_rules(transf2);
+            --num_unfolds;
+        }
+    }
+
+    if (m_ctx.get_rules().get_output_predicates().empty()) {
+        m_context->set_unsat();
+        return l_false;
+    }
+
+    query_pred = m_ctx.get_rules().get_output_predicate();
+
+    IF_VERBOSE(2, m_ctx.display_rules(verbose_stream()););
+    m_pdr_rules.replace_rules(m_ctx.get_rules());
+    m_pdr_rules.close();
+    m_ctx.record_transformed_rules();
+    m_ctx.reopen();
+    m_ctx.replace_rules(old_rules);
+    
+    scoped_restore_proof _sc(m); // update_rules may overwrite the proof mode.
+
+    m_context->set_proof_converter(m_ctx.get_proof_converter());
+    m_context->set_model_converter(m_ctx.get_model_converter());
+    m_context->set_query(query_pred);
+    m_context->set_axioms(bg_assertion);
+    m_context->update_rules(m_pdr_rules);
+    
+    if (m_pdr_rules.get_rules().empty()) {
+        m_context->set_unsat();
+        IF_VERBOSE(1, model_smt2_pp(verbose_stream(), m, *m_context->get_model(),0););
+        return l_false;
+    }
+        
+    return m_context->solve_from_lvl (lvl);
+
+}
+
 expr_ref dl_interface::get_cover_delta(int level, func_decl* pred_orig) {
     func_decl* pred = pred_orig;
     m_pred2slice.find(pred_orig, pred);

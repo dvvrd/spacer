@@ -2355,6 +2355,48 @@ namespace spacer {
         return l_undef;
     }
 
+    lbool context::solve_from_lvl (unsigned from_lvl) {
+        m_last_result = l_undef;
+        try {
+            solve_impl_from_lvl (from_lvl);
+            UNREACHABLE();
+        }
+        catch (model_exception) {        
+            //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
+            m_last_result = l_true;
+            validate();
+            return l_true;
+        }
+        catch (inductive_exception) {
+            simplify_formulas();
+            m_last_result = l_false;
+            //TRACE("spacer",  display_certificate(tout););      
+            IF_VERBOSE(1, {
+                    expr_ref_vector refs(m);
+                    vector<relation_info> rs;
+                    get_level_property(m_inductive_lvl, refs, rs);    
+                    model_converter_ref mc;
+                    inductive_property ex(m, mc, rs);
+                    verbose_stream() << ex.to_string();
+                });
+            
+            // upgrade invariants that are known to be inductive.
+            decl2rel::iterator it = m_rels.begin (), end = m_rels.end ();
+            for (; m_inductive_lvl > 0 && it != end; ++it) {
+                if (it->m_value->head() != m_query_pred) {
+                    it->m_value->propagate_to_infinity (m_inductive_lvl);	
+                }
+            }
+            validate();
+            return l_false;
+        }
+        catch (unknown_exception) {
+            return l_undef;
+        }
+        UNREACHABLE();
+        return l_undef;
+    }
+
     void context::cancel() {
         m_cancel = true;
     }
@@ -2459,6 +2501,28 @@ namespace spacer {
         }
     }
 
+    void context::solve_impl_from_lvl (unsigned from_lvl) {
+        if (!m_rels.find(m_query_pred, m_query)) {
+            throw inductive_exception();            
+        }
+        unsigned lvl = from_lvl;
+        bool reachable;
+        while (true) {
+            checkpoint();
+            m_expanded_lvl = lvl;
+            //model_node::reset_count (); // fresh counter for node ids
+            reachable = check_reachability(lvl);
+            if (reachable) {
+                throw model_exception();
+            }
+            if (lvl != 0) {
+                propagate(lvl);
+            }
+            lvl++;
+            m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
+            IF_VERBOSE(1,verbose_stream() << "Entering level "<<lvl << "\n";);
+        }
+    }
 
     //
     // Pick a potential counter example state.

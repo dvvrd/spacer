@@ -5632,6 +5632,23 @@ END_MLAPI_EXCLUDE
     Z3_lbool Z3_API Z3_fixedpoint_query(__in Z3_context c,__in Z3_fixedpoint d, __in Z3_ast query);
 
     /**
+        \brief Pose a query against the asserted rules at the given level.
+
+        \code
+           query ::= (exists (bound-vars) query)
+                 |  literals 
+        \endcode
+
+        query returns 
+        - Z3_L_FALSE if the query is unsatisfiable.
+        - Z3_L_TRUE if the query is satisfiable. Obtain the answer by calling #Z3_fixedpoint_get_answer.
+        - Z3_L_UNDEF if the query was interrupted, timed out or otherwise failed.
+
+        def_API('Z3_fixedpoint_query_from_lvl', INT, (_in(CONTEXT), _in(FIXEDPOINT), _in(AST), _in(UINT)))
+    */
+    Z3_lbool Z3_API Z3_fixedpoint_query_from_lvl (__in Z3_context c,__in Z3_fixedpoint d, __in Z3_ast query, unsigned lvl);
+
+    /**
         \brief Pose multiple queries against the asserted rules.
 
         The queries are encoded as relations (function declarations).

@@ -50,6 +50,8 @@ namespace spacer {
         
         lbool query(expr* query);
 
+        lbool query_from_lvl (expr* query, unsigned lvl);
+
         void cancel();
 
         void cleanup();

@@ -571,6 +571,7 @@ namespace spacer {
         
         // Functions used by search.
         void solve_impl();
+        void solve_impl_from_lvl (unsigned from_lvl);
         bool check_reachability(unsigned level);        
         void propagate(unsigned max_prop_lvl);
         void close_node(model_node& n);
@@ -642,6 +643,8 @@ namespace spacer {
         void display_certificate(std::ostream& strm) const;
 
         lbool solve();
+
+        lbool solve_from_lvl (unsigned from_lvl);
 
         void cancel();
 

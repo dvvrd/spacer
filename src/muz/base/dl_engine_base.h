@@ -44,6 +44,9 @@ namespace datalog {
         virtual expr_ref get_answer() = 0;
         virtual lbool query(expr* q) = 0;
         virtual lbool query(unsigned num_rels, func_decl*const* rels) { return l_undef; }
+        virtual lbool query_from_lvl (expr* q, unsigned lvl) {
+            throw default_exception(std::string("operation is not supported for ") + m_name);
+        }
 
         virtual void reset_statistics() {}
         virtual void display_profile(std::ostream& out) const {}

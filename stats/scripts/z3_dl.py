@@ -27,6 +27,10 @@ def parseArgs (argv):
     p.add_argument ('--eager-reach-check', dest='eager_reach_check',
                     help='eagerly use reachability facts for every local query',
                     action='store_true', default=False)
+    p.add_argument ('--from-lvl', dest='from_lvl',
+                    type=int,
+                    help='start level for query predicate',
+                    action='store', default=0)
 
     return p.parse_args (argv)
 
@@ -63,7 +67,7 @@ def main (argv):
         stats.put ('Trace', args.trace)
     #print fp
     with stats.timer ('Query'):
-        res = fp.query (q[0])
+        res = fp.query_from_lvl (args.from_lvl, q[0])
 
     if res == z3.sat: stat ('Result', 'CEX')
     elif res == z3.unsat: stat ('Result', 'SAFE')
