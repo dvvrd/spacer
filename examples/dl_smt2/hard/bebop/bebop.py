@@ -55,7 +55,7 @@ def populate (n):
     # main
     rules.append ("(rule (=> (and (Lvl{} g1 g2)\n"
                   "               (Lvl{} g2 g3)\n"
-                  "               (not (= g1 g3)))\n"
+                  "          )\n"
                   "          E))".format (n, n))
 
     return rules
