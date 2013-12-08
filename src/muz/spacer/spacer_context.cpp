@@ -2323,6 +2323,13 @@ namespace spacer {
             //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
             m_last_result = l_true;
             validate();
+
+            if (m_params.print_statistics ()) {
+                statistics st;
+                collect_statistics (st);
+                st.display_smt2 (verbose_stream ());
+            }
+
             return l_true;
         }
         catch (inductive_exception) {
@@ -2346,6 +2353,13 @@ namespace spacer {
                 }
             }
             validate();
+
+            if (m_params.print_statistics ()) {
+                statistics st;
+                collect_statistics (st);
+                st.display_smt2 (verbose_stream ());
+            }
+
             return l_false;
         }
         catch (unknown_exception) {
@@ -2365,6 +2379,13 @@ namespace spacer {
             //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
             m_last_result = l_true;
             validate();
+
+            if (m_params.print_statistics ()) {
+                statistics st;
+                collect_statistics (st);
+                st.display_smt2 (verbose_stream ());
+            }
+
             return l_true;
         }
         catch (inductive_exception) {
@@ -2388,6 +2409,13 @@ namespace spacer {
                 }
             }
             validate();
+
+            if (m_params.print_statistics ()) {
+                statistics st;
+                collect_statistics (st);
+                st.display_smt2 (verbose_stream ());
+            }
+
             return l_false;
         }
         catch (unknown_exception) {

@@ -31,6 +31,9 @@ def parseArgs (argv):
                     type=int,
                     help='start level for query predicate',
                     action='store', default=0)
+    p.add_argument ('--print-stats', dest='print_stats',
+                    help='flag to print stats',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -54,6 +57,7 @@ def main (argv):
     fp.set (engine=args.engine, use_farkas=True, generate_proof_trace=False)
     fp.set (use_utvpi=args.use_utvpi)
     fp.set (eager_reach_check=args.eager_reach_check)
+    fp.set (print_statistics=args.print_stats)
 
     with stats.timer ('Parse'):
         q = fp.parse_file (args.file)

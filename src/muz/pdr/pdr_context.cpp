@@ -1651,6 +1651,12 @@ namespace pdr {
                            display_certificate(verbose_stream());
                        });
 
+            if (m_params.print_statistics ()) {
+                statistics st;
+                collect_statistics (st);
+                st.display_smt2 (verbose_stream ());
+            }
+
             return l_true;
         }
         catch (inductive_exception) {
@@ -1674,6 +1680,13 @@ namespace pdr {
                 }
             }
             validate();
+
+            if (m_params.print_statistics ()) {
+                statistics st;
+                collect_statistics (st);
+                st.display_smt2 (verbose_stream ());
+            }
+
             return l_false;
         }
         catch (unknown_exception) {
@@ -1699,6 +1712,12 @@ namespace pdr {
                            display_certificate(verbose_stream());
                        });
 
+            if (m_params.print_statistics ()) {
+                statistics st;
+                collect_statistics (st);
+                st.display_smt2 (verbose_stream ());
+            }
+
             return l_true;
         }
         catch (inductive_exception) {
@@ -1722,6 +1741,13 @@ namespace pdr {
                 }
             }
             validate();
+
+            if (m_params.print_statistics ()) {
+                statistics st;
+                collect_statistics (st);
+                st.display_smt2 (verbose_stream ());
+            }
+
             return l_false;
         }
         catch (unknown_exception) {
