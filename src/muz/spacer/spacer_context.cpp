@@ -2515,6 +2515,7 @@ namespace spacer {
         while (true) {
             checkpoint();
             m_expanded_lvl = lvl;
+            m_stats.m_max_query_lvl = lvl;
             //model_node::reset_count (); // fresh counter for node ids
             reachable = check_reachability(lvl);
             if (reachable) {
@@ -2538,6 +2539,7 @@ namespace spacer {
         while (true) {
             checkpoint();
             m_expanded_lvl = lvl;
+            m_stats.m_max_query_lvl = lvl;
             //model_node::reset_count (); // fresh counter for node ids
             reachable = check_reachability(lvl);
             if (reachable) {
@@ -2761,6 +2763,8 @@ namespace spacer {
               );
 
         SASSERT (vars.empty ());
+
+        m_stats.m_num_reach_queries++;
     }
 
 
@@ -2900,6 +2904,7 @@ namespace spacer {
         model_node& ch = deriv->mk_next (post);
         ch.updt_post (post);
         m_search.add_leaf (ch);
+        m_stats.m_num_queries++;
 
 
         //qe::flatten_and(phi1, Phi);
@@ -2994,6 +2999,7 @@ namespace spacer {
             model_node& sib = deriv->mk_next (post);
             sib.updt_post (post);
             m_search.add_leaf (sib);
+            m_stats.m_num_queries++;
         }
     }
 
@@ -3043,7 +3049,10 @@ namespace spacer {
 
         if (!par->has_derivs (par->level ()-1)) {
             TRACE ("spacer", tout << "No more normal derivations\n";);
-            if (!par->is_inq ()) m_search.add_leaf (*par);
+            if (!par->is_inq ()) {
+                m_search.add_leaf (*par);
+                m_stats.m_num_queries++;
+            }
         }
         // o.w. there are other running derivations...
     }
@@ -3062,7 +3071,9 @@ namespace spacer {
         for (it = m_rels.begin(); it != end; ++it) {
             it->m_value->collect_statistics(st);
         }
-        st.update("SPACER num unfoldings", m_stats.m_num_nodes);
+        st.update("SPACER num queries", m_stats.m_num_queries);
+        st.update("SPACER num reach queries", m_stats.m_num_reach_queries);
+        st.update("SPACER max query lvl", m_stats.m_max_query_lvl);
         st.update("SPACER max depth", m_stats.m_max_depth);
         st.update("SPACER inductive level", m_inductive_lvl);
         m_pm.collect_statistics(st);

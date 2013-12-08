@@ -544,7 +544,9 @@ namespace spacer {
     class context {
 
         struct stats {
-            unsigned m_num_nodes;
+            unsigned m_num_queries;
+            unsigned m_num_reach_queries;
+            unsigned m_max_query_lvl;
             unsigned m_max_depth;
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
