@@ -2791,10 +2791,16 @@ namespace spacer {
               tout << "\n";
               tout << "Transition:\n" << mk_pp(T, m) << "\n";
               tout << "Phi:\n" << mk_pp(phi, m) << "\n";);
-                      
+
         ptr_vector<func_decl> preds;
-        ptr_vector<pred_transformer> pred_pts;
         pt.find_predecessors(r, preds);
+
+        if (preds.empty ()) {
+            updt_as_reachable (n);
+            return;
+        }
+
+        ptr_vector<pred_transformer> pred_pts;
         for (ptr_vector<func_decl>::iterator it = preds.begin ();
                 it != preds.end (); it++) {
             pred_pts.push_back (&get_pred_transformer (*it));
@@ -2841,37 +2847,31 @@ namespace spacer {
                 tout << "Reduced\n" << mk_pp (phi1, m) << "\n";
               );
 
-        if (preds.size () > 0) {
-            // create a new derivation for the model
-            // order the pts -- for now, right to left
-            bool r_to_l = (m_params.order_children() == 0);
-            vector<unsigned> o_idx;
-            pred_pts.reset ();
-            ptr_vector<func_decl>::iterator it;
-            for (ptr_vector<func_decl>::iterator fwd_it = preds.begin ();
-                    fwd_it != preds.end (); fwd_it++) {
+        // create a new derivation for the model
+        // order the pts -- for now, right to left
+        bool r_to_l = (m_params.order_children() == 0);
+        vector<unsigned> o_idx;
+        pred_pts.reset ();
+        ptr_vector<func_decl>::iterator it;
+        for (ptr_vector<func_decl>::iterator fwd_it = preds.begin ();
+                fwd_it != preds.end (); fwd_it++) {
 
-                if (r_to_l) { it = fwd_it; }
-                else { it = preds.begin () + (preds.end () - fwd_it - 1); }
+            if (r_to_l) { it = fwd_it; }
+            else { it = preds.begin () + (preds.end () - fwd_it - 1); }
 
-                pred_pts.push_back (&get_pred_transformer (*it));
-                o_idx.push_back (it-preds.begin ());
-            }
-            derivation* deriv = alloc (derivation, &n, pred_pts, o_idx, r, m_search);
-            n.add_deriv (deriv);
-            deriv->setup (phi1, M);
-            SASSERT (deriv->has_next ());
-
-            // create post for the first child and add to queue
-            expr_ref post (m);
-            model_node& ch = deriv->mk_next (post);
-            ch.updt_post (post);
-            m_search.add_leaf (ch);
+            pred_pts.push_back (&get_pred_transformer (*it));
+            o_idx.push_back (it-preds.begin ());
         }
-        else {
-            VERIFY (n.pt ().is_reachable_with_reach_facts (n, r));
-            updt_as_reachable (n);
-        }
+        derivation* deriv = alloc (derivation, &n, pred_pts, o_idx, r, m_search);
+        n.add_deriv (deriv);
+        deriv->setup (phi1, M);
+        SASSERT (deriv->has_next ());
+
+        // create post for the first child and add to queue
+        expr_ref post (m);
+        model_node& ch = deriv->mk_next (post);
+        ch.updt_post (post);
+        m_search.add_leaf (ch);
 
 
         //qe::flatten_and(phi1, Phi);
