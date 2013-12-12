@@ -1896,6 +1896,10 @@ namespace pdr {
         model_node* p = n.parent();
         while (p && p->is_1closed()) {
             p->set_closed();
+            m_stats.m_num_reach_queries++;
+            TRACE ("pdr", 
+                    tout << "reachable: " << p->pt().head()->get_name() << " level: " << p->level() << "\n";
+                    tout << mk_pp(p->state(), m) << "\n";);
             p = p->parent();
         }
     }
@@ -1930,7 +1934,10 @@ namespace pdr {
             switch (expand_state(n, cube, uses_level)) {
             case l_true:
                 if (n.level() == 0) {
-                    TRACE("pdr", tout << "reachable at level 0\n";);
+                    TRACE ("pdr", 
+                            tout << "reachable at level 0: " << n.pt().head()->get_name() << "\n";
+                            tout << mk_pp(n.state(), m) << "\n";);
+                    m_stats.m_num_reach_queries++;
                     close_node(n);
                 }
                 else {
@@ -2179,10 +2186,19 @@ namespace pdr {
             model_node* child = alloc(model_node, &n, n_cube, pt, n.level()-1);
             ++m_stats.m_num_nodes;
             m_search.add_leaf(*child); 
+            if (child->is_open ()) {
+                m_stats.m_num_queries++;
+            }
             IF_VERBOSE(3, verbose_stream() << "Predecessor: " << mk_pp(o_cube, m) << "\n";);
             m_stats.m_max_depth = std::max(m_stats.m_max_depth, child->depth());
         }
         check_pre_closed(n);
+        if (n.children().size() == 0) {
+            m_stats.m_num_reach_queries++;
+            TRACE ("pdr", 
+                    tout << "reachable: " << n.pt().head()->get_name() << " level: " << n.level() << "\n";
+                    tout << mk_pp(n.state(), m) << "\n";);
+        }
         TRACE("pdr", m_search.display(tout););
     }
 
@@ -2191,7 +2207,9 @@ namespace pdr {
         for (it = m_rels.begin(); it != end; ++it) {
             it->m_value->collect_statistics(st);
         }
-        st.update("PDR num unfoldings", m_stats.m_num_nodes);
+        st.update("PDR num nodes", m_stats.m_num_nodes);
+        st.update("PDR num queries", m_stats.m_num_queries);
+        st.update("PDR num reach queries", m_stats.m_num_reach_queries);
         st.update("PDR max depth", m_stats.m_max_depth);
         st.update("PDR inductive level", m_inductive_lvl);
         m_pm.collect_statistics(st);

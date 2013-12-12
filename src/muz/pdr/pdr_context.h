@@ -300,6 +300,8 @@ namespace pdr {
 
         struct stats {
             unsigned m_num_nodes;
+            unsigned m_num_queries;
+            unsigned m_num_reach_queries; // number of queries found to be reachable
             unsigned m_max_depth;
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
