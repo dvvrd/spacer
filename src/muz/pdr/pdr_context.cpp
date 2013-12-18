@@ -1835,6 +1835,7 @@ namespace pdr {
         while (true) {
             checkpoint();
             m_expanded_lvl = lvl;
+            m_stats.m_max_query_lvl = lvl;
             reachable = check_reachability(lvl);
             if (reachable) {
                 throw model_exception();
@@ -1857,6 +1858,7 @@ namespace pdr {
         while (true) {
             checkpoint();
             m_expanded_lvl = lvl;
+            m_stats.m_max_query_lvl = lvl;
             reachable = check_reachability(lvl);
             if (reachable) {
                 throw model_exception();
@@ -2210,6 +2212,7 @@ namespace pdr {
         st.update("PDR num nodes", m_stats.m_num_nodes);
         st.update("PDR num queries", m_stats.m_num_queries);
         st.update("PDR num reach queries", m_stats.m_num_reach_queries);
+        st.update("PDR max query lvl", m_stats.m_max_query_lvl);
         st.update("PDR max depth", m_stats.m_max_depth);
         st.update("PDR inductive level", m_inductive_lvl);
         m_pm.collect_statistics(st);
@@ -2217,6 +2220,13 @@ namespace pdr {
         for (unsigned i = 0; i < m_core_generalizers.size(); ++i) {
             m_core_generalizers[i]->collect_statistics(st);
         }
+
+        // brunch out
+        verbose_stream () << "BRUNCH_STAT max_query_lvl " << m_stats.m_max_query_lvl << "\n";
+        verbose_stream () << "BRUNCH_STAT num_queries " << m_stats.m_num_queries << "\n";
+        verbose_stream () << "BRUNCH_STAT num_reach_queries " << m_stats.m_num_reach_queries << "\n";
+        verbose_stream () << "BRUNCH_STAT inductive_lvl " << m_inductive_lvl << "\n";
+        verbose_stream () << "BRUNCH_STAT max_depth " << m_stats.m_max_depth << "\n";
     }
 
     void context::reset_statistics() {

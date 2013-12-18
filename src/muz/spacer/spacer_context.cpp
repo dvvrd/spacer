@@ -2612,6 +2612,7 @@ namespace spacer {
 
         if (n.pt().is_reachable_known (n.post())) {
             TRACE("spacer", tout << "known to be reachable\n";);
+            m_stats.m_num_reuse_reach++;
             n.close ();
             report_reach (n);
         } else {
@@ -3070,6 +3071,7 @@ namespace spacer {
         }
         st.update("SPACER num queries", m_stats.m_num_queries);
         st.update("SPACER num reach queries", m_stats.m_num_reach_queries);
+        st.update("SPACER num reuse reach facts", m_stats.m_num_reuse_reach);
         st.update("SPACER max query lvl", m_stats.m_max_query_lvl);
         st.update("SPACER max depth", m_stats.m_max_depth);
         st.update("SPACER inductive level", m_inductive_lvl);
@@ -3078,6 +3080,14 @@ namespace spacer {
         for (unsigned i = 0; i < m_core_generalizers.size(); ++i) {
             m_core_generalizers[i]->collect_statistics(st);
         }
+
+        // brunch out
+        verbose_stream () << "BRUNCH_STAT max_query_lvl " << m_stats.m_max_query_lvl << "\n";
+        verbose_stream () << "BRUNCH_STAT num_queries " << m_stats.m_num_queries << "\n";
+        verbose_stream () << "BRUNCH_STAT num_reach_queries " << m_stats.m_num_reach_queries << "\n";
+        verbose_stream () << "BRUNCH_STAT num_reach_reuse " << m_stats.m_num_reuse_reach << "\n";
+        verbose_stream () << "BRUNCH_STAT inductive_lvl " << m_inductive_lvl << "\n";
+        verbose_stream () << "BRUNCH_STAT max_depth " << m_stats.m_max_depth << "\n";
     }
 
     void context::reset_statistics() {
