@@ -21,6 +21,20 @@ def parseArgs (argv):
     p.add_argument ('--answer', help='Print answer', action='store_true',
                     default=False)
     p.add_argument ('--engine', help='Datalog Engine (pdr/spacer)', default='spacer')
+    p.add_argument ('--verbose', help='Z3 verbosity', default=0)
+    p.add_argument ('--use-utvpi', dest='use_utvpi', help='use utvpi/diff-logic '
+                                                          'solvers, if applicable',
+                    action='store_true', default=False)
+    p.add_argument ('--eager-reach-check', dest='eager_reach_check',
+                    help='eagerly use reachability facts for every local query',
+                    action='store_true', default=False)
+    p.add_argument ('--from-lvl', dest='from_lvl',
+                    type=int,
+                    help='start level for query predicate',
+                    action='store', default=0)
+    p.add_argument ('--print-stats', dest='print_stats',
+                    help='flag to print stats',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -31,6 +45,8 @@ def main (argv):
     stat ('Result', 'UNKNOWN')
 
     z3_args = 'z3'
+
+    z3_args += ' -v:' + str(args.verbose)
 
     if not args.pp:
         print 'No pre-processing'
@@ -54,7 +70,19 @@ def main (argv):
 
     z3_args += ' fixedpoint.use_farkas=true'
     z3_args += ' fixedpoint.generate_proof_trace=false'
-    z3_args += ' fixedpoint.use_utvpi=false'
+
+    if args.use_utvpi:
+        z3_args += ' fixedpoint.use_utvpi=true'
+    else:
+        z3_args += ' fixedpoint.use_utvpi=false'
+
+    if args.eager_reach_check:
+        z3_args += ' fixedpoint.eager_reach_check=true'
+    else:
+        z3_args += ' fixedpoint.eager_reach_check=false'
+
+    if args.print_stats:
+        z3_args += ' -st'
 
     z3_args += ' ' + args.file
 
