@@ -402,6 +402,9 @@ namespace spacer {
                     // TODO: use the new unsat core to further filter out soft_atoms
                 }
             }
+            else {
+                soft_atoms.reset ();
+            }
         }
 
         SASSERT (result != l_false || soft_atoms.empty ());

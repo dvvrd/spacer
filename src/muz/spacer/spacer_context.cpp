@@ -2638,9 +2638,6 @@ namespace spacer {
             reset_curr_model ();
             switch (expand_state(n, cube, uses_level)) {
             case REACH: {
-                // concretely reachable; infer new reachability fact
-                updt_as_reachable (n);
-
                 // updt m_num_reuse_reach
 
                 // pick a rule consistent with n.post
@@ -2651,6 +2648,9 @@ namespace spacer {
                 pt.find_predecessors (r, preds);
                 // we reused reach facts of all predecessors of this rule
                 m_stats.m_num_reuse_reach += preds.size ();
+
+                // concretely reachable; infer new reachability fact
+                updt_as_reachable (n);
 
                 /*expr_ref reach_fact (m);
                 mk_reach_fact (n, reach_fact);
