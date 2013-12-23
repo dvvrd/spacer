@@ -359,34 +359,48 @@ namespace spacer {
                 }
             }
 
-            // try minimizing soft_atoms part of the core
-            while (!soft_atoms.empty ()) {
-                // remove first atom
-                soft_atoms [0] = soft_atoms.back ();
-                soft_atoms.pop_back ();
-
-                // check sat with remaining assumptions
+            // check sat using just hard_atoms
+            if (!soft_atoms.empty ()) {
                 expr_atoms.reset ();
                 expr_atoms.append (hard_atoms);
-                expr_atoms.append (soft_atoms);
                 if (m_in_level) {
                     push_level_atoms(m_current_level, expr_atoms);
                 }
-
                 result = m_ctx->check(expr_atoms);
+            }
 
-                if (result == l_true && m_model) {
-                    m_ctx->get_model(*m_model);
-                    TRACE("spacer_verbose", model_pp(tout, **m_model); );
-                    TRACE ("spacer", tout << "sat using subset of soft atoms\n";);
-                    TRACE ("spacer",
-                            for (unsigned j = 0; j < soft_atoms.size (); ++j) {
-                                tout << mk_pp (soft_atoms.get (j), m) << "\n";
-                            }
-                          );
-                    break;
+            if (result == l_true) {
+                // get a model with as many soft_atoms as possible
+
+                // try minimizing soft_atoms part of the core
+                while (!soft_atoms.empty ()) {
+                    // remove first atom
+                    soft_atoms [0] = soft_atoms.back ();
+                    soft_atoms.pop_back ();
+
+                    // check sat with remaining assumptions
+                    expr_atoms.reset ();
+                    expr_atoms.append (hard_atoms);
+                    expr_atoms.append (soft_atoms);
+                    if (m_in_level) {
+                        push_level_atoms(m_current_level, expr_atoms);
+                    }
+
+                    result = m_ctx->check(expr_atoms);
+
+                    if (result == l_true && m_model) {
+                        m_ctx->get_model(*m_model);
+                        TRACE("spacer_verbose", model_pp(tout, **m_model); );
+                        TRACE ("spacer", tout << "sat using subset of soft atoms\n";);
+                        TRACE ("spacer",
+                                for (unsigned j = 0; j < soft_atoms.size (); ++j) {
+                                    tout << mk_pp (soft_atoms.get (j), m) << "\n";
+                                }
+                              );
+                        break;
+                    }
+                    // TODO: use the new unsat core to further filter out soft_atoms
                 }
-                // TODO: use the new unsat core to further filter out soft_atoms
             }
         }
 
