@@ -69,7 +69,8 @@ namespace spacer {
         
         lbool check_safe_assumptions(
             safe_assumptions& assumptions,
-            expr_ref_vector const& atoms);
+            expr_ref_vector const& hard_atoms,
+            expr_ref_vector& soft_atoms);
         
         
     public:
@@ -112,7 +113,7 @@ namespace spacer {
          * If the conjunction of atoms is consistent with the solver state and o_model is non-zero,
          * o_model will contain the "o" literals true in the assignment.
          */
-        lbool check_assumptions(const expr_ref_vector & atoms);
+        lbool check_assumptions(const expr_ref_vector & hard_atoms, expr_ref_vector& soft_atoms);
         
         lbool check_conjunction_as_assumptions(expr * conj);
         
@@ -120,7 +121,8 @@ namespace spacer {
          * Like check_assumptions, except it also asserts an extra formula
          */
         lbool check_assumptions_and_formula(
-            const expr_ref_vector & atoms, 
+            const expr_ref_vector & hard_atoms, 
+            expr_ref_vector & soft_atoms, 
             expr * form);
         
         void collect_statistics(statistics& st) const;

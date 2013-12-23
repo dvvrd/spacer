@@ -43,7 +43,8 @@ namespace spacer {
     class prop_solver::safe_assumptions {
         prop_solver&        s;
         ast_manager&        m;
-        expr_ref_vector     m_atoms;
+        expr_ref_vector     m_hard_atoms;
+        expr_ref_vector     m_soft_atoms;
         expr_ref_vector     m_assumptions;
         obj_map<app,expr *> m_proxies2expr;
         obj_map<expr, app*> m_expr2proxies;
@@ -169,15 +170,21 @@ namespace spacer {
         }
 
     public:
-        safe_assumptions(prop_solver& s, expr_ref_vector const& assumptions): 
-            s(s), m(s.m), m_atoms(assumptions), m_assumptions(m), m_num_proxies(0) {
-              mk_safe(m_atoms);
+        safe_assumptions(prop_solver& s,
+                         expr_ref_vector const& hard_assumptions,
+                         expr_ref_vector& soft_assumptions):
+            s(s), m(s.m), m_hard_atoms(hard_assumptions), m_soft_atoms (soft_assumptions),
+            m_assumptions(m), m_num_proxies(0) {
+              mk_safe(m_hard_atoms);
+              mk_safe(m_soft_atoms);
         }
         
         ~safe_assumptions() {
         }    
         
-        expr_ref_vector const& atoms() const { return m_atoms; }
+        expr_ref_vector const& hard_atoms() const { return m_hard_atoms; }
+
+        expr_ref_vector& soft_atoms() { return m_soft_atoms; }
         
         unsigned assumptions_size() const { return m_assumptions.size(); }
         
@@ -297,11 +304,13 @@ namespace spacer {
 
     lbool prop_solver::check_safe_assumptions(
         safe_assumptions& safe,
-        const expr_ref_vector& atoms)
+        const expr_ref_vector& hard_atoms,
+        expr_ref_vector& soft_atoms)
     {
         flet<bool> _model(m_fparams.m_model, m_model != 0);
         expr_ref_vector expr_atoms(m);
-        expr_atoms.append(atoms.size(), atoms.c_ptr());
+        expr_atoms.append (hard_atoms);
+        expr_atoms.append (soft_atoms);
 
         if (m_in_level) {
             push_level_atoms(m_current_level, expr_atoms);
@@ -317,7 +326,72 @@ namespace spacer {
             m_ctx->get_model(*m_model);
             TRACE("spacer_verbose", model_pp(tout, **m_model); );
         }
-        
+
+        if (result == l_false && !soft_atoms.empty ()) {
+            expr_ref_vector core (m);
+            unsigned core_size = m_ctx->get_unsat_core_size();
+            for (unsigned i = 0; i < core_size; ++i) {
+                core.push_back (m_ctx->get_unsat_core_expr (i));
+            }
+
+            TRACE ("spacer", tout << "unsat using soft atoms\n";);
+            TRACE ("spacer",
+                    tout << "Core:\n";
+                    for (unsigned i = 0; i < core_size; ++i) {
+                        tout << mk_pp (core.get (i), m) << "\n";
+                    }
+                  );
+
+            // remove soft_atoms that are not in core
+            ast_eq_proc eq_proc;
+            for (unsigned i = 0; i < soft_atoms.size (); i++) {
+                bool found = false;
+                for (unsigned j = 0; j < core_size; j++) {
+                    if (eq_proc (soft_atoms.get (i), core.get (j))) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    soft_atoms [i] = soft_atoms.back ();
+                    soft_atoms.pop_back ();
+                    i--;
+                }
+            }
+
+            // try minimizing soft_atoms part of the core
+            while (!soft_atoms.empty ()) {
+                // remove first atom
+                soft_atoms [0] = soft_atoms.back ();
+                soft_atoms.pop_back ();
+
+                // check sat with remaining assumptions
+                expr_atoms.reset ();
+                expr_atoms.append (hard_atoms);
+                expr_atoms.append (soft_atoms);
+                if (m_in_level) {
+                    push_level_atoms(m_current_level, expr_atoms);
+                }
+
+                result = m_ctx->check(expr_atoms);
+
+                if (result == l_true && m_model) {
+                    m_ctx->get_model(*m_model);
+                    TRACE("spacer_verbose", model_pp(tout, **m_model); );
+                    TRACE ("spacer", tout << "sat using subset of soft atoms\n";);
+                    TRACE ("spacer",
+                            for (unsigned j = 0; j < soft_atoms.size (); ++j) {
+                                tout << mk_pp (soft_atoms.get (j), m) << "\n";
+                            }
+                          );
+                    break;
+                }
+                // TODO: use the new unsat core to further filter out soft_atoms
+            }
+        }
+
+        SASSERT (result != l_false || soft_atoms.empty ());
+
         if (result == l_false) { 
             unsigned core_size = m_ctx->get_unsat_core_size(); 
             m_assumes_level = false;
@@ -424,28 +498,30 @@ namespace spacer {
         }
     }
 
-    lbool prop_solver::check_assumptions(const expr_ref_vector & atoms) {
-        return check_assumptions_and_formula(atoms, m.mk_true());
+    lbool prop_solver::check_assumptions(const expr_ref_vector & hard_atoms, expr_ref_vector& soft_atoms) {
+        return check_assumptions_and_formula(hard_atoms, soft_atoms, m.mk_true());
     }
 
     lbool prop_solver::check_conjunction_as_assumptions(expr * conj) {
-        expr_ref_vector asmp(m);
-        asmp.push_back(conj);
-        return check_assumptions(asmp);
+        expr_ref_vector hard_asmp(m), soft_asmp (m);
+        hard_asmp.push_back(conj);
+        return check_assumptions(hard_asmp, soft_asmp);
     }
 
-    lbool prop_solver::check_assumptions_and_formula(const expr_ref_vector & atoms, expr * form) 
+    lbool prop_solver::check_assumptions_and_formula(const expr_ref_vector & hard_atoms, expr_ref_vector& soft_atoms, expr * form) 
     {
         spacer::smt_context::scoped _scoped(*m_ctx);
-        safe_assumptions safe(*this, atoms);
+        safe_assumptions safe(*this, hard_atoms, soft_atoms);
         m_ctx->assert_expr(form);    
         CTRACE("spacer", !m.is_true(form), tout << "check with formula: " << mk_pp(form, m) << "\n";);
-        lbool res = check_safe_assumptions(safe, safe.atoms());
+        lbool res = check_safe_assumptions(safe, safe.hard_atoms(), safe.soft_atoms());
 
         //
         // we don't have to undo model naming, as from the model 
         // we extract the values for state variables directly
         //
+        soft_atoms.reset ();
+        soft_atoms.append (safe.soft_atoms ());
         return res;
     }
 
