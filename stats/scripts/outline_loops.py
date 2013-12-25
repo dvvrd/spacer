@@ -220,17 +220,36 @@ def outline_loop (name, decls, rules, self_loops, preds, succs):
 
         for out_rule in succs [name]:
             #print 'Out rule:', repr (out_rule)
-            # version all qvars
-            out_vars = list ()
+
+            # version all out_rule.qvars; treat body args and the rest separately
             sub = list ()
+            out_vars = list ()
+            # body args
+            for i in range (decl.arity ()):
+                v = out_rule.get_body_inst ().arg (i)
+                if i in arg_indices:
+                    # create new variable
+                    v_new = z3.Const (v.decl ().name () + '_temp', v.sort ())
+                    out_vars.append (v_new)
+                else:
+                    # use corresponding arg from in_rule; it is unchanged by the loop
+                    v_new = in_rule.get_head ().arg (i)
+                sub.append ( (v,v_new) )
+            # rest
             for v in out_rule.qvars:
+                is_body_arg = False
+                for i in range (decl.arity ()):
+                    if z3.eq (v, out_rule.get_body_inst ().arg (i)):
+                        is_body_arg = True
+                        break
+                if is_body_arg: continue
+
                 v_temp = z3.Const (v.decl ().name () + '_temp', v.sort ())
-                sub.append ( (v, v_temp) )
+                sub.append ( (v,v_temp) )
                 out_vars.append (v_temp)
+
             next_args = [z3.substitute (out_rule.get_body_inst ().arg (i), *sub)\
                          for i in arg_indices]
-            #next_args = [z3.substitute (arg, *sub) \
-                         #for arg in out_rule.get_body_inst ().children ()]
             out_trans = z3.substitute (out_rule.get_trans (), *sub)
             to_inst = z3.substitute (out_rule.get_head (), *sub)
 

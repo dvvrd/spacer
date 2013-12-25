@@ -158,7 +158,7 @@ def get_level_lemmas (fp, lvl, pred):
     return z3.simplify (z3.And (*lemmas))
 
 
-# doesn't seem to quite work when new expressions are created -- use z3.is_eq instead
+# doesn't seem to quite work when new expressions are created -- use z3.eq instead
 def exp_key (e): return e.ast.value
 
 
