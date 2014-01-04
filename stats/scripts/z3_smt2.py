@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import z3
 import sys
 import stats
 import subprocess
