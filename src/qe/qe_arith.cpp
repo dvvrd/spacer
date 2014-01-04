@@ -441,6 +441,7 @@ namespace qe {
                     } else {
                         x_term_val = m_terms.get (eq_idx);
                     }
+                    m_rw (x_term_val);
                     TRACE ("qe",
                             tout << "Using equality literal: " << mk_pp (m_lits.get (eq_idx), m) << "\n";
                             tout << "substitution for (lcm_coeffs * x): " << mk_pp (x_term_val, m) << "\n";
@@ -493,6 +494,7 @@ namespace qe {
                         new_lit = m.mk_eq (a.mk_mod (a.mk_add (m_terms.get (i), x_term_val),
                                                      a.mk_numeral (m_divs[i], a.mk_int ())),
                                            z);
+                        m_rw (new_lit);
                     } else if (m_eq[i] ||
                                (num_pos == 0 && m_coeffs[i].is_pos ()) ||
                                (num_neg == 0 && m_coeffs[i].is_neg ())) {
@@ -580,6 +582,7 @@ namespace qe {
                 if (m_coeffs[max_t].is_pos ()) {
                     x_term_val = a.mk_uminus (x_term_val);
                 }
+                m_rw (x_term_val);
 
                 TRACE ("qe",
                         tout << "substitution for (lcm_coeffs * x): " << mk_pp (x_term_val, m) << "\n";
@@ -895,7 +898,6 @@ namespace qe {
             scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
             rep->set_substitution (&sub);
             (*rep)(fml);
-            m_rw (fml);
         }
 
     public:
