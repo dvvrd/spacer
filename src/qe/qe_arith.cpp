@@ -337,7 +337,7 @@ namespace qe {
                               );
                         // check if the equality is true in the mdl
                         if (eq_idx == lits.size () && r == rational::zero ()) {
-                            eq_idx = i;
+                            eq_idx = m_lits.size ();
                         }
                         m_lits.push_back (lits.get (i));
                         m_coeffs.push_back(c);
