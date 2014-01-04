@@ -52,6 +52,7 @@ namespace qe {
         expr_ref_vector  m_lits;
         expr_ref_vector  m_terms;
         vector<rational> m_coeffs;
+        vector<rational> m_divs;
         svector<bool>    m_strict;
         svector<bool>    m_eq;
         scoped_ptr<contains_app> m_var;
@@ -98,7 +99,8 @@ namespace qe {
             }
         }
 
-        bool is_linear(expr* lit, rational& c, expr_ref& t, bool& is_strict, bool& is_eq, bool& is_diseq) {
+        // either an equality (cx + t = 0) or an inequality (cx + t <= 0) or a divisibility literal (d | cx + t)
+        bool is_linear(expr* lit, rational& c, expr_ref& t, rational& d, bool& is_strict, bool& is_eq, bool& is_diseq) {
             if (!(*m_var)(lit)) {
                 return false;
             }
@@ -125,22 +127,48 @@ namespace qe {
                 is_strict = !is_not;
             }
             else if (m.is_eq(lit, e1, e2)) {
-                is_linear( mul, e1, c, ts);
-                is_linear(-mul, e2, c, ts);
+                expr *t, *num;
+                rational num_val, d_val, z;
+                bool is_int;
+                if (a.is_mod (e1, t, num) && a.is_numeral (num, num_val, is_int) && is_int &&
+                        a.is_numeral (e2, z) && z.is_zero ()) {
+                    // divsibility constraint: t % num == 0 <=> num | t
+                    if (num_val.is_zero ()) {
+                        IF_VERBOSE(1, verbose_stream() << "div by zero" << mk_pp(lit, m) << "\n";);
+                        throw cant_project();
+                    }
+                    d = num_val;
+                    is_linear (mul, t, c, ts);
+                } else if (a.is_mod (e2, t, num) && a.is_numeral (num, num_val, is_int) && is_int &&
+                        a.is_numeral (e1, z) && z.is_zero ()) {
+                    // divsibility constraint: 0 == t % num <=> num | t
+                    if (num_val.is_zero ()) {
+                        IF_VERBOSE(1, verbose_stream() << "div by zero" << mk_pp(lit, m) << "\n";);
+                        throw cant_project();
+                    }
+                    d = num_val;
+                    is_linear (mul, t, c, ts);
+                } else {
+                    // equality or disequality
+                    is_linear( mul, e1, c, ts);
+                    is_linear(-mul, e2, c, ts);
+                    if (is_not) is_diseq = true;
+                    else is_eq = true;
+                }
                 s = m.get_sort(e1);
-                if (is_not) is_diseq = true;
-                else is_eq = true;
-            }            
+            }
             else {
                 IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(lit, m) << "\n";);
                 throw cant_project();
             }
+
             if (ts.empty()) {
                 t = a.mk_numeral(rational(0), s);
             }
             else {
                 t = a.mk_add(ts.size(), ts.c_ptr());
             }
+
             return true;
         }
 
@@ -158,12 +186,12 @@ namespace qe {
             m_eq.reset ();
 
             for (unsigned i = 0; i < lits.size(); ++i) {
-                rational c(0);
+                rational c(0), d(0);
                 expr_ref t(m);
                 bool is_strict = false;
                 bool is_eq = false;
                 bool is_diseq = false;
-                if (is_linear(lits.get (i), c, t, is_strict, is_eq, is_diseq)) {
+                if (is_linear(lits.get (i), c, t, d, is_strict, is_eq, is_diseq)) {
                     if (c.is_zero()) {
                         m_rw(lits.get (i), t);
                         new_lits.push_back(t);
@@ -262,23 +290,28 @@ namespace qe {
             }
         }
 
-        void project(model& mdl, app_ref_vector const& lits, expr_map& map) {
+        void project(model& mdl, app_ref_vector const& lits, expr_map& map, app_ref& div_lit) {
             unsigned num_pos = 0; // number of positive literals true in the model
             unsigned num_neg = 0; // number of negative literals true in the model
 
             m_lits.reset ();
             m_terms.reset();
             m_coeffs.reset();
+            m_divs.reset ();
             m_strict.reset();
             m_eq.reset ();
 
+            expr_ref var_val (m);
+            VERIFY (mdl.eval (m_var->x(), var_val, true));
+
+            unsigned eq_idx = lits.size ();
             for (unsigned i = 0; i < lits.size(); ++i) {
-                rational c(0);
+                rational c(0), d(0);
                 expr_ref t(m);
                 bool is_strict = false;
                 bool is_eq = false;
                 bool is_diseq = false;
-                if (is_linear(lits.get (i), c, t, is_strict, is_eq, is_diseq)) {
+                if (is_linear(lits.get (i), c, t, d, is_strict, is_eq, is_diseq)) {
                     TRACE ("qe",
                             tout << "Literal: " << mk_pp (lits.get (i), m) << "\n";
                           );
@@ -302,22 +335,16 @@ namespace qe {
                         TRACE ("qe",
                                 tout << "equality term\n";
                               );
-                        // c*x + t = 0  <=>  x = -t/c
                         // check if the equality is true in the mdl
-                        if (r == rational::zero ()) {
-                            expr_ref eq_term (mk_mul (-(rational::one ()/c), t), m);
-                            m_rw (eq_term);
-                            map.insert (m_var->x (), eq_term, 0);
-                            TRACE ("qe",
-                                    tout << "Using equality term: " << mk_pp (eq_term, m) << "\n";
-                                  );
-                            return;
+                        if (eq_idx == lits.size () && r == rational::zero ()) {
+                            eq_idx = i;
                         }
                         m_lits.push_back (lits.get (i));
                         m_coeffs.push_back(c);
                         m_terms.push_back(t);
                         m_strict.push_back(false);
                         m_eq.push_back (true);
+                        m_divs.push_back (d);
                     } else {
                         TRACE ("qe",
                                 tout << "not an equality term\n";
@@ -339,36 +366,136 @@ namespace qe {
                         m_terms.push_back(t);
                         m_strict.push_back(is_strict);
                         m_eq.push_back (false);
-                        if ((is_strict && r < rational::zero ()) ||
-                                (!is_strict && r <= rational::zero ())) { // literal true in the model
-                            if (c.is_pos()) {
-                                ++num_pos;
-                            }
-                            else {
-                                ++num_neg;
+                        m_divs.push_back (d);
+                        if (d.is_zero ()) { // not a div term
+                            if ((is_strict && r < rational::zero ()) ||
+                                    (!is_strict && r <= rational::zero ())) { // literal true in the model
+                                if (c.is_pos()) {
+                                    ++num_pos;
+                                }
+                                else {
+                                    ++num_neg;
+                                }
                             }
                         }
                     }
                     TRACE ("qe",
                             tout << "c: " << c << "\n";
                             tout << "t: " << mk_pp (t, m) << "\n";
+                            tout << "d: " << d << "\n";
                           );
                 }
+            }
+
+            rational lcm_coeffs (1), lcm_divs (1);
+            if (a.is_int (m_var->x())) {
+                // lcm of (absolute values of) coeffs
+                for (unsigned i = 0; i < m_lits.size (); i++) {
+                    lcm_coeffs = lcm (lcm_coeffs, abs (m_coeffs[i]));
+                }
+                // normalize coeffs of x to +/-lcm_coeffs and scale terms and divs appropriately;
+                // find lcm of scaled-up divs
+                for (unsigned i = 0; i < m_lits.size (); i++) {
+                    rational factor (lcm_coeffs / abs(m_coeffs[i]));
+                    m_terms[i] = a.mk_mul (a.mk_numeral (factor, a.mk_int ()),
+                                           m_terms.get (i));
+                    m_coeffs[i] = (m_coeffs[i].is_pos () ? lcm_coeffs : -lcm_coeffs);
+                    if (!m_divs[i].is_zero ()) {
+                        m_divs[i] *= factor;
+                        lcm_divs = lcm (lcm_divs, m_divs[i]);
+                    }
+                    TRACE ("qe",
+                            tout << "normalized coeff: " << m_coeffs[i] << "\n";
+                            tout << "normalized term: " << mk_pp (m_terms.get (i), m) << "\n";
+                            tout << "normalized div: " << m_divs[i] << "\n";
+                          );
+                }
+
+                // consider new divisibility literal (lcm_coeffs | (lcm_coeffs * x))
+                lcm_divs = lcm (lcm_divs, lcm_coeffs);
+
+                TRACE ("qe",
+                        tout << "lcm of coeffs: " << lcm_coeffs << "\n";
+                        tout << "lcm of divs: " << lcm_divs << "\n";
+                      );
+            }
+
+            expr_ref z (a.mk_numeral (rational::zero (), a.mk_int ()), m);
+            expr_ref x_term_val (m);
+
+            // use equality term
+            if (eq_idx < lits.size ()) {
+                if (a.is_real (m_var->x ())) {
+                    // c*x + t = 0  <=>  x = -t/c
+                    expr_ref eq_term (mk_mul (-(rational::one ()/m_coeffs[eq_idx]), m_terms.get (eq_idx)), m);
+                    m_rw (eq_term);
+                    map.insert (m_var->x (), eq_term, 0);
+                    TRACE ("qe",
+                            tout << "Using equality term: " << mk_pp (eq_term, m) << "\n";
+                          );
+                }
+                else {
+                    // find substitution term for (lcm_coeffs * x)
+                    if (m_coeffs[eq_idx].is_pos ()) {
+                        x_term_val = a.mk_uminus (m_terms.get (eq_idx));
+                    } else {
+                        x_term_val = m_terms.get (eq_idx);
+                    }
+                    TRACE ("qe",
+                            tout << "Using equality literal: " << mk_pp (m_lits.get (eq_idx), m) << "\n";
+                            tout << "substitution for (lcm_coeffs * x): " << mk_pp (x_term_val, m) << "\n";
+                          );
+                    // can't simply substitute for x; need to explicitly substitute the lits
+                    mk_lit_substitutes (x_term_val, map, eq_idx);
+
+                    if (!lcm_coeffs.is_one ()) {
+                        // new div constraint: lcm_coeffs | x_term_val
+                        div_lit = m.mk_eq (a.mk_mod (x_term_val,
+                                                     a.mk_numeral (lcm_coeffs, a.mk_int ())),
+                                           z);
+                    }
+                }
+
+                return;
             }
 
             expr_ref new_lit (m);
 
             if (num_pos == 0 || num_neg == 0) {
                 TRACE ("qe",
-                        tout << "virtual substitution of infinity\n";
+                        tout << "virtual substitution of +/-infinity\n";
                       );
-                // make all equalities false;
-                // if num_pos = 0 (num_neg = 0), make all positive (negative) inequalities false;
-                // make the rest true
+
+                /**
+                 * make all equalities false;
+                 * if num_pos = 0 (num_neg = 0), make all positive (negative) inequalities false;
+                 * make the rest inequalities true;
+                 * substitute value of x under given model for the rest (div terms)
+                 */
+
+                if (a.is_int (m_var->x())) {
+                    // to substitute for (lcm_coeffs * x), it suffices to pick
+                    // some element in the congruence class of (lcm_coeffs * x) mod lcm_divs;
+                    // simply substituting var_val for x in the literals does this job;
+                    // but to keep constants small, we use (lcm_coeffs * var_val) % lcm_divs instead
+                    rational var_val_num;
+                    VERIFY (a.is_numeral (var_val, var_val_num));
+                    x_term_val = a.mk_numeral (mod (lcm_coeffs * var_val_num, lcm_divs),
+                                               a.mk_int ());
+                    TRACE ("qe",
+                            tout << "Substitution for (lcm_coeffs * x):" << "\n";
+                            tout << mk_pp (x_term_val, m) << "\n";
+                          );
+                }
                 for (unsigned i = 0; i < m_lits.size (); i++) {
-                    if (m_eq[i] ||
-                        (num_pos == 0 && m_coeffs[i].is_pos ()) ||
-                        (num_neg == 0 && m_coeffs[i].is_neg ())) {
+                    if (!m_divs[i].is_zero ()) {
+                        // m_divs[i] | (x_term_val + m_terms[i])
+                        new_lit = m.mk_eq (a.mk_mod (a.mk_add (m_terms.get (i), x_term_val),
+                                                     a.mk_numeral (m_divs[i], a.mk_int ())),
+                                           z);
+                    } else if (m_eq[i] ||
+                               (num_pos == 0 && m_coeffs[i].is_pos ()) ||
+                               (num_neg == 0 && m_coeffs[i].is_neg ())) {
                         new_lit = m.mk_false ();
                     } else {
                         new_lit = m.mk_true ();
@@ -383,33 +510,90 @@ namespace qe {
             }
 
             bool use_pos = num_pos < num_neg; // pick a side; both are sound
+
             unsigned max_t = find_max(mdl, use_pos);
 
             TRACE ("qe",
                     tout << "test point: " << mk_pp (m_lits.get (max_t), m) << "\n";
                   );
 
-            for (unsigned i = 0; i < m_lits.size(); ++i) {
-                if (i != max_t) {
-                    if (m_eq[i]) {
-                       if (!m_strict[max_t]) {
-                           new_lit = mk_eq (i, max_t);
-                       } else {
-                           new_lit = m.mk_false ();
-                       }
-                    } else if (m_coeffs[i].is_pos() == use_pos) {
-                        new_lit = mk_le (i, max_t);
+            if (a.is_real (m_var->x ())) {
+                for (unsigned i = 0; i < m_lits.size(); ++i) {
+                    if (i != max_t) {
+                        if (m_eq[i]) {
+                            if (!m_strict[max_t]) {
+                                new_lit = mk_eq (i, max_t);
+                            } else {
+                                new_lit = m.mk_false ();
+                            }
+                        } else if (m_coeffs[i].is_pos() == use_pos) {
+                            new_lit = mk_le (i, max_t);
+                        } else {
+                            new_lit = mk_lt (i, max_t);
+                        }
                     } else {
-                        new_lit = mk_lt (i, max_t);
+                        new_lit = m.mk_true ();
                     }
-                } else {
-                    new_lit = m.mk_true ();
+                    map.insert (m_lits.get (i), new_lit, 0);
+                    TRACE ("qe",
+                            tout << "Old literal: " << mk_pp (m_lits.get (i), m) << "\n";
+                            tout << "New literal: " << mk_pp (new_lit, m) << "\n";
+                          );
                 }
-                map.insert (m_lits.get (i), new_lit, 0);
+            } else {
+                SASSERT (a.is_int (m_var->x ()));
+
+                // mk substitution term for (lcm_coeffs * x)
+
+                // evaluate c*x + t for the literal at max_t
+                expr_ref cx (m), cxt (m), val (m);
+                rational r;
+                cx = mk_mul (m_coeffs[max_t], m_var->x());
+                cxt = mk_add (cx, m_terms.get (max_t));
+                VERIFY(mdl.eval(cxt, val, true));
+                VERIFY(a.is_numeral(val, r));
+
+                // get the offset from the smallest/largest possible value for x
+                // literal      smallest/largest val of x
+                // -------      --------------------------
+                // l < x            l+1
+                // l <= x            l
+                // x < u            u-1
+                // x <= u            u
+                rational offset;
+                if (m_strict[max_t]) {
+                    offset = abs(r) - rational::one ();
+                } else {
+                    offset = abs(r);
+                }
+                // obtain the offset modulo lcm_divs
+                offset %= lcm_divs;
+
+                // for strict negative literal (i.e. strict lower bound),
+                // substitution term is (t+1+offset); for non-strict, it's (t+offset)
+                //
+                // for positive term, subtract from 0
+                x_term_val = mk_add (m_terms.get (max_t), a.mk_numeral (offset, a.mk_int ()));
+                if (m_strict[max_t]) {
+                    x_term_val = a.mk_add (x_term_val, a.mk_numeral (rational::one(), a.mk_int ()));
+                }
+                if (m_coeffs[max_t].is_pos ()) {
+                    x_term_val = a.mk_uminus (x_term_val);
+                }
+
                 TRACE ("qe",
-                        tout << "Old literal: " << mk_pp (m_lits.get (i), m) << "\n";
-                        tout << "New literal: " << mk_pp (new_lit, m) << "\n";
+                        tout << "substitution for (lcm_coeffs * x): " << mk_pp (x_term_val, m) << "\n";
                       );
+
+                // obtain substitutions for all literals in map
+                mk_lit_substitutes (x_term_val, map, max_t);
+
+                if (!lcm_coeffs.is_one ()) {
+                    // new div constraint: lcm_coeffs | x_term_val
+                    div_lit = m.mk_eq (a.mk_mod (x_term_val,
+                                                 a.mk_numeral (lcm_coeffs, a.mk_int ())),
+                                       z);
+                }
             }
         }
 
@@ -417,7 +601,7 @@ namespace qe {
             unsigned result;
             bool found = false;
             bool found_strict = false;
-            rational found_val(0), r, r_plus_x, found_c;
+            rational found_val (0), r, r_plus_x, found_c;
             expr_ref val(m);
 
             // evaluate x in mdl
@@ -450,9 +634,6 @@ namespace qe {
                 }
             }
             SASSERT(found);
-            if (a.is_int(m_var->x()) && !found_c.is_one()) {
-                throw cant_project();
-            }
             return result;
         }
 
@@ -532,6 +713,92 @@ namespace qe {
             return a.mk_mul(t1, t2);
         }
 
+        /**
+         * factor out mod terms by using divisibility terms;
+         *
+         * for now, only handle mod equalities of the form (t1 % num == t2),
+         * replacing it by the equivalent (num | (t1-t2)) /\ (0 <= t2 < abs(num));
+         * the divisibility atom is a special mod term ((t1-t2) % num == 0)
+         *
+         * TODO: to handle arbitrary terms containing mod sub-terms, we can
+         * introduce temporary auxiliary variables and eliminate them at the end
+         */
+        void mod2div (expr_ref& fml, expr_map& map) {
+            expr* new_fml = 0;
+
+            proof *pr = 0;
+            map.get (fml, new_fml, pr);
+            if (new_fml) {
+                fml = new_fml;
+                return;
+            }
+
+            expr_ref z (a.mk_numeral (rational::zero (), a.mk_int ()), m);
+            bool is_mod_eq = false;
+
+            expr *e1, *e2, *num;
+            expr_ref t1 (m), t2 (m);
+            rational num_val;
+            bool is_int;
+            // check if fml is a mod equality (t1 % num) == t2
+            if (m.is_eq (fml, e1, e2)) {
+                expr* t;
+                if (a.is_mod (e1, t, num) && a.is_numeral (num, num_val, is_int) && is_int) {
+                    t1 = t;
+                    t2 = e2;
+                    is_mod_eq = true;
+                } else if (a.is_mod (e2, t, num) && a.is_numeral (num, num_val, is_int) && is_int) {
+                    t1 = t;
+                    t2 = e1;
+                    is_mod_eq = true;
+                }
+            }
+
+            if (is_mod_eq) {
+                // recursively mod2div for t1 and t2
+                mod2div (t1, map);
+                mod2div (t2, map);
+
+                rational t2_num;
+                if (a.is_numeral (t2, t2_num) && t2_num.is_zero ()) {
+                    // already in the desired form;
+                    // new_fml is (num_val | t1)
+                    new_fml = m.mk_eq (a.mk_mod (t1, a.mk_numeral (num_val, a.mk_int ())),
+                                       z);
+                }
+                else {
+                    expr_ref_vector lits (m);
+                    // num_val | (t1 - t2)
+                    lits.push_back (m.mk_eq (a.mk_mod (a.mk_sub (t1, t2),
+                                                    a.mk_numeral (num_val, a.mk_int ())),
+                                          z));
+                    // 0 <= t2
+                    lits.push_back (a.mk_le (z, t2));
+                    // t2 < abs (num_val)
+                    lits.push_back (a.mk_lt (t2, a.mk_numeral (abs (num_val), a.mk_int ())));
+
+                    new_fml = m.mk_and (lits.size (), lits.c_ptr ());
+                }
+            }
+            else if (!is_app (fml)) {
+                new_fml = fml;
+            }
+            else {
+                app* a = to_app (fml);
+                expr_ref_vector children (m);
+                expr_ref ch (m);
+                for (unsigned i = 0; i < a->get_num_args (); i++) {
+                    ch = a->get_arg (i);
+                    mod2div (ch, map);
+                    children.push_back (ch);
+                }
+                new_fml = m.mk_app (a->get_decl (), children.size (), children.c_ptr ());
+            }
+
+            map.insert (fml, new_fml, 0);
+            fml = new_fml;
+        }
+
         void collect_lits (expr* fml, app_ref_vector& lits) {
             expr_ref_vector todo (m);
             ast_mark visited;
@@ -559,6 +826,48 @@ namespace qe {
             visited.reset();
         }
 
+        /**
+         * assume that all coeffs of x are the same, say c
+         * substitute x_term_val for (c*x) in all lits and update map
+         * make the literal at idx true
+         */
+        void mk_lit_substitutes (expr_ref const& x_term_val, expr_map& map, unsigned idx) {
+            expr_ref z (a.mk_numeral (rational::zero (), a.mk_int ()), m);
+            expr_ref cxt (m), new_lit (m);
+            for (unsigned i = 0; i < m_lits.size(); ++i) {
+                if (i == idx) {
+                    new_lit = m.mk_true ();
+                } else {
+                    // cxt
+                    if (m_coeffs[i].is_neg ()) {
+                        cxt = a.mk_sub (m_terms.get (i), x_term_val);
+                    } else {
+                        cxt = a.mk_add (m_terms.get (i), x_term_val);
+                    }
+
+                    if (m_divs[i].is_zero ()) {
+                        if (m_eq[i]) {
+                            new_lit = m.mk_eq (cxt, z);
+                        } else if (m_strict[i]) {
+                            new_lit = a.mk_lt (cxt, z);
+                        } else {
+                            new_lit = a.mk_le (cxt, z);
+                        }
+                    } else {
+                        // div term
+                        new_lit = m.mk_eq (a.mk_mod (cxt,
+                                                     a.mk_numeral (m_divs[i], a.mk_int ())),
+                                           z);
+                    }
+                }
+                map.insert (m_lits.get (i), new_lit, 0);
+                TRACE ("qe",
+                        tout << "Old literal: " << mk_pp (m_lits.get (i), m) << "\n";
+                        tout << "New literal: " << mk_pp (new_lit, m) << "\n";
+                      );
+            }
+        }
+
         void substitute (expr_ref& fml, app_ref_vector& lits, expr_map& map) {
             expr_substitution sub (m);
             // literals
@@ -568,13 +877,20 @@ namespace qe {
                 map.get (old_lit, new_lit, pr);
                 if (new_lit) {
                     sub.insert (old_lit, new_lit);
+                    TRACE ("qe",
+                            tout << "old lit " << mk_pp (old_lit, m) << "\n";
+                            tout << "new lit " << mk_pp (new_lit, m) << "\n";
+                          );
                 }
             }
-            // equality term
-            expr* eq_term = 0; proof* pr = 0;
-            map.get (m_var->x (), eq_term, pr);
-            if (eq_term) {
-                sub.insert (m_var->x (), eq_term);
+            // substitute for x, if any
+            expr* x_term = 0; proof* pr = 0;
+            map.get (m_var->x (), x_term, pr);
+            if (x_term) {
+                sub.insert (m_var->x (), x_term);
+                TRACE ("qe",
+                        tout << "substituting for x by " << mk_pp (x_term, m) << "\n";
+                      );
             }
             scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
             rep->set_substitution (&sub);
@@ -593,8 +909,12 @@ namespace qe {
                 app* v = vars.get (i);
                 m_var = alloc(contains_app, m, v);
                 try {
+                    if (a.is_int (v)) {
+                        IF_VERBOSE(1, verbose_stream() << "can't project int vars:" << mk_pp(v, m) << "\n";);
+                        throw cant_project ();
+                    }
                     project(mdl, result);
-                    TRACE("qe", tout << "projected: " << mk_pp(v, m) << " ";
+                    TRACE("qe", tout << "projected: " << mk_pp(v, m) << "\n";
                           for (unsigned i = 0; i < result.size(); ++i) {
                               tout << mk_pp(result.get (i), m) << "\n";
                           });
@@ -619,13 +939,30 @@ namespace qe {
                 try {
                     map.reset ();
                     lits.reset ();
+                    if (a.is_int (v)) {
+                        // factor out mod terms using div terms
+                        expr_map mod_map (m);
+                        mod2div (fml, mod_map);
+                        TRACE ("qe",
+                                tout << "factored out mod terms:" << "\n";
+                                tout << mk_pp (fml, m) << "\n";
+                              );
+                    }
                     collect_lits (fml, lits);
-                    project (mdl, lits, map);
+                    app_ref div_lit (m);
+                    project (mdl, lits, map, div_lit);
                     substitute (fml, lits, map);
+                    if (div_lit) {
+                        fml = m.mk_and (fml, div_lit);
+                    }
                     TRACE("qe",
                             tout << "projected: " << mk_pp(v, m) << " "
                                  << mk_pp(fml, m) << "\n";
                          );
+                    DEBUG_CODE(
+                        expr_ref bval (m);
+                        SASSERT (mdl.eval (fml, bval, true) && m.is_true (bval));
+                    );
                 }
                 catch (cant_project) {
                     IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);

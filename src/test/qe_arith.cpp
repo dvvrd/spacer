@@ -25,18 +25,9 @@ static expr_ref parse_fml(ast_manager& m, char const* str) {
            << "(declare-const a Real)\n"
            << "(declare-const b Real)\n"
            << "(declare-const b1 Bool)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_0_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_1_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_2_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_3_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_4_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_5_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_6_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_7_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_8_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_9_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_10_n Real)\n"
-           << "(declare-const E_cp-rel-bb_cp-rel-bb_11_n Real)\n"
+           << "(declare-const ix Int)\n"
+           << "(declare-const iy Int)\n"
+           << "(declare-const iz Int)\n"
            << "(assert " << str << ")\n";
     std::istringstream is(buffer.str());
     VERIFY(parse_smt2_commands(ctx, is));
@@ -109,7 +100,64 @@ static char const* example18 = "(and (or (< x y) (< x z)) (> x 5.0) (> x 0.0) (>
                                      (= y 5.0) (= z 6.0))";
 static char const* answer18 = "(and (> z 5.0) (> z 0.0) (> z 1.0) (= y 5.0) (= z 6.0))";
 
-static void test(char const *ex, char const *ans) {
+
+// integer examples
+
+static char const* example19 = "(and (< (- iy) (+ (* 3 ix) (* (- 2) iy) 1))\
+                                     (< (- (* 2 ix) 6) iz)\
+                                     (= (mod (+ ix 1) 2) 0))";
+static char const* answer19 = "(and (< (* 2 iy) (+ 18 (* 3 iz)))\
+                                    (= (mod (+ (* 2 iy) 6) 12) 0)\
+                                    (= (mod (* 2 iy) 6) 0))";
+
+static char const* example20 = "(= (* 2 ix) iy)";
+static char const* answer20 = "(= (mod iy 2) 0)";
+
+static char const* example21 = "(and (or (< ix 13) (< 15 ix)) (< ix iy))";
+static char const* answer21 = "(< 16 iy)";
+
+static char const* example22 = "(and (or (< (+ (* 3 ix) 1) 10) (> (- (* 7 ix) 6) 7))\
+                                     (= (mod ix 2) 0))";
+static char const* answer22 = "true";
+
+static char const* example23 = "(and (< (* 2 ix) (+ iz 6))\
+                                     (< (- iy 1) (* 3 ix))\
+                                     (= (mod (+ (* 5 ix) 1) 4) 0))";
+static char const* answer23 = "(and (< (* 10 iy) (* 15 (+ iz 6)))\
+                                    (= (mod (* 10 iy) 30) 0)\
+                                    (= (mod (+ (* 10 iy) 6) 24) 0))";
+
+static char const* example24 = "(and (or (< ix 63) (< 39 ix))\
+                                     (= (mod ix 42) 0)\
+                                     (= (mod ix 21) 0))";
+static char const* answer24 = "true";
+
+static char const* example25 = "(and (<= (+ (* 3 iy) ix) 10) (<= 20 (- iy ix)))";
+static char const* answer25 = "(and (<= ix (- 13)) (= (mod (+ 60 (* 3 ix)) 3) 0))";
+
+static char const* example26 = "(and (= (+ (* 3 ix) (* 4 iy)) 18) (<= (- (* 5 ix) iy) 7))";
+static char const* answer26 = "(and (>= iy 3) (= (mod (- 90 (* 20 iy)) 15) 0))";
+
+static char const* example27 = "(and (<= (+ (* 3 ix) (* 2 iy)) 18)\
+                                     (<= (* 3 iy) (* 4 ix))\
+                                     (<= (* 3 ix) (+ (* 2 iy) 1)))";
+static char const* answer27 = "(and (<= iy 4) (= (mod (* 9 iy) 12) 0))";
+
+static char const* example28 = "(and (< (* 3 ix) (+ iy iz))\
+                                     (< (* 2 iz) (* 5 ix))\
+                                     (< (- iy iz) (* 7 ix))\
+                                     (= (mod ix 10) 0))";
+static char const* answer28 = "(and (< (* 21 (* 2 iz)) (- (* 35 (+ iy iz)) 1050))\
+                                    (< (* 15 (- iy iz)) (- (* 35 (+ iy iz)) 1050))\
+                                    (= (mod (- (* 35 (+ iy iz)) 1050) 1050) 0))";
+
+static char const* example29 = "(and (= iy (mod ix 2)) (> iy 0))";
+static char const* answer29 = "(and (= (mod (- 1 iy) 2) 0) (> iy 0) (< iy 2))";
+
+static char const* example30 = "(and (>= ix 3) (= (mod (+ (* 4 ix) iy) 4) 0))";
+static char const* answer30 = "true";
+
+static void test(char const *ex, char const *ans, char const *var, bool is_real) {
     smt_params params;
     params.m_model = true;
     ast_manager m;
@@ -118,7 +166,10 @@ static void test(char const *ex, char const *ans) {
     expr_ref fml = parse_fml(m, ex);
     app_ref_vector vars(m);
     expr_ref_vector lits(m);
-    vars.push_back(m.mk_const(symbol("x"), a.mk_real()));
+    if (is_real)
+        vars.push_back(m.mk_const(symbol(var), a.mk_real()));
+    else
+        vars.push_back(m.mk_const(symbol(var), a.mk_int()));
     qe::flatten_and(fml, lits);
 
     smt::context ctx(m, params);
@@ -127,15 +178,24 @@ static void test(char const *ex, char const *ans) {
     SASSERT(result == l_true);
     ref<model> md;
     ctx.get_model(md);    
-    expr_ref pr (fml, m);
-    qe::arith_project(*md, vars, pr);
-    
+
     std::cout << "Input: " << mk_pp(fml, m) << "\n";
     std::cout << "Model:" << "\n";
     model_smt2_pp (std::cout, m, *md, 0);
+
+    expr_ref pr (fml, m);
+    qe::arith_project(*md, vars, pr);
+    
     expr_ref fml_ans = parse_fml(m, ans);
     std::cout << "One possible expected answer: " << mk_pp (fml_ans, m) << "\n";
     std::cout << "Answer: " << mk_pp(pr, m) << "\n";
+
+    // check if answer is the same as expected
+    smt::context ctx1 (m, params);
+    ctx1.assert_expr (m.mk_not (m.mk_eq (fml_ans, pr)));
+    result = ctx1.check ();
+    bool same = (result == l_false);
+    std::cout << "Answer is the expected one: " << (same ? "true" : "false") << "\n";
     std::cout << "\n";
     
 }
@@ -197,23 +257,39 @@ static void test2(char const *ex) {
 void tst_qe_arith() {
     //test2(example6);
     //return;
-    test(example1, answer1);
-    test(example2, answer2);
-    test(example3, answer3);
-    test(example4, answer4);
-    test(example5, answer5);
-    test(example6, answer6);
-    test(example7, answer7);
-    test(example8, answer8);
-    test(example9, answer9);
-    test(example10, answer10);
-    test(example11, answer11);
-    test(example12, answer12);
-    test(example13, answer13);
-    test(example14, answer14);
-    test(example15, answer15);
-    test(example16, answer16);
-    test(example17, answer17);
-    test (exampleb1, answerb1);
-    test (example18, answer18);
+
+    // rational
+    test(example1, answer1, "x", true);
+    test(example2, answer2, "x", true);
+    test(example3, answer3, "x", true);
+    test(example4, answer4, "x", true);
+    test(example5, answer5, "x", true);
+    test(example6, answer6, "x", true);
+    test(example7, answer7, "x", true);
+    test(example8, answer8, "x", true);
+    test(example9, answer9, "x", true);
+    test(example10, answer10, "x", true);
+    test(example11, answer11, "x", true);
+    test(example12, answer12, "x", true);
+    test(example13, answer13, "x", true);
+    test(example14, answer14, "x", true);
+    test(example15, answer15, "x", true);
+    test(example16, answer16, "x", true);
+    test(example17, answer17, "x", true);
+    test (exampleb1, answerb1, "x", true);
+    test (example18, answer18, "x", true);
+
+    // integer
+    test (example19, answer19, "ix", false);
+    test (example20, answer20, "ix", false);
+    test (example21, answer21, "ix", false);
+    test (example22, answer22, "ix", false);
+    test (example23, answer23, "ix", false);
+    test (example24, answer24, "ix", false);
+    test (example25, answer25, "iy", false);
+    test (example26, answer26, "ix", false);
+    test (example27, answer27, "ix", false);
+    test (example28, answer28, "ix", false);
+    test (example29, answer29, "ix", false);
+    test (example30, answer30, "ix", false);
 }
