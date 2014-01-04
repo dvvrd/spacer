@@ -1312,8 +1312,6 @@ namespace spacer {
                 }
                 else {
                     arith_vars.push_back (vars.get (i));
-                    // only handle reals for now
-                    SASSERT (vars.get (i)->get_decl ()->get_range ()->get_decl_kind () == REAL_SORT);
                 }
             }
             if (!sub.empty ()) {
@@ -1325,7 +1323,7 @@ namespace spacer {
                         tout << "Projected Boolean vars:\n" << mk_pp (fml, m) << "\n";
                       );
             }
-            // project using LW
+            // model based projection
             if (!arith_vars.empty ()) {
                 TRACE ("spacer",
                         tout << "Arith vars:\n";

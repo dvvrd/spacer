@@ -423,6 +423,10 @@ namespace spacer {
         if (result == l_false && m_core && m.proofs_enabled() && !m_subset_based_core) {
             TRACE ("spacer", tout << "theory core\n";);
             extract_theory_core(safe);
+            if (!check_theory_core ()) {
+                TRACE ("spacer", tout << "theory core unsound; using subset core\n";);
+                extract_subset_core (safe);
+            }
         }
         else if (result == l_false && m_core) {
             TRACE ("spacer", tout << "subset core\n";);
@@ -433,6 +437,25 @@ namespace spacer {
         m_model = 0;
         m_subset_based_core = false;
         return result;
+    }
+
+    bool prop_solver::check_theory_core () {
+        expr_ref_vector atoms (m);
+        if (!m_core->empty ()) {
+            expr_ref_vector _aux (m);
+            safe_assumptions safe (*this, *m_core, _aux);
+            atoms.append (safe.hard_atoms ());
+        }
+        if (m_in_level) {
+            push_level_atoms (m_current_level, atoms);
+        }
+
+        TRACE ("spacer",
+                tout << "Check theory core\n";
+                tout << mk_pp(m_pm.mk_and(atoms), m) << "\n";
+              );
+
+        return (m_ctx->check (atoms) == l_false);
     }
 
     void prop_solver::extract_subset_core(safe_assumptions& safe) {

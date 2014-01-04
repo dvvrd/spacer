@@ -63,6 +63,10 @@ namespace spacer {
 
         class safe_assumptions;
 
+        // check if theory core is actually inconsistent with the context
+        // for integers, farkas core need not be sound
+        bool check_theory_core ();
+
         void extract_theory_core(safe_assumptions& assumptions);
 
         void extract_subset_core(safe_assumptions& assumptions);
