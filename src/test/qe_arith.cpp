@@ -155,7 +155,7 @@ static char const* example29 = "(and (= iy (mod ix 2)) (> iy 0))";
 static char const* answer29 = "(and (= (mod (- 1 iy) 2) 0) (> iy 0) (< iy 2))";
 
 static char const* example30 = "(and (>= ix 3) (= (mod (+ (* 4 ix) iy) 4) 0))";
-static char const* answer30 = "true";
+static char const* answer30 = "(= (mod iy 4) 0)";
 
 static void test(char const *ex, char const *ans, char const *var, bool is_real) {
     smt_params params;
