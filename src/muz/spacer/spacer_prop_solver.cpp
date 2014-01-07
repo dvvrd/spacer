@@ -423,9 +423,15 @@ namespace spacer {
         if (result == l_false && m_core && m.proofs_enabled() && !m_subset_based_core) {
             TRACE ("spacer", tout << "theory core\n";);
             extract_theory_core(safe);
+            // save the unsat core
+            unsigned core_size = m_ctx->get_unsat_core_size ();
+            expr_ref_vector unsat_core (m);
+            for (unsigned i = 0; i < core_size; ++i) {
+                unsat_core.push_back (m_ctx->get_unsat_core_expr (i));
+            }
             if (!check_theory_core ()) {
                 TRACE ("spacer", tout << "theory core unsound; using subset core\n";);
-                extract_subset_core (safe);
+                extract_subset_core (safe, unsat_core.c_ptr (), core_size);
             }
         }
         else if (result == l_false && m_core) {
@@ -455,14 +461,20 @@ namespace spacer {
                 tout << mk_pp(m_pm.mk_and(atoms), m) << "\n";
               );
 
-        return (m_ctx->check (atoms) == l_false);
+        lbool result = m_ctx->check (atoms);
+
+        TRACE ("spacer",
+                tout << result << "\n";
+              );
+
+        return (result == l_false);
     }
 
-    void prop_solver::extract_subset_core(safe_assumptions& safe) {
-        unsigned core_size = m_ctx->get_unsat_core_size(); 
+    void prop_solver::extract_subset_core(safe_assumptions& safe, expr* const* unsat_core, unsigned unsat_core_size) {
+        unsigned core_size = unsat_core ? unsat_core_size : m_ctx->get_unsat_core_size(); 
         m_core->reset();
         for (unsigned i = 0; i < core_size; ++i) {
-            expr * core_expr = m_ctx->get_unsat_core_expr(i);
+            expr * core_expr = unsat_core ? unsat_core[i] : m_ctx->get_unsat_core_expr(i);
             SASSERT(is_app(core_expr));
 
             if (m_level_atoms_set.contains(core_expr)) {
@@ -479,7 +491,7 @@ namespace spacer {
         TRACE("spacer", 
             tout << "core_exprs: ";
                 for (unsigned i = 0; i < core_size; ++i) {
-                tout << mk_pp(m_ctx->get_unsat_core_expr(i), m) << " ";
+                tout << mk_pp(unsat_core ? unsat_core[i] : m_ctx->get_unsat_core_expr(i), m) << " ";
             }
             tout << "\n";
             tout << "core: " << mk_pp(m_pm.mk_and(*m_core), m) << "\n";              

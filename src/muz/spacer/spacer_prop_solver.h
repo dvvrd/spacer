@@ -69,7 +69,7 @@ namespace spacer {
 
         void extract_theory_core(safe_assumptions& assumptions);
 
-        void extract_subset_core(safe_assumptions& assumptions);
+        void extract_subset_core(safe_assumptions& assumptions, expr* const* unsat_core = 0, unsigned unsat_core_size = 0);
         
         lbool check_safe_assumptions(
             safe_assumptions& assumptions,
