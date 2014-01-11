@@ -660,6 +660,8 @@ namespace spacer {
         assumps.push_back (n.post ());
 
         if (ctx.get_params ().eager_reach_check ()) {
+            unsigned num_rules_no_reach = 0;
+
             // populate reach_assumps
             if (n.level () > 0 && !m_all_init) {
                 obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin (),
@@ -679,6 +681,7 @@ namespace spacer {
                             // some predecessor has no reach facts; disable the rule
                             pred_assumps.reset ();
                             pred_assumps.push_back (m.mk_not (r_tag));
+                            num_rules_no_reach++;
                             break;
                         }
                         pred_assumps.append (tmp);
@@ -687,69 +690,74 @@ namespace spacer {
                 }
             }
 
-            TRACE ("spacer", tout << "reach assumptions\n";
-                    for (unsigned i = 0; i < reach_assumps.size (); i++) {
-                        tout << mk_pp (reach_assumps.get (i), m) << "\n";
-                    }
-                  );
-            unsigned num_reach = reach_assumps.size ();
-            lbool is_sat = m_solver.check_assumptions (assumps, reach_assumps);
-            if (is_sat == l_true && core) {            
-                core->reset();
-                ctx.set_curr_model (model);
-                if (reach_assumps.size () == num_reach) {
-                    TRACE ("spacer", tout << "reachable using reach facts\n"; 
-                            model_smt2_pp (tout, m, *model, 0);
-                          );
-                    return REACH;
-                } else {
-                    TRACE ("spacer", tout << "reachable using subset of reach facts\n"; 
-                            model_smt2_pp (tout, m, *model, 0);
-                          );
-                    return ABS_REACH;
-                }
-            }
-            if (is_sat == l_false) {
-                TRACE ("spacer", tout << "unreachable with lemmas\n";);
-                TRACE ("spacer",
-                        if (core) {
-                            tout << "Core:\n";
-                            for (unsigned i = 0; i < core->size (); i++) {
-                                tout << mk_pp (core->get(i), m) << "\n";
-                            }
+            if (num_rules_no_reach < m_rules.size ()) { // there is some rule with reach facts for all predecessors
+                TRACE ("spacer", tout << "reach assumptions\n";
+                        for (unsigned i = 0; i < reach_assumps.size (); i++) {
+                            tout << mk_pp (reach_assumps.get (i), m) << "\n";
                         }
                       );
-                uses_level = m_solver.assumes_level();
-                return UNREACH;
+                unsigned num_reach = reach_assumps.size ();
+                lbool is_sat = m_solver.check_assumptions (assumps, reach_assumps);
+                if (is_sat == l_true && core) {            
+                    core->reset();
+                    ctx.set_curr_model (model);
+                    if (reach_assumps.size () == num_reach) {
+                        TRACE ("spacer", tout << "reachable using reach facts\n"; 
+                                model_smt2_pp (tout, m, *model, 0);
+                              );
+                        return REACH;
+                    } else {
+                        TRACE ("spacer", tout << "reachable using subset of reach facts\n"; 
+                                model_smt2_pp (tout, m, *model, 0);
+                              );
+                        return ABS_REACH;
+                    }
+                }
+                if (is_sat == l_false) {
+                    TRACE ("spacer", tout << "unreachable with lemmas\n";);
+                    TRACE ("spacer",
+                            if (core) {
+                                tout << "Core:\n";
+                                for (unsigned i = 0; i < core->size (); i++) {
+                                    tout << mk_pp (core->get(i), m) << "\n";
+                                }
+                            }
+                          );
+                    uses_level = m_solver.assumes_level();
+                    return UNREACH;
+                }
+                return UNKN;
             }
+
+            TRACE ("spacer",
+                    tout << "Insufficient reach facts for an eager check\n";
+                  );
+        }
+
+        LOCAL_REACH_RESULT abs_reach_result; // result if reach check without reach facts is sat
+        if (n.level () > 0 && !m_all_init) {
+            abs_reach_result = ABS_REACH;
         }
         else {
-            LOCAL_REACH_RESULT abs_reach_result; // result if reach check without reach facts is sat
-            if (n.level () > 0 && !m_all_init) {
-                abs_reach_result = ABS_REACH;
-            }
-            else {
-                // level 0 or no predecessors
-                abs_reach_result = REACH;
-            }
-
-            // check without reach facts of body preds
-            lbool is_sat = m_solver.check_conjunction_as_assumptions (n.post ());
-            if (is_sat == l_true && core) {
-                core->reset();
-                TRACE ("spacer", tout << "reachable using lemmas\n"; 
-                        model_smt2_pp (tout, m, *model, 0);
-                      );
-                ctx.set_curr_model (model);
-                return abs_reach_result;
-            }
-            else if (is_sat == l_false) {
-                TRACE ("spacer", tout << "unreachable with lemmas\n";);
-                uses_level = m_solver.assumes_level();
-                return UNREACH;
-            }
+            // level 0 or no predecessors
+            abs_reach_result = REACH;
         }
 
+        // check without reach facts of body preds
+        lbool is_sat = m_solver.check_conjunction_as_assumptions (n.post ());
+        if (is_sat == l_true && core) {
+            core->reset();
+            TRACE ("spacer", tout << "reachable using lemmas\n"; 
+                    model_smt2_pp (tout, m, *model, 0);
+                  );
+            ctx.set_curr_model (model);
+            return abs_reach_result;
+        }
+        else if (is_sat == l_false) {
+            TRACE ("spacer", tout << "unreachable with lemmas\n";);
+            uses_level = m_solver.assumes_level();
+            return UNREACH;
+        }
         return UNKN;
     }
 
