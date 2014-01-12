@@ -27,6 +27,9 @@ def parseArgs (argv):
     p.add_argument ('--eager-reach-check', dest='eager_reach_check',
                     help='eagerly use reachability facts for every local query',
                     action='store_true', default=False)
+    p.add_argument ('--validate-theory-core', dest='validate_theory_core',
+                    help='validate every theory core',
+                    action='store_true', default=False)
     p.add_argument ('--from-lvl', dest='from_lvl',
                     type=int,
                     help='start level for query predicate',
@@ -57,6 +60,7 @@ def main (argv):
     fp.set (engine=args.engine, use_farkas=True, generate_proof_trace=False)
     fp.set (use_utvpi=args.use_utvpi)
     fp.set (eager_reach_check=args.eager_reach_check)
+    fp.set (validate_theory_core=args.validate_theory_core)
     fp.set (print_statistics=args.print_stats)
 
     with stats.timer ('Parse'):

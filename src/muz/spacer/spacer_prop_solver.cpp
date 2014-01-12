@@ -233,7 +233,7 @@ namespace spacer {
     };
 
 
-    prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name) :
+    prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name, bool validate_theory_core) :
         m_fparams(pm.get_fparams()),
         m(pm.get_manager()),
         m_pm(pm),
@@ -245,7 +245,8 @@ namespace spacer {
         m_proxies(m),
         m_core(0),
         m_subset_based_core(false),
-        m_in_level(false)
+        m_in_level(false),
+        m_validate_theory_core (validate_theory_core)
     {
         m_ctx->assert_expr(m_pm.get_background());
     }
@@ -444,7 +445,7 @@ namespace spacer {
             for (unsigned i = 0; i < core_size; ++i) {
                 unsat_core.push_back (m_ctx->get_unsat_core_expr (i));
             }
-            if (!check_theory_core ()) {
+            if (m_validate_theory_core && !validate_theory_core ()) {
                 TRACE ("spacer", tout << "theory core unsound; using subset core\n";);
                 extract_subset_core (safe, unsat_core.c_ptr (), core_size);
             }
@@ -460,7 +461,7 @@ namespace spacer {
         return result;
     }
 
-    bool prop_solver::check_theory_core () {
+    bool prop_solver::validate_theory_core () {
         expr_ref_vector atoms (m);
         if (!m_core->empty ()) {
             expr_ref_vector _aux (m);
