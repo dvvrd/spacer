@@ -358,15 +358,14 @@ namespace spacer {
             }
 
             TRACE ("spacer",
-                    tout << "expr_atoms - unsat core\n";
-                    for (unsigned i = 0; i < expr_atoms.size (); i++) {
+                    tout << "soft atoms in core:\n";
+                    for (unsigned i = num_non_soft; i < expr_atoms.size (); i++) {
                         tout << mk_pp (expr_atoms.get (i), m) << "\n";
                     }
                   );
 
-            // get a model with as many soft_atoms as possible
-
-            // try minimizing soft_atoms part of the core
+            // try to get a model with as many soft_atoms as possible,
+            // by minimizing soft_atoms part of the core
             expr_ref atom_bkp (m);
             while (expr_atoms.size () > num_non_soft) {
                 // remove first soft atom
@@ -407,6 +406,13 @@ namespace spacer {
                         expr_atoms.pop_back ();
                     }
                 }
+
+                TRACE ("spacer",
+                        tout << "remaining soft atoms:\n";
+                        for (unsigned i = num_non_soft; i < expr_atoms.size (); i++) {
+                            tout << mk_pp (expr_atoms.get (i), m) << "\n";
+                        }
+                      );
             }
 
             // update soft_atoms

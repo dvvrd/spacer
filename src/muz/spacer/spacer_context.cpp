@@ -685,7 +685,7 @@ namespace spacer {
                 datalog::rule const* r = it->m_value;
                 if (!r) continue;
                 find_predecessors(*r, m_predicates);
-                if (!m_predicates.empty ()) continue;
+                if (m_predicates.empty ()) continue;
                 for (unsigned i = 0; i < m_predicates.size(); i++) {
                     func_decl* d = m_predicates[i];
                     pred_transformer const& pt = ctx.get_pred_transformer (d);
@@ -2628,9 +2628,15 @@ namespace spacer {
                 m_stats.m_num_reuse_reach += num_reuse_reach;
                 if (is_concrete) {
                     // concretely reachable; infer new reach fact
+                    TRACE ("spacer",
+                            tout << "concretely reachable\n";
+                          );
                     updt_as_reachable (n, r);
                 }
                 else {
+                    TRACE ("spacer",
+                            tout << "abstractly reachable\n";
+                          );
                     create_children (n, r);
                 }
                 break;
