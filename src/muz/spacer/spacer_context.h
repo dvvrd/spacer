@@ -47,13 +47,6 @@ namespace spacer {
     typedef obj_map<datalog::rule const, app_ref_vector*> rule2inst;
     typedef obj_map<func_decl, pred_transformer*> decl2rel;
 
-    enum LOCAL_REACH_RESULT {
-        REACH,
-        UNREACH,
-        ABS_REACH,
-        UNKN
-    };
-
     // 
     // Predicate transformer state.
     // A predicate transformer corresponds to the 
@@ -162,7 +155,7 @@ namespace spacer {
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
-        datalog::rule const& find_rule(model_core const& model) const;
+        datalog::rule const& find_rule(model_core const& model, bool& is_concrete, unsigned& num_reuse_reach) const;
         void find_rules (model_core const& model, svector<datalog::rule const*>& rules) const;
         expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
         ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }
@@ -175,10 +168,10 @@ namespace spacer {
         unsigned get_num_reach_cases () const;
 
         void add_reach_fact (expr* fact);  // add reachability fact
-        bool assert_reach_facts (expr_ref_vector& assumps) const;
-        bool assert_o_reach_facts (expr_ref_vector& assumps, unsigned oidx) const;
+        expr* get_reach_facts_assump () const;
+        expr* get_o_reach_facts_assump (unsigned oidx) const;
 
-        LOCAL_REACH_RESULT is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level);
+        lbool is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level);
         bool is_invariant(unsigned level, expr* co_state, bool inductive, bool& assumes_level, expr_ref_vector* core = 0);
         bool check_inductive(unsigned level, expr_ref_vector& state, bool& assumes_level);
 
@@ -580,15 +573,15 @@ namespace spacer {
         void close_node(model_node& n);
         void check_pre_closed(model_node& n);
         void expand_node(model_node& n);
-        LOCAL_REACH_RESULT expand_state(model_node& n, expr_ref_vector& cube, bool& uses_level);
-        void mk_reach_fact (model_node& n, expr_ref& result);
-        void create_children(model_node& n);
+        lbool expand_state(model_node& n, expr_ref_vector& cube, bool& uses_level);
+        void mk_reach_fact (model_node& n, datalog::rule const& r, expr_ref& result);
+        void create_children(model_node& n, datalog::rule const& r);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;
 
         void report_unreach (model_node& ch); // ch's post is unreachable
         void report_reach (model_node& ch); // ch's post is concretely reachable
-        void updt_as_reachable (model_node& n);
+        void updt_as_reachable (model_node& n, datalog::rule const& r);
         bool redo_at_higher_level (model_node const& ch, derivation const* d, model_node const& par) const;
         
         // Generate inductive property
