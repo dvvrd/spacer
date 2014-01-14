@@ -212,25 +212,23 @@ namespace spacer {
     }
 
     datalog::rule const& pred_transformer::find_rule(model_core const& model, bool& is_concrete, unsigned& num_reuse_reach) const {
-        obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
-        TRACE("spacer_verbose",
-              for (; it != end; ++it) {
-                  expr* pred = it->m_key;
-                  tout << mk_pp(pred, m) << ":\n";
-                  if (it->m_value) it->m_value->display_smt2(m, tout) << "\n";                  
-              }
-        );
-        
-        it = m_tag2rule.begin();
-        if (m_tag2rule.size() == 1) {
-            return *it->m_value;
-        }
+        typedef obj_map<expr, datalog::rule const*> tag2rule;
+        TRACE ("spacer_verbose",
+                tag2rule::iterator it = m_tag2rule.begin();
+                tag2rule::iterator end = m_tag2rule.end();
+                for (; it != end; ++it) {
+                    expr* pred = it->m_key;
+                    tout << mk_pp(pred, m) << ":\n";
+                    if (it->m_value) it->m_value->display_smt2(m, tout) << "\n";                  
+                }
+              );
 
         // find a rule whose tag is true in the model;
         // prefer a rule where the model intersects with reach facts of all predecessors;
         // also find how many predecessors' reach facts are true in the model
         expr_ref vl(m);
         datalog::rule const* r = ((datalog::rule*)0);
+        tag2rule::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
         for (; it != end; ++it) {
             expr* pred = it->m_key;
             if (model.eval(to_app(pred)->get_decl(), vl) && m.is_true(vl)) {
@@ -2611,6 +2609,7 @@ namespace spacer {
         if (n.pt().is_reachable_known (n.post())) {
             TRACE("spacer", tout << "known to be reachable\n";);
             m_stats.m_num_reuse_reach++;
+            TRACE ("spacer", tout << "num reuse reach 1 " << m_stats.m_num_reuse_reach << "\n";);
             n.close ();
             report_reach (n);
         } else {
@@ -2626,6 +2625,7 @@ namespace spacer {
                 datalog::rule const& r = pt.find_rule (*M, is_concrete, num_reuse_reach);
                 // update stats
                 m_stats.m_num_reuse_reach += num_reuse_reach;
+                TRACE ("spacer", tout << "num reuse reach 2 " << m_stats.m_num_reuse_reach << "\n";);
                 if (is_concrete) {
                     // concretely reachable; infer new reach fact
                     TRACE ("spacer",
