@@ -155,7 +155,7 @@ namespace spacer {
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
-        datalog::rule const& find_rule(model_core const& model, bool& is_concrete, unsigned& num_reuse_reach) const;
+        datalog::rule const* find_rule(model_core const& model, bool& is_concrete, unsigned& num_reuse_reach) const;
         void find_rules (model_core const& model, svector<datalog::rule const*>& rules) const;
         expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
         ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }
@@ -171,7 +171,7 @@ namespace spacer {
         expr* get_reach_facts_assump () const;
         expr* get_o_reach_facts_assump (unsigned oidx) const;
 
-        lbool is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level);
+        lbool is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
         bool is_invariant(unsigned level, expr* co_state, bool inductive, bool& assumes_level, expr_ref_vector* core = 0);
         bool check_inductive(unsigned level, expr_ref_vector& state, bool& assumes_level);
 
@@ -573,9 +573,9 @@ namespace spacer {
         void close_node(model_node& n);
         void check_pre_closed(model_node& n);
         void expand_node(model_node& n);
-        lbool expand_state(model_node& n, expr_ref_vector& cube, bool& uses_level);
+        lbool expand_state(model_node& n, expr_ref_vector& cube, bool& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
         void mk_reach_fact (model_node& n, datalog::rule const& r, expr_ref& result);
-        void create_children(model_node& n, datalog::rule const& r);
+        void create_children(model_node& n, datalog::rule const& r, vector<bool> const& reach_pred_used);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;
 
