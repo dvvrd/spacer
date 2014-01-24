@@ -155,7 +155,7 @@ namespace spacer {
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
-        datalog::rule const* find_rule(model_core const& model, bool& is_concrete, unsigned& num_reuse_reach) const;
+        datalog::rule const* find_rule(model& model, bool& is_concrete, unsigned& num_reuse_reach) const;
         void find_rules (model_core const& model, svector<datalog::rule const*>& rules) const;
         expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
         ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }

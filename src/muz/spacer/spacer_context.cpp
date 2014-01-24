@@ -211,7 +211,7 @@ namespace spacer {
         SASSERT (cnt > 0);
     }
 
-    datalog::rule const* pred_transformer::find_rule(model_core const& model, bool& is_concrete, unsigned& num_reuse_reach) const {
+    datalog::rule const* pred_transformer::find_rule(model& model, bool& is_concrete, unsigned& num_reuse_reach) const {
         typedef obj_map<expr, datalog::rule const*> tag2rule;
         TRACE ("spacer_verbose",
                 tag2rule::iterator it = m_tag2rule.begin();
@@ -243,7 +243,7 @@ namespace spacer {
                     if (!reach_assump) {
                         is_concrete = false;
                     }
-                    else if (model.eval (to_app (reach_assump)->get_decl (), vl)) {
+                    else if (model.eval (reach_assump, vl)) {
                         if (m.is_true (vl)) num_reuse_reach++;
                         else is_concrete = false;
                     }
