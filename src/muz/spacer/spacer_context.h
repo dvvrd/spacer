@@ -155,7 +155,7 @@ namespace spacer {
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
-        datalog::rule const* find_rule(model& model, bool& is_concrete, unsigned& num_reuse_reach) const;
+        datalog::rule const* find_rule(model& model, bool& is_concrete, vector<bool>& reach_pred_used, unsigned& num_reuse_reach) const;
         void find_rules (model_core const& model, svector<datalog::rule const*>& rules) const;
         expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
         ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }
@@ -344,6 +344,7 @@ namespace spacer {
 
         model_node*                         m_concl;// conclusion
         ptr_vector<model_node>              m_prems;// all premises which need to be derived
+        vector<bool>                        m_reach_pred_used;
         vector<unsigned>                    m_o_idx;// order of o-index's to be processed
         datalog::rule const&                m_rule; // the rule from m_prems to m_concl
         ptr_vector<model_node>::iterator    m_curr_it; // the premise currently being processed
@@ -370,11 +371,11 @@ namespace spacer {
         // mk substitution to replace ghosts by n-versions of o-consts for the pt at curr_o_idx ()
         //void mk_unghost_sub (expr_substitution& sub) const;
 
-        model_node& next () {
+        model_node* next () {
             if (is_last ()) throw default_exception ("No next premise");
             if (m_curr_it == m_prems.end ()) m_curr_it = m_prems.begin ();
             else m_curr_it++;
-            return **m_curr_it;
+            return *m_curr_it;
         }
 
         model_node& prev () {
@@ -386,6 +387,7 @@ namespace spacer {
     public:
         derivation (model_node* concl,
                     ptr_vector<pred_transformer>& pred_pts,
+                    vector<bool> const & reach_pred_used,
                     vector<unsigned> pred_o_idx,
                     datalog::rule const& rule,
                     model_search& search);
@@ -436,7 +438,7 @@ namespace spacer {
 
         // make post (phi) and post_ctx (ctx) for the next premise
         //void mk_prem_post (expr_ref& phi, expr_ref& ctx) const;
-        model_node& mk_next (expr_ref& post);
+        model_node* mk_next ();
 
         datalog::rule const& get_rule () const { return m_rule; }
 
