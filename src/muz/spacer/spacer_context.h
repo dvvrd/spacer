@@ -141,17 +141,19 @@ namespace spacer {
 
         // add all lemmas from level up to infty to forms;
         // use the o-index idx while adding
-        void add_lemmas (int level, int idx, expr_ref_vector& forms) const;
+        void add_o_lemmas (int level, int idx, expr_ref_vector& forms) const;
 
         std::ostream& display(std::ostream& strm) const;
 
         void collect_statistics(statistics& st) const;
         void reset_statistics();
 
-        bool is_reachable_known (expr* state);
+        bool is_reachable_known (expr* state, model_ref* M = 0);
         bool is_reachable_with_reach_facts (model_node& n, datalog::rule const& r);
-        void get_reach_explanation (model_ref& M, expr_ref& reach_fact);
-        expr* get_used_reach_facts (model_ref const& M, unsigned oidx) const;
+        //void get_reach_explanation (model_ref& M, expr_ref& reach_fact);
+        void get_used_reach_fact (model_ref const& M, expr_ref& reach_fact) const;
+        void get_used_o_reach_fact (model_ref const& M, unsigned oidx, expr_ref& reach_fact) const;
+        void get_all_used_o_reach_facts (model_ref const& M, unsigned oidx, expr_ref& reach_fact) const;
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
@@ -168,6 +170,7 @@ namespace spacer {
         unsigned get_num_reach_cases () const;
 
         void add_reach_fact (expr* fact);  // add reachability fact
+        expr* get_last_reach_fact () const { return m_reach_facts.back (); }
         expr* get_reach_facts_assump () const;
         expr* get_o_reach_facts_assump (unsigned oidx) const;
 
@@ -340,8 +343,6 @@ namespace spacer {
      * clause for m_concl.pt()) in order to reach concl.post
      */
     class derivation {
-        typedef std::pair<app_ref*, app_ref*> app_ref_ptr_pair;
-
         model_node*                         m_concl;// conclusion
         ptr_vector<model_node>              m_prems;// all premises which need to be derived
         vector<bool>                        m_reach_pred_used;
@@ -350,9 +351,11 @@ namespace spacer {
         ptr_vector<model_node>::iterator    m_curr_it; // the premise currently being processed
         ast_manager&                        m;
         manager&                            m_sm;
+        context const&                      m_ctx;
         //vector<vector<app_ref_vector> >     m_ghosts;
                         // for each o_index, vector of (o_const, ghost) pairs
-        expr_ref                            m_post; // combined goal for m_prems
+        expr_ref                            m_trans; // transition relation over oidx variables
+        expr_ref_vector                     m_prem_facts; // reach-facts/lemmas of prem pts
         vector<app_ref_vector>              m_ovars;
         vector<app_ref_vector>              m_nvars;
         model_ref                           M;
@@ -390,7 +393,8 @@ namespace spacer {
                     vector<bool> const & reach_pred_used,
                     vector<unsigned> pred_o_idx,
                     datalog::rule const& rule,
-                    model_search& search);
+                    model_search& search,
+                    context const& ctx);
 
         ~derivation ();
 
@@ -402,6 +406,10 @@ namespace spacer {
         // o_idx of the pt at m_curr_it
         unsigned curr_o_idx () const {
             return m_o_idx [m_curr_it-m_prems.begin ()];
+        }
+
+        unsigned curr_idx () const {
+            return m_curr_it-m_prems.begin ();
         }
 
         unsigned num_prems () const { return m_prems.size (); }
@@ -436,11 +444,21 @@ namespace spacer {
 
         //expr_ref const& post () const { return m_post; }
 
+        void updt_setup ();
+
         // make post (phi) and post_ctx (ctx) for the next premise
         //void mk_prem_post (expr_ref& phi, expr_ref& ctx) const;
         model_node* mk_next ();
 
         datalog::rule const& get_rule () const { return m_rule; }
+
+        model_node& get_concl () const { return *m_concl; }
+
+        model* get_model_ptr () const { return M.get (); }
+
+        expr* get_prem_fact (unsigned i) const { return m_prem_facts.get (i); }
+
+        pred_transformer& get_prem_pt (unsigned i) const { return m_prems[i]->pt (); }
 
         // get symbolic cex for the derivation to m_concl.post
         //void get_trace (expr_ref_vector& trace_conjs) const;
@@ -577,6 +595,7 @@ namespace spacer {
         void expand_node(model_node& n);
         lbool expand_state(model_node& n, expr_ref_vector& cube, bool& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
         void mk_reach_fact (model_node& n, datalog::rule const& r, expr_ref& result);
+        //void mk_reach_fact_from_deriv (derivation& deriv, expr_ref& result);
         void create_children(model_node& n, datalog::rule const& r, vector<bool> const& reach_pred_used);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;

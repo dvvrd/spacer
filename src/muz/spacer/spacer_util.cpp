@@ -164,14 +164,13 @@ namespace spacer {
         return model;
     }
     
-    expr_ref_vector model_evaluator::minimize_literals(ptr_vector<expr> const& formulas, model_ref& mdl) {
+    void model_evaluator::minimize_literals(ptr_vector<expr> const& formulas, model_ref& mdl, expr_ref_vector& result) {
         
         TRACE("spacer", 
               tout << "formulas:\n";
               for (unsigned i = 0; i < formulas.size(); ++i) tout << mk_pp(formulas[i], m) << "\n"; 
               );
         
-        expr_ref_vector result(m);
         expr_ref tmp(m);
         ptr_vector<expr> tocollect;
         
@@ -203,8 +202,6 @@ namespace spacer {
               tout << "minimized model:\n";
               for (unsigned i = 0; i < result.size(); ++i) tout << mk_pp(result[i].get(), m) << "\n"; 
               );
-        
-        return result;
     }
     
     void model_evaluator::process_formula(app* e, ptr_vector<expr>& todo, ptr_vector<expr>& tocollect) {

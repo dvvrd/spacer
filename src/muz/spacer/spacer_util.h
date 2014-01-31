@@ -123,7 +123,7 @@ namespace spacer {
 
           \pre model satisfies formulas
        */
-       expr_ref_vector minimize_literals(ptr_vector<expr> const & formulas, model_ref& mdl);
+       void minimize_literals(ptr_vector<expr> const & formulas, model_ref& mdl, expr_ref_vector& result);
 
        /** 
            for_each_expr visitor.
