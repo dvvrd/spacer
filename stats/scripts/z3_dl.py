@@ -37,6 +37,9 @@ def parseArgs (argv):
     p.add_argument ('--print-stats', dest='print_stats',
                     help='flag to print stats',
                     action='store_true', default=False)
+    p.add_argument ('--dfs', dest='dfs',
+                    help='use dfs instead of bfs',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -62,6 +65,8 @@ def main (argv):
     fp.set (eager_reach_check=args.eager_reach_check)
     fp.set (validate_theory_core=args.validate_theory_core)
     fp.set (print_statistics=args.print_stats)
+
+    if args.dfs: fp.set (bfs_model_search=False)
 
     with stats.timer ('Parse'):
         q = fp.parse_file (args.file)
