@@ -40,6 +40,8 @@ def parseArgs (argv):
     p.add_argument ('--dfs', dest='dfs',
                     help='use dfs instead of bfs',
                     action='store_true', default=False)
+    p.add_argument ('--order-children', dest='order_children',
+                    help='0 (rtol), 1 (ltor)', default=0)
 
     return p.parse_args (argv)
 
@@ -67,6 +69,8 @@ def main (argv):
     fp.set (print_statistics=args.print_stats)
 
     if args.dfs: fp.set (bfs_model_search=False)
+
+    fp.set (order_children=int(args.order_children))
 
     with stats.timer ('Parse'):
         q = fp.parse_file (args.file)
