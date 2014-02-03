@@ -1488,8 +1488,15 @@ namespace spacer {
         expr_ref n_trans (m);
         m_sm.formula_o2n (m_trans, n_trans, curr_o_idx (), false);
         fmls.push_back (n_trans);
+        TRACE ("spacer",
+                tout << "ntrans: " << mk_pp (n_trans, m) << "\n";
+              );
         for (unsigned i = curr_idx ()+1; i < m_prems.size (); i++) {
             fmls.push_back (m_prem_facts.get (i));
+            TRACE ("spacer",
+                    tout << "prem fact: " << mk_pp (m_prem_facts.get (i), m) << "\n";
+                    tout << "prem is reach: " << m_reach_pred_used.get (i) << "\n";
+                  );
         }
         VERIFY (pt.is_reachable_known (m_sm.mk_and (fmls), &M));
 
