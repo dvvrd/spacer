@@ -340,38 +340,54 @@ namespace spacer {
                     }
                   );
 
-            // remove soft_atoms from expr_atoms that are not in core
+            expr_ref atom_bkp (m);
             ast_eq_proc eq_proc;
-            unsigned core_size = m_ctx->get_unsat_core_size();
-            for (unsigned i = expr_atoms.size ()-1; i >= num_non_soft; i--) {
-                bool found = false;
-                for (unsigned j = 0; j < core_size; j++) {
-                    if (eq_proc (expr_atoms.get (i), m_ctx->get_unsat_core_expr (j))) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    expr_atoms[i] = expr_atoms.back ();
-                    expr_atoms.pop_back ();
-                }
-            }
 
             TRACE ("spacer",
                     tout << "soft atoms in core:\n";
                     for (unsigned i = num_non_soft; i < expr_atoms.size (); i++) {
-                        tout << mk_pp (expr_atoms.get (i), m) << "\n";
+                        bool found = false;
+                        for (unsigned j = 0; j < m_ctx->get_unsat_core_size(); j++) {
+                            if (eq_proc (expr_atoms.get (i), m_ctx->get_unsat_core_expr (j))) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (found) {
+                            tout << mk_pp (expr_atoms.get (i), m) << "\n";
+                        }
                     }
                   );
 
             // try to get a model with as many soft_atoms as possible,
-            // by minimizing soft_atoms part of the core
-            expr_ref atom_bkp (m);
             while (expr_atoms.size () > num_non_soft) {
-                // remove first soft atom
-                atom_bkp = expr_atoms.get (num_non_soft);
-                expr_atoms[num_non_soft] = expr_atoms.back ();
-                expr_atoms.pop_back ();
+                // remove the first atom in core
+                unsigned core_size = m_ctx->get_unsat_core_size();
+                unsigned num_atoms = expr_atoms.size ();
+                bool found = false;
+                for (unsigned i = num_non_soft; i < num_atoms; i++) {
+                    for (unsigned j = 0; j < core_size; j++) {
+                        if (eq_proc (expr_atoms.get (i), m_ctx->get_unsat_core_expr (j))) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) {
+                        atom_bkp = expr_atoms.get (i);
+                        expr_atoms[i] = expr_atoms.back ();
+                        expr_atoms.pop_back ();
+                        TRACE ("spacer",
+                                tout << "removing soft atom: " << mk_pp (atom_bkp,m) << "\n";
+                              );
+                        break;
+                    }
+                }
+                if (!found) {
+                    // no soft atom in core
+                    // drop all soft atoms
+                    expr_atoms.resize (num_non_soft);
+                    break;
+                }
 
                 // check sat with remaining assumptions
                 result = m_ctx->check(expr_atoms);
@@ -390,29 +406,6 @@ namespace spacer {
                 }
 
                 SASSERT (result == l_false);
-
-                // use new unsat core to filter out soft atoms in expr_atoms
-                core_size = m_ctx->get_unsat_core_size();
-                for (unsigned i = expr_atoms.size ()-1; i >= num_non_soft; i--) {
-                    bool found = false;
-                    for (unsigned j = 0; j < core_size; j++) {
-                        if (eq_proc (expr_atoms.get (i), m_ctx->get_unsat_core_expr (j))) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        expr_atoms[i] = expr_atoms.back ();
-                        expr_atoms.pop_back ();
-                    }
-                }
-
-                TRACE ("spacer",
-                        tout << "remaining soft atoms:\n";
-                        for (unsigned i = num_non_soft; i < expr_atoms.size (); i++) {
-                            tout << mk_pp (expr_atoms.get (i), m) << "\n";
-                        }
-                      );
             }
 
             // update soft_atoms
