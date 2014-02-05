@@ -1502,12 +1502,12 @@ namespace spacer {
 
         // get new reach fact
         expr_ref reach_fact (m);
-        if (m_ctx.get_params ().eager_reach_check ()) {
-            reach_fact = pt.get_last_reach_fact ();
-        }
-        else {
+        //if (m_ctx.get_params ().eager_reach_check ()) {
+            //reach_fact = pt.get_last_reach_fact ();
+        //}
+        //else {
             pt.get_used_reach_fact (M, reach_fact);
-        }
+        //}
         TRACE ("spacer",
                 tout << "Post of derivation with n-vars for current index:\n"
                 << mk_pp (m_trans, m) << "\n";
@@ -2793,8 +2793,7 @@ namespace spacer {
                 tout << mk_pp(n.post(), m) << "\n";);
 
 
-        // with eager check, we never ask queries that are known to be reachable
-        if (!get_params ().eager_reach_check () && n.pt().is_reachable_known (n.post())) {
+        if (n.pt().is_reachable_known (n.post())) {
             TRACE("spacer", tout << "known to be reachable\n";);
             m_stats.m_num_reuse_reach++;
             n.close ();
