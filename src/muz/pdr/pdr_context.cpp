@@ -2190,7 +2190,16 @@ namespace pdr {
         }
         
         expr_ref n_cube(m);
-        for (unsigned i = 0; i < preds.size(); ++i) {            
+
+        bool r_to_l = (m_params.order_children() == 0);
+        ptr_vector<func_decl>::iterator it;
+        for (ptr_vector<func_decl>::iterator fwd_it = preds.begin ();
+                fwd_it != preds.end (); fwd_it++) {
+
+            if (r_to_l) { it = fwd_it; }
+            else { it = preds.begin () + (preds.end () - fwd_it - 1); }
+
+            unsigned i = (it-preds.begin ());
             pred_transformer& pt = *m_rels.find(preds[i]);
             SASSERT(pt.head() == preds[i]);           
             expr_ref o_cube = m_pm.mk_and(child_states[i]);            
@@ -2204,6 +2213,22 @@ namespace pdr {
             IF_VERBOSE(3, verbose_stream() << "Predecessor: " << mk_pp(o_cube, m) << "\n";);
             m_stats.m_max_depth = std::max(m_stats.m_max_depth, child->depth());
         }
+        /**
+         * for (unsigned i = 0; i < preds.size(); ++i) {            
+         *     pred_transformer& pt = *m_rels.find(preds[i]);
+         *     SASSERT(pt.head() == preds[i]);           
+         *     expr_ref o_cube = m_pm.mk_and(child_states[i]);            
+         *     m_pm.formula_o2n(o_cube, n_cube, i);
+         *     model_node* child = alloc(model_node, &n, n_cube, pt, n.level()-1);
+         *     ++m_stats.m_num_nodes;
+         *     m_search.add_leaf(*child); 
+         *     if (child->is_open ()) {
+         *         m_stats.m_num_queries++;
+         *     }
+         *     IF_VERBOSE(3, verbose_stream() << "Predecessor: " << mk_pp(o_cube, m) << "\n";);
+         *     m_stats.m_max_depth = std::max(m_stats.m_max_depth, child->depth());
+         * }
+         */
         check_pre_closed(n);
         if (n.children().size() == 0) {
             m_stats.m_num_reach_queries++;
