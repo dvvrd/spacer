@@ -34,6 +34,11 @@ def parseArgs (argv):
     p.add_argument ('--print-stats', dest='print_stats',
                     help='flag to print stats',
                     action='store_true', default=False)
+    p.add_argument ('--dfs', dest='dfs',
+                    help='use dfs instead of bfs',
+                    action='store_true', default=False)
+    p.add_argument ('--order-children', dest='order_children',
+                    help='0 (rtol), 1 (ltor)', default=0)
 
     return p.parse_args (argv)
 
@@ -83,6 +88,12 @@ def main (argv):
     if args.print_stats:
         z3_args += ' -st'
 
+    if args.dfs:
+        z3_args += ' fixedpoint.bfs_model_search=false'
+
+    if int(args.order_children)==1:
+        z3_args += ' fixedpoint.order_children=1'
+
     z3_args += ' ' + args.file
 
 
@@ -101,6 +112,12 @@ def main (argv):
         popen.wait()
         res = popen.stdout.read()
     res = res[:-1] # strip off the newline
+    if res.startswith ('sat'):
+        res = 'sat'
+    elif res.startswith ('unsat'):
+        res = 'unsat'
+    else:
+        res = 'unknown'
     print 'Result:', res
 
 #    with stats.timer ('Parse'):
