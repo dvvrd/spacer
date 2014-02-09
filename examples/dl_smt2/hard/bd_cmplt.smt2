@@ -1,3 +1,8 @@
+;;;
+;;; An example showing divergence of GPDR engine of Z3
+;;;
+(set-option :fixedpoint.engine pdr)
+(set-option :fixedpoint.inline_eager false)
 (declare-var x Real)
 (declare-var y Real)
 (declare-var x1 Real)
