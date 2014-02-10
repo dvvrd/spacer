@@ -11,12 +11,12 @@ Abstract:
 
 Author:
 
-    Nikolaj Bjorner (nbjorner) 2011-11-20.
+    Anvesh Komuravelli
 
 Revision History:
 
-    Based on spacer_dl.cpp by
-     Krystof Hoder (t-khoder) 2011-9-19.
+    Based on ../pdr/pdr_context.cpp by
+     Nikolaj Bjorner (nbjorner)
 
 Notes:
 

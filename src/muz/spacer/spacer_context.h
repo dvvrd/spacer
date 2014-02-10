@@ -11,9 +11,12 @@ Abstract:
 
 Author:
 
-    Nikolaj Bjorner (nbjorner) 2011-11-20.
+    Anvesh Komuravelli
 
 Revision History:
+
+    Based on ../pdr/pdr_context.h by
+     Nikolaj Bjorner (nbjorner)
 
 --*/
 
