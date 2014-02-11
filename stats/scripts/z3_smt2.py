@@ -48,7 +48,12 @@ def main (argv):
     args = parseArgs (argv[1:])
     stat ('Result', 'UNKNOWN')
 
-    z3_args = 'z3'
+    if 'z3' in os.listdir('.') and os.path.isfile ('z3'):
+        z3_args = os.getcwd () + '/z3'
+        print 'Using z3 at :', z3_args
+    else:
+        print 'Assuming z3 is in the executable path'
+        z3_args = 'z3'
 
     z3_args += ' -v:' + str(args.verbose)
 
@@ -119,13 +124,6 @@ def main (argv):
     else:
         res = 'unknown'
     print 'Result:', res
-
-#    with stats.timer ('Parse'):
-#        q = fp.parse_file (args.file)
-#
-#    #print fp
-#    with stats.timer ('Query'):
-#        res = fp.query (q[0])
 
     if res == 'sat': stat ('Result', 'SAFE')
     elif res == 'unsat': stat ('Result', 'CEX')
