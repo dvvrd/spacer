@@ -2690,31 +2690,46 @@ namespace spacer {
         return ex.to_expr();
     }
 
-    void context::solve_impl() {
+    ///this is where everything starts
+    void context::solve_impl() 
+    {
+        //if there is no query predicate, abort
         if (!m_rels.find(m_query_pred, m_query)) {
             throw inductive_exception();            
         }
-        unsigned lvl = 0;
-        bool reachable;
+
+        //this is the outer loop of RECMC
+        unsigned lvl = 0; //this is stack depth bound
+        bool reachable = false;
         while (true) {
             checkpoint();
             m_expanded_lvl = lvl;
             m_stats.m_max_query_lvl = lvl;
             //model_node::reset_count (); // fresh counter for node ids
-            reachable = check_reachability(lvl);
+
+            reachable = check_reachability(lvl); //check bounded safety
             if (reachable) {
                 throw model_exception();
             }
+
+            //if bounded-safe, the check if summaries are
+            //inductive. throws an exception if inductive
             if (lvl != 0) {
                 propagate(lvl);
             }
+
+            //this means summaries are not inductive. increase stack
+            //depth bound and continue.
             lvl++;
             m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
             IF_VERBOSE(1,verbose_stream() << "Entering level "<<lvl << "\n";);
         }
     }
 
-    void context::solve_impl_from_lvl (unsigned from_lvl) {
+    ///this is a variant of solve_impl that starts from stack depth
+    ///from_lvl instead of zero
+    void context::solve_impl_from_lvl (unsigned from_lvl) 
+    {
         if (!m_rels.find(m_query_pred, m_query)) {
             throw inductive_exception();            
         }
@@ -2745,12 +2760,18 @@ namespace spacer {
     // the search tree is a model, otherwise obtain the next
     // query state.
     //
-    bool context::check_reachability(unsigned level) {
+    bool context::check_reachability(unsigned level) 
+    {
         expr_ref post (m.mk_true(), m);
+
+        //create the initial goal -- this is the INIT rule
         model_node* root = alloc (model_node, 0, *m_query, level, 0, m_search);
+
         root->updt_post (post);
         m_search.set_root(root);            
         
+        //keep picking the next goal and solving them. this is how the
+        //selection of rules is determinized.
         while (model_node* node = m_search.next()) {
             IF_VERBOSE(2, verbose_stream() << "Expand node: " << node->level() << "\n";);
             checkpoint();
@@ -2781,7 +2802,9 @@ namespace spacer {
     }
 */
 
-    void context::expand_node(model_node& n) {
+    //this processes a goal and creates sub-goal
+    void context::expand_node(model_node& n) 
+    {
         SASSERT(n.is_open());
         
         if (n.level() < m_expanded_lvl) {
@@ -2789,16 +2812,18 @@ namespace spacer {
         }
 
         TRACE ("spacer", 
-                tout << "expand-node: " << n.pt().head()->get_name() << " level: " << n.level() << "\n";
-                tout << mk_pp(n.post(), m) << "\n";);
+               tout << "expand-node: " << n.pt().head()->get_name() << " level: " << n.level() << "\n";
+               tout << mk_pp(n.post(), m) << "\n";);
 
-
+        //check if reachable by using existing UA.
         if (n.pt().is_reachable_known (n.post())) {
             TRACE("spacer", tout << "known to be reachable\n";);
             m_stats.m_num_reuse_reach++;
             n.close ();
             report_reach (n);
-        } else {
+        }
+        //otherwise check which of SUM/REACH/QUERY rule is applicable
+        else {
             reset_curr_model ();
             // unreachable stuff
             bool uses_level = true;
@@ -2808,10 +2833,14 @@ namespace spacer {
             datalog::rule const* r = 0;
             vector<bool> reach_pred_used; // indicator vector denoting which predecessor's (along r) reach facts are used
             unsigned num_reuse_reach = 0;
+
             switch (expand_state(n, cube, uses_level, is_concrete, r, reach_pred_used, num_reuse_reach)) {
+                //reachable but don't know if this is purely using UA
             case l_true: {
                 // update stats
                 m_stats.m_num_reuse_reach += num_reuse_reach;
+
+                //if reachable using UA only
                 if (is_concrete) {
                     // concretely reachable; infer new reach fact
                     TRACE ("spacer",
@@ -2819,6 +2848,7 @@ namespace spacer {
                           );
                     updt_as_reachable (n, *r);
                 }
+                //otherwise pick the first OA and create a sub-goal
                 else {
                     TRACE ("spacer",
                             tout << "abstractly reachable\n";
@@ -2827,6 +2857,8 @@ namespace spacer {
                 }
                 break;
             }
+
+                //query is not reachable, create new summary facts
             case l_false: {
                 core_generalizer::cores cores;
                 cores.push_back(std::make_pair(cube, uses_level));
@@ -2855,6 +2887,7 @@ namespace spacer {
                 //m_search.backtrack_level(!found_invariant && m_params.flexible_trace(), n);
                 break;
             }
+                //something went wrong
             case l_undef: {
                 TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
                 throw unknown_exception();
