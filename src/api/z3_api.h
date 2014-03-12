@@ -7679,6 +7679,37 @@ END_MLAPI_EXCLUDE
 
     /*@}*/
 
+    /**
+       \brief Project variables given a model
+
+       def_API('Z3_qe_model_project', AST, (_in(CONTEXT), _in(MODEL), _in(UINT), _in_array(2, APP), _in(AST)))
+    */
+    Z3_ast Z3_API Z3_qe_model_project 
+      (__in Z3_context c,
+       __in Z3_model m,
+       unsigned num_bounds,
+       __in_ecount (num_bounds) Z3_app const bound[],
+       __in Z3_ast body);
+
+    /**
+       \brief Extrapolates a model of a formula
+
+       def_API('Z3_model_extrapolate', AST, (_in(CONTEXT), _in(MODEL), _in(AST)))
+    */
+    Z3_ast Z3_API Z3_model_extrapolate 
+      (__in Z3_context c,
+       __in Z3_model m,
+       __in Z3_ast fml);
+
+    /**
+       \brief Best-effort quantifier elimination
+       
+       def_API ('Z3_qe_lite', AST, (_in(CONTEXT), _in(AST_VECTOR), _in(AST)))
+    */
+    Z3_ast Z3_qe_lite 
+      (__in Z3_context c,
+       __inout Z3_ast_vector vars,
+       __in Z3_ast body);
 #endif
 
 
