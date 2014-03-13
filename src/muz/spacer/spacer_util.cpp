@@ -780,6 +780,12 @@ namespace spacer {
             VERIFY(m.is_iff(e, arg1, arg2));
             eval_eq(e, arg1, arg2);
             break;
+        case OP_XOR:
+          VERIFY (m.is_xor (e, arg1, arg2));
+          eval_eq (e, arg1, arg2);
+          if (is_false (e)) set_true (e);
+          else if (is_true (e)) set_false (e);
+          break;
         case OP_ITE: 
             VERIFY(m.is_ite(e, argCond, argThen, argElse));
             if (is_true(argCond)) { 
