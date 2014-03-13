@@ -406,7 +406,7 @@ namespace spacer {
             break;                            
         case OP_UMINUS: 
             SASSERT(arity == 1);
-            set_number(e, get_number(e->get_arg(0)));
+            set_number(e, -get_number(e->get_arg(0)));
             break;                
         case OP_MUL: 
             r = rational::one();
