@@ -894,7 +894,7 @@ namespace qe {
             if (x_term) {
                 sub.insert (m_var->x (), x_term);
                 TRACE ("qe",
-                        tout << "substituting for x by " << mk_pp (x_term, m) << "\n";
+                        tout << "substituting " << mk_pp (m_var->x (), m) << " by " << mk_pp (x_term, m) << "\n";
                       );
             }
             scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
@@ -925,6 +925,7 @@ namespace qe {
                 }
                 catch (cant_project) {
                     IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
+
                     new_vars.push_back(v);
                 }
             }
@@ -934,9 +935,14 @@ namespace qe {
         }
 
         void operator()(model& mdl, app_ref_vector& vars, expr_ref& fml) {
+          expr_map map (m);
+        	operator()(mdl, vars, fml, map);
+        }
+
+        void operator()(model& mdl, app_ref_vector& vars, expr_ref& fml, expr_map& map) {
             app_ref_vector new_vars(m);
             app_ref_vector lits (m);
-            expr_map map (m);
+//          expr_map map (m);
             for (unsigned i = 0; i < vars.size(); ++i) {
                 app* v = vars.get (i);
                 m_var = alloc(contains_app, m, v);
@@ -992,5 +998,15 @@ namespace qe {
         mk_atom_default mk_atom;
         get_nnf (fml, is_relevant, mk_atom, pos_lits, neg_lits);
         ap(mdl, vars, fml);
+    }
+
+    void arith_project(model& mdl, app_ref_vector& vars, expr_ref& fml, expr_map& map) {
+        ast_manager& m = vars.get_manager();
+        arith_project_util ap(m);
+        atom_set pos_lits, neg_lits;
+        is_relevant_default is_relevant;
+        mk_atom_default mk_atom;
+        get_nnf (fml, is_relevant, mk_atom, pos_lits, neg_lits);
+        ap(mdl, vars, fml, map);
     }
 }

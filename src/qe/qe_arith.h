@@ -3,6 +3,7 @@
 #define __QE_ARITH_H_
 
 #include "model.h"
+#include "expr_map.h"
 
 namespace qe {
     /**
@@ -13,6 +14,8 @@ namespace qe {
     expr_ref arith_project(model& model, app_ref_vector& vars, expr_ref_vector const& lits);
 
     void arith_project(model& model, app_ref_vector& vars, expr_ref& fml);
+
+    void arith_project(model& model, app_ref_vector& vars, expr_ref& fml, expr_map& map);
 };
 
 #endif

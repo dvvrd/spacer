@@ -7691,6 +7691,20 @@ END_MLAPI_EXCLUDE
        __in_ecount (num_bounds) Z3_app const bound[],
        __in Z3_ast body);
 
+
+    /**
+       \brief Project variables given a model
+
+       def_API('Z3_qe_model_project_skolem', AST, (_in(CONTEXT), _in(MODEL), _in(UINT), _in_array(2, APP), _in(AST), _in(AST_MAP)))
+    */
+    Z3_ast Z3_API Z3_qe_model_project_skolem
+      (__in Z3_context c,
+       __in Z3_model m,
+       unsigned num_bounds,
+       __in_ecount (num_bounds) Z3_app const bound[],
+       __in Z3_ast body,
+       __inout Z3_ast_map map);
+
     /**
        \brief Extrapolates a model of a formula
 
