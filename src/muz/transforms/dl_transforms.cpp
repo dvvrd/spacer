@@ -26,7 +26,7 @@ Revision History:
 #include"dl_mk_interp_tail_simplifier.h"
 #include"dl_mk_rule_inliner.h"
 #include"dl_mk_bit_blast.h"
-#include"dl_mk_array_blast.h"
+#include"dl_mk_array_blast_full.h"
 #include"dl_mk_karr_invariants.h"
 #include"dl_mk_magic_symbolic.h"
 #include"dl_mk_quantifier_abstraction.h"
@@ -66,12 +66,12 @@ namespace datalog {
 
         if (ctx.get_params().quantify_arrays()) {
             transf.register_plugin(alloc(datalog::mk_quantifier_abstraction, ctx, 33000));
-            transf.register_plugin(alloc(datalog::mk_array_blast, ctx, 32500));
+            transf.register_plugin(alloc(datalog::mk_array_blast_full, ctx, 32500));
         }
         transf.register_plugin(alloc(datalog::mk_quantifier_instantiation, ctx, 32000));
 
         transf.register_plugin(alloc(datalog::mk_bit_blast, ctx, 35000));
-        transf.register_plugin(alloc(datalog::mk_array_blast, ctx, 36000));
+        transf.register_plugin(alloc(datalog::mk_array_blast_full, ctx, 36000));
         transf.register_plugin(alloc(datalog::mk_karr_invariants, ctx, 36010));
         if (ctx.get_params().magic()) {
             transf.register_plugin(alloc(datalog::mk_magic_symbolic, ctx, 36020));
