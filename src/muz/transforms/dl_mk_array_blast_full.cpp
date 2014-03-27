@@ -29,8 +29,8 @@ namespace datalog {
         rule_transformer::plugin(priority, false),
         m_ctx(ctx),
         m(ctx.get_manager()), 
-        a(m),
-        rm(ctx.get_rule_manager()),
+        m_a(m),
+        m_rm(ctx.get_rule_manager()),
         m_rewriter(m, m_params),
         m_simplifier(ctx)
     { }
@@ -47,13 +47,13 @@ namespace datalog {
         qe_array qea (m);
 
         uint_set ut_vars; // vars used in uninterpreted part of the tail
-        uint_set tail_vars = rm.collect_tail_vars (&r);
-        ptr_vector<sort> tail_var_sorts (rm.get_var_sorts ());
+        uint_set tail_vars = m_rm.collect_tail_vars (&r);
+        ptr_vector<sort> tail_var_sorts (m_rm.get_var_sorts ());
 
         for (unsigned i = 0; i < utsz; ++i) {
             expr *t = r.get_tail (i);
             new_conjs.push_back(t);
-            ut_vars |= rm.collect_vars (t);
+            ut_vars |= m_rm.collect_vars (t);
         }
         for (unsigned i = utsz; i < tsz; ++i) {
             expr *t = r.get_tail (i);
@@ -72,7 +72,7 @@ namespace datalog {
         unsigned num_vars = tail_var_sorts.size ();
         for (unsigned idx = 0; idx < num_vars; idx++) {
             sort* s = tail_var_sorts.get (idx);
-            if (s && a.is_array (s) && !ut_vars.contains (idx)) {
+            if (s && m_a.is_array (s) && !ut_vars.contains (idx)) {
                 arr_vars.insert (idx);
                 TRACE ("dl",
                         tout << "array var to eliminate: " << idx << "\n";
@@ -83,8 +83,8 @@ namespace datalog {
         // head
         expr_ref head (r.get_head(), m);
 
-        uint_set _head_vars = rm.collect_vars (head);
-        unsigned num_head_vars = rm.get_var_sorts ().size ();
+        uint_set _head_vars = m_rm.collect_vars (head);
+        unsigned num_head_vars = m_rm.get_var_sorts ().size ();
         // update the guess of num vars
         if (num_head_vars > num_vars) {
             num_vars = num_head_vars;
@@ -122,10 +122,10 @@ namespace datalog {
         fml2 = m.mk_implies(body, head);
         proof_ref p(m);
         rule_set new_rules(m_ctx);
-        rm.mk_rule(fml2, p, new_rules, r.name());
+        m_rm.mk_rule(fml2, p, new_rules, r.name());
 
         // add the new rule if necessary
-        rule_ref new_rule(rm);
+        rule_ref new_rule(m_rm);
         if (m_simplifier.transform_rule(new_rules.last(), new_rule)) {
             if (r.get_proof()) {
                 scoped_proof _sc(m);
@@ -135,7 +135,7 @@ namespace datalog {
                 new_rule->set_proof(m, p);                
             }
             rules.add_rule(new_rule);
-            rm.mk_rule_rewrite_proof(r, *new_rule.get());
+            m_rm.mk_rule_rewrite_proof(r, *new_rule.get());
             TRACE("dl", new_rule->display(m_ctx, tout << "new rule\n"););
         }
         else {

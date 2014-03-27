@@ -35,13 +35,13 @@ namespace datalog {
     class mk_array_blast_full : public rule_transformer::plugin {
         typedef obj_map<app, var*> defs_t;
 
-        context&        m_ctx;
-        ast_manager&    m;
-        array_util      a;
-        rule_manager&   rm;
-        params_ref      m_params;
-        th_rewriter     m_rewriter;
-        mk_interp_tail_simplifier m_simplifier;
+        context&                    m_ctx;
+        ast_manager&                m;
+        array_util                  m_a;
+        rule_manager&               m_rm;
+        params_ref                  m_params;
+        th_rewriter                 m_rewriter;
+        mk_interp_tail_simplifier   m_simplifier;
 
         bool blast(rule& r, rule_set& new_rules);
 
