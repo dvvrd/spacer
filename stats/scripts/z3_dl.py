@@ -42,6 +42,9 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--order-children', dest='order_children',
                     help='0 (rtol), 1 (ltor)', default=0)
+    p.add_argument ('--bit-blast', dest='bit_blast',
+                    help='blast bitvectors into bits',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -67,6 +70,7 @@ def main (argv):
     fp.set (eager_reach_check=args.eager_reach_check)
     fp.set (validate_theory_core=args.validate_theory_core)
     fp.set (print_statistics=args.print_stats)
+    fp.set (bit_blast=args.bit_blast)
 
     if args.dfs: fp.set (bfs_model_search=False)
 
