@@ -984,10 +984,14 @@ namespace qe {
                             tout << "projected: " << mk_pp(v, m) << " "
                                  << mk_pp(fml, m) << "\n";
                          );
-                    DEBUG_CODE(
-                        expr_ref bval (m);
-                        SASSERT (mdl.eval (fml, bval, true) && m.is_true (bval));
-                    );
+                    /**
+                     * DEBUG_CODE(
+                     *     expr_ref bval (m);
+                     *     // model evaluation doesn't always work for array
+                     *     // variables
+                     *     SASSERT (mdl.eval (fml, bval, true) && m.is_true (bval));
+                     * );
+                     */
                 }
                 catch (cant_project) {
                     IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
