@@ -337,14 +337,14 @@ namespace datalog {
                 for (unsigned i = 0; i < sorts.size(); ++i) {
                     if (!sorts[i]) {
                         if (i < vars.size()) { 
-                            sorts[i] = vars[i]->get_decl()->get_range();
+                          sorts[i] = vars[vars.size () - i - 1]->get_decl()->get_range();
                         }
                         else {
                             sorts[i] = m.mk_bool_sort();
                         }
                     }
                     if (i < vars.size()) {
-                        m_names.push_back(vars[i]->get_decl()->get_name());
+                      m_names.push_back(vars[vars.size () - i - 1]->get_decl()->get_name());
                     }
                     else {
                         m_names.push_back(symbol(i));
