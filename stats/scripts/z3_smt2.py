@@ -44,11 +44,30 @@ def parseArgs (argv):
 
 def stat (key, val): stats.put (key, val)
 
+import os.path
+
+def isexec (fpath):
+    if fpath == None: return False
+    return os.path.isfile(fpath) and os.access(fpath, os.X_OK) 
+
+def which(program):
+    exe_file = os.path.join ('./', program)
+    if (isexec (exe_file)): return program
+    for path in os.environ["PATH"].split(os.pathsep):
+        exe_file = os.path.join(path, program)
+        if isexec (exe_file):
+            return exe_file
+    return None
+
 def main (argv):
     args = parseArgs (argv[1:])
     stat ('Result', 'UNKNOWN')
 
-    z3_args = 'z3'
+    z3_args = which ('z3')
+
+    if z3_args is None:
+        print 'No executable named "z3" found in current directory or PATH'
+        return
 
     z3_args += ' -v:' + str(args.verbose)
 
@@ -119,13 +138,6 @@ def main (argv):
     else:
         res = 'unknown'
     print 'Result:', res
-
-#    with stats.timer ('Parse'):
-#        q = fp.parse_file (args.file)
-#
-#    #print fp
-#    with stats.timer ('Query'):
-#        res = fp.query (q[0])
 
     if res == 'sat': stat ('Result', 'SAFE')
     elif res == 'unsat': stat ('Result', 'CEX')

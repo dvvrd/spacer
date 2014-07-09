@@ -466,7 +466,11 @@ namespace qe {
 
             if (num_pos == 0 || num_neg == 0) {
                 TRACE ("qe",
-                        tout << "virtual substitution of +/-infinity\n";
+                        if (num_pos == 0) {
+                            tout << "virtual substitution with +infinity\n";
+                        } else {
+                            tout << "virtual substitution with -infinity\n";
+                        }
                       );
 
                 /**
@@ -518,7 +522,15 @@ namespace qe {
             unsigned max_t = find_max(mdl, use_pos);
 
             TRACE ("qe",
+                    if (use_pos) {
+                        tout << "virtual substitution with upper bound:\n";
+                    } else {
+                        tout << "virtual substitution with lower bound:\n";
+                    }
                     tout << "test point: " << mk_pp (m_lits.get (max_t), m) << "\n";
+                    tout << "coeff: " << m_coeffs[max_t] << "\n";
+                    tout << "term: " << mk_pp (m_terms.get (max_t), m) << "\n";
+                    tout << "is_strict: " << m_strict[max_t] << "\n";
                   );
 
             if (a.is_real (m_var->x ())) {
@@ -945,6 +957,9 @@ namespace qe {
 //          expr_map map (m);
             for (unsigned i = 0; i < vars.size(); ++i) {
                 app* v = vars.get (i);
+                TRACE ("qe",
+                        tout << "projecting variable: " << mk_pp (v, m) << "\n";
+                      );
                 m_var = alloc(contains_app, m, v);
                 try {
                     map.reset ();
