@@ -352,6 +352,7 @@ namespace datalog {
                 }
                 quantifier_ref q(m);
                 sorts.reverse();
+                m_names.reverse ();
                 q = m.mk_quantifier(is_forall, sorts.size(), sorts.c_ptr(), m_names.c_ptr(), result); 
                 m_elim_unused_vars(q, result);
             }
