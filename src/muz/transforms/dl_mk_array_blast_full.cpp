@@ -145,7 +145,9 @@ namespace datalog {
     }
     
     rule_set * mk_array_blast_full::operator()(rule_set const & source) {
-
+        if (!m_ctx.array_blast_full ()) {
+            return 0;
+        }
         rule_set* rules = alloc(rule_set, m_ctx);
         rules->inherit_predicates(source);
         rule_set::iterator it = source.begin(), end = source.end();

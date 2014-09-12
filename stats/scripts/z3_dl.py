@@ -49,6 +49,12 @@ def parseArgs (argv):
     p.add_argument ('--bit-blast', dest='bit_blast',
                     help='blast bitvectors into bits',
                     action='store_true', default=False)
+    p.add_argument ('--array-blast-full', dest='array_blast_full',
+                    help='elim local array variables using QE',
+                    action='store_true', default=False)
+    p.add_argument ('--array-blast', dest='array_blast',
+                    help='elim local array variables using heuristics',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -79,6 +85,12 @@ def main (argv):
     if args.dfs: fp.set (bfs_model_search=False)
 
     fp.set (order_children=int(args.order_children))
+
+    if args.array_blast:
+        fp.set (array_blast=True)
+
+    if args.array_blast_full:
+        fp.set (array_blast_full=True)
 
     with stats.timer ('Parse'):
         q = fp.parse_file (args.file)

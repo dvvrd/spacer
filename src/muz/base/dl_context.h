@@ -270,6 +270,7 @@ namespace datalog {
         bool quantify_arrays() const;
         bool instantiate_quantifiers() const;
         bool array_blast() const;
+        bool array_blast_full() const;
 
         void register_finite_sort(sort * s, sort_kind k);
 

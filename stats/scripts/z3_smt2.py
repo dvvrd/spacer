@@ -39,6 +39,12 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--order-children', dest='order_children',
                     help='0 (rtol), 1 (ltor)', default=0)
+    p.add_argument ('--array-blast-full', dest='array_blast_full',
+                    help='elim local array variables using QE',
+                    action='store_true', default=False)
+    p.add_argument ('--array-blast', dest='array_blast',
+                    help='elim local array variables using heuristics',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -112,6 +118,12 @@ def main (argv):
 
     if int(args.order_children)==1:
         z3_args += ' fixedpoint.order_children=1'
+
+    if args.array_blast:
+        z3_args += ' fixedpoint.array_blast=true'
+
+    if args.array_blast_full:
+        z3_args += ' fixedpoint.array_blast_full=true'
 
     z3_args += ' ' + args.file
 
