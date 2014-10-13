@@ -66,28 +66,25 @@ namespace datalog {
                 tout << mk_pp (it_tail, m) << "\n";
               );
 
-        // eliminate array vars in (tail_vars - ut_vars)
+        // head vars
+        expr_ref head (r.get_head(), m);
+        uint_set head_vars = m_rm.collect_vars (head);
+        unsigned num_head_vars = m_rm.get_var_sorts ().size ();
+
+        // num_tail_vars and num_vars
+        unsigned num_tail_vars = tail_var_sorts.size ();
+        unsigned num_vars = (num_head_vars > num_tail_vars) ? num_head_vars : num_tail_vars;
+
+        // eliminate array vars in (tail_vars - ut_vars - head_vars)
         uint_set arr_vars;
-        // current guess of num vars
-        unsigned num_vars = tail_var_sorts.size ();
-        for (unsigned idx = 0; idx < num_vars; idx++) {
+        for (unsigned idx = 0; idx < num_tail_vars; idx++) {
             sort* s = tail_var_sorts.get (idx);
-            if (s && m_a.is_array (s) && !ut_vars.contains (idx)) {
+            if (s && m_a.is_array (s) && !ut_vars.contains (idx) && !head_vars.contains (idx)) {
                 arr_vars.insert (idx);
                 TRACE ("dl",
                         tout << "array var to eliminate: " << idx << "\n";
                       );
             }
-        }
-
-        // head
-        expr_ref head (r.get_head(), m);
-
-        uint_set _head_vars = m_rm.collect_vars (head);
-        unsigned num_head_vars = m_rm.get_var_sorts ().size ();
-        // update the guess of num vars
-        if (num_head_vars > num_vars) {
-            num_vars = num_head_vars;
         }
 
         TRACE ("dl",
