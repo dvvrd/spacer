@@ -2648,6 +2648,54 @@ namespace spacer {
     /**
        \brief retrieve answer.
     */
+
+    void context::get_rules_along_trace (datalog::rule_ref_vector& rules) {
+        if (m_last_result != l_true) {
+            verbose_stream () << "Trace unavailable when result is false\n";
+            return;
+        }
+
+        // treat the following as queues: read from left to right and insert at right
+        ptr_vector<func_decl> preds;
+        ptr_vector<pred_transformer> pts;
+        expr_ref_vector facts (m);
+
+        // temporary
+        expr_ref fact (m);
+        datalog::rule const* r;
+        pred_transformer* pt;
+
+        // get and discard query rule
+        fact = m.mk_true ();
+        r = m_query->get_just_rule (fact);
+
+        // initialize queues
+        facts.append (*(m_query->get_just_pred_facts (fact)));
+        SASSERT (facts.size () == 1);
+        m_query->find_predecessors (*r, preds);
+        SASSERT (preds.size () == 1);
+        pts.push_back (&(get_pred_transformer (preds[0])));
+
+        // populate rules according to a preorder traversal of the query derivation tree
+        for (unsigned curr = 0; curr < pts.size (); curr++) {
+            // get current pt and fact
+            pt = pts.get (curr);
+            fact = facts.get (curr);
+            // get rule justifying the derivation of fact at pt
+            r = pt->get_just_rule (fact);
+            rules.push_back (const_cast<datalog::rule *> (r));
+            TRACE ("spacer",
+                    tout << "next rule: " << r->name ().str () << "\n";
+                  );
+            // add child facts and pts
+            facts.append (*(pt->get_just_pred_facts (fact)));
+            pt->find_predecessors (*r, preds);
+            for (unsigned j = 0; j < preds.size (); j++) {
+                pts.push_back (&(get_pred_transformer (preds[j])));
+            }
+        }
+    }
+
     model_ref context::get_model () {
         return model_ref ();
     }
@@ -2710,6 +2758,117 @@ namespace spacer {
         get_level_property(m_inductive_lvl, refs, rs);            
         inductive_property ex(m, const_cast<model_converter_ref&>(m_mc), rs);
         return ex.to_expr();
+    }
+
+    expr_ref context::get_ground_sat_answer () const {
+        if (m_last_result != l_true) {
+            verbose_stream () << "Sat answer unavailable when result is false\n";
+            return expr_ref (m);
+        }
+
+        // treat the following as queues: read from left to right and insert at the right
+        expr_ref_vector reach_facts (m);
+        ptr_vector<func_decl> preds;
+        ptr_vector<pred_transformer> pts;
+        expr_ref_vector cex (m), // pre-order list of ground instances of predicates
+                        cex_facts (m); // equalities for the ground cex using signature constants
+
+        // temporary
+        expr_ref reach_fact (m);
+        pred_transformer* pt;
+        expr_ref cex_fact (m);
+        datalog::rule const* r;
+
+        // get and discard query rule
+        reach_fact = m.mk_true ();
+        r = m_query->get_just_rule (reach_fact);
+
+        // initialize queues
+        reach_facts.append (*(m_query->get_just_pred_facts (reach_fact)));
+        SASSERT (reach_facts.size () == 1);
+        m_query->find_predecessors (*r, preds);
+        SASSERT (preds.size () == 1);
+        pts.push_back (&(get_pred_transformer (preds[0])));
+        cex_facts.push_back (m.mk_true ());
+        cex.push_back (m.mk_const (preds[0]));
+
+        // smt context to obtain local cexes
+        scoped_ptr<smt::kernel> cex_ctx = alloc (smt::kernel, m, get_fparams ());
+        model_evaluator mev (m);
+
+        // preorder traversal of the query derivation tree
+        for (unsigned curr = 0; curr < pts.size (); curr++) {
+            // pick next pt, fact, and cex_fact
+            pt = pts.get (curr);
+            reach_fact = reach_facts.get (curr);
+            cex_fact = cex_facts.get (curr);
+
+            expr_ref_vector const* child_reach_facts;
+            ptr_vector<pred_transformer> child_pts;
+
+            // get justifying rule and child facts for the derivation of reach_fact at pt
+            r = pt->get_just_rule (reach_fact);
+            child_reach_facts = pt->get_just_pred_facts (reach_fact);
+            // get child pts
+            preds.reset (); pt->find_predecessors (*r, preds);
+            for (unsigned j = 0; j < preds.size (); j++) {
+                child_pts.push_back (&(get_pred_transformer (preds[j])));
+            }
+            // update the queues
+            reach_facts.append (*child_reach_facts);
+            pts.append (child_pts);
+
+            // update cex and cex_facts by making a local sat check:
+            // check consistency of reach facts of children, rule body, and cex_fact
+            cex_ctx->push ();
+            cex_ctx->assert_expr (cex_fact);
+            unsigned u_tail_sz = r->get_uninterpreted_tail_size ();
+            SASSERT (child_reach_facts->size () == u_tail_sz);
+            for (unsigned i = 0; i < u_tail_sz; i++) {
+                expr_ref ofml (m);
+                child_pts.get (i)->get_spacer_manager ().formula_n2o (child_reach_facts->get (i), ofml, i);
+                cex_ctx->assert_expr (ofml);
+            }
+            cex_ctx->assert_expr (pt->transition ());
+            cex_ctx->assert_expr (pt->rule2tag (r));
+            VERIFY (cex_ctx->check () == l_true);
+            model_ref local_mdl;
+            cex_ctx->get_model (local_mdl);
+            cex_ctx->pop (1);
+
+            for (unsigned i = 0; i < child_pts.size (); i++) {
+                pred_transformer& ch_pt = *(child_pts.get (i));
+                unsigned sig_size = ch_pt.sig_size ();
+                expr_ref_vector ground_fact_conjs (m);
+                expr_ref_vector ground_arg_vals (m);
+                for (unsigned j = 0; j < sig_size; j++) {
+                    expr_ref sig_arg (m), sig_val (m);
+                    sig_arg = m.mk_const (ch_pt.get_spacer_manager ().o2o (ch_pt.sig (j), 0, i));
+                    sig_val = mev.eval (local_mdl, sig_arg);
+                    ground_fact_conjs.push_back (m.mk_eq (sig_arg, sig_val));
+                    ground_arg_vals.push_back (sig_val);
+                }
+                if (ground_fact_conjs.size () > 0) {
+                    expr_ref ground_fact (m);
+                    ground_fact = m.mk_and (ground_fact_conjs.size (), ground_fact_conjs.c_ptr ());
+                    ch_pt.get_spacer_manager ().formula_o2n (ground_fact, ground_fact, i);
+                    cex_facts.push_back (ground_fact);
+                }
+                else {
+                    cex_facts.push_back (m.mk_true ());
+                }
+                cex.push_back (m.mk_app (ch_pt.head (), sig_size, ground_arg_vals.c_ptr ()));
+            }
+        }
+
+        TRACE ("spacer",
+                tout << "ground cex\n";
+                for (unsigned i = 0; i < cex.size (); i++) {
+                    tout << mk_pp (cex.get (i), m) << "\n";
+                }
+              );
+
+        return expr_ref (m.mk_and (cex.size (), cex.c_ptr ()), m);
     }
 
     ///this is where everything starts

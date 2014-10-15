@@ -64,6 +64,10 @@ namespace spacer {
 
         expr_ref get_answer();
 
+        expr_ref get_ground_sat_answer ();
+
+        void get_rules_along_trace (datalog::rule_ref_vector& rules);
+
         unsigned get_num_levels(func_decl* pred);
 
         expr_ref get_cover_delta(int level, func_decl* pred);

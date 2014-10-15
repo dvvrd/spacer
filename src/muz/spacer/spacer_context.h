@@ -664,6 +664,11 @@ namespace spacer {
         pred_transformer& get_pred_transformer(func_decl* p) const { return *m_rels.find(p); }
         datalog::context& get_context() const { SASSERT(m_context); return *m_context; }
         expr_ref          get_answer();
+        /**
+         * get bottom-up (from query) sequence of ground predicate instances
+         * (for e.g. P(0,1,0,0,3)) that together form a ground derivation to query
+         */
+        expr_ref          get_ground_sat_answer () const;
 
         bool              is_dl() const { return m_fparams.m_arith_mode == AS_DIFF_LOGIC; }
         bool              is_utvpi() const { return m_fparams.m_arith_mode == AS_UTVPI; }
@@ -690,6 +695,8 @@ namespace spacer {
         void set_unsat() { m_last_result = l_false; }
 
         void set_model_converter(model_converter_ref& mc) { m_mc = mc; }
+
+        void get_rules_along_trace (datalog::rule_ref_vector& rules);
 
         model_converter_ref get_model_converter() { return m_mc; }
 

@@ -295,6 +295,14 @@ expr_ref dl_interface::get_answer() {
     return m_context->get_answer();
 }
 
+expr_ref dl_interface::get_ground_sat_answer () {
+    return m_context->get_ground_sat_answer ();
+}
+
+void dl_interface::get_rules_along_trace (datalog::rule_ref_vector& rules) {
+    m_context->get_rules_along_trace (rules);
+}
+
 void dl_interface::cancel() {
     m_context->cancel();
 }
