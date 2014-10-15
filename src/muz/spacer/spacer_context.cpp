@@ -92,6 +92,10 @@ namespace spacer {
         for (; it3 != end3; ++it3) {
             m.dec_ref(it3->m_value);
         }
+        obj_map<expr, reach_fact_just*>::iterator it4 = m_reach_fact_justs.begin (), end4 = m_reach_fact_justs.end ();
+        for (; it4 != end4; it4++) {
+            dealloc (it4->m_value);
+        }
     }
 
     std::ostream& pred_transformer::display(std::ostream& out) const {
@@ -182,18 +186,19 @@ namespace spacer {
         SASSERT (reach_fact);
     }
 
-    void pred_transformer::get_used_o_reach_fact (model_ref const& M, unsigned oidx, expr_ref& reach_fact) const {
+    void pred_transformer::get_used_o_reach_fact (model_ref const& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact) const {
         expr_ref bval (m);
         for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
             u_map<expr*> const& omap = m_o_reach_case_maps.get (i);
             expr* oassump;
             VERIFY (omap.find (oidx, oassump));
             if (M->eval (oassump, bval) && m.is_false (bval)) {
-                pm.formula_n2o (m_reach_facts.get (i), reach_fact, oidx);
+                n_reach_fact = m_reach_facts.get (i);
+                pm.formula_n2o (n_reach_fact, o_reach_fact, oidx);
                 break;
             }
         }
-        SASSERT (reach_fact);
+        SASSERT (o_reach_fact);
     }
 
     void pred_transformer::get_all_used_o_reach_facts (model_ref const& M, unsigned oidx, expr_ref& reach_fact) const {
@@ -210,6 +215,20 @@ namespace spacer {
             }
         }
         reach_fact = m.mk_or (fmls.size (), fmls.c_ptr ());
+    }
+
+    datalog::rule const* pred_transformer::get_just_rule (expr* fact) {
+        reach_fact_just* j = m_reach_fact_justs.find (fact);
+        TRACE ("spacer",
+                tout << "justification: " << j << "\n";);
+        //VERIFY (m_reach_fact_justs.find (fact, j));
+        return &(j->r);
+    }
+
+    expr_ref_vector const* pred_transformer::get_just_pred_facts (expr* fact) {
+        reach_fact_just* j = m_reach_fact_justs.find (fact);
+        //VERIFY (m_reach_fact_justs.find (fact, j));
+        return &(j->pred_reach_facts);
     }
 
     void pred_transformer::find_rules (model_core const& model, svector<datalog::rule const*>& rules) const {
@@ -517,8 +536,10 @@ namespace spacer {
         return m_reach_case_assumps.size ();
     }
 
-    void pred_transformer::add_reach_fact (expr* fact) {
+    void pred_transformer::add_reach_fact (expr* fact, datalog::rule const& r, expr_ref_vector const& child_reach_facts) {
         m_reach_facts.push_back (fact);
+        reach_fact_just* j = alloc (reach_fact_just, r, child_reach_facts);
+        m_reach_fact_justs.insert (fact, j);
         TRACE ("spacer",
                 tout << "add_reach_fact: " << head()->get_name() << " " << mk_pp(fact, m) << "\n";);
 
@@ -1442,7 +1463,8 @@ namespace spacer {
             expr_ref_vector facts (m);
             if (m_reach_pred_used.get (i)) {
                 expr_ref reach_fact (m);
-                pt.get_used_o_reach_fact (M, m_o_idx[i], reach_fact);
+                expr_ref _n_reach_fact (m);
+                pt.get_used_o_reach_fact (M, m_o_idx[i], reach_fact, _n_reach_fact);
                 TRACE ("spacer",
                         tout << "setup reach fact:" << mk_pp (reach_fact, m) << "\n";
                       );
@@ -2931,7 +2953,7 @@ namespace spacer {
         }
     }
 
-    void context::mk_reach_fact (model_node& n, datalog::rule const& r, expr_ref& result) {
+    void context::mk_reach_fact (model_node& n, datalog::rule const& r, expr_ref& result, expr_ref_vector& child_reach_facts) {
         pred_transformer& pt = n.pt ();
         model_ref M (get_curr_model_ptr());
 
@@ -2946,14 +2968,15 @@ namespace spacer {
             func_decl* pred = preds[i];
             pred_transformer& ch_pt = get_pred_transformer (pred);
             // get a reach fact of body preds used in the model
-            expr_ref ch_reach (m);
+            expr_ref ch_reach (m), n_ch_reach (m);
             //ch_pt.get_all_used_o_reach_facts (M, i, ch_reach);
-            ch_pt.get_used_o_reach_fact (M, i, ch_reach);
+            ch_pt.get_used_o_reach_fact (M, i, ch_reach, n_ch_reach);
             DEBUG_CODE (
                 expr_ref bval (m);
                 SASSERT (M->eval (ch_reach, bval) && m.is_true (bval));
             );
             path_cons.push_back (ch_reach);
+            child_reach_facts.push_back (n_ch_reach);
             // collect o-vars to eliminate
             for (unsigned j = 0; j < pred->get_arity (); j++) {
                 vars.push_back (m.mk_const (m_pm.o2o (ch_pt.sig (j), 0, i)));
@@ -3225,8 +3248,9 @@ namespace spacer {
 
     void context::updt_as_reachable (model_node& n, datalog::rule const& r) {
         expr_ref reach_fact (m);
-        mk_reach_fact (n, r, reach_fact);
-        n.pt ().add_reach_fact (reach_fact);
+        expr_ref_vector child_reach_facts (m);
+        mk_reach_fact (n, r, reach_fact, child_reach_facts);
+        n.pt ().add_reach_fact (reach_fact, r, child_reach_facts);
         if (n.is_inq ()) m_search.erase_leaf (n);
         n.close ();
         report_reach (n);

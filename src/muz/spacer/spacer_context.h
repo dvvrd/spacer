@@ -100,6 +100,17 @@ namespace spacer {
                                         // in any rule
         expr_ref_vector              _o_reach_case_assumps; // dummy to have references to the o-versions
 
+        // reach fact justification
+        struct reach_fact_just {
+            datalog::rule const& r;
+            expr_ref_vector pred_reach_facts; // predecessor reach facts
+            reach_fact_just (datalog::rule const& g_r, expr_ref_vector const& g_facts):
+                r (g_r), pred_reach_facts (g_facts)
+            {}
+        };
+
+        obj_map<expr, reach_fact_just*>     m_reach_fact_justs;
+
         void init_sig();
         void ensure_level(unsigned level);
         bool add_property1(expr * lemma, unsigned lvl);  // add property 'p' to state at level lvl.
@@ -155,8 +166,10 @@ namespace spacer {
         bool is_reachable_with_reach_facts (model_node& n, datalog::rule const& r);
         //void get_reach_explanation (model_ref& M, expr_ref& reach_fact);
         void get_used_reach_fact (model_ref const& M, expr_ref& reach_fact) const;
-        void get_used_o_reach_fact (model_ref const& M, unsigned oidx, expr_ref& reach_fact) const;
+        void get_used_o_reach_fact (model_ref const& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact) const;
         void get_all_used_o_reach_facts (model_ref const& M, unsigned oidx, expr_ref& reach_fact) const;
+        datalog::rule const* get_just_rule (expr* fact);
+        expr_ref_vector const* get_just_pred_facts (expr* fact);
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
@@ -172,7 +185,7 @@ namespace spacer {
         expr* get_reach_case_assump (unsigned idx) const;
         unsigned get_num_reach_cases () const;
 
-        void add_reach_fact (expr* fact);  // add reachability fact
+        void add_reach_fact (expr* fact, datalog::rule const& r, expr_ref_vector const& child_reach_facts);  // add reachability fact
         expr* get_last_reach_fact () const { return m_reach_facts.back (); }
         expr* get_reach_facts_assump () const;
         expr* get_o_reach_facts_assump (unsigned oidx) const;
@@ -597,7 +610,7 @@ namespace spacer {
         void check_pre_closed(model_node& n);
         void expand_node(model_node& n);
         lbool expand_state(model_node& n, expr_ref_vector& cube, bool& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
-        void mk_reach_fact (model_node& n, datalog::rule const& r, expr_ref& result);
+        void mk_reach_fact (model_node& n, datalog::rule const& r, expr_ref& result, expr_ref_vector& child_reach_facts);
         //void mk_reach_fact_from_deriv (derivation& deriv, expr_ref& result);
         void create_children(model_node& n, datalog::rule const& r, vector<bool> const& reach_pred_used);
         expr_ref mk_sat_answer() const;
