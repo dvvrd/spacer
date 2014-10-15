@@ -154,6 +154,10 @@ namespace pdr {
      */
     void normalize_arithmetic(expr_ref& t);
 
+    /**
+     * \brief replace variables in fml by fresh constants
+     */
+    void replace_vars_by_consts (expr* fml, expr_ref& result, expr_ref_vector& consts, ast_manager& m);
 
     /**
        \brief determine if formulas belong to difference logic or UTVPI fragment.

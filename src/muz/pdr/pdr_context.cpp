@@ -48,6 +48,7 @@ Notes:
 #include "qe_util.h"
 #include "scoped_proof.h"
 #include "expr_safe_replace.h"
+#include "model_pp.h"
 
 namespace pdr {
 
@@ -1936,6 +1937,81 @@ namespace pdr {
         get_level_property(m_inductive_lvl, refs, rs);            
         inductive_property ex(m, const_cast<model_converter_ref&>(m_mc), rs);
         return ex.to_expr();
+    }
+
+    expr_ref context::get_ground_sat_answer () const {
+        if (m_last_result != l_true) {
+            verbose_stream () << "Sat answer unavailable when result is false\n";
+            return expr_ref (m);
+        }
+
+        expr_ref_vector result (m);
+
+        // obtain symbolic trace
+        expr_ref trace (m);
+        trace = m_search.get_trace (*this);
+
+        // extract a ground cex from trace
+
+        // replace vars by consts
+        expr_ref ctrace (m);
+        expr_ref_vector consts (m);
+        replace_vars_by_consts (trace, ctrace, consts, m);
+
+        // split ctrace into interpreted and uninterpreted parts
+        SASSERT (m.is_and (ctrace));
+        expr_ref_vector interp (m), uninterp (m);
+        app* a = to_app (ctrace);
+        unsigned num_args = a->get_num_args ();
+        for (unsigned i = 0; i < num_args; i++) {
+            expr* ti = a->get_arg (i);
+            if (m_context->is_predicate (ti)) {
+                uninterp.push_back (ti);
+            }
+            else {
+                interp.push_back (ti);
+            }
+        }
+
+        // get model using interp part
+        scoped_ptr<smt::kernel> smt_ctx = alloc (smt::kernel, m, get_fparams ());
+        unsigned num_interp = interp.size ();
+        for (unsigned i = 0; i < num_interp; i++) {
+            smt_ctx->assert_expr (interp.get (i));
+        }
+        VERIFY (smt_ctx->check () == l_true);
+        model_ref mdl;
+        smt_ctx->get_model (mdl);
+
+        TRACE ("pdr",
+                tout << "ground model\n";
+                model_pp (tout, *mdl);
+                tout << "\n";
+              );
+
+        // mk ground instances of predicates
+        model_evaluator mev (m);
+        unsigned num_uninterp = uninterp.size ();
+        for (unsigned i = 0; i < num_uninterp; i++) {
+            app* a = to_app (uninterp.get (i));
+            expr_ref_vector ground_arg_vals (m);
+            for (unsigned j = 0; j < a->get_num_args (); j++) {
+                expr_ref sig_val (m);
+                sig_val = mev.eval (mdl, a->get_arg (j));
+                ground_arg_vals.push_back (sig_val);
+            }
+            func_decl* pred = a->get_decl ();
+            result.push_back (m.mk_app (pred, ground_arg_vals.size (), ground_arg_vals.c_ptr ()));
+        }
+
+        TRACE ("pdr",
+                tout << "ground cex\n";
+                for (unsigned i = 0; i < result.size (); i++) {
+                    tout << mk_pp (result.get (i), m) << "\n";
+                }
+              );
+
+        return expr_ref (m.mk_and (result.size (), result.c_ptr ()), m);
     }
 
     void context::solve_impl() {

@@ -45,6 +45,8 @@ Notes:
 #include "poly_rewriter_def.h"
 #include "arith_rewriter.h"
 #include "scoped_proof.h"
+#include "var_subst.h"
+#include "expr_safe_replace.h"
 
 
 
@@ -1437,6 +1439,35 @@ namespace pdr {
         expr_ref tmp(m);
         rw(t, tmp);
         t = tmp;                
+    }
+
+    void replace_vars_by_consts (expr* fml, expr_ref& result, expr_ref_vector& consts, ast_manager& m) {
+        // get free vars
+        ptr_vector<sort> vars;
+        get_free_vars (fml, vars);
+
+        // mk substitution of vars by consts
+        consts.reset ();
+        unsigned num_vars = vars.size ();
+        expr_safe_replace sub (m);
+        for (unsigned i = 0; i < num_vars; i++) {
+            sort* s = vars.get (i);
+            if (!s) continue;
+            // mk var
+            var_ref v (m.mk_var (i, s), m);
+            // mk const
+            std::stringstream ss;
+            ss << "v" << i;
+            symbol sym (ss.str ().c_str ());
+            app_ref c (m.mk_const (sym, s), m);
+            // insert subst pair
+            sub.insert (v, c);
+            consts.push_back (c);
+        }
+
+        // substitute
+        result = fml;
+        sub (result);
     }
 
 }

@@ -1031,6 +1031,11 @@ namespace datalog {
         return m_last_answer.get();
     }
 
+    expr_ref context::get_ground_sat_answer () {
+        ensure_engine ();
+        return m_engine->get_ground_sat_answer ();
+    }
+
     void context::get_rules_along_trace (rule_ref_vector& rules) {
         ensure_engine ();
         m_engine->get_rules_along_trace (rules);

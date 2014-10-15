@@ -527,6 +527,12 @@ namespace datalog {
         expr* get_answer_as_formula();
 
         /**
+         * get bottom-up (from query) sequence of ground predicate instances
+         * (for e.g. P(0,1,0,0,3)) that together form a ground derivation to query
+         */
+        expr_ref get_ground_sat_answer ();
+
+        /**
          * \brief obtain the sequence of rules along the counterexample trace
          */
         void get_rules_along_trace (rule_ref_vector& rules);

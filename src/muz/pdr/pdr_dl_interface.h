@@ -65,6 +65,8 @@ namespace pdr {
 
         virtual expr_ref get_answer();
 
+        virtual expr_ref get_ground_sat_answer ();
+
         virtual void get_rules_along_trace (datalog::rule_ref_vector& rules);
 
         virtual unsigned get_num_levels(func_decl* pred);
