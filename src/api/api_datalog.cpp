@@ -361,6 +361,16 @@ extern "C" {
         Z3_CATCH_RETURN(0);
     }
 
+    Z3_ast Z3_API Z3_fixedpoint_get_ground_sat_answer(Z3_context c, Z3_fixedpoint d) {
+        Z3_TRY;
+        LOG_Z3_fixedpoint_get_ground_sat_answer(c, d);
+        RESET_ERROR_CODE();
+        expr* e = to_fixedpoint_ref(d)->ctx().get_ground_sat_answer();
+        mk_c(c)->save_ast_trail(e);
+        RETURN_Z3(of_expr(e));
+        Z3_CATCH_RETURN(0);
+    }
+
     Z3_ast_vector Z3_API Z3_fixedpoint_get_rules_along_trace(
         Z3_context c,
         Z3_fixedpoint d)

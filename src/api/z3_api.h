@@ -5679,6 +5679,15 @@ END_MLAPI_EXCLUDE
     Z3_ast Z3_API Z3_fixedpoint_get_answer(__in Z3_context c,__in Z3_fixedpoint d);
 
     /**
+       \brief Retrieve a bottom-up (from query) sequence of ground facts
+
+       The previous call to Z3_fixedpoint_query must have returned Z3_L_TRUE.
+
+       def_API('Z3_fixedpoint_get_ground_sat_answer', AST, (_in(CONTEXT), _in(FIXEDPOINT)))
+    */    
+    Z3_ast Z3_API Z3_fixedpoint_get_ground_sat_answer(__in Z3_context c,__in Z3_fixedpoint d);
+
+    /**
        \brief Obtain the list of rules along the counterexample trace.
 
        def_API('Z3_fixedpoint_get_rules_along_trace', AST_VECTOR, (_in(CONTEXT), _in(FIXEDPOINT)))

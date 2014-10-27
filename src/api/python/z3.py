@@ -6178,6 +6178,11 @@ class Fixedpoint(Z3PPObject):
         r = Z3_fixedpoint_get_answer(self.ctx.ref(), self.fixedpoint)
         return _to_expr_ref(r, self.ctx)
 
+    def get_ground_sat_answer(self):
+        """Retrieve a ground cex from last query call."""
+        r = Z3_fixedpoint_get_ground_sat_answer(self.ctx.ref(), self.fixedpoint)
+        return _to_expr_ref(r, self.ctx)
+
     def get_rules_along_trace(self):
         """retrieve rules along the counterexample trace"""
         return AstVector(Z3_fixedpoint_get_rules_along_trace(self.ctx.ref(), self.fixedpoint), self.ctx)
