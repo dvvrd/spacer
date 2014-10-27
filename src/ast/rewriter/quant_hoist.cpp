@@ -41,9 +41,9 @@ public:
         m_rewriter(m)
     {}
     
-    void operator()(expr* fml, app_ref_vector& vars, bool& is_fa, expr_ref& result, bool use_fresh) {
+    void operator()(expr* fml, app_ref_vector& vars, bool& is_fa, expr_ref& result, bool use_fresh, bool rewrite_ok) {
         quantifier_type qt = Q_none_pos;
-        pull_quantifier(fml, qt, vars, result, use_fresh);
+        pull_quantifier(fml, qt, vars, result, use_fresh, rewrite_ok);
         TRACE("qe_verbose", 
               tout << mk_pp(fml, m) << "\n";
               tout << mk_pp(result, m) << "\n";);
@@ -51,18 +51,18 @@ public:
         is_fa = (Q_forall_pos == qt);
     }
     
-    void pull_exists(expr* fml, app_ref_vector& vars, expr_ref& result, bool use_fresh) {
+    void pull_exists(expr* fml, app_ref_vector& vars, expr_ref& result, bool use_fresh, bool rewrite_ok) {
         quantifier_type qt = Q_exists_pos;
-        pull_quantifier(fml, qt, vars, result, use_fresh);
+        pull_quantifier(fml, qt, vars, result, use_fresh, rewrite_ok);
         TRACE("qe_verbose", 
               tout << mk_pp(fml, m) << "\n";
               tout << mk_pp(result, m) << "\n";);
     }
 
-    void pull_quantifier(bool is_forall, expr_ref& fml, app_ref_vector& vars, bool use_fresh) {
+    void pull_quantifier(bool is_forall, expr_ref& fml, app_ref_vector& vars, bool use_fresh, bool rewrite_ok) {
         quantifier_type qt = is_forall?Q_forall_pos:Q_exists_pos;
         expr_ref result(m);
-        pull_quantifier(fml, qt, vars, result, use_fresh);
+        pull_quantifier(fml, qt, vars, result, use_fresh, rewrite_ok);
         TRACE("qe_verbose", 
               tout << mk_pp(fml, m) << "\n";
               tout << mk_pp(result, m) << "\n";);
@@ -82,7 +82,7 @@ public:
         instantiate(m, q, exprs, result);
     }
 
-    unsigned pull_quantifier(bool is_forall, expr_ref& fml, ptr_vector<sort>* sorts, svector<symbol>* names, bool use_fresh) {
+    unsigned pull_quantifier(bool is_forall, expr_ref& fml, ptr_vector<sort>* sorts, svector<symbol>* names, bool use_fresh, bool rewrite_ok) {
         unsigned index = var_counter().get_next_var(fml);
         while (is_quantifier(fml) && (is_forall == to_quantifier(fml)->is_forall())) {
             quantifier* q = to_quantifier(fml);
@@ -99,7 +99,7 @@ public:
             return index;
         }
         app_ref_vector vars(m);
-        pull_quantifier(is_forall, fml, vars, use_fresh);
+        pull_quantifier(is_forall, fml, vars, use_fresh, rewrite_ok);
         if (vars.empty()) {
             return index;
         }
@@ -196,7 +196,7 @@ private:
     }
     
     
-    void pull_quantifier(expr* fml, quantifier_type& qt, app_ref_vector& vars, expr_ref& result, bool use_fresh) {
+    void pull_quantifier(expr* fml, quantifier_type& qt, app_ref_vector& vars, expr_ref& result, bool use_fresh, bool rewrite_ok) {
         
         if (!has_quantifiers(fml)) {
             result = fml;
@@ -212,33 +212,43 @@ private:
             if (m.is_and(fml)) {
                 num_args = a->get_num_args();
                 for (unsigned i = 0; i < num_args; ++i) {
-                    pull_quantifier(a->get_arg(i), qt, vars, tmp, use_fresh);
+                    pull_quantifier(a->get_arg(i), qt, vars, tmp, use_fresh, rewrite_ok);
                     args.push_back(tmp);
                 }
-                m_rewriter.mk_and(args.size(), args.c_ptr(), result);
+                if (rewrite_ok) {
+                    m_rewriter.mk_and(args.size(), args.c_ptr(), result);
+                }
+                else {
+                    result = m.mk_and (args.size (), args.c_ptr ());
+                }
             }
             else if (m.is_or(fml)) {
                 num_args = to_app(fml)->get_num_args();
                 for (unsigned i = 0; i < num_args; ++i) {
-                    pull_quantifier(to_app(fml)->get_arg(i), qt, vars, tmp, use_fresh);
+                    pull_quantifier(to_app(fml)->get_arg(i), qt, vars, tmp, use_fresh, rewrite_ok);
                     args.push_back(tmp);
                 }
-                m_rewriter.mk_or(args.size(), args.c_ptr(), result);
+                if (rewrite_ok) {
+                    m_rewriter.mk_or(args.size(), args.c_ptr(), result);
+                }
+                else {
+                    result = m.mk_or (args.size (), args.c_ptr ());
+                }
             }
             else if (m.is_not(fml)) {
-                pull_quantifier(to_app(fml)->get_arg(0), negate(qt), vars, tmp, use_fresh);
+                pull_quantifier(to_app(fml)->get_arg(0), negate(qt), vars, tmp, use_fresh, rewrite_ok);
                 negate(qt);
                 result = m.mk_not(tmp);
             }
             else if (m.is_implies(fml)) {
-                pull_quantifier(to_app(fml)->get_arg(0), negate(qt), vars, tmp, use_fresh);
+                pull_quantifier(to_app(fml)->get_arg(0), negate(qt), vars, tmp, use_fresh, rewrite_ok);
                 negate(qt);
-                pull_quantifier(to_app(fml)->get_arg(1), qt, vars, result, use_fresh);
+                pull_quantifier(to_app(fml)->get_arg(1), qt, vars, result, use_fresh, rewrite_ok);
                 result = m.mk_implies(tmp, result);
             }
             else if (m.is_ite(fml)) {
-                pull_quantifier(to_app(fml)->get_arg(1), qt, vars, tmp, use_fresh);
-                pull_quantifier(to_app(fml)->get_arg(2), qt, vars, result, use_fresh);
+                pull_quantifier(to_app(fml)->get_arg(1), qt, vars, tmp, use_fresh, rewrite_ok);
+                pull_quantifier(to_app(fml)->get_arg(2), qt, vars, result, use_fresh, rewrite_ok);
                 result = m.mk_ite(to_app(fml)->get_arg(0), tmp, result);
             }
             else {
@@ -256,7 +266,7 @@ private:
             }
             set_quantifier_type(qt, q->is_forall());
             extract_quantifier(q, vars, tmp, use_fresh);
-            pull_quantifier(tmp, qt, vars, result, use_fresh);
+            pull_quantifier(tmp, qt, vars, result, use_fresh, rewrite_ok);
             break;
         }
         case AST_VAR:
@@ -279,18 +289,18 @@ quantifier_hoister::~quantifier_hoister() {
     dealloc(m_impl);
 }
 
-void quantifier_hoister::operator()(expr* fml, app_ref_vector& vars, bool& is_fa, expr_ref& result, bool use_fresh) {
-    (*m_impl)(fml, vars, is_fa, result, use_fresh);
+void quantifier_hoister::operator()(expr* fml, app_ref_vector& vars, bool& is_fa, expr_ref& result, bool use_fresh, bool rewrite_ok) {
+    (*m_impl)(fml, vars, is_fa, result, use_fresh, rewrite_ok);
 }
 
-void quantifier_hoister::pull_exists(expr* fml, app_ref_vector& vars, expr_ref& result, bool use_fresh) {
-    m_impl->pull_exists(fml, vars, result, use_fresh);
+void quantifier_hoister::pull_exists(expr* fml, app_ref_vector& vars, expr_ref& result, bool use_fresh, bool rewrite_ok) {
+    m_impl->pull_exists(fml, vars, result, use_fresh, rewrite_ok);
 }
 
-void quantifier_hoister::pull_quantifier(bool is_forall, expr_ref& fml, app_ref_vector& vars, bool use_fresh) {
-    m_impl->pull_quantifier(is_forall, fml, vars, use_fresh);
+void quantifier_hoister::pull_quantifier(bool is_forall, expr_ref& fml, app_ref_vector& vars, bool use_fresh, bool rewrite_ok) {
+    m_impl->pull_quantifier(is_forall, fml, vars, use_fresh, rewrite_ok);
 }
 
-unsigned quantifier_hoister::pull_quantifier(bool is_forall, expr_ref& fml, ptr_vector<sort>* sorts, svector<symbol>* names, bool use_fresh) {
-    return m_impl->pull_quantifier(is_forall, fml, sorts, names, use_fresh);
+unsigned quantifier_hoister::pull_quantifier(bool is_forall, expr_ref& fml, ptr_vector<sort>* sorts, svector<symbol>* names, bool use_fresh, bool rewrite_ok) {
+    return m_impl->pull_quantifier(is_forall, fml, sorts, names, use_fresh, rewrite_ok);
 }
