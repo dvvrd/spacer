@@ -204,6 +204,7 @@ namespace datalog {
         bool               m_saturation_was_run;
         execution_result   m_last_status;
         expr_ref           m_last_answer;
+        expr_ref           m_last_ground_answer;
         DL_ENGINE          m_engine_type;
         volatile bool      m_cancel;
 
@@ -530,7 +531,7 @@ namespace datalog {
          * get bottom-up (from query) sequence of ground predicate instances
          * (for e.g. P(0,1,0,0,3)) that together form a ground derivation to query
          */
-        expr_ref get_ground_sat_answer ();
+        expr* get_ground_sat_answer ();
 
         /**
          * \brief obtain the sequence of rules along the counterexample trace

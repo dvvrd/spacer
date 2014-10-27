@@ -225,6 +225,7 @@ namespace datalog {
         m_saturation_was_run(false),
         m_last_status(OK),
         m_last_answer(m),
+        m_last_ground_answer(m),
         m_engine_type(LAST_ENGINE),
         m_cancel(false) {
         re.set_context(this);
@@ -956,6 +957,7 @@ namespace datalog {
         m_mc = mk_skip_model_converter();
         m_last_status = OK;
         m_last_answer = 0;
+        m_last_ground_answer = 0;
         switch (get_engine()) {
         case DATALOG_ENGINE:
         case SPACER_ENGINE:
@@ -978,6 +980,7 @@ namespace datalog {
         m_mc = mk_skip_model_converter();
         m_last_status = OK;
         m_last_answer = 0;
+        m_last_ground_answer = 0;
         switch (get_engine()) {
         case DATALOG_ENGINE:
         case SPACER_ENGINE:
@@ -1031,9 +1034,13 @@ namespace datalog {
         return m_last_answer.get();
     }
 
-    expr_ref context::get_ground_sat_answer () {
+    expr* context::get_ground_sat_answer () {
+        if (m_last_ground_answer) {
+            return m_last_ground_answer;
+        }
         ensure_engine ();
-        return m_engine->get_ground_sat_answer ();
+        m_last_ground_answer = m_engine->get_ground_sat_answer ();
+        return m_last_ground_answer;
     }
 
     void context::get_rules_along_trace (rule_ref_vector& rules) {
