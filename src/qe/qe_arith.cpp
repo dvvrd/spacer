@@ -29,6 +29,7 @@ Revision History:
 #include "expr_functors.h"
 #include "expr_substitution.h"
 #include "expr_replacer.h"
+#include "model_pp.h"
 
 namespace qe {
 
@@ -731,14 +732,94 @@ namespace qe {
         }
 
         /**
+         * walk the ast of fml and introduce a fresh variable for every mod term
+         * (updating the mdl accordingly)
+         */
+        void factor_mod_terms (expr_ref& fml, app_ref_vector& vars, model& mdl) {
+            expr_ref_vector todo (m), eqs (m);
+            expr_map factored_terms (m);
+            ast_mark done;
+
+            todo.push_back (fml);
+            while (!todo.empty ()) {
+                expr* e = todo.back ();
+                if (!is_app (e) || done.is_marked (e)) {
+                    todo.pop_back ();
+                    continue;
+                }
+                app* ap = to_app (e);
+                unsigned num_args = ap->get_num_args ();
+                bool all_done = true, changed = false;
+                expr_ref_vector args (m);
+                for (unsigned i = 0; i < num_args; i++) {
+                    expr* old_arg = ap->get_arg (i);
+                    if (!done.is_marked (old_arg)) {
+                        todo.push_back (old_arg);
+                        all_done = false;
+                    }
+                    if (!all_done) continue;
+                    // all args so far have been processed
+                    // get the correct arg to use
+                    proof* pr = 0; expr* new_arg = 0;
+                    factored_terms.get (old_arg, new_arg, pr);
+                    if (new_arg) {
+                        // changed
+                        args.push_back (new_arg);
+                        changed = true;
+                    }
+                    else {
+                        // not changed
+                        args.push_back (old_arg);
+                    }
+                }
+                if (all_done) {
+                    // all args processed; make new term
+                    func_decl* d = ap->get_decl ();
+                    expr_ref new_term (m);
+                    new_term = m.mk_app (d, args.size (), args.c_ptr ());
+                    // check for mod and introduce new var
+                    if (a.is_mod (ap)) {
+                        app_ref new_var (m);
+                        new_var = m.mk_fresh_const ("mod_var", d->get_range ());
+                        eqs.push_back (m.mk_eq (new_var, new_term));
+                        // obtain value of new_term in mdl
+                        expr_ref val (m);
+                        mdl.eval (new_term, val, true);
+                        // use the variable from now on
+                        new_term = new_var;
+                        changed = true;
+                        // update vars and mdl
+                        vars.push_back (new_var);
+                        mdl.register_decl (new_var->get_decl (), val);
+                    }
+                    if (changed) {
+                        factored_terms.insert (e, new_term, 0);
+                    }
+                    done.mark (e, true);
+                    todo.pop_back ();
+                }
+            }
+
+            // mk new fml
+            proof* pr = 0; expr* new_fml = 0;
+            factored_terms.get (fml, new_fml, pr);
+            if (new_fml) {
+                fml = new_fml;
+                // add in eqs
+                fml = m.mk_and (fml, m.mk_and (eqs.size (), eqs.c_ptr ()));
+            }
+            else {
+                // unchanged
+                SASSERT (eqs.empty ());
+            }
+        }
+
+        /**
          * factor out mod terms by using divisibility terms;
          *
          * for now, only handle mod equalities of the form (t1 % num == t2),
          * replacing it by the equivalent (num | (t1-t2)) /\ (0 <= t2 < abs(num));
          * the divisibility atom is a special mod term ((t1-t2) % num == 0)
-         *
-         * TODO: to handle arbitrary terms containing mod sub-terms, we can
-         * introduce temporary auxiliary variables and eliminate them at the end
          */
         void mod2div (expr_ref& fml, expr_map& map) {
             expr* new_fml = 0;
@@ -909,7 +990,7 @@ namespace qe {
                         tout << "substituting " << mk_pp (m_var->x (), m) << " by " << mk_pp (x_term, m) << "\n";
                       );
             }
-            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+            scoped_ptr<expr_replacer> rep = mk_default_expr_replacer (m);
             rep->set_substitution (&sub);
             (*rep)(fml);
         }
@@ -953,6 +1034,26 @@ namespace qe {
 
         void operator()(model& mdl, app_ref_vector& vars, expr_ref& fml, expr_map& map) {
             app_ref_vector new_vars(m);
+
+            // factor out mod terms by introducing new variables
+            TRACE ("qe",
+                    tout << "before factoring out mod terms:" << "\n";
+                    tout << mk_pp (fml, m) << "\n";
+                    tout << "mdl:\n";
+                    model_pp (tout, mdl);
+                    tout << "\n";
+                  );
+            
+            factor_mod_terms (fml, vars, mdl);
+
+            TRACE ("qe",
+                    tout << "after factoring out mod terms:" << "\n";
+                    tout << mk_pp (fml, m) << "\n";
+                    tout << "updated mdl:\n";
+                    model_pp (tout, mdl);
+                    tout << "\n";
+                  );
+
             app_ref_vector lits (m);
 //          expr_map map (m);
             for (unsigned i = 0; i < vars.size(); ++i) {
@@ -969,7 +1070,7 @@ namespace qe {
                         expr_map mod_map (m);
                         mod2div (fml, mod_map);
                         TRACE ("qe",
-                                tout << "factored out mod terms:" << "\n";
+                                tout << "after mod2div:" << "\n";
                                 tout << mk_pp (fml, m) << "\n";
                               );
                     }
@@ -1000,6 +1101,7 @@ namespace qe {
             }
             vars.reset();
             vars.append(new_vars);
+            m_rw (fml);
         }
     };
 
