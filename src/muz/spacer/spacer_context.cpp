@@ -2651,7 +2651,9 @@ namespace spacer {
 
     void context::get_rules_along_trace (datalog::rule_ref_vector& rules) {
         if (m_last_result != l_true) {
-            verbose_stream () << "Trace unavailable when result is false\n";
+          IF_VERBOSE(1, 
+                     verbose_stream () 
+                     << "Trace unavailable when result is false\n";);
             return;
         }
 
@@ -2671,6 +2673,14 @@ namespace spacer {
 
         // initialize queues
         facts.append (*(m_query->get_just_pred_facts (fact)));
+        if (facts.size () != 1) 
+        {
+          // XXX AG: Escape if an assertion is about to fail
+          IF_VERBOSE(1, 
+                     verbose_stream () << 
+                     "Warning: counterexample is trivial or non-existent\n";);
+          return;
+        }
         SASSERT (facts.size () == 1);
         m_query->find_predecessors (*r, preds);
         SASSERT (preds.size () == 1);
