@@ -4269,6 +4269,15 @@ END_MLAPI_EXCLUDE
     unsigned Z3_API Z3_get_index_value(__in Z3_context c, __in Z3_ast a);
 
     /**
+       \brief Return sort of de-Brujin bound variant
+       
+       \pre Z3_get_ast_kind(a) = Z3_VAR_AST
+
+       def_API('Z3_get_index_sort', SORT, (_in(CONTEXT), _in(AST)))
+     */
+    Z3_sort Z3_API Z3_get_index_sort (__in Z3_context c, __in Z3_ast a);
+
+    /**
        \brief Determine if quantifier is universal.
        
        \pre Z3_get_ast_kind(a) == Z3_QUANTIFIER_AST

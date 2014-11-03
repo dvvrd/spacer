@@ -1144,6 +1144,26 @@ extern "C" {
         Z3_CATCH_RETURN(0);
     }
 
+  Z3_sort Z3_API Z3_get_index_sort (Z3_context c, Z3_ast a) {
+    Z3_TRY;
+    LOG_Z3_get_index_sort(c, a);
+    RESET_ERROR_CODE();
+    ast* _a = reinterpret_cast<ast*>(a);
+    if (!_a || _a->get_kind() != AST_VAR) {
+      SET_ERROR_CODE(Z3_INVALID_ARG);
+      return 0;
+    }
+    var *va = to_var (_a);
+    if (va)
+    {
+      Z3_sort r = of_sort (va->get_sort ());
+      RETURN_Z3(r);
+    }
+    SET_ERROR_CODE(Z3_INVALID_ARG);
+    return 0;
+    Z3_CATCH_RETURN(0);
+  }
+  
     Z3_ast Z3_API Z3_translate(Z3_context c, Z3_ast a, Z3_context target) {
         Z3_TRY;
         LOG_Z3_translate(c, a, target);
