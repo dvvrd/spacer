@@ -21,6 +21,8 @@ def parseArgs (argv):
                     default=False)
     p.add_argument ('--ground-answer', dest='ground_answer', help='Print ground sat answer', action='store_true',
                     default=False)
+    p.add_argument ('--rules-along-trace', dest='rules_along_trace', help='Print rules along cex trace', action='store_true',
+                    default=False)
     p.add_argument ('--engine', help='Datalog Engine (pdr/spacer)', default='spacer')
     p.add_argument ('--verbose', help='Z3 verbosity', default=0)
     p.add_argument ('--use-utvpi', dest='use_utvpi', help='use utvpi/diff-logic '
@@ -99,9 +101,13 @@ def main (argv):
         print 'The answer is:'
         print fp.get_answer ()
 
-    if res == z3.sat and args.ground_answer:
-        print 'A ground answer:'
-        print fp.get_ground_sat_answer ()
+    if res == z3.sat:
+        if args.ground_answer:
+            print 'A ground answer:'
+            print fp.get_ground_sat_answer ()
+        if args.rules_along_trace:
+            print 'Rules along trace:'
+            print fp.get_rules_along_trace ()
     
 if __name__ == '__main__':
     try:
