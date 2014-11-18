@@ -2672,6 +2672,8 @@ namespace spacer {
         r = m_query->get_just_rule (fact);
 
         // initialize queues
+        // assume that the query is only on a single predicate
+        // (i.e. disallow fancy queries for now)
         facts.append (*(m_query->get_just_pred_facts (fact)));
         if (facts.size () != 1) 
         {
