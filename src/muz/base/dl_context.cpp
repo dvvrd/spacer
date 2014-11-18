@@ -296,6 +296,7 @@ namespace datalog {
     bool context::magic() const { return m_params->magic(); }
     bool context::quantify_arrays() const { return m_params->quantify_arrays(); }
     bool context::instantiate_quantifiers() const { return m_params->instantiate_quantifiers(); }
+    bool context::array_blast() const { return m_params->array_blast(); }
 
 
     void context::register_finite_sort(sort * s, sort_kind k) {

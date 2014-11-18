@@ -269,6 +269,7 @@ namespace datalog {
         bool magic() const;
         bool quantify_arrays() const;
         bool instantiate_quantifiers() const;
+        bool array_blast() const;
 
         void register_finite_sort(sort * s, sort_kind k);
 
