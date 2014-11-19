@@ -24,7 +24,6 @@ Revision History:
 #include "ast_pp.h"
 #include "expr_substitution.h"
 #include "expr_abstract.h"
-#include "qe_lite.h"
 #include "quant_hoist.h"
 
 
@@ -318,45 +317,13 @@ void qe_array::operator () (expr* fml, expr_ref& result) {
     // eliminate array variables
     qe_array_core (exp_body, var_idx_to_elim, exp_body);
 
-    ptr_vector<sort> sorts;
-    svector<symbol> names;
-    expr_ref tmp (m);
-
-    // pass through qe-lite to eliminate any unnecessary quantifiers
-
-    tmp = exp_body;
-    qe::mk_exists (m_aux_consts.size (), m_aux_consts.c_ptr (), tmp);
-    // qe-lite
-    qe_lite qel (m);
-    proof_ref prl (m);
-    qel (tmp, prl);
-
-    // collect any remaining quantified vars of tmp
-    m_aux_consts.reset ();
-    exp_body = tmp;
-    qh.pull_quantifier (false, exp_body, &sorts, &names, false, false);
-    for (unsigned i = 0; i < sorts.size (); i++) {
-        sort* s = sorts.get (i);
-        symbol const& sym = names.get (i);
-        m_aux_consts.push_back (m.mk_const (sym, s));
-    }
-    // replace non_arrays by variables
-    if (!non_arrays.empty ()) {
-        expr_abstract (m, m_aux_consts.size (), non_arrays.size (), (expr* const*) non_arrays.c_ptr (), exp_body, exp_body);
-    }
-    // existentially quantify non_arrays + aux consts
-    non_arrays.append (m_aux_consts);
-    if (!non_arrays.empty ()) {
-        sorts.reset (); names.reset ();
-        for (unsigned i = 0; i < non_arrays.size (); i++) {
-            sorts.push_back (m.get_sort (non_arrays.get (i)));
-            names.push_back (non_arrays.get (i)->get_decl ()->get_name ());
-        }
-        // mk exists
-        result = m.mk_exists (non_arrays.size (), sorts.c_ptr (), names.c_ptr (), exp_body);
-    }
-    else {
-        result = exp_body;
+    // existentially quantify non_arrays and m_aux_consts
+    app_ref_vector qvars (m);
+    qvars.append (non_arrays);
+    qvars.append (m_aux_consts);
+    result = exp_body;
+    if (!qvars.empty ()) {
+        qe::mk_exists (qvars.size (), qvars.c_ptr (), result);
     }
 }
 
