@@ -214,7 +214,7 @@ int main(int argc, char ** argv) {
     TST(quant_solve);
     TST(rcf);
     TST(polynorm);
-    TST(qe_arith);
+    TST(qe_project);
     TST(expr_substitution);
     TST(qe_array);
 }

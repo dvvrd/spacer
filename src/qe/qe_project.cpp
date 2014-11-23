@@ -20,7 +20,7 @@ Revision History:
 
 --*/
 
-#include "qe_arith.h"
+#include "qe_project.h"
 #include "qe_util.h"
 #include "qe.h"
 #include "arith_decl_plugin.h"

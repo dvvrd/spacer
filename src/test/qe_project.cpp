@@ -1,4 +1,4 @@
-#include "qe_arith.h"
+#include "qe_project.h"
 #include "qe.h"
 #include "th_rewriter.h"
 #include "smt2parser.h"
@@ -254,7 +254,7 @@ static void test2(char const *ex) {
     
 }
 
-void tst_qe_arith() {
+void tst_qe_project() {
     //test2(example6);
     //return;
 
