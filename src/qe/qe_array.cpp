@@ -99,23 +99,26 @@ void peq::mk_peq (app_ref& result) {
     result = m_peq;
 }
 
-void peq::mk_eq (app_ref_vector& aux_consts, app_ref& result) {
+void peq::mk_eq (app_ref_vector& aux_consts, app_ref& result, bool stores_on_rhs) {
     if (!m_eq) {
+        expr_ref lhs (m_lhs, m), rhs (m_rhs, m);
+        if (!stores_on_rhs) {
+            std::swap (lhs, rhs);
+        }
         // lhs = (...(store (store rhs i0 v0) i1 v1)...)
-        sort* val_sort = get_array_range (m.get_sort (m_lhs));
-        expr* rhs_new = m_rhs.get ();
+        sort* val_sort = get_array_range (m.get_sort (lhs));
         expr_ref_vector::iterator end = m_diff_indices.end ();
         for (expr_ref_vector::iterator it = m_diff_indices.begin ();
                 it != end; it++) {
             app* val = m.mk_fresh_const ("diff", val_sort);
             ptr_vector<expr> store_args;
-            store_args.push_back (rhs_new);
+            store_args.push_back (rhs);
             store_args.push_back (*it);
             store_args.push_back (val);
-            rhs_new = m_arr_u.mk_store (store_args.size (), store_args.c_ptr ());
+            rhs = m_arr_u.mk_store (store_args.size (), store_args.c_ptr ());
             aux_consts.push_back (val);
         }
-        m_eq = m.mk_eq (m_lhs, rhs_new);
+        m_eq = m.mk_eq (lhs, rhs);
     }
     result = m_eq;
 }

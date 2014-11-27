@@ -71,7 +71,7 @@ public:
 
     void mk_peq (app_ref& result);
 
-    void mk_eq (app_ref_vector& aux_consts, app_ref& result);
+    void mk_eq (app_ref_vector& aux_consts, app_ref& result, bool stores_on_rhs = true);
 };
 
 class qe_array {
