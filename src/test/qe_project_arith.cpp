@@ -254,7 +254,7 @@ static void test2(char const *ex) {
     
 }
 
-void tst_qe_project() {
+void tst_qe_project_arith() {
     //test2(example6);
     //return;
 
