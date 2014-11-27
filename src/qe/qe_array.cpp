@@ -379,7 +379,8 @@ void qe_array::elim_stores (expr* e, expr_ref& result, expr_ref_vector& partial_
             SASSERT (m_arr_u.is_array (to_app (arg)->get_arg (1)));
             is_disequality = true;
             // process disequality between arrays
-            disequality (to_app (arg)->get_arg (0), to_app (arg)->get_arg (1), result, partial_eqs);
+            elim_disequality (to_app (arg)->get_arg (0), to_app (arg)->get_arg (1), result);
+            elim_stores (result, result, partial_eqs);
         }
     }
 
@@ -438,7 +439,7 @@ void qe_array::elim_stores (expr* e, expr_ref& result, expr_ref_vector& partial_
           );
 }
 
-void qe_array::disequality (expr* arr0, expr* arr1, expr_ref& result, expr_ref_vector& partial_eqs) {
+void qe_array::elim_disequality (expr* arr0, expr* arr1, expr_ref& result) {
 
     // Not (arr0==arr1) --> Not (arr0[idx] == arr1[idx]), idx is fresh
 
@@ -463,9 +464,10 @@ void qe_array::disequality (expr* arr0, expr* arr1, expr_ref& result, expr_ref_v
                  << " and " << mk_pp (arr1_idx, m) << "\n";
           );
 
+    result = m.mk_not (m.mk_eq (arr0_idx, arr1_idx));
     // elim stores from arr0[idx]!=arr1[idx]
-    app_ref a (m.mk_not (m.mk_eq (arr0_idx, arr1_idx)), m);
-    elim_stores (a, result, partial_eqs);
+    //app_ref a (m.mk_not (m.mk_eq (arr0_idx, arr1_idx)), m);
+    //elim_stores (a, result, partial_eqs);
 }
 
 void qe_array::select (app* a, expr_ref& result, expr_ref_vector& partial_eqs) {

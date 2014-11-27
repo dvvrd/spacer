@@ -109,9 +109,9 @@ class qe_array {
     void elim_stores (expr* e, expr_ref& result, expr_ref_vector& partial_eqs);
 
     /**
-     * \brief process the disequality between array types using extensionality
+     * \brief eliminate disequality between array types using extensionality
      */
-    void disequality (expr* arr0, expr* arr1, expr_ref& result, expr_ref_vector& partial_eqs);
+    void elim_disequality (expr* arr0, expr* arr1, expr_ref& result);
 
     /**
      * \brief process the select expression to eliminate stores or to cofactor
