@@ -1117,6 +1117,7 @@ namespace qe {
         ast_mark                    m_has_stores;
         expr_ref_vector             _tmp;   // to ensure a reference
         app_ref_vector              m_aux_vars;
+        expr_ref_vector             m_aux_lits;
         model_ref                   M;
         model_evaluator_array_util  m_mev;
 
@@ -1128,6 +1129,7 @@ namespace qe {
             m_has_stores.reset ();
             _tmp.reset ();
             m_aux_vars.reset ();
+            m_aux_lits.reset ();
         }
 
         /**
@@ -1307,6 +1309,7 @@ namespace qe {
                 if (val_i == val_j) {
                     // (store arr i val)[i] --> val
                     a_new = val;
+                    m_aux_lits.push_back (m.mk_eq (i, j));
                 }
                 else {
                     // (store arr i val)[j] /\ i!=j --> arr[j]
@@ -1318,6 +1321,7 @@ namespace qe {
                     if (m_has_stores.is_marked (arr)) {
                         m_has_stores.mark (a_new, true);
                     }
+                    m_aux_lits.push_back (m.mk_not (m.mk_eq (i, j)));
                     // we need to store it as a_new might get deleted otherwise,
                     // in which case, the keys in the expr_map's and ast_mark's
                     // (m_has_stores, m_elim_stores_done, m_elim_stores_cache)
@@ -1353,7 +1357,7 @@ namespace qe {
          * this is only used when a substitution term is found for v, so we
          * don't bother about marking stores for newly created terms
          */
-        void factor_selects (expr_ref& fml, app* v, expr_ref_vector& aux_lits) {
+        void factor_selects (expr_ref& fml, app* v) {
             expr_map sel_cache (m);
             ast_mark done;
             expr_ref_vector todo (m);
@@ -1399,7 +1403,7 @@ namespace qe {
                     m_mev.eval (*M, a_new, val);
                     M->register_decl (val_const->get_decl (), val);
                     // add equality
-                    aux_lits.push_back (m.mk_eq (val_const, a_new));
+                    m_aux_lits.push_back (m.mk_eq (val_const, a_new));
                     // replace select by const
                     a_new = val_const;
                 }
@@ -1417,7 +1421,7 @@ namespace qe {
             }
         }
 
-        void find_subst_term (expr_ref_vector& peqs, app* v, expr_ref& subst_term, expr_ref_vector& aux_lits) {
+        void find_subst_term (expr_ref_vector& peqs, app* v, expr_ref& subst_term) {
             expr_ref p_exp (m);
             bool subst_eq_found = false;
             while (!peqs.empty ()) {
@@ -1530,7 +1534,7 @@ namespace qe {
                         else {
                             // not an array equality
                             expr_ref eq (m.mk_eq (arr1_i, x), m);
-                            aux_lits.push_back (eq);
+                            m_aux_lits.push_back (eq);
                             if (m_has_stores.is_marked (arr1_i) || m_has_stores.is_marked (x)) {
                                 m_has_stores.mark (eq, true);
                             }
@@ -1558,7 +1562,7 @@ namespace qe {
                 else {
                     app_ref eq (m);
                     convert_peq_to_eq (p_exp, eq);
-                    aux_lits.push_back (eq);
+                    m_aux_lits.push_back (eq);
                     // no stores on eq -- no need to mark
 
                     TRACE ("qe",
@@ -1569,14 +1573,14 @@ namespace qe {
             }
             // factor out select terms on v from p_exp
             if (subst_eq_found) {
-                aux_lits.reset ();
-                factor_selects (p_exp, v, aux_lits);
+                m_aux_lits.reset ();
+                factor_selects (p_exp, v);
 
                 TRACE ("qe",
                         tout << "after factoring selects:\n";
                         tout << mk_pp (p_exp, m) << "\n";
-                        for (unsigned i = 0; i < aux_lits.size (); i++) {
-                            tout << mk_pp (aux_lits.get (i), m) << "\n";
+                        for (unsigned i = 0; i < m_aux_lits.size (); i++) {
+                            tout << mk_pp (m_aux_lits.get (i), m) << "\n";
                         }
                       );
 
@@ -1754,23 +1758,24 @@ namespace qe {
 
             // find a substitution term for v using peqs
             expr_ref subst_term (m);
-            expr_ref_vector lits (m);
-            find_subst_term (peqs, v, subst_term, lits);
-            if (!lits.empty ()) {
-                // conjoin lits with fml
-                lits.push_back (fml);
-                fml = m.mk_and (lits.size (), lits.c_ptr ());
+            find_subst_term (peqs, v, subst_term);
+            if (!m_aux_lits.empty ()) {
+                // conjoin aux lits with fml
+                m_aux_lits.push_back (fml);
+                fml = m.mk_and (m_aux_lits.size (), m_aux_lits.c_ptr ());
 
                 // mark fml for stores
                 bool fml_has_stores = false;
-                for (unsigned i = 0; !fml_has_stores && i < lits.size (); i++) {
-                    if (m_has_stores.is_marked (lits.get (i))) {
+                for (unsigned i = 0; !fml_has_stores && i < m_aux_lits.size (); i++) {
+                    if (m_has_stores.is_marked (m_aux_lits.get (i))) {
                         fml_has_stores = true;
                     }
                 }
                 if (fml_has_stores) {
                     m_has_stores.mark (fml, true);
                 }
+                // done with aux lits for now
+                m_aux_lits.reset ();
             }
 
             if (subst_term) {
@@ -1784,6 +1789,12 @@ namespace qe {
                 // elim stores and selects
                 // postpone the substitution for equalities, as it's going to mess with the ast marking
                 project_sel_after_stores (fml, v, eqs.size (), eqs.c_ptr ());
+                if (!m_aux_lits.empty ()) {
+                    // add them in
+                    m_aux_lits.push_back (fml);
+                    fml = m.mk_and (m_aux_lits.size (), m_aux_lits.c_ptr ());
+                    m_aux_lits.reset ();
+                }
 
                 TRACE ("qe",
                         tout << "after projecting stores:\n";
@@ -1816,6 +1827,7 @@ namespace qe {
             m_elim_stores_cache (m),
             _tmp (m),
             m_aux_vars (m),
+            m_aux_lits (m),
             m_mev (m)
         {}
 
