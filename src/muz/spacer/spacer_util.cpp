@@ -45,6 +45,8 @@ Notes:
 #include "scoped_proof.h"
 #include "qe_lite.h"
 #include "qe_project.h"
+#include "model_pp.h"
+#include "expr_safe_replace.h"
 
 
 namespace spacer {
@@ -1331,7 +1333,7 @@ namespace spacer {
                 TRACE ("spacer",
                         tout << "Arith vars:\n";
                         for (unsigned i = 0; i < arith_vars.size (); ++i) {
-                            tout << mk_pp (arith_vars.get (i), m) << "\n";
+                        tout << mk_pp (arith_vars.get (i), m) << "\n";
                         }
                       );
                 {
@@ -1349,15 +1351,91 @@ namespace spacer {
         }
     }
 
+    void subst_vars_in_array_terms (ast_manager& m, app_ref_vector const& vars, expr_ref& fml, model_ref const& M) {
+        ast_mark has_vars, done;
+        expr_safe_replace sub (m);
+        array_util arr_u (m);
+
+        // initialize has_vars and make sub
+        expr_ref val (m);
+        for (unsigned i = 0; i < vars.size (); i++) {
+            app* v = vars.get (i);
+            has_vars.mark (v, true);
+            VERIFY (M->eval (v, val, true)); // use model completion
+            sub.insert (v, val);
+        }
+
+        expr_map cache (m);
+        expr_ref_vector todo (m), _tmp (m);
+        todo.push_back (fml);
+        while (!todo.empty ()) {
+            expr_ref e (todo.back (), m);
+            if (!is_app (e) || done.is_marked (e)) {
+                todo.pop_back ();
+                continue;
+            }
+            app* a = to_app (e);
+            expr_ref_vector args (m);
+            bool all_done = true;
+            bool args_have_vars = false;
+            bool args_changed = false;
+            for (unsigned i = 0; i < a->get_num_args (); i++) {
+                expr* arg = a->get_arg (i);
+                if (!done.is_marked (arg)) {
+                    all_done = false;
+                    todo.push_back (arg);
+                }
+                else if (all_done) { // all done so far..
+                    expr* arg_new = 0; proof* pr;
+                    cache.get (arg, arg_new, pr);
+                    if (!arg_new) {
+                        arg_new = arg;
+                    }
+                    args.push_back (arg_new);
+                    if (arg_new != arg) {
+                        args_changed = true;
+                    }
+                    if (!args_have_vars && has_vars.is_marked (arg_new)) {
+                        args_have_vars = true;
+                    }
+                }
+            }
+            if (!all_done) continue;
+            todo.pop_back ();
+
+            app_ref a_new (a, m);
+            if (args_changed) {
+                a_new = m.mk_app (a->get_decl (), args.size (), args.c_ptr ());
+            }
+
+            if (args_have_vars && (arr_u.is_select (a_new) || arr_u.is_store (a_new))) {
+                expr_ref e_new (a_new, m);
+                sub (e_new);
+                a_new = to_app (e_new);
+            }
+            else if (args_have_vars) {
+                has_vars.mark (a_new, true);
+            }
+
+            if (a_new != a) {
+                cache.insert (a, a_new.get (), 0);
+                _tmp.push_back (a_new);
+            }
+            done.mark (a, true);
+        }
+        // updt fml
+        expr* res = 0; proof* pr;
+        cache.get (fml, res, pr);
+        if (res) {
+            fml = res;
+        }
+    }
+
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M) {
         th_rewriter rw (m);
-        // qe-lite; TODO: use qe_lite aggressively
-        qe_lite qe (m);
-        qe (vars, fml);
-        rw (fml);
 
         TRACE ("spacer",
-                tout << "After qe_lite:\n";
+                tout << "Before projection:\n";
                 tout << mk_pp (fml, m) << "\n";
                 tout << "Vars:\n";
                 for (unsigned i = 0; i < vars.size(); ++i) {
@@ -1365,54 +1443,123 @@ namespace spacer {
                 }
               );
 
-        // substitute model values for booleans and
-        // use LW projection for arithmetic variables
-        if (!vars.empty ()) {
-            app_ref_vector arith_vars (m);
-            expr_substitution sub (m);
-            proof_ref pr (m.mk_asserted (m.mk_true ()), m);
-            expr_ref bval (m);
+/**
+ *         // qe-lite; TODO: use qe_lite aggressively
+ *         qe_lite qe (m);
+ *         qe (vars, fml);
+ *         rw (fml);
+ * 
+ *         TRACE ("spacer",
+ *                 tout << "After qe_lite:\n";
+ *                 tout << mk_pp (fml, m) << "\n";
+ *                 tout << "Vars:\n";
+ *                 for (unsigned i = 0; i < vars.size(); ++i) {
+ *                     tout << mk_pp(vars.get (i), m) << "\n";
+ *                 }
+ *               );
+ */
+
+        if (vars.empty ()) return;
+
+        // MBP for Booleans (substitute), reals (based on LW), ints (based on Cooper), and arrays
+        app_ref_vector arith_vars (m);
+        app_ref_vector array_vars (m);
+        array_util arr_u (m);
+        arith_util ari_u (m);
+        expr_substitution sub (m);
+        proof_ref pr (m.mk_asserted (m.mk_true ()), m);
+        expr_ref bval (m);
+
+        // sort out vars into bools, arith (int/real), and arrays
+        //  and project array variables
+        // when array vars are projected, the newly introduced auxiliary variables can be of array type as well
+        // (e.g. multi-dimensional arrays). hence, the loop
+        while (true) {
             for (unsigned i = 0; i < vars.size (); i++) {
                 if (m.is_bool (vars.get (i))) {
                     // obtain the interpretation of the ith var using model completion
                     VERIFY (M->eval (vars.get (i), bval, true));
                     sub.insert (vars.get (i), bval, pr);
+                    TRACE ("spacer",
+                            tout << "substituting Boolean: \n";
+                            tout << mk_pp (vars.get (i), m) << "\n";
+                          );
+                }
+                else if (arr_u.is_array (vars.get (i))) {
+                    array_vars.push_back (vars.get (i));
                 }
                 else {
+                    SASSERT (ari_u.is_int (vars.get (i)) || ari_u.is_real (vars.get (i)));
                     arith_vars.push_back (vars.get (i));
                 }
             }
-            if (!sub.empty ()) {
-                scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
-                rep->set_substitution (&sub);
-                (*rep)(fml);
-                rw (fml);
-                TRACE ("spacer",
-                        tout << "Projected Boolean vars:\n" << mk_pp (fml, m) << "\n";
-                      );
+
+            if (array_vars.empty ()) break;
+
+            TRACE ("spacer",
+                    tout << "Array vars:\n";
+                    for (unsigned i = 0; i < array_vars.size (); ++i) {
+                        tout << mk_pp (array_vars.get (i), m) << "\n";
+                    }
+                  );
+            {
+                scoped_no_proof _sp (m);
+                qe::array_project (*M, array_vars, fml);
             }
-            // model based projection
-            if (!arith_vars.empty ()) {
-                TRACE ("spacer",
-                        tout << "Arith vars:\n";
-                        for (unsigned i = 0; i < arith_vars.size (); ++i) {
-                            tout << mk_pp (arith_vars.get (i), m) << "\n";
-                        }
-                      );
-                {
-                    scoped_no_proof _sp (m);
-                    qe::arith_project (*M, arith_vars, fml);
-                   // ast_manager& m = arith_vars.get_manager();
-                }
-                SASSERT (arith_vars.empty ());
-                TRACE ("spacer",
-                        tout << "Projected arith vars:\n" << mk_pp (fml, m) << "\n";
-                      );
-            }
-            SASSERT (M->eval (fml, bval, true) && m.is_true (bval)); // M |= fml
             vars.reset ();
-            vars.append (arith_vars);
+            vars.append (array_vars);
+            array_vars.reset ();
+            TRACE ("spacer",
+                    tout << "Projected array vars:\n" << mk_pp (fml, m) << "\n";
+                    tout << "extended model:\n";
+                    model_pp (tout, *M);
+                    tout << "Auxiliary variables of index and value sorts:\n";
+                    for (unsigned i = 0; i < vars.size (); i++) {
+                        tout << mk_pp (vars.get (i), m) << "\n";
+                    }
+                  );
         }
+
+        // substitute arith vars in array terms
+        subst_vars_in_array_terms (m, arith_vars, fml, M);
+
+        TRACE ("spacer",
+                tout << "Substituted arith vars in array terms:\n";
+                tout << mk_pp (fml, m) << "\n";
+              );
+
+        // project Booleans
+        if (!sub.empty ()) {
+            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+            rep->set_substitution (&sub);
+            (*rep)(fml);
+            // rw (fml);
+            TRACE ("spacer",
+                    tout << "Projected Booleans:\n" << mk_pp (fml, m) << "\n";
+                  );
+        }
+
+        // project reals and ints
+        if (!arith_vars.empty ()) {
+            TRACE ("spacer",
+                    tout << "Arith vars:\n";
+                    for (unsigned i = 0; i < arith_vars.size (); ++i) {
+                    tout << mk_pp (arith_vars.get (i), m) << "\n";
+                    }
+                  );
+            {
+                scoped_no_proof _sp (m);
+                qe::arith_project (*M, arith_vars, fml);
+            }
+            SASSERT (arith_vars.empty ());
+            TRACE ("spacer",
+                    tout << "Projected arith vars:\n" << mk_pp (fml, m) << "\n";
+                  );
+        }
+        // the check is not guaranteed to work with arrays..
+        //SASSERT (M->eval (fml, bval, true) && m.is_true (bval)); // M |= fml
+        vars.reset ();
+        vars.append (arith_vars);
     }
 
 
