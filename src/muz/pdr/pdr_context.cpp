@@ -2352,6 +2352,13 @@ namespace pdr {
             TRACE("pdr", tout << "Projected:\n" << mk_pp(phi1, m) << "\n";);
         }
         Phi.reset();
+        if (!use_model_generalizer)
+        {
+          select_reducer sr(m, M);
+          sr (phi1);
+          TRACE ("pdr", tout << "SelectReduced:\n" << mk_pp (phi1, m) << "\n";);
+        }
+        
         qe::flatten_and(phi1, Phi);
         unsigned_vector indices;
         vector<expr_ref_vector> child_states;

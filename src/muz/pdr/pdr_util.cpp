@@ -967,28 +967,6 @@ namespace pdr {
     }
 
 
-  class select_reducer
-  {
-    ast_manager &m;
-    array_util m_au;
-    model_evaluator_array_util m_mev;
-    th_rewriter m_rw;
-    model_ref m_model;
-    
-    expr_ref_vector m_side;
-    expr_ref_vector m_pinned;
-    obj_map<app, expr*> m_cache;
-    
-    bool is_equals (expr *e1, expr *e2);
-    expr *reduce_expr (expr *lit);
-    expr *reduce_select (expr *e);
-    
-  public:
-    select_reducer (ast_manager &manager, model_ref &model);
-    void reset ();
-    void operator() (expr_ref &fml);
-    
-  };
   
   select_reducer::select_reducer (ast_manager &manager, model_ref &model) :
     m(manager), m_au (m), m_mev (m), m_rw (m), 
@@ -1010,7 +988,7 @@ namespace pdr {
     
     conjs.append (m_side);
     fml = m.mk_and(conjs.size(), conjs.c_ptr());        
-    m_rw (fml.get (), fml);
+    m_rw (fml);
   }
   
   expr* select_reducer::reduce_expr (expr *lit)
