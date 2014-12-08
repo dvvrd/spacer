@@ -49,6 +49,8 @@ Notes:
 #include "expr_safe_replace.h"
 
 
+#include "model_evaluator.h"
+
 
 namespace pdr {
 
@@ -967,13 +969,12 @@ namespace pdr {
 
   class select_reducer
   {
-    ast_manager &m
+    ast_manager &m;
     array_util m_au;
     model_evaluator_array_util m_mev;
     th_rewriter m_rw;
-    model &m_model;
+    model_ref m_model;
     
-    expr_ref_vector m_conjs;
     expr_ref_vector m_side;
     expr_ref_vector m_pinned;
     obj_map<app, expr*> m_cache;
@@ -983,19 +984,18 @@ namespace pdr {
     expr *reduce_select (expr *e);
     
   public:
-    select_reducer (ast_manager &manager, model &model);
+    select_reducer (ast_manager &manager, model_ref &model);
     void reset ();
     void operator() (expr_ref &fml);
     
   };
   
-  select_reducer::select_reducer (ast_manager &manager, model &model) :
+  select_reducer::select_reducer (ast_manager &manager, model_ref &model) :
     m(manager), m_au (m), m_mev (m), m_rw (m), 
-    m_model (model), m_conjs (m), m_side (m), m_pinned (m) {} 
+    m_model (model), m_side (m), m_pinned (m) {} 
   
   void select_reducer::reset ()
   {
-    m_conjs.reset ();
     m_side.reset ();
     m_pinned.reset ();
     m_cache.reset ();
@@ -1003,6 +1003,7 @@ namespace pdr {
   
   void select_reducer::operator() (expr_ref &fml)
   {
+    expr_ref_vector conjs (m);
     qe::flatten_and (fml, conjs);
     for (unsigned i = 0; i < conjs.size (); ++i)
       conjs[i] = reduce_expr (conjs [i].get ());
@@ -1017,17 +1018,17 @@ namespace pdr {
     if (!is_app (lit)) return lit;
     
     expr *r = NULL;
-    if (m_cache.find (lit, r)) return r;
+    if (m_cache.find (to_app (lit), r)) return r;
     
     ptr_vector<app> todo;
-    todo.push_back (lit);
+    todo.push_back (to_app (lit));
     
     while (!todo.empty ())
     {
       app *a = todo.back ();
       unsigned sz = todo.size ();
       expr_ref_vector args (m);
-      dirty = false;
+      bool dirty = false;
       
       for (unsigned i = 0; i < a->get_num_args (); ++i)
       {
@@ -1035,13 +1036,13 @@ namespace pdr {
         expr *narg;
         
         if (!is_app (arg)) args.push_back (arg);
-        else if (m_cache.find (arg, narg)) 
+        else if (m_cache.find (to_app (arg), narg)) 
         { 
           args.push_back (narg);
           dirty |= (arg != narg);
         }
         else 
-          todo.push_back (arg);
+          todo.push_back (to_app (arg));
       }
       
       if (todo.size () > sz) continue;
@@ -1060,14 +1061,14 @@ namespace pdr {
       m_cache.insert (a, r);
     }
     
-    assert (r);
+    SASSERT (r);
     return r;
   }
   
   bool select_reducer::is_equals (expr *e1, expr *e2)
   {
     if (e1 == e2) return true;
-    expr *val1, *val2;
+    expr_ref val1 (m), val2 (m);
     m_mev.eval (*m_model, e1, val1);
     m_mev.eval (*m_model, e2, val2);
     return val1 == val2;
@@ -1086,22 +1087,23 @@ namespace pdr {
     expr* array;
     while (m_au.is_store (a))
     {
-      SASSERT (a->num_args () == 2 && "Multi-dimensional arrays are not supported");
+      SASSERT (a->get_num_args () == 2 && "Multi-dimensional arrays are not supported");
       expr *idx = a->get_arg (1);
+      expr_ref cond (m);
       
       if (is_equals (idx, j))
       {
-        m_side.push_back (m.mk_eq (idx, j));
-        m_rw (m_side.back ().get (), m_side.back ());
-        if (m.is_true (m_side.back ())) m_side.pop_back ();
-        return store->get_arg (2);
+        cond = m.mk_eq (idx, j);
+        m_rw (cond);
+        if (!m.is_true (cond)) m_side.push_back (cond);
+        return a->get_arg (2);
       }
       else
       {
-        m_side.push_back (mk.mk_not (m.mk_eq (idx, j)));
-        m_rw (m_side.back ().get (), m_side.back ());
-        if (m.is_true (m_side.back ())) m_side.pop_back ();
-        array = store->get_arg (0);
+        cond = m.mk_not (m.mk_eq (idx, j));
+        m_rw (cond);
+        if (!m.is_true (cond)) m_side.push_back (cond);
+        array = a->get_arg (0);
       }
       if (!is_app (array)) break;
       a = to_app (array);
