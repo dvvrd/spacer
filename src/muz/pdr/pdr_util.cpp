@@ -987,6 +987,7 @@ namespace pdr {
       conjs[i] = reduce_expr (conjs [i].get ());
     
     conjs.append (m_side);
+    m_side.reset ();
     fml = m.mk_and(conjs.size(), conjs.c_ptr());        
     m_rw (fml);
   }
@@ -1011,7 +1012,7 @@ namespace pdr {
       for (unsigned i = 0; i < a->get_num_args (); ++i)
       {
         expr *arg = a->get_arg (i);
-        expr *narg;
+        expr *narg = NULL;
         
         if (!is_app (arg)) args.push_back (arg);
         else if (m_cache.find (to_app (arg), narg)) 
@@ -1033,8 +1034,7 @@ namespace pdr {
       }
       else r = a;
       
-      if (m_au.is_select (a->get_decl ()))
-        r = reduce_select (r);
+      if (m_au.is_select (r)) r = reduce_select (to_app(r));
       
       m_cache.insert (a, r);
     }
@@ -1052,19 +1052,16 @@ namespace pdr {
     return val1 == val2;
   }
   
-  expr *select_reducer::reduce_select (expr *e)
+  expr *select_reducer::reduce_select (app *a)
   {
-    if (!is_app (e)) return e;
+    if (!m_au.is_store (a->get_arg (0))) return a;
     
-    app* a = to_app (e);
-    if (!m_au.is_store (a->get_arg (0))) return e;
-    
+    expr* array = a->get_arg (0);
     expr *j = a->get_arg (1);
-    a = to_app (a->get_arg (0));
     
-    expr* array;
-    while (m_au.is_store (a))
+    while (m_au.is_store (array))
     {
+      a = to_app (array);
       SASSERT (a->get_num_args () == 2 && "Multi-dimensional arrays are not supported");
       expr *idx = a->get_arg (1);
       expr_ref cond (m);
@@ -1083,8 +1080,6 @@ namespace pdr {
         if (!m.is_true (cond)) m_side.push_back (cond);
         array = a->get_arg (0);
       }
-      if (!is_app (array)) break;
-      a = to_app (array);
     }
     
     expr* args[2] = {array, j};

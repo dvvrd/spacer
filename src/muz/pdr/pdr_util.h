@@ -182,7 +182,7 @@ namespace pdr {
     
     bool is_equals (expr *e1, expr *e2);
     expr *reduce_expr (expr *lit);
-    expr *reduce_select (expr *e);
+    expr *reduce_select (app *e);
     
   public:
     select_reducer (ast_manager &manager, model_ref &model);
