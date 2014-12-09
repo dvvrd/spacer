@@ -1056,13 +1056,13 @@ namespace pdr {
   {
     if (!m_au.is_store (a->get_arg (0))) return a;
     
+    SASSERT (a->get_num_args () == 2 && "Multi-dimensional arrays are not supported");
     expr* array = a->get_arg (0);
     expr *j = a->get_arg (1);
     
     while (m_au.is_store (array))
     {
       a = to_app (array);
-      SASSERT (a->get_num_args () == 2 && "Multi-dimensional arrays are not supported");
       expr *idx = a->get_arg (1);
       expr_ref cond (m);
       
