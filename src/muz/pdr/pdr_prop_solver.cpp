@@ -204,7 +204,8 @@ namespace pdr {
             for (; it != end; ++it) {
                 sub.insert(it->m_key, m.mk_true(), pr);
             }
-            scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
+            // scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
+            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer(m);
             rep->set_substitution(&sub);
             replace_proxies(*rep, es);
         }
