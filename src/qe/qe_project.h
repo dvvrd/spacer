@@ -18,6 +18,8 @@ namespace qe {
     void arith_project(model& model, app_ref_vector& vars, expr_ref& fml, expr_map& map);
 
     void array_project (model& model, app_ref_vector& vars, expr_ref& fml);
+
+    void array_project_simpl (model& model, app_ref_vector& vars, expr_ref& fml);
 };
 
 #endif
