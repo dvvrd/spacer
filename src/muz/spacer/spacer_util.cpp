@@ -917,6 +917,25 @@ namespace spacer {
         return !has_x;
     }
 
+    void model_evaluator::eval_heavy (model_ref& model, expr* fml, expr_ref& result) {
+        setup_model (model);
+        ptr_vector<expr> fmls; fmls.push_back (fml);
+        eval_fmls (fmls);
+        if (is_false (fml)) {
+            result = m.mk_false ();
+        }
+        else if (is_true (fml) || is_x (fml)) {
+            result = m.mk_true ();
+        }
+        else if (m_arith.is_int_real (fml)) {
+            result = m_arith.mk_numeral (get_number (fml), m_arith.is_int (fml));
+        }
+        else {
+            result = get_value (fml);
+        }
+        reset ();
+    }
+
     expr_ref model_evaluator::eval(model_ref& model, func_decl* d) {
         SASSERT(d->get_arity() == 0);
         expr_ref result(m);

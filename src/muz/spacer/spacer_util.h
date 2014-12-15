@@ -132,6 +132,8 @@ namespace spacer {
        */
        void operator()(expr* e) {} 
 
+       void eval_heavy (model_ref& mdl, expr* fml, expr_ref& result);
+
        expr_ref eval(model_ref& mdl, expr* e);
 
        expr_ref eval(model_ref& mdl, func_decl* d);
