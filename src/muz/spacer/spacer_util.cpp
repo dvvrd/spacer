@@ -1526,7 +1526,8 @@ namespace spacer {
                   );
             {
                 scoped_no_proof _sp (m);
-                qe::array_project_simpl (*M, array_vars, fml);
+                qe::array_project (*M, array_vars, fml);
+                //qe::array_project_simpl (*M, array_vars, fml);
             }
             vars.reset ();
             vars.append (array_vars);
