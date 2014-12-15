@@ -850,8 +850,8 @@ namespace spacer {
             UNREACHABLE();        
         }
     }
-    
-    bool model_evaluator::check_model(ptr_vector<expr> const& formulas) {
+
+    void model_evaluator::eval_fmls (ptr_vector<expr> const& formulas) {
         ptr_vector<expr> todo(formulas);
         
         while (!todo.empty()) {
@@ -893,7 +893,10 @@ namespace spacer {
                        <<(is_true(curr_e) ? "true" : is_false(curr_e) ? "false" : "unknown") << "\n";);
             SASSERT(!is_unknown(curr));
         }
-        
+    }
+    
+    bool model_evaluator::check_model(ptr_vector<expr> const& formulas) {
+        eval_fmls (formulas);
         bool has_x = false;
         for (unsigned i = 0; i < formulas.size(); ++i) {
             expr * form = formulas[i];

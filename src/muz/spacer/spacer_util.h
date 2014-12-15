@@ -101,6 +101,8 @@ namespace spacer {
         inline expr* get_value(expr* x) { return m_values.find(x); }
         inline void set_value(expr* x, expr* v) { set_v(x); m_refs.push_back(v); m_values.insert(x, v); }
         
+        void eval_fmls(ptr_vector<expr> const & formulas);
+
         bool check_model(ptr_vector<expr> const & formulas);
 
         bool extract_array_func_interp(expr* a, vector<expr_ref_vector>& stores, expr_ref& else_case);
