@@ -61,7 +61,7 @@ def isexec (fpath):
 
 def which(program):
     exe_file = os.path.join ('./', program)
-    if (isexec (exe_file)): return program
+    if (isexec (exe_file)): return exe_file
     for path in os.environ["PATH"].split(os.pathsep):
         exe_file = os.path.join(path, program)
         if isexec (exe_file):
