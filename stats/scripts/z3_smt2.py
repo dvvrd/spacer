@@ -45,6 +45,9 @@ def parseArgs (argv):
     p.add_argument ('--array-blast', dest='array_blast',
                     help='elim local array variables using heuristics',
                     action='store_true', default=False)
+    p.add_argument ('--use-heavy-mev', dest='use_heavy_mev',
+                    help='use heavy model evaluation routines for arrays',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -124,6 +127,9 @@ def main (argv):
 
     if args.array_blast_full:
         z3_args += ' fixedpoint.array_blast_full=true'
+
+    if args.use_heavy_mev:
+        z3_args += ' fixedpoint.use_heavy_mev=true'
 
     z3_args += ' ' + args.file
 

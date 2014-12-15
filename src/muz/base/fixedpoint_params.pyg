@@ -71,6 +71,7 @@ def_module_params('fixedpoint',
                     ('order_children', UINT, 0, 'SPACER: order of enqueuing children in non-linear rules : 0 (original), 1 (reverse)'),
                     ('eager_reach_check', BOOL, False, 'SPACER: eagerly check if a query is reachable using reachability facts of predecessors'),
                     ('validate_theory_core', BOOL, False, 'SPACER: validate every theory core'),
+                    ('use_heavy_mev', BOOL, False, 'SPACER: use heavy (best-effort) model evaluation, e.g., when arrays are present'),
 	                  ('tab_selection', SYMBOL, 'weight', 'selection method for tabular strategy: weight (default), first, var-use'),
                           ('dump_aig', SYMBOL, '', 'Dump clauses in AIG text format (AAG) to the given file name'),
                           ))

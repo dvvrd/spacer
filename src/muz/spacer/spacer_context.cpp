@@ -80,7 +80,8 @@ namespace spacer {
         m_all_init (false),
         //m_reachable(pm, (datalog::SPACER_CACHE_MODE)ctx.get_params().cache_mode()),
         m_reach_case_assumps (m),
-        _o_reach_case_assumps (m)
+        _o_reach_case_assumps (m),
+        m_mev (m)
     { init_sig (); }
 
     pred_transformer::~pred_transformer() {
@@ -175,10 +176,16 @@ namespace spacer {
      * }
      */
 
-    void pred_transformer::get_used_reach_fact (model_ref const& M, expr_ref& reach_fact) const {
+    void pred_transformer::get_used_reach_fact (model_ref& M, expr_ref& reach_fact) {
         expr_ref bval (m);
         for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
-            if (M->eval (m_reach_case_assumps.get (i), bval) && m.is_false (bval)) {
+            if (ctx.get_params ().use_heavy_mev ()) {
+                m_mev.eval_heavy (M, m_reach_case_assumps.get (i), bval);
+            }
+            else {
+                bval = m_mev.eval (M, m_reach_case_assumps.get (i));
+            }
+            if (m.is_false (bval)) {
                 reach_fact = m_reach_facts.get (i);
                 break;
             }
@@ -186,13 +193,19 @@ namespace spacer {
         SASSERT (reach_fact);
     }
 
-    void pred_transformer::get_used_o_reach_fact (model_ref const& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact) const {
+    void pred_transformer::get_used_o_reach_fact (model_ref& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact) {
         expr_ref bval (m);
         for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
             u_map<expr*> const& omap = m_o_reach_case_maps.get (i);
             expr* oassump;
             VERIFY (omap.find (oidx, oassump));
-            if (M->eval (oassump, bval) && m.is_false (bval)) {
+            if (ctx.get_params ().use_heavy_mev ()) {
+                m_mev.eval_heavy (M, oassump, bval);
+            }
+            else {
+                bval = m_mev.eval (M, oassump);
+            }
+            if (m.is_false (bval)) {
                 n_reach_fact = m_reach_facts.get (i);
                 pm.formula_n2o (n_reach_fact, o_reach_fact, oidx);
                 break;
@@ -201,14 +214,20 @@ namespace spacer {
         SASSERT (o_reach_fact);
     }
 
-    void pred_transformer::get_all_used_o_reach_facts (model_ref const& M, unsigned oidx, expr_ref& reach_fact) const {
+    void pred_transformer::get_all_used_o_reach_facts (model_ref& M, unsigned oidx, expr_ref& reach_fact) {
         expr_ref bval (m);
         expr_ref_vector fmls (m);
         for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
             u_map<expr*> const& omap = m_o_reach_case_maps.get (i);
             expr* oassump;
             VERIFY (omap.find (oidx, oassump));
-            if (M->eval (oassump, bval) && m.is_false (bval)) {
+            if (ctx.get_params ().use_heavy_mev ()) {
+                m_mev.eval_heavy (M, oassump, bval);
+            }
+            else {
+                bval = m_mev.eval (M, oassump);
+            }
+            if (m.is_false (bval)) {
                 expr_ref fact (m);
                 pm.formula_n2o (m_reach_facts.get (i), fact, oidx);
                 fmls.push_back (fact);
@@ -259,7 +278,7 @@ namespace spacer {
         SASSERT (cnt > 0);
     }
 
-    datalog::rule const* pred_transformer::find_rule(model& model, bool& is_concrete, vector<bool>& reach_pred_used, unsigned& num_reuse_reach) const {
+    datalog::rule const* pred_transformer::find_rule(model& model, bool& is_concrete, vector<bool>& reach_pred_used, unsigned& num_reuse_reach) {
         typedef obj_map<expr, datalog::rule const*> tag2rule;
         TRACE ("spacer_verbose",
                 tag2rule::iterator it = m_tag2rule.begin();
@@ -293,11 +312,17 @@ namespace spacer {
                     if (!reach_assump) {
                         is_concrete = false;
                     }
-                    else if (model.eval (reach_assump, vl)) {
+                    else {
+                        model_ref M (&model);
+                        if (ctx.get_params ().use_heavy_mev ()) {
+                            m_mev.eval_heavy (M, reach_assump, vl);
+                        }
+                        else {
+                            vl = m_mev.eval (M, reach_assump);
+                        }
                         if (m.is_true (vl)) used = true;
                         else is_concrete = false;
                     }
-                    else is_concrete = false;
 
                     reach_pred_used.push_back (used);
                     if (used) num_reuse_reach++;
@@ -1145,9 +1170,9 @@ namespace spacer {
     // ----------------
     // model_node
 
-    static bool is_ini(datalog::rule const& r) {
-        return r.get_uninterpreted_tail_size() == 0;
-    }
+    //static bool is_ini(datalog::rule const& r) {
+        //return r.get_uninterpreted_tail_size() == 0;
+    //}
 
     //unsigned model_node::m_count;
 
@@ -2120,7 +2145,8 @@ namespace spacer {
           m_inductive_lvl(0),
           m_expanded_lvl(0),
           m_cancel(false),
-          m_curr_model (0)
+          m_curr_model (0),
+          m_mev (m)
     {
     }
 
@@ -2772,7 +2798,7 @@ namespace spacer {
         return ex.to_expr();
     }
 
-    expr_ref context::get_ground_sat_answer () const {
+    expr_ref context::get_ground_sat_answer () {
         if (m_last_result != l_true) {
             verbose_stream () << "Sat answer unavailable when result is false\n";
             return expr_ref (m);
@@ -2856,7 +2882,12 @@ namespace spacer {
                 for (unsigned j = 0; j < sig_size; j++) {
                     expr_ref sig_arg (m), sig_val (m);
                     sig_arg = m.mk_const (ch_pt.get_spacer_manager ().o2o (ch_pt.sig (j), 0, i));
-                    sig_val = mev.eval (local_mdl, sig_arg);
+                    if (m_params.use_heavy_mev ()) {
+                        m_mev.eval_heavy (local_mdl, sig_arg, sig_val);
+                    }
+                    else {
+                        sig_val = m_mev.eval (local_mdl, sig_arg);
+                    }
                     ground_fact_conjs.push_back (m.mk_eq (sig_arg, sig_val));
                     ground_arg_vals.push_back (sig_val);
                 }
@@ -3142,9 +3173,22 @@ namespace spacer {
             expr_ref ch_reach (m), n_ch_reach (m);
             //ch_pt.get_all_used_o_reach_facts (M, i, ch_reach);
             ch_pt.get_used_o_reach_fact (M, i, ch_reach, n_ch_reach);
+            TRACE ("spacer",
+                    tout << mk_pp (ch_reach, m) << "\n";
+                    expr_ref bval (m);
+                    bval = m_mev.eval (M, ch_reach);
+                    tout << "val in model: \n";
+                    tout << mk_pp (bval, m) << "\n";
+                  );
             DEBUG_CODE (
                 expr_ref bval (m);
-                SASSERT (M->eval (ch_reach, bval) && m.is_true (bval));
+                if (m_params.use_heavy_mev ()) {
+                    m_mev.eval_heavy (M, ch_reach, bval);
+                }
+                else {
+                    bval = m_mev.eval (M, ch_reach);
+                }
+                SASSERT (m.is_true (bval));
             );
             path_cons.push_back (ch_reach);
             child_reach_facts.push_back (n_ch_reach);

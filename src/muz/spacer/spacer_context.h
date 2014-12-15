@@ -99,6 +99,7 @@ namespace spacer {
                                         // predicate appears as a body predicate
                                         // in any rule
         expr_ref_vector              _o_reach_case_assumps; // dummy to have references to the o-versions
+        model_evaluator              m_mev;
 
         // reach fact justification
         struct reach_fact_just {
@@ -165,15 +166,15 @@ namespace spacer {
         bool is_reachable_known (expr* state, model_ref* M = 0);
         bool is_reachable_with_reach_facts (model_node& n, datalog::rule const& r);
         //void get_reach_explanation (model_ref& M, expr_ref& reach_fact);
-        void get_used_reach_fact (model_ref const& M, expr_ref& reach_fact) const;
-        void get_used_o_reach_fact (model_ref const& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact) const;
-        void get_all_used_o_reach_facts (model_ref const& M, unsigned oidx, expr_ref& reach_fact) const;
+        void get_used_reach_fact (model_ref& M, expr_ref& reach_fact);
+        void get_used_o_reach_fact (model_ref& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact);
+        void get_all_used_o_reach_facts (model_ref& M, unsigned oidx, expr_ref& reach_fact);
         datalog::rule const* get_just_rule (expr* fact);
         expr_ref_vector const* get_just_pred_facts (expr* fact);
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
-        datalog::rule const* find_rule(model& model, bool& is_concrete, vector<bool>& reach_pred_used, unsigned& num_reuse_reach) const;
+        datalog::rule const* find_rule(model& model, bool& is_concrete, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
         void find_rules (model_core const& model, svector<datalog::rule const*>& rules) const;
         expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
         ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }
@@ -600,6 +601,7 @@ namespace spacer {
         model_converter_ref  m_mc;
         proof_converter_ref  m_pc;
         model_ref            m_curr_model; // sat model for the current model_node whose reachability is being checked
+        model_evaluator      m_mev;
         
         // Functions used by search.
         void solve_impl();
@@ -668,7 +670,7 @@ namespace spacer {
          * get bottom-up (from query) sequence of ground predicate instances
          * (for e.g. P(0,1,0,0,3)) that together form a ground derivation to query
          */
-        expr_ref          get_ground_sat_answer () const;
+        expr_ref          get_ground_sat_answer ();
 
         bool              is_dl() const { return m_fparams.m_arith_mode == AS_DIFF_LOGIC; }
         bool              is_utvpi() const { return m_fparams.m_arith_mode == AS_UTVPI; }
