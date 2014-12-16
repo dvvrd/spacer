@@ -2312,11 +2312,7 @@ namespace qe {
         }
     };
 
-    /**
-     * handle only simple equalities between arrays:
-     *   e.g. (a=b) where either a or b is the array to be eliminated
-     */
-    class array_project_simpl_util {
+    class array_project_selects_util {
         ast_manager&                m;
         array_util                  m_arr_u;
         arith_util                  m_ari_u;
@@ -2326,11 +2322,11 @@ namespace qe {
         expr_ref_vector             m_idx_vals;
         app_ref_vector              m_sel_consts;
         expr_ref_vector             m_pinned;   // to ensure a reference
-        expr_ref_vector             m_aux_lits;
+        expr_ref_vector             m_idx_lits;
         model_ref                   M;
         model_evaluator_array_util  m_mev;
         th_rewriter                 m_rw;
-
+        expr_safe_replace           m_sub;
 
         struct cant_project {};
 
@@ -2340,7 +2336,8 @@ namespace qe {
             m_idx_vals.reset ();
             m_sel_consts.reset ();
             m_pinned.reset ();
-            m_aux_lits.reset ();
+            m_idx_lits.reset ();
+            m_sub.reset ();
         }
 
         bool is_equals (expr *e1, expr *e2) {
@@ -2351,12 +2348,12 @@ namespace qe {
             return (val1 == val2);
         }
 
-        void add_aux_cond (expr_ref& cond) {
+        void add_idx_cond (expr_ref& cond) {
             m_rw (cond);
-            if (!m.is_true (cond)) m_aux_lits.push_back (cond);
+            if (!m.is_true (cond)) m_idx_lits.push_back (cond);
         }
 
-        expr* project_sel_after_stores (expr *e) {
+        expr* sel_after_stores (expr *e) {
             if (!is_app (e)) return e;
 
             expr *r = 0;
@@ -2394,7 +2391,7 @@ namespace qe {
                 }
                 else r = a;
 
-                if (m_arr_u.is_select (r)) r = project_sel_after_stores_core (to_app(r));
+                if (m_arr_u.is_select (r)) r = sel_after_stores_core (to_app(r));
 
                 m_elim_stores_cache.insert (a, r);
             }
@@ -2403,7 +2400,7 @@ namespace qe {
             return r;
         }
 
-        expr* project_sel_after_stores_core (app *a) {
+        expr* sel_after_stores_core (app *a) {
             if (!m_arr_u.is_store (a->get_arg (0))) return a;
 
             SASSERT (a->get_num_args () == 2 && "Multi-dimensional arrays are not supported");
@@ -2417,12 +2414,12 @@ namespace qe {
 
                 if (is_equals (idx, j)) {
                     cond = m.mk_eq (idx, j);
-                    add_aux_cond (cond);
+                    add_idx_cond (cond);
                     return a->get_arg (2);
                 }
                 else {
                     cond = m.mk_not (m.mk_eq (idx, j));
-                    add_aux_cond (cond);
+                    add_idx_cond (cond);
                     array = a->get_arg (0);
                 }
             }
@@ -2474,7 +2471,7 @@ namespace qe {
          *
          * update sub with val consts for sel terms
          */
-        void project_selects (ptr_vector<app> const& sel_terms, expr_substitution& sub) {
+        void ackermann (ptr_vector<app> const& sel_terms) {
             if (sel_terms.empty ()) return;
 
             expr* v = sel_terms.get (0)->get_arg (0); // array variable
@@ -2496,10 +2493,10 @@ namespace qe {
                         // idx belongs to the jth equivalence class;
                         // substitute sel term with ith sel const
                         expr* c = m_sel_consts.get (j);
-                        sub.insert (a, c);
+                        m_sub.insert (a, c);
                         // add equality (idx == repr)
                         expr* repr = m_idx_reprs.get (j);
-                        m_aux_lits.push_back (m.mk_eq (idx, repr));
+                        m_idx_lits.push_back (m.mk_eq (idx, repr));
 
                         is_new = false;
                         break;
@@ -2512,7 +2509,7 @@ namespace qe {
                     app_ref c (m.mk_fresh_const ("sel", val_sort), m);
                     m_sel_consts.push_back (c);
                     // substitute sel term with new const
-                    sub.insert (a, c);
+                    m_sub.insert (a, c);
                     // extend M to include c
                     m_mev.eval (*M, a, val);
                     M->register_decl (c->get_decl (), val);
@@ -2542,37 +2539,32 @@ namespace qe {
             }
 
             for (unsigned i = start; i < end-1; i++) {
-                m_aux_lits.push_back (m_ari_u.mk_lt (m_idx_reprs.get (i),
+                m_idx_lits.push_back (m_ari_u.mk_lt (m_idx_reprs.get (i),
                                                      m_idx_reprs.get (i+1)));
             }
         }
 
+        /**
+         * project selects
+         * populates idx lits and obtains substitution for sel terms
+         */
         void project (app_ref_vector& vars, expr_ref& fml) {
             typedef obj_map<app, ptr_vector<app>*> sel_map;
 
-            // 1. elim equalities using qe_lite
-            qe_lite qel (m);
-            qel (vars, fml);
             if (vars.empty ()) return;
 
-            TRACE ("qe",
-                    tout << "after qe lite:\n";
-                    tout << mk_pp (fml, m) << "\n";
-                  );
-
-            // 2. proj sel after stores
-            fml = project_sel_after_stores (fml);
-            // add-in the aux lits
-            m_aux_lits.push_back (fml);
-            fml = m.mk_and (m_aux_lits.size (), m_aux_lits.c_ptr ());
-            m_aux_lits.reset ();
+            // 1. proj sel after stores
+            fml = sel_after_stores (fml);
 
             TRACE ("qe",
                     tout << "after projecting sel after stores:\n";
                     tout << mk_pp (fml, m) << "\n";
+                    for (unsigned i = 0; i < m_idx_lits.size (); i++) {
+                        tout << mk_pp (m_idx_lits.get (i), m) << "\n";
+                    }
                   );
 
-            // 3. proj selects over vars
+            // 2. proj selects over vars
 
             // indicator for arrays to eliminate
             ast_mark arr_test;
@@ -2587,32 +2579,22 @@ namespace qe {
 
             // collect sel terms -- populate the map
             collect_selects (fml, arr_test, sel_terms);
+            for (unsigned i = 0; i < m_idx_lits.size (); i++) {
+                collect_selects (m_idx_lits.get (i), arr_test, sel_terms);
+            }
 
             // model based ackermannization
-            expr_substitution sub (m);
             sel_map::iterator begin = sel_terms.begin (),
                               end = sel_terms.end ();
             for (sel_map::iterator it = begin; it != end; it++) {
-                project_selects (*(it->m_value), sub);
+                ackermann (*(it->m_value));
             }
-            // conjoin aux lits
-            m_aux_lits.push_back (fml);
-            fml = m.mk_and (m_aux_lits.size (), m_aux_lits.c_ptr ());
-            m_aux_lits.reset ();
 
             TRACE ("qe",
-                    tout << "after model based Ackermannization (before sub):\n";
-                    tout << mk_pp (fml, m) << "\n";
-                  );
-
-            // substitute for sel terms
-            scoped_ptr<expr_replacer> rep = mk_default_expr_replacer (m);
-            rep->set_substitution (&sub);
-            (*rep)(fml);
-
-            TRACE ("qe",
-                    tout << "after mbp of arrays:\n";
-                    tout << mk_pp (fml, m) << "\n";
+                    tout << "idx lits after ackermannization:\n";
+                    for (unsigned i = 0; i < m_idx_lits.size (); i++) {
+                        tout << mk_pp (m_idx_lits.get (i), m) << "\n";
+                    }
                   );
 
             // dealloc
@@ -2621,9 +2603,25 @@ namespace qe {
             }
         }
 
+        void mk_result (expr_ref& fml) {
+            // conjoin aux lits
+            expr_ref_vector lits (m);
+            lits.append (m_idx_lits);
+            lits.push_back (fml);
+            fml = m.mk_and (lits.size (), lits.c_ptr ());
+
+            // substitute for sel terms
+            m_sub (fml);
+
+            TRACE ("qe",
+                    tout << "after projection of selects:\n";
+                    tout << mk_pp (fml, m) << "\n";
+                  );
+        }
+
     public:
 
-        array_project_simpl_util (ast_manager& m):
+        array_project_selects_util (ast_manager& m):
             m (m),
             m_arr_u (m),
             m_ari_u (m),
@@ -2631,9 +2629,10 @@ namespace qe {
             m_idx_vals (m),
             m_sel_consts (m),
             m_pinned (m),
-            m_aux_lits (m),
+            m_idx_lits (m),
             m_mev (m),
-            m_rw (m)
+            m_rw (m),
+            m_sub (m)
         {}
 
         void operator () (model& mdl, app_ref_vector& vars, expr_ref& fml) {
@@ -2643,6 +2642,7 @@ namespace qe {
             try {
                 reset ();
                 project (vars, fml);
+                mk_result (fml);
                 new_vars.append (m_sel_consts);
             }
             catch (cant_project) {
@@ -2687,9 +2687,9 @@ namespace qe {
         ap (mdl, vars, fml);
     }
 
-    void array_project_simpl (model& mdl, app_ref_vector& vars, expr_ref& fml) {
+    void array_project_selects (model& mdl, app_ref_vector& vars, expr_ref& fml) {
         ast_manager& m = vars.get_manager ();
-        array_project_simpl_util ap (m);
+        array_project_selects_util ap (m);
         ap (mdl, vars, fml);
     }
 
