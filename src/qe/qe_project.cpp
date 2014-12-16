@@ -1109,6 +1109,456 @@ namespace qe {
         }
     };
 
+
+    class array_project_eqs_util {
+        ast_manager&                m;
+        array_util                  m_arr_u;
+        ast_mark                    m_has_stores;
+        app_ref_vector              m_aux_vars;
+        expr_ref_vector             m_aux_lits;
+        expr_ref_vector             m_idx_lits;
+        model_ref                   M;
+        model_evaluator_array_util  m_mev;
+        app_ref                     m_v;    // array var to eliminate
+        expr_safe_replace           m_true_sub;
+        expr_safe_replace           m_false_sub;
+        expr_ref                    m_subst_term;
+
+        struct cant_project {};
+
+        void reset () {
+            m_has_stores.reset ();
+            m_aux_vars.reset ();
+            m_aux_lits.reset ();
+            m_idx_lits.reset ();
+        }
+
+        /**
+         * find all array equalities on m_v or containing stores on/of m_v
+         *
+         * also mark terms containing stores on/of m_v
+         */
+        void find_arr_eqs (expr_ref const& fml, expr_ref_vector& eqs) {
+            if (!is_app (fml)) return;
+            ast_mark done;
+            ptr_vector<app> todo;
+            todo.push_back (to_app (fml));
+            while (!todo.empty ()) {
+                app* a = todo.back ();
+                if (done.is_marked (a)) {
+                    todo.pop_back ();
+                    continue;
+                }
+                bool all_done = true;
+                bool args_have_stores = false;
+                unsigned num_args = a->get_num_args ();
+                for (unsigned i = 0; i < num_args; i++) {
+                    expr* arg = a->get_arg (i);
+                    if (!is_app (arg)) continue;
+                    if (!done.is_marked (arg)) {
+                        all_done = false;
+                        todo.push_back (to_app (arg));
+                    }
+                    else if (!args_have_stores && m_has_stores.is_marked (arg)) {
+                        args_have_stores = true;
+                    }
+                }
+                if (!all_done) continue;
+                todo.pop_back ();
+
+                // mark if a has stores
+                if ((!m_arr_u.is_select (a) && args_have_stores) ||
+                        (m_arr_u.is_store (a) && (a->get_arg (0) == m_v))) {
+                    m_has_stores.mark (a, true);
+
+                    TRACE ("qe",
+                            tout << "has stores:\n";
+                            tout << mk_pp (a, m) << "\n";
+                          );
+                }
+
+                // check if a is a relevant array equality
+                if (m.is_eq (a)) {
+                    expr* a0 = to_app (a)->get_arg (0);
+                    expr* a1 = to_app (a)->get_arg (1);
+                    if (a0 == m_v || a1 == m_v ||
+                            (m_arr_u.is_array (a0) && m_has_stores.is_marked (a))) {
+                        eqs.push_back (a);
+                    }
+                }
+                // else, we can check for disequalities and handle them using extensionality,
+                // but it's not necessary
+
+                done.mark (a, true);
+            }
+        }
+
+        /**
+         * factor out select terms on m_v using fresh consts
+         */
+        void factor_selects (app_ref& fml) {
+            expr_map sel_cache (m);
+            ast_mark done;
+            ptr_vector<app> todo;
+            expr_ref_vector pinned (m); // to ensure a reference
+
+            todo.push_back (fml);
+            while (!todo.empty ()) {
+                app* a = todo.back ();
+                if (done.is_marked (a)) {
+                    todo.pop_back ();
+                    continue;
+                }
+                expr_ref_vector args (m);
+                bool all_done = true;
+                for (unsigned i = 0; i < a->get_num_args (); i++) {
+                    expr* arg = a->get_arg (i);
+                    if (!is_app (arg)) continue;
+                    if (!done.is_marked (arg)) {
+                        all_done = false;
+                        todo.push_back (to_app (arg));
+                    }
+                    else if (all_done) { // all done so far..
+                        expr* arg_new = 0; proof* pr;
+                        sel_cache.get (arg, arg_new, pr);
+                        if (!arg_new) {
+                            arg_new = arg;
+                        }
+                        args.push_back (arg_new);
+                    }
+                }
+                if (!all_done) continue;
+                todo.pop_back ();
+
+                expr_ref a_new (m.mk_app (a->get_decl (), args.size (), args.c_ptr ()), m);
+
+                // if a_new is select on m_v, introduce new constant
+                if (m_arr_u.is_select (a) &&
+                        (args.get (0) == m_v || m_has_stores.is_marked (args.get (0)))) {
+                    sort* val_sort = get_array_range (m.get_sort (m_v));
+                    app_ref val_const (m.mk_fresh_const ("sel", val_sort), m);
+                    m_aux_vars.push_back (val_const);
+                    // extend M to include val_const
+                    expr_ref val (m);
+                    m_mev.eval (*M, a_new, val);
+                    M->register_decl (val_const->get_decl (), val);
+                    // add equality
+                    m_aux_lits.push_back (m.mk_eq (val_const, a_new));
+                    // replace select by const
+                    a_new = val_const;
+                }
+
+                if (a != a_new) {
+                    sel_cache.insert (a, a_new, 0);
+                    pinned.push_back (a_new);
+                }
+                done.mark (a, true);
+            }
+            expr* res = 0; proof* pr;
+            sel_cache.get (fml, res, pr);
+            if (res) {
+                fml = to_app (res);
+            }
+        }
+
+        /**
+         * convert partial equality expression p_exp to an equality by
+         * recursively adding stores on diff indices
+         *
+         * add stores on lhs or rhs depending on whether stores_on_rhs is false/true
+         */
+        void convert_peq_to_eq (expr* p_exp, app_ref& eq, bool stores_on_rhs = true) {
+            peq p (to_app (p_exp), m);
+            app_ref_vector diff_val_consts (m);
+            p.mk_eq (diff_val_consts, eq, stores_on_rhs);
+            // extend M to include diff_val_consts
+            expr_ref arr (m);
+            expr_ref_vector I (m);
+            p.lhs (arr);
+            p.get_diff_indices (I);
+            expr_ref val (m);
+            unsigned num_diff = diff_val_consts.size ();
+            SASSERT (num_diff == I.size ());
+            for (unsigned i = 0; i < num_diff; i++) {
+                // mk val term
+                ptr_vector<expr> sel_args;
+                sel_args.push_back (arr);
+                sel_args.push_back (I.get (i));
+                expr_ref val_term (m_arr_u.mk_select (sel_args.size (), sel_args.c_ptr ()), m);
+                // evaluate and assign to ith diff_val_const
+                m_mev.eval (*M, val_term, val);
+                M->register_decl (diff_val_consts.get (i)->get_decl (), val);
+            }
+        }
+
+        /**
+         * mk (e0 ==indices e1)
+         *
+         * result has stores if either e0 or e1 or an index term has stores
+         */
+        void mk_peq (expr* e0, expr* e1, unsigned num_indices, expr* const* indices, app_ref& result) {
+            peq p (e0, e1, num_indices, indices, m);
+            p.mk_peq (result);
+        }
+
+        void find_subst_term (app* eq) {
+            app_ref p_exp (m);
+            mk_peq (eq->get_arg (0), eq->get_arg (1), 0, 0, p_exp);
+            bool subst_eq_found = false;
+            while (true) {
+                TRACE ("qe",
+                        tout << "processing peq:\n";
+                        tout << mk_pp (p_exp, m) << "\n";
+                      );
+
+                peq p (p_exp, m);
+                expr_ref lhs (m), rhs (m);
+                p.lhs (lhs); p.rhs (rhs);
+                if (!m_has_stores.is_marked (lhs)) {
+                    std::swap (lhs, rhs);
+                }
+                if (m_has_stores.is_marked (lhs)) {
+                    /** project using the equivalence:
+                     *
+                     *  (store(arr0,idx,x) ==I arr1) <->
+                     *
+                     *  (idx \in I => (arr0 ==I arr1)) /\
+                     *  (idx \not\in I => (arr0 ==I+idx arr1) /\ (arr1[idx] == x)))
+                     */
+                    expr_ref_vector I (m);
+                    p.get_diff_indices (I);
+                    app* a_lhs = to_app (lhs);
+                    expr* arr0 = a_lhs->get_arg (0);
+                    expr* idx = a_lhs->get_arg (1);
+                    expr* x = a_lhs->get_arg (2);
+                    expr* arr1 = rhs;
+                    // check if (idx \in I) in M
+                    bool idx_in_I = false;
+                    expr_ref_vector idx_diseq (m);
+                    if (!I.empty ()) {
+                        expr_ref val (m);
+                        m_mev.eval (*M, idx, val);
+                        for (unsigned i = 0; i < I.size () && !idx_in_I; i++) {
+                            if (idx == I.get (i)) {
+                                idx_in_I = true;
+                            }
+                            else {
+                                expr_ref val1 (m);
+                                expr* idx1 = I.get (i);
+                                expr_ref idx_eq (m.mk_eq (idx, idx1), m);
+                                m_mev.eval (*M, idx1, val1);
+                                if (val == val1) {
+                                    idx_in_I = true;
+                                    m_idx_lits.push_back (idx_eq);
+                                }
+                                else {
+                                    idx_diseq.push_back (m.mk_not (idx_eq));
+                                }
+                            }
+                        }
+                    }
+                    if (idx_in_I) {
+                        TRACE ("qe",
+                                tout << "store index in diff indices:\n";
+                                tout << mk_pp (m_idx_lits.back (), m) << "\n";
+                              );
+
+                        // arr0 ==I arr1
+                        mk_peq (arr0, arr1, I.size (), I.c_ptr (), p_exp);
+
+                        TRACE ("qe",
+                                tout << "new peq:\n";
+                                tout << mk_pp (p_exp, m) << "\n";
+                              );
+                    }
+                    else {
+                        m_idx_lits.append (idx_diseq);
+                        // arr0 ==I+idx arr1
+                        I.push_back (idx);
+                        mk_peq (arr0, arr1, I.size (), I.c_ptr (), p_exp);
+
+                        TRACE ("qe",
+                                tout << "new peq:\n";
+                                tout << mk_pp (p_exp, m) << "\n";
+                              );
+
+                        // arr1[idx] == x
+                        ptr_vector<expr> sel_args;
+                        sel_args.push_back (arr1);
+                        sel_args.push_back (idx);
+                        expr_ref arr1_idx (m_arr_u.mk_select (sel_args.size (), sel_args.c_ptr ()), m);
+                        expr_ref eq (m.mk_eq (arr1_idx, x), m);
+                        m_aux_lits.push_back (eq);
+
+                        TRACE ("qe",
+                                tout << "new eq:\n";
+                                tout << mk_pp (eq, m) << "\n";
+                              );
+                    }
+                }
+                else if (lhs == rhs) { // trivial peq (a ==I a)
+                    break;
+                }
+                else if (lhs == m_v || rhs == m_v) {
+                    subst_eq_found = true;
+                    TRACE ("qe",
+                            tout << "subst eq found!\n";
+                          );
+                    break;
+                }
+                else {
+                    UNREACHABLE ();
+                }
+            }
+
+            // factor out select terms on m_v from p_exp using fresh constants
+            if (subst_eq_found) {
+                factor_selects (p_exp);
+
+                TRACE ("qe",
+                        tout << "after factoring selects:\n";
+                        tout << mk_pp (p_exp, m) << "\n";
+                        for (unsigned i = m_aux_lits.size () - m_aux_vars.size (); i < m_aux_lits.size (); i++) {
+                            tout << mk_pp (m_aux_lits.get (i), m) << "\n";
+                        }
+                      );
+
+                // find subst_term
+                bool stores_on_rhs = true;
+                app* a = to_app (p_exp);
+                if (a->get_arg (1) == m_v) {
+                    stores_on_rhs = false;
+                }
+                app_ref eq (m);
+                convert_peq_to_eq (p_exp, eq, stores_on_rhs);
+                m_subst_term = eq->get_arg (1);
+
+                TRACE ("qe",
+                        tout << "subst term found:\n";
+                        tout << mk_pp (m_subst_term, m) << "\n";
+                      );
+            }
+        }
+
+        /**
+         * try to substitute for m_v, using array equalities
+         *
+         * compute substitution term and aux lits
+         */
+        void project (expr_ref const& fml) {
+            expr_ref_vector eqs (m);
+
+            find_arr_eqs (fml, eqs);
+            TRACE ("qe",
+                    tout << "array equalities:\n";
+                    for (unsigned i = 0; i < eqs.size (); i++) {
+                        tout << mk_pp (eqs.get (i), m) << "\n";
+                    }
+                  );
+
+            // find subst term
+            // TODO: better ordering of eqs?
+            for (unsigned i = 0; !m_subst_term && i < eqs.size (); i++) {
+                TRACE ("qe",
+                        tout << "array equality:\n";
+                        tout << mk_pp (eqs.get (i), m) << "\n";
+                      );
+
+                expr* curr_eq = eqs.get (i);
+
+                // evaluate curr_eq in M
+                app* a = to_app (curr_eq);
+                expr_ref val (m);
+                m_mev.eval_array_eq (*M, a, a->get_arg (0), a->get_arg (1), val);
+                if (!val) {
+                    // unable to evaluate. set to true?
+                    val = m.mk_true ();
+                }
+                SASSERT (m.is_true (val) || m.is_false (val));
+                TRACE ("qe",
+                        tout << "true in model:\n";
+                        tout << mk_pp (val, m) << "\n";
+                      );
+
+                if (m.is_false (val)) {
+                    m_false_sub.insert (curr_eq, m.mk_false ());
+                }
+                else {
+                    m_true_sub.insert (curr_eq, m.mk_true ());
+                    // try to find subst term
+                    find_subst_term (to_app (curr_eq));
+                }
+            }
+        }
+
+        void mk_result (expr_ref& fml) {
+            // add in aux_lits and idx_lits
+            expr_ref_vector lits (m);
+            // TODO: eliminate possible duplicates, especially in idx_lits
+            //       theory rewriting is a possibility, but not sure if it
+            //          introduces unwanted terms such as ite's
+            lits.append (m_idx_lits);
+            lits.append (m_aux_lits);
+            lits.push_back (fml);
+            fml = m.mk_and (lits.size (), lits.c_ptr ());
+
+            if (m_subst_term) {
+                m_true_sub.insert (m_v, m_subst_term);
+                m_true_sub (fml);
+            }
+            else {
+                m_true_sub (fml);
+                m_false_sub (fml);
+            }
+        }
+
+    public:
+
+        array_project_eqs_util (ast_manager& m):
+            m (m),
+            m_arr_u (m),
+            m_aux_vars (m),
+            m_aux_lits (m),
+            m_idx_lits (m),
+            m_mev (m),
+            m_v (m),
+            m_true_sub (m),
+            m_false_sub (m),
+            m_subst_term (m)
+        {}
+
+        void operator () (model& mdl, app_ref_vector& vars, expr_ref& fml) {
+            app_ref_vector new_vars (m);
+            M = &mdl;
+            for (unsigned i = 0; i < vars.size (); i++) {
+                m_v = vars.get (i);
+                if (!m_arr_u.is_array (m_v)) {
+                    TRACE ("qe",
+                            tout << "not an array variable: " << mk_pp (m_v, m) << "\n";
+                          );
+                    new_vars.push_back (m_v);
+                    continue;
+                }
+                TRACE ("qe",
+                        tout << "projecting variable: " << mk_pp (m_v, m) << "\n";
+                      );
+                try {
+                    reset ();
+                    project (fml);
+                    mk_result (fml);
+                    new_vars.append (m_aux_vars);
+                }
+                catch (cant_project) {
+                    IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(m_v, m) << "\n";);
+                    new_vars.push_back(m_v);
+                }
+            }
+            vars.reset ();
+            vars.append (new_vars);
+        }
+    };
+
+
     class array_project_util {
         ast_manager&                m;
         array_util                  m_arr_u;
@@ -2240,6 +2690,12 @@ namespace qe {
     void array_project_simpl (model& mdl, app_ref_vector& vars, expr_ref& fml) {
         ast_manager& m = vars.get_manager ();
         array_project_simpl_util ap (m);
+        ap (mdl, vars, fml);
+    }
+
+    void array_project_eqs (model& mdl, app_ref_vector& vars, expr_ref& fml) {
+        ast_manager& m = vars.get_manager ();
+        array_project_eqs_util ap (m);
         ap (mdl, vars, fml);
     }
 }
