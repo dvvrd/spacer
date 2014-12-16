@@ -162,7 +162,7 @@ namespace spacer {
      * 2. for remaining boolean vars, substitute using M
      * 3. for remaining arith vars, use LW projection
      */
-    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M);
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, bool project_all_arr_stores = false);
 
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
 }

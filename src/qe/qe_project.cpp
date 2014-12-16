@@ -2327,6 +2327,9 @@ namespace qe {
         model_evaluator_array_util  m_mev;
         th_rewriter                 m_rw;
         expr_safe_replace           m_sub;
+        ast_mark                    m_arr_test;
+        ast_mark                    m_has_stores;
+        bool                        m_project_all_stores;
 
         struct cant_project {};
 
@@ -2338,6 +2341,8 @@ namespace qe {
             m_pinned.reset ();
             m_idx_lits.reset ();
             m_sub.reset ();
+            m_arr_test.reset ();
+            m_has_stores.reset ();
         }
 
         bool is_equals (expr *e1, expr *e2) {
@@ -2351,6 +2356,19 @@ namespace qe {
         void add_idx_cond (expr_ref& cond) {
             m_rw (cond);
             if (!m.is_true (cond)) m_idx_lits.push_back (cond);
+        }
+
+        bool has_stores (expr* e) {
+            if (m_project_all_stores) return true;
+            return m_has_stores.is_marked (e);
+        }
+
+        void mark_stores (app* a, bool args_have_stores) {
+            if (m_project_all_stores) return;
+            if (args_have_stores ||
+                    (m_arr_u.is_store (a) && m_arr_test.is_marked (a->get_arg (0)))) {
+                m_has_stores.mark (a, true);
+            }
         }
 
         expr* sel_after_stores (expr *e) {
@@ -2367,6 +2385,7 @@ namespace qe {
                 unsigned sz = todo.size ();
                 expr_ref_vector args (m);
                 bool dirty = false;
+                bool args_have_stores = false;
 
                 for (unsigned i = 0; i < a->get_num_args (); ++i) {
                     expr *arg = a->get_arg (i);
@@ -2376,6 +2395,9 @@ namespace qe {
                     else if (m_elim_stores_cache.find (arg, narg)) { 
                         args.push_back (narg);
                         dirty |= (arg != narg);
+                        if (!args_have_stores && has_stores (narg)) {
+                            args_have_stores = true;
+                        }
                     }
                     else {
                         todo.push_back (to_app (arg));
@@ -2391,7 +2413,12 @@ namespace qe {
                 }
                 else r = a;
 
-                if (m_arr_u.is_select (r)) r = sel_after_stores_core (to_app(r));
+                if (m_arr_u.is_select (r) && has_stores (to_app (r)->get_arg (0))) {
+                    r = sel_after_stores_core (to_app(r));
+                }
+                else {
+                    mark_stores (to_app (r), args_have_stores);
+                }
 
                 m_elim_stores_cache.insert (a, r);
             }
@@ -2431,9 +2458,9 @@ namespace qe {
         }
 
         /**
-         * collect sel terms on array vars as given by arr_test
+         * collect sel terms on array vars as given by m_arr_test
          */
-        void collect_selects (expr* fml, ast_mark const& arr_test, obj_map<app, ptr_vector<app>*>& sel_terms) {
+        void collect_selects (expr* fml, obj_map<app, ptr_vector<app>*>& sel_terms) {
             if (!is_app (fml)) return;
             ast_mark done;
             ptr_vector<app> todo;
@@ -2457,7 +2484,7 @@ namespace qe {
                 todo.pop_back ();
                 if (m_arr_u.is_select (a)) {
                     expr* arr = a->get_arg (0);
-                    if (arr_test.is_marked (arr)) {
+                    if (m_arr_test.is_marked (arr)) {
                         ptr_vector<app>* lst = sel_terms.find (to_app (arr));;
                         lst->push_back (a);
                     }
@@ -2549,9 +2576,8 @@ namespace qe {
          * populates idx lits and obtains substitution for sel terms
          */
         void project (app_ref_vector& vars, expr_ref& fml) {
-            typedef obj_map<app, ptr_vector<app>*> sel_map;
-
             if (vars.empty ()) return;
+            typedef obj_map<app, ptr_vector<app>*> sel_map;
 
             // 1. proj sel after stores
             fml = sel_after_stores (fml);
@@ -2566,21 +2592,17 @@ namespace qe {
 
             // 2. proj selects over vars
 
-            // indicator for arrays to eliminate
-            ast_mark arr_test;
             // empty map from array var to sel terms over it
             sel_map sel_terms;
             for (unsigned i = 0; i < vars.size (); i++) {
-                app* v = vars.get (i);
-                arr_test.mark (v, true);
                 ptr_vector<app>* lst = alloc (ptr_vector<app>);
-                sel_terms.insert (v, lst);
+                sel_terms.insert (vars.get (i), lst);
             }
 
             // collect sel terms -- populate the map
-            collect_selects (fml, arr_test, sel_terms);
+            collect_selects (fml, sel_terms);
             for (unsigned i = 0; i < m_idx_lits.size (); i++) {
-                collect_selects (m_idx_lits.get (i), arr_test, sel_terms);
+                collect_selects (m_idx_lits.get (i), sel_terms);
             }
 
             // model based ackermannization
@@ -2635,9 +2657,16 @@ namespace qe {
             m_sub (m)
         {}
 
-        void operator () (model& mdl, app_ref_vector& vars, expr_ref& fml) {
+        void operator () (model& mdl, app_ref_vector& vars, expr_ref& fml, bool project_all_stores = false) {
             app_ref_vector new_vars (m);
             M = &mdl;
+            m_project_all_stores = project_all_stores;
+
+            // mark vars to eliminate
+            for (unsigned i = 0; i < vars.size (); i++) {
+                m_arr_test.mark (vars.get (i), true);
+            }
+
             // assume all vars are of array sort
             try {
                 reset ();
@@ -2689,10 +2718,10 @@ namespace qe {
      * }
      */
 
-    void array_project_selects (model& mdl, app_ref_vector& vars, expr_ref& fml) {
+    void array_project_selects (model& mdl, app_ref_vector& vars, expr_ref& fml, bool project_all_stores) {
         ast_manager& m = vars.get_manager ();
         array_project_selects_util ap (m);
-        ap (mdl, vars, fml);
+        ap (mdl, vars, fml, project_all_stores);
     }
 
     void array_project_eqs (model& mdl, app_ref_vector& vars, expr_ref& fml) {
