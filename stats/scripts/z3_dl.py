@@ -55,6 +55,9 @@ def parseArgs (argv):
     p.add_argument ('--array-blast', dest='array_blast',
                     help='elim local array variables using heuristics',
                     action='store_true', default=False)
+    p.add_argument ('--use-heavy-mev', dest='use_heavy_mev',
+                    help='use heavy model evaluation routines for arrays',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -91,6 +94,9 @@ def main (argv):
 
     if args.array_blast_full:
         fp.set (array_blast_full=True)
+
+    if args.use_heavy_mev:
+        fp.set (use_heavy_mev=True)
 
     with stats.timer ('Parse'):
         q = fp.parse_file (args.file)
