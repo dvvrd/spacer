@@ -2576,7 +2576,7 @@ namespace qe {
          * populates idx lits and obtains substitution for sel terms
          */
         void project (app_ref_vector& vars, expr_ref& fml) {
-            if (vars.empty ()) return;
+            if (!m_project_all_stores && vars.empty ()) return;
             typedef obj_map<app, ptr_vector<app>*> sel_map;
 
             // 1. proj sel after stores
@@ -2589,6 +2589,8 @@ namespace qe {
                         tout << mk_pp (m_idx_lits.get (i), m) << "\n";
                     }
                   );
+
+            if (vars.empty ()) return;
 
             // 2. proj selects over vars
 
@@ -2654,7 +2656,8 @@ namespace qe {
             m_idx_lits (m),
             m_mev (m),
             m_rw (m),
-            m_sub (m)
+            m_sub (m),
+            m_project_all_stores (false)
         {}
 
         void operator () (model& mdl, app_ref_vector& vars, expr_ref& fml, bool project_all_stores = false) {

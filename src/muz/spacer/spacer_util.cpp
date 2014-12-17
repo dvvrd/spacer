@@ -1390,7 +1390,6 @@ namespace spacer {
      * then, MBP for Booleans (substitute), reals (based on LW), ints (based on Cooper), and arrays
      */
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, bool project_all_arr_stores) {
-        if (vars.empty ()) return;
         th_rewriter rw (m);
         TRACE ("spacer",
                 tout << "Before projection:\n";
@@ -1412,7 +1411,7 @@ namespace spacer {
             // qe-lite; TODO: use qe_lite aggressively
             qe_lite qe (m);
             qe (vars, fml);
-            rw (fml);
+            rw (fml); // TODO: is this okay?!
 
             TRACE ("spacer",
                     tout << "After qe_lite:\n";
@@ -1423,7 +1422,7 @@ namespace spacer {
                     }
                   );
 
-            if (vars.empty ()) break;
+            bool has_bool_vars = false;
 
             // sort out vars into bools, arith (int/real), and arrays
             for (unsigned i = 0; i < vars.size (); i++) {
@@ -1431,6 +1430,7 @@ namespace spacer {
                     // obtain the interpretation of the ith var using model completion
                     VERIFY (M->eval (vars.get (i), bval, true));
                     bool_sub.insert (vars.get (i), bval);
+                    has_bool_vars = true;
                 }
                 else if (arr_u.is_array (vars.get (i))) {
                     array_vars.push_back (vars.get (i));
@@ -1442,12 +1442,14 @@ namespace spacer {
             }
 
             // substitute Booleans
-            bool_sub (fml);
-            //rw (fml);
-            TRACE ("spacer",
-                    tout << "Projected Booleans:\n" << mk_pp (fml, m) << "\n";
-                  );
-            bool_sub.reset ();
+            if (has_bool_vars) {
+                bool_sub (fml);
+                //rw (fml);
+                TRACE ("spacer",
+                        tout << "Projected Booleans:\n" << mk_pp (fml, m) << "\n";
+                      );
+                bool_sub.reset ();
+            }
 
             TRACE ("spacer",
                     tout << "Array vars:\n";
@@ -1456,19 +1458,12 @@ namespace spacer {
                     }
                   );
 
-            if (array_vars.empty ()) break;
-
             // project arrays
             {
                 scoped_no_proof _sp (m);
                 qe::array_project_eqs (*M, array_vars, fml);
                 qe::array_project_selects (*M, array_vars, fml, project_all_arr_stores);
             }
-
-            // collect new vars
-            vars.reset ();
-            vars.append (array_vars);
-            array_vars.reset ();
 
             TRACE ("spacer",
                     tout << "Projected array vars:\n" << mk_pp (fml, m) << "\n";
@@ -1479,6 +1474,13 @@ namespace spacer {
                         tout << mk_pp (vars.get (i), m) << "\n";
                     }
                   );
+
+            if (array_vars.empty ()) break;
+
+            // collect new vars
+            vars.reset ();
+            vars.append (array_vars);
+            array_vars.reset ();
         }
 
         // project reals and ints
