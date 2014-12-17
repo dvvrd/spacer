@@ -190,6 +190,8 @@ namespace pdr {
     void operator() (expr_ref &fml);
     
   };
+  
+  void expand_literals(ast_manager &m, expr_ref_vector& conjs);
 
 }
 

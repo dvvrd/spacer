@@ -51,6 +51,8 @@ Notes:
 
 #include "model_evaluator.h"
 
+#include "datatype_decl_plugin.h"
+#include "bv_decl_plugin.h"
 
 namespace pdr {
 
@@ -1593,10 +1595,87 @@ namespace pdr {
         result = fml;
         sub (result);
     }
+          
+expr* apply_accessor(ast_manager &m,
+                     ptr_vector<func_decl> const& acc,
+                     unsigned j,
+                     func_decl* f,
+                     expr* c) {
+  if (is_app(c) && to_app(c)->get_decl() == f) {
+    return to_app(c)->get_arg(j);
+  }
+  else {
+    return m.mk_app(acc[j], c);
+  }
+}
+
+  void expand_literals(ast_manager &m, expr_ref_vector& conjs) {
+    if (conjs.empty ()) return;
+    arith_util arith(m);
+    datatype_util dt(m);
+    bv_util       bv(m);
+    expr* e1, *e2, *c, *val;
+    rational r;
+    unsigned bv_size;
+
+    TRACE("pdr", 
+          tout << "begin expand\n";
+          for (unsigned i = 0; i < conjs.size(); ++i) {
+            tout << mk_pp(conjs[i].get(), m) << "\n";
+          });
+
+    for (unsigned i = 0; i < conjs.size(); ++i) {
+      expr* e = conjs[i].get();
+      if (m.is_eq(e, e1, e2) && arith.is_int_real(e1)) {
+        conjs[i] = arith.mk_le(e1,e2);
+        if (i+1 == conjs.size()) {
+          conjs.push_back(arith.mk_ge(e1, e2));
+        }
+        else {
+          conjs.push_back(conjs[i+1].get());
+          conjs[i+1] = arith.mk_ge(e1, e2);
+        }
+        ++i;
+      }
+      else if ((m.is_eq(e, c, val) && is_app(val) && dt.is_constructor(to_app(val))) ||
+               (m.is_eq(e, val, c) && is_app(val) && dt.is_constructor(to_app(val)))){
+        func_decl* f = to_app(val)->get_decl();
+        func_decl* r = dt.get_constructor_recognizer(f);
+        conjs[i] = m.mk_app(r, c);
+        ptr_vector<func_decl> const& acc = *dt.get_constructor_accessors(f);
+        for (unsigned j = 0; j < acc.size(); ++j) {
+          conjs.push_back(m.mk_eq(apply_accessor(m, acc, j, f, c), to_app(val)->get_arg(j)));
+        }
+      }
+      else if ((m.is_eq(e, c, val) && bv.is_numeral(val, r, bv_size)) ||
+               (m.is_eq(e, val, c) && bv.is_numeral(val, r, bv_size))) {
+        rational two(2);
+        for (unsigned j = 0; j < bv_size; ++j) {
+          parameter p(j);
+          //expr* e = m.mk_app(bv.get_family_id(), OP_BIT2BOOL, 1, &p, 1, &c);
+          expr* e = m.mk_eq(m.mk_app(bv.get_family_id(), OP_BIT1), bv.mk_extract(j, j, c));
+          if ((r % two).is_zero()) {
+            e = m.mk_not(e);
+          }
+          r = div(r, two);
+          if (j == 0) {
+            conjs[i] = e;
+          }
+          else {
+            conjs.push_back(e);
+          }
+        }
+      }
+    }
+    TRACE("pdr", 
+          tout << "end expand\n";
+          for (unsigned i = 0; i < conjs.size(); ++i) {
+            tout << mk_pp(conjs[i].get(), m) << "\n";
+          });
+  }
 
 }
 
 template class rewriter_tpl<pdr::ite_hoister_cfg>;
 template class rewriter_tpl<pdr::arith_normalizer_cfg>;
-
 
