@@ -644,7 +644,7 @@ namespace qe {
                             (!m_strict[i] && r_plus_x <= rational::zero ()))) {
                         continue;
                     }
-                    IF_VERBOSE(1, verbose_stream() << "max: " << mk_pp(m_terms.get (i), m) << " " << r << " " <<
+                    IF_VERBOSE(2, verbose_stream() << "max: " << mk_pp(m_terms.get (i), m) << " " << r << " " <<
                                 (!found || r > found_val || (r == found_val && !found_strict && m_strict[i])) << "\n";);
                     if (!found || r > found_val || (r == found_val && !found_strict && m_strict[i])) {
                         result = i;
