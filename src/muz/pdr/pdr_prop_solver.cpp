@@ -78,7 +78,7 @@ namespace pdr {
 
         void mk_safe(expr_ref_vector& conjs) {
             qe::flatten_and(conjs);
-            expand_literals(conjs);
+            //expand_literals(conjs);
             for (unsigned i = 0; i < conjs.size(); ++i) {
                 expr * lit = conjs[i].get();
                 expr * lit_core = lit;
@@ -204,7 +204,8 @@ namespace pdr {
             for (; it != end; ++it) {
                 sub.insert(it->m_key, m.mk_true(), pr);
             }
-            scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
+            // scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
+            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer(m);
             rep->set_substitution(&sub);
             replace_proxies(*rep, es);
         }

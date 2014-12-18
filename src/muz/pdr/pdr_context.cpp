@@ -2352,7 +2352,24 @@ namespace pdr {
             TRACE("pdr", tout << "Projected:\n" << mk_pp(phi1, m) << "\n";);
         }
         Phi.reset();
+        qe::flatten_and (phi1, Phi);
+        if (!Phi.empty ())
+        {
+          // expand equality and other terms for better generalization
+          expand_literals (m, Phi);
+          phi1 = m_pm.mk_and (Phi);
+        }
+
+        if (!use_model_generalizer)
+        {
+          select_reducer sr(m, M);
+          sr (phi1);
+          TRACE ("pdr", tout << "SelectReduced:\n" << mk_pp (phi1, m) << "\n";);
+        }
+        
+        Phi.reset ();
         qe::flatten_and(phi1, Phi);
+        
         unsigned_vector indices;
         vector<expr_ref_vector> child_states;
         child_states.resize(preds.size(), expr_ref_vector(m));
@@ -2402,6 +2419,7 @@ namespace pdr {
             unsigned i = (it-preds.begin ());
             pred_transformer& pt = *m_rels.find(preds[i]);
             SASSERT(pt.head() == preds[i]);           
+            //expand_literals (m, child_states [i]);
             expr_ref o_cube = m_pm.mk_and(child_states[i]);            
             m_pm.formula_o2n(o_cube, n_cube, i);
             model_node* child = alloc(model_node, &n, n_cube, pt, n.level()-1);

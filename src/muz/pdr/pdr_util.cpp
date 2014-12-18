@@ -49,6 +49,10 @@ Notes:
 #include "expr_safe_replace.h"
 
 
+#include "model_evaluator.h"
+
+#include "datatype_decl_plugin.h"
+#include "bv_decl_plugin.h"
 
 namespace pdr {
 
@@ -965,6 +969,128 @@ namespace pdr {
     }
 
 
+  
+  select_reducer::select_reducer (ast_manager &manager, model_ref &model) :
+    m(manager), m_au (m), m_mev (m), m_rw (m), 
+    m_model (model), m_side (m), m_pinned (m) {} 
+  
+  void select_reducer::reset ()
+  {
+    m_side.reset ();
+    m_pinned.reset ();
+    m_cache.reset ();
+  }
+  
+  void select_reducer::operator() (expr_ref &fml)
+  {
+    expr_ref_vector conjs (m);
+    qe::flatten_and (fml, conjs);
+    for (unsigned i = 0; i < conjs.size (); ++i)
+      conjs[i] = reduce_expr (conjs [i].get ());
+    
+    conjs.append (m_side);
+    m_side.reset ();
+    fml = m.mk_and(conjs.size(), conjs.c_ptr());        
+    m_rw (fml);
+  }
+  
+  expr* select_reducer::reduce_expr (expr *lit)
+  {
+    if (!is_app (lit)) return lit;
+    
+    expr *r = NULL;
+    if (m_cache.find (to_app (lit), r)) return r;
+    
+    ptr_vector<app> todo;
+    todo.push_back (to_app (lit));
+    
+    while (!todo.empty ())
+    {
+      app *a = todo.back ();
+      unsigned sz = todo.size ();
+      expr_ref_vector args (m);
+      bool dirty = false;
+      
+      for (unsigned i = 0; i < a->get_num_args (); ++i)
+      {
+        expr *arg = a->get_arg (i);
+        expr *narg = NULL;
+        
+        if (!is_app (arg)) args.push_back (arg);
+        else if (m_cache.find (to_app (arg), narg)) 
+        { 
+          args.push_back (narg);
+          dirty |= (arg != narg);
+        }
+        else 
+          todo.push_back (to_app (arg));
+      }
+      
+      if (todo.size () > sz) continue;
+      todo.pop_back ();
+      
+      if (dirty)
+      {
+        r = m.mk_app (a->get_decl (), args.size (), args.c_ptr ());
+        m_pinned.push_back (r);
+      }
+      else r = a;
+      
+      if (m_au.is_select (r)) r = reduce_select (to_app(r));
+      
+      m_cache.insert (a, r);
+    }
+    
+    SASSERT (r);
+    return r;
+  }
+  
+  bool select_reducer::is_equals (expr *e1, expr *e2)
+  {
+    if (e1 == e2) return true;
+    expr_ref val1 (m), val2 (m);
+    m_mev.eval (*m_model, e1, val1);
+    m_mev.eval (*m_model, e2, val2);
+    return val1 == val2;
+  }
+  
+  expr *select_reducer::reduce_select (app *a)
+  {
+    if (!m_au.is_store (a->get_arg (0))) return a;
+    
+    SASSERT (a->get_num_args () == 2 && "Multi-dimensional arrays are not supported");
+    expr* array = a->get_arg (0);
+    expr *j = a->get_arg (1);
+    
+    while (m_au.is_store (array))
+    {
+      a = to_app (array);
+      expr *idx = a->get_arg (1);
+      expr_ref cond (m);
+      
+      if (is_equals (idx, j))
+      {
+        cond = m.mk_eq (idx, j);
+        m_rw (cond);
+        if (!m.is_true (cond)) m_side.push_back (cond);
+        return a->get_arg (2);
+      }
+      else
+      {
+        cond = m.mk_not (m.mk_eq (idx, j));
+        m_rw (cond);
+        if (!m.is_true (cond)) m_side.push_back (cond);
+        array = a->get_arg (0);
+      }
+    }
+    
+    expr* args[2] = {array, j};
+    m_pinned.push_back (m_au.mk_select (2, args));
+    return m_pinned.back ();
+  }
+  
+  
+  
     void reduce_disequalities(model& model, unsigned threshold, expr_ref& fml) {
         ast_manager& m = fml.get_manager();
         expr_ref_vector conjs(m);
@@ -1469,10 +1595,87 @@ namespace pdr {
         result = fml;
         sub (result);
     }
+          
+expr* apply_accessor(ast_manager &m,
+                     ptr_vector<func_decl> const& acc,
+                     unsigned j,
+                     func_decl* f,
+                     expr* c) {
+  if (is_app(c) && to_app(c)->get_decl() == f) {
+    return to_app(c)->get_arg(j);
+  }
+  else {
+    return m.mk_app(acc[j], c);
+  }
+}
+
+  void expand_literals(ast_manager &m, expr_ref_vector& conjs) {
+    if (conjs.empty ()) return;
+    arith_util arith(m);
+    datatype_util dt(m);
+    bv_util       bv(m);
+    expr* e1, *e2, *c, *val;
+    rational r;
+    unsigned bv_size;
+
+    TRACE("pdr", 
+          tout << "begin expand\n";
+          for (unsigned i = 0; i < conjs.size(); ++i) {
+            tout << mk_pp(conjs[i].get(), m) << "\n";
+          });
+
+    for (unsigned i = 0; i < conjs.size(); ++i) {
+      expr* e = conjs[i].get();
+      if (m.is_eq(e, e1, e2) && arith.is_int_real(e1)) {
+        conjs[i] = arith.mk_le(e1,e2);
+        if (i+1 == conjs.size()) {
+          conjs.push_back(arith.mk_ge(e1, e2));
+        }
+        else {
+          conjs.push_back(conjs[i+1].get());
+          conjs[i+1] = arith.mk_ge(e1, e2);
+        }
+        ++i;
+      }
+      else if ((m.is_eq(e, c, val) && is_app(val) && dt.is_constructor(to_app(val))) ||
+               (m.is_eq(e, val, c) && is_app(val) && dt.is_constructor(to_app(val)))){
+        func_decl* f = to_app(val)->get_decl();
+        func_decl* r = dt.get_constructor_recognizer(f);
+        conjs[i] = m.mk_app(r, c);
+        ptr_vector<func_decl> const& acc = *dt.get_constructor_accessors(f);
+        for (unsigned j = 0; j < acc.size(); ++j) {
+          conjs.push_back(m.mk_eq(apply_accessor(m, acc, j, f, c), to_app(val)->get_arg(j)));
+        }
+      }
+      else if ((m.is_eq(e, c, val) && bv.is_numeral(val, r, bv_size)) ||
+               (m.is_eq(e, val, c) && bv.is_numeral(val, r, bv_size))) {
+        rational two(2);
+        for (unsigned j = 0; j < bv_size; ++j) {
+          parameter p(j);
+          //expr* e = m.mk_app(bv.get_family_id(), OP_BIT2BOOL, 1, &p, 1, &c);
+          expr* e = m.mk_eq(m.mk_app(bv.get_family_id(), OP_BIT1), bv.mk_extract(j, j, c));
+          if ((r % two).is_zero()) {
+            e = m.mk_not(e);
+          }
+          r = div(r, two);
+          if (j == 0) {
+            conjs[i] = e;
+          }
+          else {
+            conjs.push_back(e);
+          }
+        }
+      }
+    }
+    TRACE("pdr", 
+          tout << "end expand\n";
+          for (unsigned i = 0; i < conjs.size(); ++i) {
+            tout << mk_pp(conjs[i].get(), m) << "\n";
+          });
+  }
 
 }
 
 template class rewriter_tpl<pdr::ite_hoister_cfg>;
 template class rewriter_tpl<pdr::arith_normalizer_cfg>;
-
 
