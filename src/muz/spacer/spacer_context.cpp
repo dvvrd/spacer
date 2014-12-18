@@ -434,9 +434,14 @@ namespace spacer {
     }
 
     bool pred_transformer::propagate_to_next_level(unsigned src_level) {
+      
+      if (m_levels.size () <= src_level) return true;
+      if (m_levels [src_level].empty ()) return true;
+      
         unsigned tgt_level = next_level(src_level);
         ensure_level(next_level(tgt_level));
         expr_ref_vector& src = m_levels[src_level];
+        
 
         CTRACE("spacer", !src.empty(), 
                tout << "propagating " << src_level << " to " << tgt_level;
@@ -470,6 +475,10 @@ namespace spacer {
                    for (unsigned i = 0; i < src.size(); ++i) {
                        verbose_stream() << mk_pp(src[i].get(), m) << "\n";   
                    });
+        CTRACE ("spacer", src.empty (), 
+                tout << "Fully propagated level " 
+                << src_level << " of " << head ()->get_name () << "\n";);
+        
         return src.empty();
     }
 
@@ -2939,7 +2948,7 @@ namespace spacer {
             //if bounded-safe, the check if summaries are
             //inductive. throws an exception if inductive
             if (lvl != 0) {
-                propagate(lvl);
+              propagate(m_expanded_lvl, lvl, UINT_MAX);
             }
 
             //this means summaries are not inductive. increase stack
@@ -2969,7 +2978,7 @@ namespace spacer {
                 throw model_exception();
             }
             if (lvl != 0) {
-                propagate(lvl);
+              propagate(m_expanded_lvl, lvl, UINT_MAX);
             }
             lvl++;
             m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
@@ -3130,12 +3139,17 @@ namespace spacer {
         return n.pt().is_reachable(n, &result, uses_level, is_concrete, r, reach_pred_used, num_reuse_reach);
     }
 
-    void context::propagate(unsigned max_prop_lvl) {    
+  void context::propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, unsigned full_prop_lvl) {    
+    if (full_prop_lvl < max_prop_lvl) full_prop_lvl = max_prop_lvl;
+    
         if (m_params.simplify_formulas_pre()) {
             simplify_formulas();
         }
-        for (unsigned lvl = m_expanded_lvl; lvl <= max_prop_lvl; lvl++) {
+        for (unsigned lvl = min_prop_lvl; lvl <= full_prop_lvl; lvl++) {
             checkpoint();
+            CTRACE ("spacer", lvl > max_prop_lvl && lvl == max_prop_lvl + 1, 
+                    tout << "In full propagation\n";);
+            
             bool all_propagated = true;
             decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
             for (; it != end; ++it) {
@@ -3143,12 +3157,13 @@ namespace spacer {
                 pred_transformer& r = *it->m_value;
                 all_propagated = r.propagate_to_next_level(lvl) && all_propagated;
             }
-            CASSERT("spacer", check_invariant(lvl));
+            //CASSERT("spacer", check_invariant(lvl));
 
             if (all_propagated && lvl == max_prop_lvl) {
                 m_inductive_lvl = lvl;
                 throw inductive_exception();
             }
+            else if (all_propagated && lvl > max_prop_lvl) break;
         }
         if (m_params.simplify_formulas_post()) {            
             simplify_formulas();

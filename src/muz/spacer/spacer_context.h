@@ -607,7 +607,7 @@ namespace spacer {
         void solve_impl();
         void solve_impl_from_lvl (unsigned from_lvl);
         bool check_reachability(unsigned level);        
-        void propagate(unsigned max_prop_lvl);
+      void propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, unsigned full_prop_lvl);
         void close_node(model_node& n);
         void check_pre_closed(model_node& n);
         void expand_node(model_node& n);
