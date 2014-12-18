@@ -3363,60 +3363,6 @@ namespace spacer {
         model_node* ch = deriv->mk_next ();
         m_search.add_leaf (*ch);
         m_stats.m_num_queries++;
-
-
-        //qe::flatten_and(phi1, Phi);
-/*      unsigned_vector indices;
-        vector<expr_ref_vector> child_states;
-        child_states.resize(preds.size(), expr_ref_vector(m));
-        for (unsigned i = 0; i < Phi.size(); ++i) {            
-            m_pm.collect_indices(Phi[i].get(), indices);    
-            if (indices.size() == 0) {
-                IF_VERBOSE(3, verbose_stream() << "Skipping " << mk_pp(Phi[i].get(), m) << "\n";);
-            }
-            else if (indices.size() == 1) {
-                child_states[indices.back()].push_back(Phi[i].get());
-            }
-            else {
-                expr_substitution sub(m);
-                expr_ref tmp(m);
-                proof_ref pr(m);
-                pr = m.mk_asserted(m.mk_true());
-                vector<ptr_vector<app> > vars;
-                m_pm.collect_variables(Phi[i].get(), vars);
-                SASSERT(vars.size() == indices.back()+1);
-                for (unsigned j = 1; j < indices.size(); ++j) {
-                    ptr_vector<app> const& vs = vars[indices[j]];
-                    for (unsigned k = 0; k < vs.size(); ++k) {
-                        tmp = mev.eval(M, vs[k]);
-                        sub.insert(vs[k], tmp, pr);
-                        child_states[indices[j]].push_back(m.mk_eq(vs[k], tmp));
-                    }
-                }
-                tmp = Phi[i].get();
-                if (!rep) rep = mk_expr_simp_replacer(m);
-                rep->set_substitution(&sub);
-                (*rep)(tmp);
-                child_states[indices[0]].push_back(tmp);
-            }
-
-        }
-        
-        expr_ref n_cube(m);
-        for (unsigned i = 0; i < preds.size(); ++i) {            
-            pred_transformer& pt = *m_rels.find(preds[i]);
-            SASSERT(pt.head() == preds[i]);           
-            expr_ref o_cube = m_pm.mk_and(child_states[i]);            
-            m_pm.formula_o2n(o_cube, n_cube, i);
-            model_node* child = alloc(model_node, &n, n_cube, pt, n.level()-1);
-            ++m_stats.m_num_nodes;
-            m_search.add_leaf(*child); 
-            IF_VERBOSE(3, verbose_stream() << "Predecessor: " << mk_pp(o_cube, m) << "\n";);
-            m_stats.m_max_depth = std::max(m_stats.m_max_depth, child->depth());
-        }
-        check_pre_closed(n);
-        TRACE("spacer", m_search.display(tout););
-*/
     }
 
     void context::report_reach (model_node& ch) {
