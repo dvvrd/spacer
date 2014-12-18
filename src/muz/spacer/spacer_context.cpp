@@ -706,12 +706,16 @@ namespace spacer {
         add_property(result, level);        
     }
 
-    void  pred_transformer::propagate_to_infinity(unsigned invariant_level) {
-        expr_ref inv = get_formulas(invariant_level, false);
-        add_property(inv, infty_level);
-        // cleanup
-        for (unsigned i = invariant_level; i < m_levels.size(); ++i) {
-            m_levels[i].reset();
+    void  pred_transformer::propagate_to_infinity(unsigned level) {
+      TRACE ("spacer", tout << "propagating to oo from lvl " << level 
+             << " of " << head ()->get_name () << "\n";);
+      
+        for (unsigned i = m_levels.size () - 1; i >= level; --i)
+        {
+          expr_ref_vector &lemmas = m_levels [i];
+          for (unsigned j = 0; j < lemmas.size (); ++j)
+            add_property(lemmas[j].get (), infty_level);
+          lemmas.reset();
         }
     }
 
