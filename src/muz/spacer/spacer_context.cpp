@@ -3163,6 +3163,22 @@ namespace spacer {
             }
             //CASSERT("spacer", check_invariant(lvl));
 
+            if (all_propagated)
+            {
+              // XXX this can negatively affect convergence bound
+              for (it = m_rels.begin (); it != end; ++it)
+              {
+                pred_transformer& r = *it->m_value;
+                r.propagate_to_infinity (lvl);
+              }
+              if (lvl <= max_prop_lvl)
+              {
+                m_inductive_lvl = lvl;
+                throw inductive_exception ();
+              }
+              break;
+            }
+            
             if (all_propagated && lvl == max_prop_lvl) {
                 m_inductive_lvl = lvl;
                 throw inductive_exception();
