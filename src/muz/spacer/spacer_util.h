@@ -31,7 +31,6 @@ Revision History:
 #include "array_decl_plugin.h"
 #include "bv_decl_plugin.h"
 
-
 class model;
 class model_core;
 
@@ -165,6 +164,8 @@ namespace spacer {
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, bool project_all_arr_stores = false);
 
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
+
+  void expand_literals(ast_manager &m, expr_ref_vector& conjs);
 }
 
 #endif

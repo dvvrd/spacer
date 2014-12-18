@@ -3337,6 +3337,18 @@ namespace spacer {
                 tout << "Reduced\n" << mk_pp (phi1, m) << "\n";
               );
 
+        // expand literals. Ideally, we do not want to split aliasing
+        // equalities. Unfortunately, the interface does not allow for
+        // that yet.
+        // XXX This mixes up with derivation. Needs more thought.
+        // Phi.reset ();
+        // qe::flatten_and (phi1, Phi);
+        // if (!Phi.empty ())
+        // {
+        //   expand_literals (m, Phi);
+        //   phi1 = m_pm.mk_and (Phi);
+        // }
+        
         // create a new derivation for the model
         // order the pts -- for now, right to left
         bool r_to_l = (m_params.order_children() == 0);
