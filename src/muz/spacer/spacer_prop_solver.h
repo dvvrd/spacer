@@ -51,7 +51,7 @@ namespace spacer {
         expr_ref_vector*    m_core; 
         model_ref*          m_model;
         bool                m_subset_based_core;
-        bool                m_assumes_level;
+        unsigned            m_uses_level;
         func_decl_set       m_aux_symbols;      
         bool                m_in_level;         
         unsigned            m_current_level;    // set when m_in_level
@@ -91,7 +91,9 @@ namespace spacer {
         void set_core(expr_ref_vector* core) { m_core = core; }
         void set_model(model_ref* mdl) { m_model = mdl; }
         void set_subset_based_core(bool f) { m_subset_based_core = f; }
-        bool assumes_level() const { return m_assumes_level; }
+        bool assumes_level() const { return !is_infty_level (m_uses_level); }
+        unsigned uses_level () const {return m_uses_level;}
+      
         
         void add_level();
         unsigned level_cnt() const;

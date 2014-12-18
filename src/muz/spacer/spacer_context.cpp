@@ -46,27 +46,6 @@ Notes:
 #include "scoped_proof.h"
 
 namespace spacer {
-
-
-    static const unsigned infty_level = UINT_MAX;
-
-    static bool is_infty_level(unsigned lvl) { return lvl == infty_level; }
-
-    static unsigned next_level(unsigned lvl) { return is_infty_level(lvl)?lvl:(lvl+1); }
-
-    struct pp_level {
-        unsigned m_level;
-        pp_level(unsigned l): m_level(l) {}        
-    };
-
-    static std::ostream& operator<<(std::ostream& out, pp_level const& p) {
-        if (is_infty_level(p.m_level)) {
-            return out << "oo";
-        }
-        else {
-            return out << p.m_level;
-        }
-    }
     
     // ----------------
     // pred_tansformer
@@ -452,16 +431,16 @@ namespace spacer {
             unsigned stored_lvl;
             VERIFY(m_prop2level.find(curr, stored_lvl));
             SASSERT(stored_lvl >= src_level);
-            bool assumes_level;
+            unsigned solver_level;
             if (stored_lvl > src_level) {
                 TRACE("spacer", tout << "at level: "<< stored_lvl << " " << mk_pp(curr, m) << "\n";);
                 src[i] = src.back();
                 src.pop_back();
             }
-            else if (is_invariant(tgt_level, curr, false, assumes_level)) {
-
-                add_property(curr, assumes_level?tgt_level:infty_level);
-                TRACE("spacer", tout << "is invariant: "<< pp_level(tgt_level) << " " << mk_pp(curr, m) << "\n";);              
+            else if (is_invariant(tgt_level, curr, false, solver_level)) {
+              
+                add_property(curr, solver_level);
+                TRACE("spacer", tout << "is invariant: "<< pp_level(solver_level) << " " << mk_pp(curr, m) << "\n";);              
                 src[i] = src.back();
                 src.pop_back();
                 ++m_stats.m_num_propagations;
@@ -595,7 +574,7 @@ namespace spacer {
 
         // update users; reach facts are independent of levels
         for (unsigned i = 0; i < m_use.size(); ++i) {
-            m_use[i]->add_child_property (*this, fml, infty_level, true);
+          m_use[i]->add_child_property (*this, fml, infty_level (), true);
         }
     }
 
@@ -714,7 +693,7 @@ namespace spacer {
         {
           expr_ref_vector &lemmas = m_levels [i];
           for (unsigned j = 0; j < lemmas.size (); ++j)
-            add_property(lemmas[j].get (), infty_level);
+            add_property(lemmas[j].get (), infty_level ());
           lemmas.reset();
         }
     }
@@ -752,7 +731,8 @@ namespace spacer {
         return false;
     }
 
-    lbool pred_transformer::is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach) {
+    lbool pred_transformer::is_reachable(model_node& n, expr_ref_vector* core, unsigned& uses_level, 
+                                         bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach) {
         TRACE("spacer", 
               tout << "is-reachable: " << head()->get_name() << " level: " << n.level() << "\n";
               tout << mk_pp(n.post(), m) << "\n";);
@@ -852,13 +832,13 @@ namespace spacer {
                         }
                     }
                   );
-            uses_level = m_solver.assumes_level();
+            uses_level = m_solver.uses_level();
             return l_false;
         }
         return l_undef;
     }
 
-    bool pred_transformer::is_invariant(unsigned level, expr* states, bool inductive, bool& assumes_level, expr_ref_vector* core) {
+    bool pred_transformer::is_invariant(unsigned level, expr* states, bool inductive, unsigned& solver_level, expr_ref_vector* core) {
         expr_ref_vector conj(m);
         expr_ref tmp(m);
         
@@ -873,12 +853,17 @@ namespace spacer {
         m_solver.set_model(0);
         lbool r = m_solver.check_conjunction_as_assumptions(tmp);
         if (r == l_false) {
-            assumes_level = m_solver.assumes_level();
+            solver_level = m_solver.uses_level ();
+            CTRACE ("spacer", level < m_solver.uses_level (), 
+                    tout << "Checking at level " << level 
+                    << " but only using " << m_solver.uses_level () << "\n";);
+            SASSERT (level <= solver_level);
         }
         return r == l_false;
     }
 
-    bool pred_transformer::check_inductive(unsigned level, expr_ref_vector& lits, bool& assumes_level) {
+    bool pred_transformer::check_inductive(unsigned level, expr_ref_vector& lits, 
+                                           unsigned& uses_level) {
         manager& pm = get_spacer_manager();
         expr_ref_vector conj(m), core(m);
         expr_ref fml(m), states(m);
@@ -893,7 +878,7 @@ namespace spacer {
         if (res == l_false) {
             lits.reset();
             lits.append(core);
-            assumes_level = m_solver.assumes_level();
+            uses_level = m_solver.uses_level();
         }
         return res == l_false;
     }
@@ -2280,7 +2265,7 @@ namespace spacer {
             m_rels.insert(p, pt);
             IF_VERBOSE(10, verbose_stream() << "did not find predicate " << p->get_name() << "\n";);
         }
-        unsigned lvl = (level == -1)?infty_level:((unsigned)level);
+        unsigned lvl = (level == -1)?infty_level():((unsigned)level);
         pt->add_cover(lvl, property);
     }
 
@@ -3063,7 +3048,7 @@ namespace spacer {
         else {
             reset_curr_model ();
             // unreachable stuff
-            bool uses_level = true;
+            unsigned uses_level = infty_level ();
             expr_ref_vector cube(m);
             // reachable stuff
             bool is_concrete;
@@ -3109,19 +3094,16 @@ namespace spacer {
                     cores.reset();
                     cores.append(new_cores);
                 }
-                bool found_invariant = false;
                 for (unsigned i = 0; i < cores.size(); ++i) {
                     expr_ref_vector const& core = cores[i].first;
                     uses_level = cores[i].second;
-                    found_invariant = !uses_level || found_invariant;
                     expr_ref ncore(m_pm.mk_not_and(core), m);
-                    TRACE("spacer", tout << "invariant state: " << (uses_level?"":"(inductive) ") <<  mk_pp(ncore, m) << "\n";);
-                    n.pt().add_property(ncore, uses_level?n.level():infty_level);
+                    TRACE("spacer", tout << "invariant state: " << (!is_infty_level(uses_level)?"":"(inductive) ") <<  mk_pp(ncore, m) << "\n";);
+                    n.pt().add_property (ncore, uses_level);
                 }
-                CASSERT("spacer",n.level() == 0 || check_invariant(n.level()-1));
+                CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
                 n.close ();
                 report_unreach (n);
-                //m_search.backtrack_level(!found_invariant && m_params.flexible_trace(), n);
                 break;
             }
                 //something went wrong
@@ -3139,7 +3121,7 @@ namespace spacer {
     // return a property that blocks state and is implied by the 
     // predicate transformer (or some unfolding of it).
     // 
-    lbool context::expand_state(model_node& n, expr_ref_vector& result, bool& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach) {
+    lbool context::expand_state(model_node& n, expr_ref_vector& result, unsigned& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach) {
         return n.pt().is_reachable(n, &result, uses_level, is_concrete, r, reach_pred_used, num_reuse_reach);
     }
 

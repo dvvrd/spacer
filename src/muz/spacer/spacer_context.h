@@ -191,9 +191,15 @@ namespace spacer {
         expr* get_reach_facts_assump () const;
         expr* get_o_reach_facts_assump (unsigned oidx) const;
 
-        lbool is_reachable(model_node& n, expr_ref_vector* core, bool& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
-        bool is_invariant(unsigned level, expr* co_state, bool inductive, bool& assumes_level, expr_ref_vector* core = 0);
-        bool check_inductive(unsigned level, expr_ref_vector& state, bool& assumes_level);
+        lbool is_reachable(model_node& n, expr_ref_vector* core, 
+                           unsigned& uses_level, bool& is_concrete, 
+                           datalog::rule const*& r, 
+                           vector<bool>& reach_pred_used, 
+                           unsigned& num_reuse_reach);
+        bool is_invariant(unsigned level, expr* co_state, bool inductive, 
+                          unsigned& solver_level, expr_ref_vector* core = 0);
+        bool check_inductive(unsigned level, expr_ref_vector& state, 
+                             unsigned& assumes_level);
 
         expr_ref get_formulas(unsigned level, bool add_axioms);
 
@@ -555,11 +561,11 @@ namespace spacer {
     protected:
         context& m_ctx;
     public:
-        typedef vector<std::pair<expr_ref_vector,bool> > cores;
+        typedef vector<std::pair<expr_ref_vector,unsigned> > cores;
         core_generalizer(context& ctx): m_ctx(ctx) {}
         virtual ~core_generalizer() {}
-        virtual void operator()(model_node& n, expr_ref_vector& core, bool& uses_level) = 0;
-        virtual void operator()(model_node& n, expr_ref_vector const& core, bool uses_level, cores& new_cores) {
+        virtual void operator()(model_node& n, expr_ref_vector& core, unsigned& uses_level) = 0;
+        virtual void operator()(model_node& n, expr_ref_vector const& core, unsigned uses_level, cores& new_cores) {
             new_cores.push_back(std::make_pair(core, uses_level));
             if (!core.empty()) {
                 (*this)(n, new_cores.back().first, new_cores.back().second);
@@ -611,7 +617,7 @@ namespace spacer {
         void close_node(model_node& n);
         void check_pre_closed(model_node& n);
         void expand_node(model_node& n);
-        lbool expand_state(model_node& n, expr_ref_vector& cube, bool& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
+        lbool expand_state(model_node& n, expr_ref_vector& cube, unsigned& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
         void mk_reach_fact (model_node& n, datalog::rule const& r, expr_ref& result, expr_ref_vector& child_reach_facts);
         //void mk_reach_fact_from_deriv (derivation& deriv, expr_ref& result);
         void create_children(model_node& n, datalog::rule const& r, vector<bool> const& reach_pred_used);

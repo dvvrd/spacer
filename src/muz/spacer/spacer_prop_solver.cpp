@@ -248,6 +248,7 @@ namespace spacer {
         m_proxies(m),
         m_core(0),
         m_subset_based_core(false),
+        m_uses_level(infty_level ()),
         m_in_level(false),
         m_validate_theory_core (validate_theory_core)
     {
@@ -429,12 +430,20 @@ namespace spacer {
 
         if (result == l_false) { 
             unsigned core_size = m_ctx->get_unsat_core_size(); 
-            m_assumes_level = false;
+            m_uses_level = infty_level ();
+            
             for (unsigned i = 0; i < core_size; ++i) {
-                if (m_level_atoms_set.contains(m_ctx->get_unsat_core_expr(i))) {
-                    m_assumes_level = true;
+              expr* core = m_ctx->get_unsat_core_expr (i);
+              if (m_level_atoms_set.contains (core))
+              {
+                for (unsigned j = 0; j < m_neg_level_atoms.size (); ++j)
+                  if (m_neg_level_atoms [j].get () == core)
+                  {
+                    m_uses_level = std::min (j, m_uses_level);
                     break;
-                }
+                  }
+                SASSERT (!is_infty_level (m_uses_level));
+              }
             }
         }
 
