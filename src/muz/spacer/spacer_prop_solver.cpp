@@ -436,10 +436,11 @@ namespace spacer {
               expr* core = m_ctx->get_unsat_core_expr (i);
               if (m_level_atoms_set.contains (core))
               {
-                for (unsigned j = 0; j < m_neg_level_atoms.size (); ++j)
+                unsigned sz = std::min (m_uses_level, m_neg_level_atoms.size ());
+                for (unsigned j = 0; j < sz; ++j)
                   if (m_neg_level_atoms [j].get () == core)
                   {
-                    m_uses_level = std::min (j, m_uses_level);
+                    m_uses_level = j;
                     break;
                   }
                 SASSERT (!is_infty_level (m_uses_level));
