@@ -27,6 +27,9 @@ def parseArgs (argv):
     p.add_argument ('--eager-reach-check', dest='eager_reach_check',
                     help='eagerly use reachability facts for every local query',
                     action='store_true', default=False)
+    p.add_argument ('--validate-theory-core', dest='validate_theory_core',
+                    help='validate every theory core',
+                    action='store_true', default=False)
     p.add_argument ('--from-lvl', dest='from_lvl',
                     type=int,
                     help='start level for query predicate',
@@ -103,6 +106,9 @@ def main (argv):
         z3_args += ' fixedpoint.eager_reach_check=true'
     else:
         z3_args += ' fixedpoint.eager_reach_check=false'
+
+    if args.validate_theory_core:
+        z3_args += ' fixedpoint.validate_theory_core=true'
 
     if args.print_stats:
         z3_args += ' -st'
