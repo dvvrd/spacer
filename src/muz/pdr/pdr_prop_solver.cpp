@@ -227,7 +227,7 @@ namespace pdr {
     };
 
 
-    prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name) :
+    prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name, bool validate_theory_core) :
         m_fparams(pm.get_fparams()),
         m(pm.get_manager()),
         m_pm(pm),
@@ -243,7 +243,8 @@ namespace pdr {
         m_subset_based_core(false),
         m_use_farkas(false),
         m_in_level(false),
-        m_current_level(0)
+        m_current_level(0),
+        m_validate_theory_core (validate_theory_core)
     {
         m_ctx->assert_expr(m_pm.get_background());
     }
@@ -340,6 +341,16 @@ namespace pdr {
             m_use_farkas    && 
             !m_subset_based_core) {
             extract_theory_core(safe);
+            // save the unsat core
+            unsigned core_size = m_ctx->get_unsat_core_size ();
+            expr_ref_vector unsat_core (m);
+            for (unsigned i = 0; i < core_size; ++i) {
+                unsat_core.push_back (m_ctx->get_unsat_core_expr (i));
+            }
+            if (m_validate_theory_core && !validate_theory_core ()) {
+                TRACE ("pdr", tout << "theory core unsound; using subset core\n";);
+                extract_subset_core (safe, unsat_core.c_ptr (), core_size);
+            }
         }
         else if (result == l_false && m_core) {
             extract_subset_core(safe);    
@@ -351,11 +362,35 @@ namespace pdr {
         return result;
     }
 
-    void prop_solver::extract_subset_core(safe_assumptions& safe) {
-        unsigned core_size = m_ctx->get_unsat_core_size(); 
+    bool prop_solver::validate_theory_core () {
+        expr_ref_vector atoms (m);
+        if (!m_core->empty ()) {
+            safe_assumptions safe (*this, *m_core);
+            atoms.append (safe.atoms ());
+        }
+        if (m_in_level) {
+            push_level_atoms (m_current_level, atoms);
+        }
+
+        TRACE ("pdr",
+                tout << "Check theory core\n";
+                tout << mk_pp(m_pm.mk_and(atoms), m) << "\n";
+              );
+
+        lbool result = m_ctx->check (atoms);
+
+        TRACE ("pdr",
+                tout << result << "\n";
+              );
+
+        return (result == l_false);
+    }
+
+    void prop_solver::extract_subset_core(safe_assumptions& safe, expr* const* unsat_core, unsigned unsat_core_size) {
+        unsigned core_size = unsat_core ? unsat_core_size : m_ctx->get_unsat_core_size(); 
         m_core->reset();
         for (unsigned i = 0; i < core_size; ++i) {
-            expr * core_expr = m_ctx->get_unsat_core_expr(i);
+            expr * core_expr = unsat_core ? unsat_core[i] : m_ctx->get_unsat_core_expr(i);
             SASSERT(is_app(core_expr));
 
             if (m_level_atoms_set.contains(core_expr)) {
@@ -372,7 +407,7 @@ namespace pdr {
         TRACE("pdr", 
             tout << "core_exprs: ";
                 for (unsigned i = 0; i < core_size; ++i) {
-                tout << mk_pp(m_ctx->get_unsat_core_expr(i), m) << " ";
+                tout << mk_pp(unsat_core ? unsat_core[i] : m_ctx->get_unsat_core_expr(i), m) << " ";
             }
             tout << "\n";
             tout << "core: " << mk_pp(m_pm.mk_and(*m_core), m) << "\n";              

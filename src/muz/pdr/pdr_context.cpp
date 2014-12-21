@@ -79,7 +79,7 @@ namespace pdr {
     pred_transformer::pred_transformer(context& ctx, manager& pm, func_decl* head): 
         pm(pm), m(pm.get_manager()),
         ctx(ctx), m_head(head, m), 
-        m_sig(m), m_solver(pm, ctx.get_params(), head->get_name()),
+        m_sig(m), m_solver(pm, ctx.get_params(), head->get_name(), ctx.get_params ().validate_theory_core ()),
         m_invariants(m), m_transition(m), m_initial_state(m), 
         m_reachable(pm, (datalog::PDR_CACHE_MODE)ctx.get_params().cache_mode()) {}
 

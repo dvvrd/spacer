@@ -709,19 +709,39 @@ namespace spacer {
     bool pred_transformer::is_reachable_with_reach_facts (model_node& n, datalog::rule const& r) {
         expr_ref_vector assumps (m);
         assumps.push_back (n.post ());
+
+        TRACE ("spacer",
+                tout << "post query:\n";
+                tout << mk_pp (n.post (), m) << "\n";
+              );
+
         expr* r_tag = rule2tag (&r);
         assumps.push_back (r_tag);
 
+        TRACE ("spacer",
+                tout << "rule tag: " << mk_pp (r_tag, m) << "\n";
+              );
+
         find_predecessors(r, m_predicates);
+
+        TRACE ("spacer",
+                tout << "num preds: " << m_predicates.size () << "\n";
+              );
+
         for (unsigned i = 0; i < m_predicates.size(); i++) {
             func_decl* d = m_predicates[i];
             pred_transformer const& pt = ctx.get_pred_transformer (d);
             expr_ref assump (pt.get_o_reach_facts_assump (i), m);
             VERIFY (assump);
             assumps.push_back (assump);
+
+            TRACE ("spacer",
+                    tout << "reach assumption: " << mk_pp (assump, m) << "\n";
+                  );
         }
 
-        prop_solver::scoped_level _sl(m_solver, n.level());
+        // disable all level lemmas
+        prop_solver::scoped_level _sl(m_solver, infty_level);
         expr_ref_vector core (m);
         m_solver.set_core (&core);
         model_ref model;
