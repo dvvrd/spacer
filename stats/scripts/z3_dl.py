@@ -9,8 +9,11 @@ def parseArgs (argv):
     p = a.ArgumentParser (description='Z3 Datalog Frontend')
     
     p.add_argument ('file', metavar='BENCHMARK', help='Benchmark file')
-    p.add_argument ('--pp', 
-                    help='Enable default pre-processing', 
+    p.add_argument ('--slice', 
+                    help='Enable slicing', 
+                    action='store_true', default=False)
+    p.add_argument ('--inline', 
+                    help='Enable inlining', 
                     action='store_true', default=False)
     p.add_argument ('--validate', help='Enable validation',
                     action='store_true', default=False)
@@ -69,9 +72,13 @@ def main (argv):
     z3.set_option (verbose=args.verbose)
     ctx = z3.Context ()
     fp = z3.Fixedpoint (ctx=ctx)
-    if not args.pp:
-        print 'No pre-processing'
+
+    if not args.slice:
+        print 'No slicing'
         fp.set (slice=False)
+
+    if not args.inline:
+        print 'No inlining'
         fp.set (inline_linear=False)
         fp.set (inline_eager=False)
 
