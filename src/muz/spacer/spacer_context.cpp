@@ -733,7 +733,7 @@ namespace spacer {
         }
 
         // disable all level lemmas
-        prop_solver::scoped_level _sl(m_solver, infty_level);
+        prop_solver::scoped_level _sl(m_solver, infty_level());
         expr_ref_vector core (m);
         m_solver.set_core (&core);
         model_ref model;
