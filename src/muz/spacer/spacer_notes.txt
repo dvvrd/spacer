@@ -1,0 +1,66 @@
+a queue contains a model_node
+
+let n = leaves.pop_top ()
+
+if (!n.has_derivation ())
+
+   if n.pt ().must_reach (n.post ())
+     add parent of n to the leaves
+     return
+
+   check abstract reachability of n
+   
+   if must reachable then
+      create new reachability fact for n.pt ()
+      add parent of n to the leaves
+   else if may reachable then 
+       create derivation d for n
+       create model_node kid for the top of d
+       add kid to the leaves
+
+   else /* unreachable */
+       create a lemma for n.pt ()
+       p = parent of n
+       p.reset_derivation()
+       add p to the leaves
+       
+else if (n.has_derivation ())
+ 
+   create next model_node kid for n.get_derivation ()
+   
+   if (kid != NULL) 
+      add kid to leaves
+   else /* done with the derivation, no more kids */
+      // the derivation is reachable, otherwise it was reset in another branch
+      p = parent of n
+      p.reset_derivation ()
+      add p to the leaves
+
+     
+=================================================================================
+create derivation for the top of d
+input: 
+       model M, 
+       transition relation formula trans with auxiliary variables quantified out
+       sequence of pedicates P_i, 
+       may and must summaries of P_i
+=================================================================================
+
+create first derivation child:
+       input: model 
+       
+       
+create next derivation child:
+       create new model
+       update trans by computing pre-image over new reachability facts
+       call create next derivation child
+
+private:
+create next derivation child using a given model, and starting index
+
+=========================================================
+
+create a next model for a derivation 
+
+
+

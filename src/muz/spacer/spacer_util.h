@@ -43,7 +43,15 @@ namespace spacer {
 
     inline unsigned next_level(unsigned lvl) 
     { return is_infty_level(lvl)?lvl:(lvl+1); }
-
+  
+  inline unsigned prev_level (unsigned lvl)
+  {
+    if (is_infty_level (lvl)) return infty_level ();
+    if (lvl == 0) return 0;
+    return lvl -1;
+  }
+  
+  
     struct pp_level {
         unsigned m_level;
         pp_level(unsigned l): m_level(l) {}        
@@ -75,6 +83,8 @@ namespace spacer {
     std::string pp_cube(const app_ref_vector& model, ast_manager& manager);
     std::string pp_cube(unsigned sz, app * const * lits, ast_manager& manager);
     std::string pp_cube(unsigned sz, expr * const * lits, ast_manager& manager);
+  
+  
     
     class model_evaluator {
         ast_manager&           m;
@@ -189,6 +199,9 @@ namespace spacer {
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
 
   void expand_literals(ast_manager &m, expr_ref_vector& conjs);
+  void compute_implicant_literals (model_evaluator &mev, model_ref &model, expr_ref_vector &formula, expr_ref_vector &res);
+  
+  
 }
 
 #endif

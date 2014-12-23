@@ -158,12 +158,7 @@ namespace spacer {
     void pred_transformer::get_used_reach_fact (model_ref& M, expr_ref& reach_fact) {
         expr_ref bval (m);
         for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
-            if (ctx.get_params ().use_heavy_mev ()) {
-                m_mev.eval_heavy (M, m_reach_case_assumps.get (i), bval);
-            }
-            else {
-                bval = m_mev.eval (M, m_reach_case_assumps.get (i));
-            }
+            eval (M, m_reach_case_assumps.get (i), bval);
             if (m.is_false (bval)) {
                 reach_fact = m_reach_facts.get (i);
                 break;
@@ -172,26 +167,39 @@ namespace spacer {
         SASSERT (reach_fact);
     }
 
-    void pred_transformer::get_used_o_reach_fact (model_ref& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact) {
-        expr_ref bval (m);
-        for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
-            u_map<expr*> const& omap = m_o_reach_case_maps.get (i);
-            expr* oassump;
-            VERIFY (omap.find (oidx, oassump));
-            if (ctx.get_params ().use_heavy_mev ()) {
-                m_mev.eval_heavy (M, oassump, bval);
-            }
-            else {
-                bval = m_mev.eval (M, oassump);
-            }
-            if (m.is_false (bval)) {
-                n_reach_fact = m_reach_facts.get (i);
-                pm.formula_n2o (n_reach_fact, o_reach_fact, oidx);
-                break;
-            }
-        }
-        SASSERT (o_reach_fact);
+  expr* pred_transformer::reach_case_assump_n2o (unsigned assumption_id, unsigned oidx)
+  {
+    u_map<expr*> const &map = m_o_reach_case_maps.get (assumption_id);
+    expr *res = NULL;
+    VERIFY (map.find (oidx, res));
+    return res;
+  }
+  
+  expr_ref pred_transformer::eval (model_ref &model, expr * v)
+  {
+    expr_ref res(m);
+    if (ctx.get_params ().use_heavy_mev ()) 
+      m_mev.eval_heavy (M, oassump, res);
+    else 
+      res = m_mev.eval (M, oassump);
+    return res;
+  }
+  
+  void pred_transformer::get_used_o_reach_fact (model_ref& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact) {
+    expr *oassump;
+    expr_ref bval (m);
+    for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
+      oassump = reach_case_assump_n2o (i, oidx);
+      bval = eval (M, oassump);
+      
+      if (m.is_false (bval)) {
+        n_reach_fact = m_reach_facts.get (i);
+        pm.formula_n2o (n_reach_fact, o_reach_fact, oidx);
+        break;
+      }
     }
+    SASSERT (o_reach_fact);
+  }
 
     void pred_transformer::get_all_used_o_reach_facts (model_ref& M, unsigned oidx, expr_ref& reach_fact) {
         expr_ref bval (m);
@@ -642,6 +650,54 @@ namespace spacer {
         return result;        
     }
 
+  /**
+   * get an origin summary used by this transformer in the given model
+   * level is the level at which may summaries are obtained
+   * oidx is the origin index of this predicate in the model
+   * must indicates whether a must or a may summary is requested
+   *
+   * returns an implicant of the summary
+   */
+  expr_ref pred_transformer::get_origin_summary (model_ref model, 
+                                                 unsigned level, 
+                                                 unsigned oidx,
+                                                 bool must)
+  {
+    expr_ref_vector summary (m);
+    expr_ref v(m);
+    
+    if (!must)
+      summary.push_back (get_formulas (level, false));
+    else 
+    {
+      for (unsigned i = 0; i < m_reach_case_assumps.size (); ++i)
+      {
+        v = eval (model, reach_case_assump_n2o (i, oidx));
+        if (m.is_false (v))
+        {
+          summary.push_back (m_reach_facts.get (i));
+          break;
+        }
+      }
+    }
+    
+    SASSERT (!summary.empty ());
+    
+
+    // -- convert to origin
+    for (unsigned i = 0; i < summary.size (); ++i)
+    {
+      pm.formula_n2o (summary.get (i), v, oidx);
+      summary[i] = res;
+    }
+    
+    // -- pick an implicant
+    expr_ref_vect r literals (m);
+    compute_implicant_literals (m_mev, model, summary, literals);
+    
+    return m_sm.mk_and (literals);
+  }
+  
     void pred_transformer::add_o_lemmas (int level, int oidx, expr_ref_vector& forms) const {
         SASSERT (level >= -1);
         SASSERT (oidx >= 0);
@@ -1186,721 +1242,162 @@ namespace spacer {
     }
 
     // ----------------
-    // model_node
-
-    //static bool is_ini(datalog::rule const& r) {
-        //return r.get_uninterpreted_tail_size() == 0;
-    //}
-
-    //unsigned model_node::m_count;
-
-    void model_node::close () {
-        m_open = false;
-        del_derivs ();
-        if (is_inq ()) m_search.erase_leaf (*this);
-    }
-
-    void model_node::del_derivs () {
-        // deallocate every deriv
-        for (ptr_vector<derivation>::iterator it = m_derivs.begin ();
-                it != m_derivs.end (); it++) {
-            dealloc (*it);
-        }
-        // empty the vector
-        m_derivs.reset ();
-    }
-
-    void model_node::del_derivs (pred_transformer const& pt, unsigned level) {
-        ptr_vector<derivation>::iterator it = m_derivs.begin ();
-        while (it != m_derivs.end ()) {
-            TRACE ("spacer", tout << (*it) << "\n";);
-            if ((*it)->has_prem (pt, level)) {
-                TRACE ("spacer", tout << "Deleting " << (*it) << "\n";);
-                dealloc (*it);
-                m_derivs.erase (it);
-            } else it++;
-        }
-    }
-
-    void model_node::del_derivs (derivation* d) {
-        m_derivs.erase (d);
-        dealloc (d);
-    }
-
-    void model_node::del_derivs_except (derivation* d) {
-        SASSERT (d);
-        // deallocate every deriv except d
-        for (ptr_vector<derivation>::iterator it = m_derivs.begin ();
-                it != m_derivs.end (); it++) {
-            if ((*it) != d) dealloc (*it);
-        }
-        // empty the vector and add d
-        m_derivs.reset ();
-        add_deriv (d);
-    }
-
-    bool model_node::has_derivs (unsigned level) const {
-        for (ptr_vector<derivation>::const_iterator it = m_derivs.begin ();
-                it != m_derivs.end (); it++) {
-            if ((*it)->curr ().level () == level) return true;
-        }
-        return false;
-    }
-
-    model_node::~model_node () {
-        TRACE ("spacer",
-                tout << "Deleting model node:" << this << "\n";
-              );
-        if (is_inq ()) m_search.erase_leaf (*this);
-        del_derivs ();
-    }
-
-/*
-    datalog::rule* model_node::get_rule() {
-        if (m_rule) {
-            return const_cast<datalog::rule*>(m_rule);
-        }
-        // only initial states are not set by the SPACER search.
-        datalog::rule const& rl1 = pt().find_rule(*m_model);
-        if (is_ini(rl1)) {
-            set_rule(&rl1);
-            return const_cast<datalog::rule*>(m_rule);
-        }
-        ast_manager& m = pt().get_manager();
-        // otherwise, the initial state is reachable.
-        ptr_vector<datalog::rule> const& rules = pt().rules();
-        ptr_vector<datalog::rule> ini_rules;
-        expr_ref_vector tags(m);
-        expr_ref ini_tags(m), ini_state(m);
-        for (unsigned i = 0; i < rules.size(); ++i) {
-            datalog::rule* rl = rules[i];
-            if (is_ini(*rl)) {
-                tags.push_back(pt().rule2tag(rl));
-            }
-        }
-        SASSERT(!tags.empty());
-        ini_tags = m.mk_or(tags.size(), tags.c_ptr());
-        ini_state = m.mk_and(ini_tags, pt().initial_state(), state());
-        model_ref mdl;
-        pt().get_solver().set_model(&mdl);
-        VERIFY(l_true == pt().get_solver().check_conjunction_as_assumptions(ini_state));
-        datalog::rule const& rl2 = pt().find_rule(*mdl);
-        SASSERT(is_ini(rl2));
-        set_rule(&rl2);
-        return const_cast<datalog::rule*>(m_rule);
-    }
-
-    void model_node::mk_instantiate(datalog::rule_ref& r0, datalog::rule_ref& r1, expr_ref_vector& binding) {
-        ast_manager& m = pt().get_manager();
-        expr_ref_vector conjs(m);
-        obj_map<expr,expr*> model;
-        qe::flatten_and(state(), conjs);
-        for (unsigned i = 0; i < conjs.size(); ++i) {
-            expr* e = conjs[i].get(), *e1, *e2;
-            if (m.is_eq(e, e1, e2) || m.is_iff(e, e1, e2)) {
-                if (m.is_value(e2)) {
-                    model.insert(e1, e2);
-                }
-                else if (m.is_value(e1)) {
-                    model.insert(e2, e1);
-                }
-            }
-            else if (m.is_not(e, e1)) {
-                model.insert(e1, m.mk_false());
-            }
-            else {
-                model.insert(e, m.mk_true());
-            }
-        }
-        r0 = get_rule();
-        app_ref_vector& inst = pt().get_inst(r0);
-        TRACE("spacer", tout << mk_pp(state(), m) << " instance: " << inst.size() << "\n";);
-        for (unsigned i = 0; i < inst.size(); ++i) {
-            expr* v;
-            if (model.find(inst[i].get(), v)) {
-                binding.push_back(v);
-            }            
-            else {
-                binding.push_back(m.mk_var(i, m.get_sort(inst[i].get())));
-            }            
-        }
-        r1 = r0;
-        if (!inst.empty()) {
-            r1.get_manager().substitute(r1, binding.size(), binding.c_ptr());
-        }
-    }
-
-
-    std::ostream& model_node::display(std::ostream& out, unsigned indent) {
-        for (unsigned i = 0; i < indent; ++i) out << " ";
-        out << m_level << " " << m_pt.head()->get_name() << " " << (m_closed?"closed":"open") << "\n";
-        for (unsigned i = 0; i < indent; ++i) out << " ";
-        out << "  " << mk_pp(m_state, m_state.get_manager(), indent) << "\n";
-        for (unsigned i = 0; i < children().size(); ++i) {
-            children()[i]->display(out, indent + 1);
-        }
-        return out;
-    }
-
-    unsigned model_node::index() const {
-        model_node* p = parent();
-        if (!p) return 0;
-        for (unsigned i = 0; i < p->children().size(); ++i) {
-            if (this == p->children()[i]) return i;
-        }
-        UNREACHABLE();
-        return 0;
-    }
-
-*/
-
-    // ----------------
     // derivation
 
-    derivation::derivation (model_node* concl,
-                            ptr_vector<pred_transformer>& pred_pts,
-                            vector<bool> const& reach_pred_used,
-                            vector<unsigned> pred_o_idx,
-                            datalog::rule const& rule,
-                            model_search& search,
-                            context const& ctx):
-        m_concl (concl),
-        m_reach_pred_used (reach_pred_used),
-        m_o_idx (pred_o_idx),
-        m_rule (rule),
-        m_curr_it (0),
-        m (m_concl->get_manager ()),
-        m_sm (m_concl->get_spacer_manager ()),
-        m_ctx (ctx),
-        m_trans (m),
-        m_prem_facts (m),
-        M (0)
+  derivation::derivation (model_node* parent, datalog::rule const& rule,
+                          expr_ref trans) :
+        m_parent (parent),
+        m (parent.get_ast_manager ()),
+        m_sm (parent.get_manager ()),
+        m_ctx (parent.get_context ()),
+        m_rule (rule)
+        m_premises (m),
+        m_active (0),
+        m_trans (trans, m) {} 
+  
+  void derivation::premise::premise (pred_transformer &pt, unsigned oidx, 
+                                     expr *summary, bool must) : 
+    m_pt (pt), m_oidx (oidx), 
+    m_summary (summary, pt.get_ast_manager ()), m_must (must),
+    m_ovars (pt.get_ast_manager ()),
+    m_nvars (pt.get_ast_manager ())
+  {
+    
+    ast_manager &m = m_pt.get_ast_manager ();
+    manager &sm = m_pt.get_manager ();
+    
+    unsigned sig_sz = m_pt.head ()->get_arity ();
+    for (unsigned i = 0; i < sig_sz; ++i)
     {
-        SASSERT (m_concl); // non-null
-        for (unsigned i = 0; i < pred_pts.size (); i++) {
-            pred_transformer& pt = *(pred_pts [i]);
-            // create model node for the premise
-            m_prems.push_back (alloc (model_node, m_concl, pt, m_concl->level()-1, this, search));
-            // populate n-vars and o-vars of pt
-            m_ovars.push_back (app_ref_vector (m));
-            m_nvars.push_back (app_ref_vector (m));
-            app_ref_vector& pt_ovars = m_ovars.back ();
-            app_ref_vector& pt_nvars = m_nvars.back ();
-            unsigned sig_size = pt.head()->get_arity();
-            for (unsigned j = 0; j < sig_size; ++j) {
-                pt_ovars.push_back (m.mk_const (m_sm.o2o (pt.sig (j), 0, m_o_idx [i])));
-                pt_nvars.push_back (m.mk_const (m_sm.o2n (pt.sig (j), 0)));
-            }
-        }
-        // initialize m_curr_it to point to nothing
-        m_curr_it = m_prems.end ();
+      m_ovars.push_back (m.mk_const (sm.o2o (pt.sig (i), 0, m_oidx)));
+      m_nvars.push_back (m.mk_const (sm.o2n (pt.sig (i), 0)));
     }
+  }
+  
+  void derivation::premise::premise (const derivation::premise &p) :
+    m_pt (p.m_pt), m_oidx (p.m_oidx), m_summary (p.m_summary), m_must (p.m_must),
+    m_ovars (pt.m_ovars), n_ovars (pt.m_nvars) {}
+  
+  void derivation::add_premise (pred_transformer &pt, 
+                                unsigned oidx,
+                                expr* summary,
+                                bool must)
+  {m_premises.push_back (premise (pt, oidx, summary, must))}
+  
 
-    /**
-     * traverse e to make ghosts for the uninterpreted leaves;
-     * for now, does not handle quantifiers and de-bruijn variables
-     */
-    /*void derivation::mk_ghosts (ast_mark& mark, ptr_vector<expr>& todo, expr* e) {
-        todo.push_back(e);
-        while (!todo.empty()) {
-            e = todo.back();
-            todo.pop_back();
-            if (mark.is_marked(e)) {
-                continue;
-            }
-            mark.mark(e, true);
-            switch(e->get_kind()) {
-            case AST_QUANTIFIER: {
-                // not handling quantifiers for now
-                UNREACHABLE();
-                break;
-            }
-            case AST_VAR: {
-                // not handling variables for now;
-                UNREACHABLE();
-                break;
-            }
-            case AST_APP: {
-                app* a = to_app(e);
-                if (is_uninterp_const (a) && !model_node::is_ghost (a->get_decl ())) {
-                    unsigned idx; // store in this, the o-index of a
-                    m_sm.get_o_index (a->get_decl (), idx);
-                    SASSERT (m_ghosts.size () > idx); // m_ghosts is expected to be of the right size
-                    app* ghost = m_concl->mk_ghost (a);
-                    app_ref_vector vec (m);
-                    vec.push_back (a);
-                    vec.push_back (ghost);
-                    m_ghosts[idx].push_back (vec);
-                    TRACE ("spacer", tout << "Orig: " << mk_pp (a, m) << "\n";);
-                    TRACE ("spacer", tout << "Ghost: " << mk_pp (ghost, m) << "\n";);
-                    TRACE ("spacer", tout << "o-index: " << idx << "\n";);
-                } else {
-                    for (unsigned i = 0; i < a->get_num_args(); ++i) {
-                        todo.push_back(a->get_arg(i));
-                    }
-                }
-                break;
-            }
-            default:
-                UNREACHABLE();
-            }
-        }
+
+  model_node *derivation::create_first_child (model_ref &model)
+  {
+    if (m_premises.empty ()) return NULL;
+    m_active = 0;
+    return create_next_child (model);
+  }
+  
+  model_node *derivation::create_next_child (model_ref &model)
+  {
+    
+    expr_ref_vector summaries (m);
+    app_ref_vector vars (m);
+    
+    // -- find first may premise
+    while (m_active < m_premises.size () && !m_premises[i].is_must ())
+    {
+      summaries.push_back (m_premises[m_active].get_summary ());
+      vars.append (m_premises[m_active].get_ovars ());
+      ++m_active;
     }
-
-    void derivation::mk_ghosts (expr_ref const& phi) {
-        m_ghosts.reset ();
-        m_ghosts.resize (num_prems (), vector<app_ref_vector>());
-        ast_mark mark;
-        ptr_vector<expr> todo;
-        mk_ghosts (mark, todo, phi.get ());
+    if (m_active >= m_premises.size ()) return NULL;
+    
+    // -- update m_trans with the pre-image of m_trans over the summaries
+    summaries.push_back (m_trans);
+    m_trans = m_sm.mk_and (summaries);
+    summaries.reset ();
+    
+    if (!vars.empty ()) qe_project (m, vars, m_trans, model, true);
+    
+    
+    // create the post condition by compute post-image over summaries
+    // that precede currently active premise
+    vars.reset ();
+    for (unsigned i = m_active + 1; i < m_premises.size (); ++i)
+    {
+      summaries.push_back (m_premises [i].get_summary ());
+      vars.append (m_premises [i].get_ovars ());
     }
-
-    void derivation::mk_ghost_sub (expr_substitution& sub) const {
-        sub.reset ();
-        for (vector<vector<app_ref_vector> >::const_iterator it = m_ghosts.begin ();
-                it != m_ghosts.end (); it++) {
-            if ((*it).empty ()) continue; // no ghosts for this idx
-            for (vector<app_ref_vector>::const_iterator g_it = it->begin ();
-                    g_it != it->end (); g_it++) {
-                app_ref_vector const& vec = *g_it;
-                SASSERT (vec.size () == 2); // it's a pair
-                sub.insert (vec[0], vec[1]);
-            }
-        }
-    }
-
-    void derivation::mk_unghost_sub (expr_substitution& sub) const {
-        sub.reset ();
-        SASSERT (m_curr_it != m_prems.end ()); // points to something
-        vector<app_ref_vector> const& curr_ghosts = m_ghosts[curr_o_idx ()];
-        if (curr_ghosts.empty ()) return; // no ghosts for curr_o_idx ()
-        for (vector<app_ref_vector>::const_iterator g_it = curr_ghosts.begin ();
-                g_it != curr_ghosts.end (); g_it++) {
-            app_ref_vector const& vec = *g_it;
-            app* orig_o = vec[0];
-            app* ghost = vec[1];
-            app* orig_n = m.mk_const (m_sm.o2n (orig_o->get_decl (), curr_o_idx ()));
-            sub.insert (ghost, orig_n);
-        }
-    }
-
-    void derivation::ghostify (expr_ref& phi) {
-        mk_ghosts (phi);
-        TRACE ("spacer", tout << "before ghostify: " << mk_pp(phi,m) << "\n";);
-        expr_substitution sub (m);
-        mk_ghost_sub (sub);
-        scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
-        rep->set_substitution (&sub);
-        (*rep) (phi);
-        TRACE ("spacer", tout << "after ghostify: " << mk_pp(phi,m) << "\n";);
-    }*/
-
-    void derivation::setup (expr_ref& phi, model_ref& mdl) {
-        m_trans = phi;
-        M = mdl;
-
-        // update m_prem_facts with (implicants of) reach-facts/lemmas according to m_reach_pred_used
-        m_prem_facts.reset ();
-        for (unsigned i = 0; i < m_prems.size (); i++) {
-            pred_transformer& pt = m_prems[i]->pt ();
-            expr_ref_vector facts (m);
-            if (m_reach_pred_used.get (i)) {
-                expr_ref reach_fact (m);
-                expr_ref _n_reach_fact (m);
-                pt.get_used_o_reach_fact (M, m_o_idx[i], reach_fact, _n_reach_fact);
-                TRACE ("spacer",
-                        tout << "setup reach fact:" << mk_pp (reach_fact, m) << "\n";
-                      );
-                facts.push_back (reach_fact);
-            }
-            else {
-                pt.add_o_lemmas (m_concl->level ()-1, m_o_idx[i], facts);
-            }
-            // get an implicant
-            qe::flatten_and (facts);
-            ptr_vector<expr> facts1 (facts.size (), facts.c_ptr ());
-            model_evaluator mev (m);
-            expr_ref_vector lits (m);
-            mev.minimize_literals (facts1, M, lits);
-            m_prem_facts.push_back (m_sm.mk_and (lits));
-            TRACE ("spacer",
-                    if (m_reach_pred_used.get (i)) {
-                        tout << "setup added fact:" << mk_pp (m_prem_facts.back (), m) << "\n";
-                    }
-                  );
-        }
-    }
-
-    /*void derivation::mk_prem_post (expr_ref& phi, expr_ref& ctx) const {
-        TRACE ("spacer", tout << "input to post: " << mk_pp(phi,m) << "\n";);
-        expr_substitution sub (m);
-        mk_unghost_sub (sub);
-        scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
-        rep->set_substitution (&sub);
-        (*rep) (phi);
-        ctx = expr_ref (m.mk_true (), m);
-        TRACE ("spacer", tout << "output of post: " << mk_pp(phi,m) << "\n";);
-    }*/
-
-    void derivation::updt_setup () {
-        SASSERT (m_curr_it != m_prems.end ());
-
-        expr_ref_vector fmls (m);
-        pred_transformer& pt = curr ().pt ();
-
-        // get new model consistent with m_trans, new reach fact of current
-        // child and facts of remaining children
-        expr_ref n_trans (m);
-        m_sm.formula_o2n (m_trans, n_trans, curr_o_idx (), false);
-        fmls.push_back (n_trans);
-        TRACE ("spacer",
-                tout << "ntrans: " << mk_pp (n_trans, m) << "\n";
-              );
-        for (unsigned i = curr_idx ()+1; i < m_prems.size (); i++) {
-            fmls.push_back (m_prem_facts.get (i));
-            TRACE ("spacer",
-                    tout << "prem fact: " << mk_pp (m_prem_facts.get (i), m) << "\n";
-                    tout << "prem is reach: " << m_reach_pred_used.get (i) << "\n";
-                  );
-        }
-        VERIFY (pt.is_reachable_known (m_sm.mk_and (fmls), &M));
-
-        // get new reach fact
-        expr_ref reach_fact (m);
-        //if (m_ctx.get_params ().eager_reach_check ()) {
-            //reach_fact = pt.get_last_reach_fact ();
-        //}
-        //else {
-            pt.get_used_reach_fact (M, reach_fact);
-        //}
-        TRACE ("spacer",
-                tout << "Post of derivation with n-vars for current index:\n"
-                << mk_pp (m_trans, m) << "\n";
-                tout << "Using reach fact of " << curr ().pt ().head ()->get_name () << ":\n"
-                << mk_pp (reach_fact, m) << "\n";
-                tout << "Model:\n";
-                model_smt2_pp (tout, m, *M, 0);
-              );
-
-        // pick an implicant
-        expr_ref_vector facts (m);
-        facts.push_back (reach_fact);
-        qe::flatten_and (facts);
-        ptr_vector<expr> facts1 (facts.size (), facts.c_ptr ());
-        model_evaluator mev (m);
-        expr_ref_vector lits (m);
-        mev.minimize_literals (facts1, M, lits);
-        expr_ref impl (m_sm.mk_and (lits), m);
-
-        // update m_prem_facts
-        expr_ref oimpl (m);
-        m_sm.formula_n2o (impl, oimpl, curr_o_idx ());
-        m_prem_facts.set (curr_idx (), oimpl);
-
-        // update m_trans
-        fmls.reset ();
-        fmls.push_back (n_trans);
-        fmls.push_back (impl);
-        m_trans = m_sm.mk_and (fmls);
-        qe_project (m, m_nvars [curr_idx ()], m_trans, M, true);
-    }
-
-    model_node* derivation::mk_next () {
-        expr_ref_vector jump_facts (m);
-        app_ref_vector vars (m);
-        model_node* sib;
-
-        /**
-         * // populate reach facts to jump over
-         * if (m_curr_it != m_prems.end ()) {
-         *     // M is over n-vars of curr child
-         *     expr_ref n_reach_fact (m);
-         *     m_sm.formula_o2n (m_prem_facts.get (curr_idx ()), n_reach_fact, curr_o_idx ());
-         *     jump_facts.push_back (n_reach_fact);
-         *     vars.append (m_nvars [curr_idx ()]);
-         *     m_sm.formula_o2n (m_trans, m_trans, curr_o_idx (), false);
-         * }
-         */
-        bool no_next = true;
-        while (has_next ()) {
-            sib = next (); // updates m_curr_it
-            if (!m_reach_pred_used.get (curr_idx ())) {
-                no_next = false;
-                break;
-            }
-            jump_facts.push_back (m_prem_facts.get (curr_idx ()));
-            vars.append (m_ovars [curr_idx ()]);
-        }
-
-        if (no_next) { // no more children to process
-            return (model_node*) (0);
-        }
-
-        // update m_trans
-        jump_facts.push_back (m_trans);
-        m_trans = m_sm.mk_and (jump_facts);
-        if (!vars.empty ()) {
-            qe_project (m, vars, m_trans, M, true);
-            TRACE ("spacer",
-                    tout << "Updated post of derivation:\n"
-                         << mk_pp (m_trans, m) << "\n";
-                  );
-        }
-
-        // create post for sib; use all prem facts except the current
-        vars.reset ();
-        expr_ref_vector fmls (m);
-        fmls.push_back (m_trans);
-        for (unsigned i = curr_idx ()+1; i < m_prems.size (); i++) {
-            fmls.push_back (m_prem_facts.get (i));
-            vars.append (m_ovars [i]);
-        }
-        expr_ref sib_post (m_sm.mk_and (fmls), m);
-        qe_project (m, vars, sib_post, M, true);
-        m_sm.formula_o2n (sib_post, sib_post, curr_o_idx ());
-
-        // update sib
-        sib->reset ();
-        sib->updt_post (sib_post);
-        TRACE ("spacer",
-                tout << "Post of next sibling:\n"
-                << mk_pp (sib_post, m) << "\n";
-              );
-        return sib;
-
-/**
- *         if (m_curr_it != m_prems.end ()) {
- *             // project vars of current pt and update m_post
- *             idx = (m_curr_it - m_prems.begin ());
- *             vars.append (m_nvars[idx]);
- *             qe_project (m, vars, m_post, M);
- *             TRACE ("spacer",
- *                     tout << "Updated post of derivation:\n"
- *                          << mk_pp (m_post, m) << "\n";
- *                   );
- *             idx += 2;
- *         }
- * 
- *         // project all variables except those of the next premise
- *         for (; idx < m_prems.size (); idx++) {
- *             vars.append (m_ovars[idx]);
- *         }
- *         expr_ref post_actual (m);
- *         post_actual = m_post;
- *         qe_project (m, vars, post_actual, M);
- * 
- *         // next sibling; this updates local bookkeeping info about o-indices, etc.
- *         model_node& sib = next ();
- *         sib.reset ();
- * 
- *         TRACE ("spacer",
- *                 tout << "post on actual params:\n"
- *                      << mk_pp (post_actual, m) << "\n";
- *                 tout << "o-idx: " << curr_o_idx () << "\n";
- *               );
- * 
- *         // replace actuals by formals
- *         m_sm.formula_o2n (post_actual, post, curr_o_idx ());
- *         TRACE ("spacer",
- *                 tout << "Post of next sibling:\n"
- *                 << mk_pp (post, m) << "\n";
- *               );
- * 
- *         return sib;
- */
-    }
-
-    /*void derivation::get_trace (expr_ref_vector& trace_conjs) const {
-        expr_substitution sub (m);
-        expr* c1;
-        expr* c2;
-        // obtain traces of m_prems in reverse order
-        if (m_prems.size () > 0) {
-            for (unsigned i = 0; i < m_prems.size (); i++) {
-                unsigned idx = m_prems.size ()-i-1;
-                model_node* prem = m_prems [idx];
-                SASSERT (prem->closing_deriv ());
-                prem->closing_deriv ()->get_trace (trace_conjs);
-                // version all the o-consts
-                pred_transformer const& pt = prem->pt ();
-                unsigned sig_size = pt.sig_size ();
-                for (unsigned j = 0; j < sig_size; j++) {
-                    c1 = m.mk_const (m_sm.o2o (pt.sig (j), 0, m_o_idx [idx]));
-                    c2 = m.mk_const (m_sm.o2o (pt.sig (j), 0, prem->id ()));
-                    sub.insert (c1, c2);
-                }
-            }
-        }
-        // version n-consts and the auxiliaries
-        pred_transformer& concl_pt = m_concl->pt ();
-        unsigned sig_size = concl_pt.sig_size ();
-        for (unsigned j = 0; j < sig_size; j++) {
-            c1 = m.mk_const (m_sm.o2n (concl_pt.sig (j), 0));
-            c2 = m.mk_const (m_sm.o2o (concl_pt.sig (j), 0, m_concl->id ()));
-            sub.insert (c1, c2);
-        }
-        ptr_vector<app>& aux_vars = concl_pt.get_aux_vars (m_rule);
-        for (unsigned j = 0; j < aux_vars.size (); j++) {
-            app* var = aux_vars [j];
-            sort* s = var->get_decl ()->get_range ();
-            std::stringstream new_name;
-            new_name << var->get_decl ()->get_name () << "_" << m_concl->id ();
-            app* new_var = m.mk_const (symbol (new_name.str ().c_str ()), s);
-            sub.insert (var, new_var);
-        }
-
-        scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
-        rep->set_substitution(&sub);
-
-        // add transition relation
-        expr* T = concl_pt.get_transition (m_rule);
-        expr_ref T_v (m);
-        (*rep) (T, T_v);
-        trace_conjs.push_back (T_v);
-    }*/
-
-    derivation::~derivation () {
-        TRACE ("spacer",
-                tout << "Destroying deriv:" << this << "\n";
-              );
-        // destroy m_prems
-        while (!m_prems.empty ()) {
-            model_node* n = m_prems.back ();
-            m_prems.pop_back ();
-            dealloc (n);
-        }
-    }
-
+    summaries.push_back (m_trans);
+    
+    expr_ref post(m) = m_sm.mk_and (summaries);
+    summaries.reset ();
+    if (!vars.empty ()) qe_project (m, vars, post, model, true);
+    m_sm.formula_o2n (post.get (), post, m_premises [m_active].get_oidx ());
+    
+    model_node *n = alloc (model_node, m_parent, 
+                           m_premises[m_active].pt (), 
+                           prev_level (m_parent.level ()));
+    n->set_post (post);
+    return n;
+  }
+  
+  model_node *derivation::create_next_child ()
+  {
+    if (m_active >= m_premises.size ()) return NULL;
+    
+    // update the summary of the active node to some must summary
+    
+    // construct a new model consistent with the must summary of m_active premise
+    pred_transformer &pt = m_premises[m_active].pt ();
+    model_ref &model (m);
+    
+    expr_ref_vector summaries (m);
+    
+    for (unsigned i = m_active + 1; i < m_premises.size (); ++i)
+      summaries.push_back (m_premises [i].get_summary ());
+    
+    // -- orient transition relation towards m_active premise
+    expr_ref v(m);
+    m_sm.formula_o2n (m_trans, v, m_premises[m_active].get_oidx (), false)
+    summaries.push_back (v);
+    
+    /// must be true, otherwise no suitable must summary found
+    VERIFY (pt.is_reachable_known (m_sm.mk_and (summaries), &model));
+    
+    // find must summary used
+    pt.get_used_reach_fact (model, v);
+    
+    // get an implicant of the summary
+    model_evaluator mev (m);
+    expr_ref_vector u(m), lits (m);
+    u.push_back (v);
+    compute_implicant_literals (mev, model, u, lits);
+    v = m_sm.mk_and (lits);
+    
+    expr_ref s(m);
+    m_sm.formula_n2o (v, s, m_premises[m_active].get_oidx ());
+    m_premises[m_active].set_summary (s, true);
+    
+    return create_next_child (model);
+  }
+  
     // ----------------
     // model_search
 
-    model_node* model_search::next () {
-        if (m_leaves.empty ()) {
-            return 0;
-        }
-        model_node* result = m_leaves.top ();
-        m_leaves.pop ();
-        result->outq ();
-        TRACE ("spacer",
-                tout << "Popping node for PT:" << result->pt().head()->get_name()
-                     << " " << result
-                     << " at level:" << result->level() << "\n";
-              );
-        return result;
-    }
+  model_node* model_search::next () {
+    if (m_leaves.empty ()) return NULL;
+      
+    model_node* result = m_leaves.back ();
+    m_leaves.pop_back ();
+    return result;
+  }
 
-/*
-    bool model_search::is_repeated(model_node& n) const {
-        model_node* p = n.parent();
-        while (p) {
-            if (p->post() == n.post()) {
-                return true;
-            }
-            p = p->parent();
-        }
-        return false;
-    }
-*/
+    void model_search::enqueue_leaf(model_node& n) {m_leaves.push_back (&n);}
 
-    void model_search::add_leaf(model_node& n) {
-        set_leaf (n);
-        /*unsigned& count = cache(n).insert_if_not_there2(n.post(), 0)->get_data().m_value;
-        ++count;
-        if (count == 1 || is_repeated(n)) {
-            set_leaf(n);
-        }
-        else {
-            n.set_pre_closed();
-        }*/
-    }
-
-    void model_search::set_leaf(model_node& n) {
-        enqueue_leaf(n);
-    }
-
-    void model_search::enqueue_leaf(model_node& n) {
-        m_leaves.push (&n);
-        n.inq ();
-        TRACE ("spacer",
-                tout << "Enqueuing node for PT:" << n.pt().head()->get_name()
-                     << " " << &n
-                     << " at level:" << n.level() << "\n";
-              );
-    }
-
-    void model_search::set_root(model_node* root) {
+    void model_search::set_root (model_node& root) {
         reset();
-        m_root = root;
-        //SASSERT(cache(*root).empty());        
-        //cache(*root).insert(root->post(), 1);
-        set_leaf(*root);
+        m_root = &root;
+        enqueue_leaf(*root);
     }
 
-    void model_search::erase_leaf (model_node& n) { m_leaves.erase (&n); n.outq ();
-        TRACE ("spacer",
-                tout << "Erasing node for PT:" << n.pt().head()->get_name()
-                     << " " << &n
-                     << " at level:" << n.level() << "\n";
-              );
-    }
-
-
-/*    obj_map<expr, unsigned>& model_search::cache(model_node const& n) {
-        unsigned l = n.orig_level();
-        if (l >= m_cache.size()) {
-            m_cache.resize(l + 1);
-        }
-        return m_cache[l];
-    }
-
-    std::ostream& model_search::display(std::ostream& out) const {
-        if (m_root) {
-            m_root->display(out, 0);
-        }
-        out << "goals\n";
-        std::deque<model_node*>::const_iterator 
-            it  = m_leaves.begin(), 
-            end = m_leaves.end();
-        for (; it != end; ++it) {
-            (*it)->display(out, 1);
-        }
-        return out;
-    }
-*/
-
-
-    /**
-       \brief Ensure that all nodes in the tree have associated models.
-       get_trace and get_proof_trace rely on models to extract rules.
-     */
-
-/*
-    void model_search::update_models() {
-        obj_map<expr, model*> models;
-        ptr_vector<model_node> todo;
-        todo.push_back(m_root);
-        while (!todo.empty()) {
-            model_node* n = todo.back();
-            if (n->get_model_ptr()) {
-                models.insert(n->state(), n->get_model_ptr());
-            }
-            todo.pop_back();
-            todo.append(n->children().size(), n->children().c_ptr());
-        }
-
-        todo.push_back(m_root);
-        while (!todo.empty()) {
-            model_node* n = todo.back();
-            model* md = 0;
-            if (!n->get_model_ptr() && models.find(n->state(), md)) {
-                model_ref mr(md);
-                n->set_model(mr);
-            }
-            todo.pop_back();
-            todo.append(n->children().size(), n->children().c_ptr());
-        }        
-    }
-*/
+    void model_search::erase_leaf (model_node& n) {m_leaves.erase (&n);}
 
     /**
        Extract trace comprising of constraints 
@@ -1910,239 +1407,15 @@ namespace spacer {
     expr_ref model_search::get_trace(context const& ctx) {
         ast_manager& m = ctx.get_manager ();
         return expr_ref (m.mk_true (), m);
-        /*SASSERT (m_root->closing_deriv ());
-        expr_ref_vector trace_conjs (m);
-        m_root->closing_deriv ()->get_trace (trace_conjs);
-        TRACE ("spacer",
-                tout << "Trace:" << "\n";
-                tout << mk_pp (m.mk_and (trace_conjs.size (), trace_conjs.c_ptr ()), m) << "\n";
-              );
-        expr_ref result (m.mk_and (trace_conjs.size (), trace_conjs.c_ptr ()), m);
-        return result;*/
     }
-/*
-    expr_ref model_search::get_trace(context const& ctx) {       
-        pred_transformer& pt = get_root().pt();
-        ast_manager& m = pt.get_manager();
-        manager& pm = pt.get_spacer_manager();
-        datalog::context& dctx = ctx.get_context();
-        datalog::rule_manager& rm = dctx.get_rule_manager();
-        expr_ref_vector constraints(m), predicates(m);
-        expr_ref tmp(m);
-        ptr_vector<model_node> children;
-        unsigned deltas[2];
-        datalog::rule_ref rule(rm), r0(rm);
-        model_node* n = m_root;
-        datalog::rule_counter& vc = rm.get_counter();
-        substitution subst(m);
-        unifier unif(m);
-        rule = n->get_rule();
-        unsigned max_var = vc.get_max_rule_var(*rule);
-        predicates.push_back(rule->get_head());
-        children.push_back(n);
-        bool first = true;
-        update_models();
-        while (!children.empty()) {
-            SASSERT(children.size() == predicates.size());
-            expr_ref_vector binding(m);
-            n = children.back();
-            children.pop_back();
-            TRACE("spacer", n->display(tout, 0););
-            n->mk_instantiate(r0, rule, binding);
-            
-            max_var = std::max(max_var, vc.get_max_rule_var(*rule));
-            subst.reset();
-            subst.reserve(2, max_var+1);
-            deltas[0] = 0;
-            deltas[1] = max_var+1;
-        
-            VERIFY(unif(predicates.back(), rule->get_head(), subst));
-            for (unsigned i = 0; i < constraints.size(); ++i) {
-                subst.apply(2, deltas, expr_offset(constraints[i].get(), 0), tmp);
-                dctx.get_rewriter()(tmp);
-                constraints[i] = tmp;
-            }
-            for (unsigned i = 0; i < predicates.size(); ++i) {
-                subst.apply(2, deltas, expr_offset(predicates[i].get(), 0), tmp);
-                predicates[i] = tmp;
-            }
-            if (!first) {
-                constraints.push_back(predicates.back());
-            }
-            first = false;
-            predicates.pop_back();
-            for (unsigned i = 0; i < rule->get_uninterpreted_tail_size(); ++i) {
-                subst.apply(2, deltas, expr_offset(rule->get_tail(i), 1), tmp);
-                predicates.push_back(tmp);
-            }
-            for (unsigned i = rule->get_uninterpreted_tail_size(); i < rule->get_tail_size(); ++i) {
-                subst.apply(2, deltas, expr_offset(rule->get_tail(i), 1), tmp);
-                dctx.get_rewriter()(tmp);
-                if (!m.is_true(tmp)) {
-                    constraints.push_back(tmp);
-                }
-            }
-            for (unsigned i = 0; i < constraints.size(); ++i) {
-                max_var = std::max(vc.get_max_var(constraints[i].get()), max_var);
-            }
-            for (unsigned i = 0; i < predicates.size(); ++i) {
-                max_var = std::max(vc.get_max_var(predicates[i].get()), max_var);
-            }
-            children.append(n->children());
-        }            
-        return pm.mk_and(constraints);
-    }
-
-    proof_ref model_search::get_proof_trace(context const& ctx) {
-        pred_transformer& pt = get_root().pt();
-        ast_manager& m = pt.get_manager();
-        datalog::context& dctx = ctx.get_context();
-        datalog::rule_manager& rm = dctx.get_rule_manager();
-        datalog::rule_unifier unifier(dctx);
-        datalog::dl_decl_util util(m);
-        datalog::rule_ref r0(rm), r1(rm);
-        obj_map<expr, proof*> cache;
-        obj_map<expr, datalog::rule*>  rules;
-        ptr_vector<model_node> todo;
-        proof_ref_vector trail(m);
-        datalog::rule_ref_vector rules_trail(rm);
-        proof* pr = 0;
-        unifier.set_normalize(false);
-        todo.push_back(m_root);
-        update_models();
-        while (!todo.empty()) {
-            model_node* n = todo.back();
-            TRACE("spacer", n->display(tout, 0););
-            if (cache.find(n->state(), pr)) {
-                todo.pop_back();
-                continue;
-            }
-            ptr_vector<proof> pfs;
-            ptr_vector<datalog::rule> rls;
-            ptr_vector<model_node> const& chs = n->children();
-            pfs.push_back(0);
-            rls.push_back(0);
-            for (unsigned i = 0; i < chs.size(); ++i) {
-                if (cache.find(chs[i]->state(), pr)) {
-                    pfs.push_back(pr);
-                    rls.push_back(rules.find(chs[i]->state()));
-                }
-                else {
-                    todo.push_back(chs[i]);
-                }
-            }            
-            if (pfs.size() != 1 + chs.size()) {
-                continue;
-            }
-            proof_ref rl(m);
-            expr_ref_vector binding(m);
-            n->mk_instantiate(r0, r1, binding);
-            proof_ref p1(m), p2(m);
-            p1 = r0->get_proof();
-            if (!p1) {
-                r0->display(dctx, std::cout);
-            }
-            SASSERT(p1);
-            pfs[0] = p1;
-            rls[0] = r1;
-            TRACE("spacer",
-                  tout << "root: " << mk_pp(p1.get(), m) << "\n";
-                  for (unsigned i = 0; i < binding.size(); ++i) {
-                      tout << mk_pp(binding[i].get(), m) << "\n";
-                  }
-                  for (unsigned i = 1; i < pfs.size(); ++i) {
-                      tout << mk_pp(pfs[i], m) << "\n";
-                  }
-                  );
-            datalog::rule_ref reduced_rule(rm), r3(rm);            
-            reduced_rule = rls[0];
-            // check if binding is identity.
-            bool binding_is_id = true;
-            for (unsigned i = 0; binding_is_id && i < binding.size(); ++i) {
-                expr* v = binding[i].get();
-                binding_is_id = is_var(v) && to_var(v)->get_idx() == i;
-            }
-            if (rls.size() > 1 || !binding_is_id) {
-                expr_ref tmp(m);
-                vector<expr_ref_vector> substs;
-                svector<std::pair<unsigned,unsigned> > positions;
-                substs.push_back(binding); // TODO base substitution.
-                for (unsigned i = 1; i < rls.size(); ++i) {
-                    datalog::rule& src = *rls[i];
-                    bool unified = unifier.unify_rules(*reduced_rule, 0, src);
-                    if (!unified) {
-                        IF_VERBOSE(0,
-                                   verbose_stream() << "Could not unify rules: ";
-                                   reduced_rule->display(dctx, verbose_stream());
-                                   src.display(dctx, verbose_stream()););
-                    }
-                    expr_ref_vector sub1 = unifier.get_rule_subst(*reduced_rule, true);
-                    TRACE("spacer",
-                          for (unsigned k = 0; k < sub1.size(); ++k) {
-                              tout << mk_pp(sub1[k].get(), m) << " ";
-                          }
-                          tout << "\n";
-                          );
-
-                    for (unsigned j = 0; j < substs.size(); ++j) {
-                        for (unsigned k = 0; k < substs[j].size(); ++k) {
-                            var_subst(m, false)(substs[j][k].get(), sub1.size(), sub1.c_ptr(), tmp);
-                            substs[j][k] = tmp;
-                        }
-                        while (substs[j].size() < sub1.size()) {
-                            substs[j].push_back(sub1[substs[j].size()].get());
-                        }
-                    }
-
-                    positions.push_back(std::make_pair(i,0));
-                    substs.push_back(unifier.get_rule_subst(src, false));
-                    VERIFY(unifier.apply(*reduced_rule.get(), 0, src, r3));
-                    reduced_rule = r3;
-                }
-
-                expr_ref fml_concl(m);
-                reduced_rule->to_formula(fml_concl);                    
-                p1 = m.mk_hyper_resolve(pfs.size(), pfs.c_ptr(), fml_concl, positions, substs);
-
-            }
-            cache.insert(n->state(), p1);
-            rules.insert(n->state(), reduced_rule);
-            trail.push_back(p1);
-            rules_trail.push_back(reduced_rule);
-            todo.pop_back();
-        }
-        return proof_ref(cache.find(m_root->state()), m);
-    }
-*/
-
-    model_search::~model_search() {
-        TRACE("spacer", tout << "\n";);
-        reset();
-    }
+  
+    model_search::~model_search() {reset();}
 
     void model_search::reset() {
-        if (m_root) {
-            dealloc(m_root);
-            m_root = 0;
-        }
+        m_leaves.reset ();
+        m_root = NULL;
     }
-/*
-    void model_search::backtrack_level(bool uses_level, model_node& n) {
-        SASSERT(m_root);
-        if (uses_level && m_root->level() > n.level()) {
-            IF_VERBOSE(2, verbose_stream() << "Increase level " << n.level() << "\n";);
-            n.increase_level();
-            enqueue_leaf(n);
-        }
-        else {
-            model_node* p = n.parent();
-            if (p) {
-                set_leaf(*p);
-            }               
-        }     
-    }
-*/
-
+  
     // ----------------
     // context
 
@@ -2767,32 +2040,6 @@ namespace spacer {
         }
     }
 
-/*
-    model_ref context::get_model() {
-        SASSERT(m_last_result == l_false);        
-        expr_ref_vector refs(m);
-        vector<relation_info> rs;
-        model_ref md;
-        get_level_property(m_inductive_lvl, refs, rs);            
-        inductive_property ex(m, m_mc, rs);
-        ex.to_model(md);
-        return md;
-    }
-
-    proof_ref context::get_proof() const {
-        datalog::scoped_proof _sc(m);
-        proof_ref proof(m);
-        SASSERT(m_last_result == l_true);
-        proof = m_search.get_proof_trace(*this);
-        TRACE("spacer", tout << "SPACER trace: " << mk_pp(proof, m) << "\n";);
-        apply(m, m_pc.get(), proof);
-        TRACE("spacer", tout << "SPACER trace: " << mk_pp(proof, m) << "\n";);
-        // proof_utils::push_instantiations_up(proof);
-        // TRACE("spacer", tout << "SPACER up: " << mk_pp(proof, m) << "\n";);
-        return proof;
-    }
-*/
-
 
     /**
         \brief Retrieve satisfying assignment with explanation.
@@ -3007,132 +2254,137 @@ namespace spacer {
         expr_ref post (m.mk_true(), m);
 
         //create the initial goal -- this is the INIT rule
-        model_node* root = alloc (model_node, 0, *m_query, level, 0, m_search);
-
-        root->updt_post (post);
+        model_node* root = alloc (model_node, 0, *m_query, level, NULL);
+        root->set_post (post);
         m_search.set_root(root);            
         
-        //keep picking the next goal and solving them. this is how the
-        //selection of rules is determinized.
-        while (model_node* node = m_search.next()) {
-            IF_VERBOSE(2, verbose_stream() << "Expand node: " << node->level() << "\n";);
+        while (model_node* node = m_search.next ()) 
+        {
+            IF_VERBOSE(2, 
+                       verbose_stream() << "Expand node: " 
+                       << node->level() << "\n";);
             checkpoint();
-            expand_node(*node);   
+            
+            // -- if a node has a derivation, either close it or derive a child
+            if (node->has_derivation ())
+            {
+              model_node *kid = node->get_derivation ().create_next_child ();
+              if (kid) 
+              {
+                m_search.enqueue_leaf (kid);
+                continue;
+              }
+              else
+                node->reset_derivation ();
+            }
+            
+            SASSERT (!node->has_derivation ());
+            expand_node (*node);   
+            if (!node->is_root ()) dealloc (node);
         }
         return root->is_reachable ();
     }
 
-/*  void context::close_node(model_node& n) {
-        n.close();
-        model_node* p = n.parent();
-        while (p && p->is_1closed()) {
-            p->close();
-            p = p->parent();
-        }
-    }
-
-    void context::check_pre_closed(model_node& n) {
-        for (unsigned i = 0; i < n.children().size(); ++i) {
-            if (!n.children()[i]->is_closed()) return;
-        }
-        n.set_pre_closed();
-        model_node* p = n.parent();
-        while (p && p->is_1closed()) {
-            p->set_pre_closed();
-            p = p->parent();
-        }
-    }
-*/
-
     //this processes a goal and creates sub-goal
     void context::expand_node(model_node& n) 
     {
-        SASSERT(n.is_open());
+      SASSERT(n.is_open());
+      
+      if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
+
+      TRACE ("spacer", 
+             tout << "expand-node: " << n.pt().head()->get_name() 
+             << " level: " << n.level() << "\n";
+             tout << mk_pp(n.post(), m) << "\n";);
+
+      // check the cache
+      // DISABLED FOR NOW
+      // if (n.pt().is_reachable_known (n.post())) {
+      //     m_stats.m_num_reuse_reach++;
+      //     n.set_reachable (true);
+      // }
         
-        if (n.level() < m_expanded_lvl) {
-            m_expanded_lvl = n.level();
+        
+      // used in case n is unreachable
+      unsigned uses_level = infty_level ();
+      expr_ref_vector cube(m);
+      
+      // used in case n is reachable
+      bool is_concrete;
+      datalog::rule const* r = 0;
+      // denotes which predecessor's (along r) reach facts are used
+      vector<bool> reach_pred_used; 
+      unsigned num_reuse_reach = 0;
+
+      switch (expand_state(n, cube, uses_level, is_concrete, r, 
+                           reach_pred_used, num_reuse_reach)) 
+      {
+        //reachable but don't know if this is purely using UA
+      case l_true: 
+        // update stats
+        m_stats.m_num_reuse_reach += num_reuse_reach;
+
+        // must-reachable
+        if (is_concrete) 
+        {
+          // -- update must summary
+          expr_ref reach_fact (m);
+          expr_ref_vector child_reach_facts (m);
+          mk_reach_fact (n, *r, reach_fact, child_reach_facts);
+          n.pt ().add_reach_fact (reach_fact, r, child_reach_facts);
+          n.set_reachable (true);
+          
+          if (!n.is_root ())
+            m_search.enqueue_leaf (n.parent ());
         }
+        //otherwise pick the first OA and create a sub-goal
+        else 
+          create_children (n, *r, reach_pred_used);
+        break;
 
-        TRACE ("spacer", 
-               tout << "expand-node: " << n.pt().head()->get_name() << " level: " << n.level() << "\n";
-               tout << mk_pp(n.post(), m) << "\n";);
+        // n is unreachable, create new summary facts
+      case l_false: 
+        TRACE("spacer", tout << "cube:\n"; 
+              for (unsigned j = 0; j < cube.size(); ++j) 
+                tout << mk_pp(cube[j].get(), m) << "\n";);
 
-        //check if reachable by using existing UA.
-        if (n.pt().is_reachable_known (n.post())) {
-            TRACE("spacer", tout << "known to be reachable\n";);
-            m_stats.m_num_reuse_reach++;
-            n.close ();
-            report_reach (n);
+        core_generalizer::cores cores;
+        cores.push_back (std::make_pair(cube, uses_level));
+        
+        // -- run all core generalizers
+        for (unsigned i = 0; !cores.empty() && i < m_core_generalizers.size(); ++i) {
+          core_generalizer::cores new_cores;                    
+          for (unsigned j = 0; j < cores.size(); ++j) 
+            (*m_core_generalizers[i])(n, cores[j].first, cores[j].second, new_cores);
+          cores.reset ();
+          cores.append (new_cores);
         }
-        //otherwise check which of SUM/REACH/QUERY rule is applicable
-        else {
-            reset_curr_model ();
-            // unreachable stuff
-            unsigned uses_level = infty_level ();
-            expr_ref_vector cube(m);
-            // reachable stuff
-            bool is_concrete;
-            datalog::rule const* r = 0;
-            vector<bool> reach_pred_used; // indicator vector denoting which predecessor's (along r) reach facts are used
-            unsigned num_reuse_reach = 0;
-
-            switch (expand_state(n, cube, uses_level, is_concrete, r, reach_pred_used, num_reuse_reach)) {
-                //reachable but don't know if this is purely using UA
-            case l_true: {
-                // update stats
-                m_stats.m_num_reuse_reach += num_reuse_reach;
-
-                //if reachable using UA only
-                if (is_concrete) {
-                    // concretely reachable; infer new reach fact
-                    TRACE ("spacer",
-                            tout << "concretely reachable\n";
-                          );
-                    updt_as_reachable (n, *r);
-                }
-                //otherwise pick the first OA and create a sub-goal
-                else {
-                    TRACE ("spacer",
-                            tout << "abstractly reachable\n";
-                          );
-                    create_children (n, *r, reach_pred_used);
-                }
-                break;
-            }
-
-                //query is not reachable, create new summary facts
-            case l_false: {
-                core_generalizer::cores cores;
-                cores.push_back(std::make_pair(cube, uses_level));
-                TRACE("spacer", tout << "cube:\n"; 
-                      for (unsigned j = 0; j < cube.size(); ++j) tout << mk_pp(cube[j].get(), m) << "\n";);
-                for (unsigned i = 0; !cores.empty() && i < m_core_generalizers.size(); ++i) {
-                    core_generalizer::cores new_cores;                    
-                    for (unsigned j = 0; j < cores.size(); ++j) {
-                        (*m_core_generalizers[i])(n, cores[j].first, cores[j].second, new_cores);
-                    }
-                    cores.reset();
-                    cores.append(new_cores);
-                }
-                for (unsigned i = 0; i < cores.size(); ++i) {
-                    expr_ref_vector const& core = cores[i].first;
-                    uses_level = cores[i].second;
-                    expr_ref ncore(m_pm.mk_not_and(core), m);
-                    TRACE("spacer", tout << "invariant state: " << (!is_infty_level(uses_level)?"":"(inductive) ") <<  mk_pp(ncore, m) << "\n";);
-                    n.pt().add_property (ncore, uses_level);
-                }
-                CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
-                n.close ();
-                report_unreach (n);
-                break;
-            }
-                //something went wrong
-            case l_undef: {
-                TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
-                throw unknown_exception();
-            }
-            }
+        
+        for (unsigned i = 0; i < cores.size(); ++i) {
+          expr_ref_vector const& core = cores[i].first;
+          uses_level = cores[i].second;
+          expr_ref lemma (m_pm.mk_not_and(core), m);
+          TRACE("spacer", tout << "invariant state: " << (is_infty_level(uses_level)?"(inductive)":"") <<  mk_pp (lemma, m) << "\n";);
+          n.pt().add_property (lemma, uses_level);
         }
+        CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
+        n.set_reachable (false);
+        
+        // -- add parent as a leaf
+        if (!n.is_root ())
+        {
+          model_node *p = n.parent ();
+          p->reset_derivation ();
+          m_search.enqueue_leaf (p);
+        }
+        break;
+      
+        //something went wrong
+      case l_undef: 
+        TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
+        throw unknown_exception();
+      }
+      
     }
 
     //
@@ -3208,25 +2460,7 @@ namespace spacer {
             pred_transformer& ch_pt = get_pred_transformer (pred);
             // get a reach fact of body preds used in the model
             expr_ref ch_reach (m), n_ch_reach (m);
-            //ch_pt.get_all_used_o_reach_facts (M, i, ch_reach);
             ch_pt.get_used_o_reach_fact (M, i, ch_reach, n_ch_reach);
-            TRACE ("spacer",
-                    tout << mk_pp (ch_reach, m) << "\n";
-                    expr_ref bval (m);
-                    bval = m_mev.eval (M, ch_reach);
-                    tout << "val in model: \n";
-                    tout << mk_pp (bval, m) << "\n";
-                  );
-            DEBUG_CODE (
-                expr_ref bval (m);
-                if (m_params.use_heavy_mev ()) {
-                    m_mev.eval_heavy (M, ch_reach, bval);
-                }
-                else {
-                    bval = m_mev.eval (M, ch_reach);
-                }
-                SASSERT (m.is_true (bval));
-            );
             path_cons.push_back (ch_reach);
             child_reach_facts.push_back (n_ch_reach);
             // collect o-vars to eliminate
@@ -3322,12 +2556,6 @@ namespace spacer {
               tout << "Phi:\n" << mk_pp(phi, m) << "\n";);
 
         SASSERT (r.get_uninterpreted_tail_size () > 0);
-        /**
-         * if (r.get_uninterpreted_tail_size () == 0) {
-         *     updt_as_reachable (n, r);
-         *     return;
-         * }
-         */
 
         ptr_vector<func_decl> preds;
         pt.find_predecessors(r, preds);
@@ -3386,30 +2614,23 @@ namespace spacer {
         //   phi1 = m_pm.mk_and (Phi);
         // }
         
-        // create a new derivation for the model
-        // order the pts -- for now, right to left
-        bool r_to_l = (m_params.order_children() == 0);
-        vector<unsigned> o_idx;
-        vector<bool> reach_pred_used1;
-        pred_pts.reset ();
-        ptr_vector<func_decl>::iterator it;
-        for (ptr_vector<func_decl>::iterator fwd_it = preds.begin ();
-                fwd_it != preds.end (); fwd_it++) {
-
-            if (r_to_l) { it = fwd_it; }
-            else { it = preds.begin () + (preds.end () - fwd_it - 1); }
-
-            pred_pts.push_back (&get_pred_transformer (*it));
-            o_idx.push_back (it-preds.begin ());
-            reach_pred_used1.push_back (reach_pred_used.get (it-preds.begin ()));
+        
+        /// create a derivation and populate it with premises
+        derivation *deriv = alloc (derivation, n, r, phi1);
+        for (unsigned i = 0; i < preds.size (); ++i)
+        {
+          pred_transformer &pt = get_pred_transformer (preds [i]);
+          deriv.add_premise (pt, i, 
+                             pt.get_origin_summary (M, prev_level (n.level ()),
+                                                    i, reach_pred_used [i]),
+                             reach_pred_used [i]);
         }
-        derivation* deriv = alloc (derivation, &n, pred_pts, reach_pred_used1, o_idx, r, m_search, *this);
-        n.add_deriv (deriv);
-        deriv->setup (phi1, M);
-        SASSERT (deriv->has_next ());
+        n.set_derivation (deriv);
 
         // create post for the first child and add to queue
-        model_node* ch = deriv->mk_next ();
+        model_node* ch = deriv->create_first_child (M, m_search);
+        SASSERT (ch);
+        
         m_search.add_leaf (*ch);
         m_stats.m_num_queries++;
     }

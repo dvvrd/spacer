@@ -1,4 +1,4 @@
-/*++
+)/*+
 Copyright (c) 2011 Microsoft Corporation
 
 Module Name:
@@ -1604,6 +1604,15 @@ namespace spacer {
           });
   }
 
+  void compute_implicant_literals (model_evaluator &mev, model_ref &model, 
+                                   expr_ref_vector &formula, expr_ref_vector &res)
+  {
+    qe::flatten_and (formula);
+    ptr_vector<expr> f (formula.size (), formula.c_ptr ());
+    mev.minimize_literals (f, model, res);
+    mev.reset();
+  }
+  
 }
 
 template class rewriter_tpl<spacer::ite_hoister_cfg>;
