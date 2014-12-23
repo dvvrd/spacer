@@ -2034,6 +2034,7 @@ namespace qe {
             peq p (to_app (p_exp), m);
             app_ref_vector diff_val_consts (m);
             p.mk_eq (diff_val_consts, eq, stores_on_rhs);
+            m_aux_vars.append (diff_val_consts);
             // extend M to include diff_val_consts
             expr_ref arr (m);
             expr_ref_vector I (m);
