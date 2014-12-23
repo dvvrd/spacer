@@ -1465,16 +1465,25 @@ namespace spacer {
             {
                 scoped_no_proof _sp (m);
                 qe::array_project_eqs (*M, array_vars, fml);
+
+                TRACE ("spacer",
+                        tout << "Projected array eqs:\n" << mk_pp (fml, m) << "\n";
+                      );
+
                 qe::array_project_selects (*M, array_vars, fml, project_all_arr_stores);
+
+                TRACE ("spacer",
+                        tout << "Projected array selects:\n" << mk_pp (fml, m) << "\n";
+                      );
+
             }
 
             TRACE ("spacer",
-                    tout << "Projected array vars:\n" << mk_pp (fml, m) << "\n";
                     tout << "extended model:\n";
                     model_pp (tout, *M);
                     tout << "Auxiliary variables of index and value sorts:\n";
-                    for (unsigned i = 0; i < vars.size (); i++) {
-                        tout << mk_pp (vars.get (i), m) << "\n";
+                    for (unsigned i = 0; i < array_vars.size (); i++) {
+                        tout << mk_pp (array_vars.get (i), m) << "\n";
                     }
                   );
 
