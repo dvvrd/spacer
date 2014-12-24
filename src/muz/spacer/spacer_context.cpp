@@ -1072,9 +1072,9 @@ namespace spacer {
   derivation::derivation (model_node& parent, datalog::rule const& rule,
                           expr * trans) :
         m_parent (parent),
-        m (parent.get_ast_manager ()),
-        m_sm (parent.get_manager ()),
-        m_ctx (parent.get_context ()),
+        m (m_parent.get_ast_manager ()),
+        m_sm (m_parent.get_manager ()),
+        m_ctx (m_parent.get_context ()),
         m_rule (rule),
         m_premises (),
         m_active (0),
@@ -2102,7 +2102,6 @@ namespace spacer {
             
             SASSERT (!node->has_derivation ());
             expand_node (*node);   
-            if (!node->is_root ()) dealloc (node);
         }
         return root->is_reachable ();
     }
@@ -2155,10 +2154,14 @@ namespace spacer {
           expr_ref_vector child_reach_facts (m);
           mk_reach_fact (n, model, *r, reach_fact, child_reach_facts);
           n.pt ().add_reach_fact (reach_fact, *r, child_reach_facts);
-          n.set_reachable (true);
           
-          if (!n.is_root ())
+          if (n.is_root ()) n.set_reachable (true);
+          else
+          {
+            dealloc (&n);
             m_search.enqueue_leaf (*n.parent ());
+          }
+          
         }
         //otherwise pick the first OA and create a sub-goal
         else 
@@ -2195,12 +2198,15 @@ namespace spacer {
         CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
         n.set_reachable (false);
         
+        if (n.is_root ())
+          n.set_reachable (false);
         // -- add parent as a leaf
-        if (!n.is_root ())
+        else
         {
           model_node &p = *n.parent ();
           p.reset_derivation ();
           m_search.enqueue_leaf (p);
+          dealloc (&n);
         }
         break;
       }
