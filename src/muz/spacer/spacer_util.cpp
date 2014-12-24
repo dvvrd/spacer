@@ -122,10 +122,10 @@ namespace spacer {
         }
     }
 
-    void model_evaluator::setup_model(model_ref& model) {
+    void model_evaluator::setup_model(const model_ref& model) {
         m_numbers.reset();
         m_values.reset();
-        m_model = model;
+        m_model = model.get ();
         rational r;
         unsigned sz = model->get_num_constants();
         for (unsigned i = 0; i < sz; i++) {
@@ -170,7 +170,8 @@ namespace spacer {
         return model;
     }
     
-    void model_evaluator::minimize_literals(ptr_vector<expr> const& formulas, model_ref& mdl, expr_ref_vector& result) {
+    void model_evaluator::minimize_literals(ptr_vector<expr> const& formulas, 
+                                            const model_ref& mdl, expr_ref_vector& result) {
         
         TRACE("spacer", 
               tout << "formulas:\n";
@@ -920,7 +921,7 @@ namespace spacer {
         return !has_x;
     }
 
-    void model_evaluator::eval_heavy (model_ref& model, expr* fml, expr_ref& result) {
+    void model_evaluator::eval_heavy (const model_ref& model, expr* fml, expr_ref& result) {
         setup_model (model);
         ptr_vector<expr> fmls; fmls.push_back (fml);
         eval_fmls (fmls);
@@ -939,7 +940,7 @@ namespace spacer {
         reset ();
     }
 
-    expr_ref model_evaluator::eval(model_ref& model, func_decl* d) {
+    expr_ref model_evaluator::eval(const model_ref& model, func_decl* d) {
         SASSERT(d->get_arity() == 0);
         expr_ref result(m);
         if (m_array.is_array(d->get_range())) {
@@ -953,9 +954,9 @@ namespace spacer {
         return result;
     }
 
-    expr_ref model_evaluator::eval(model_ref& model, expr* e) {
+    expr_ref model_evaluator::eval(const model_ref& model, expr* e) {
         expr_ref result(m);
-        m_model = model;
+        m_model = model.get ();
         VERIFY(m_model->eval(e, result, true));
         if (m_array.is_array(e)) {
             vector<expr_ref_vector> stores;
@@ -1376,7 +1377,8 @@ namespace spacer {
         }
     }
 
-    void subst_vars (ast_manager& m, app_ref_vector const& vars, model_ref& M, expr_ref& fml) {
+    void subst_vars (ast_manager& m, app_ref_vector const& vars, 
+                     const model_ref& M, expr_ref& fml) {
         expr_safe_replace sub (m);
         model_evaluator mev (m);
         for (unsigned i = 0; i < vars.size (); i++) {
@@ -1392,7 +1394,8 @@ namespace spacer {
      * eliminate simple equalities using qe_lite
      * then, MBP for Booleans (substitute), reals (based on LW), ints (based on Cooper), and arrays
      */
-    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, bool project_all_arr_stores) {
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, 
+                     const model_ref& M, bool project_all_arr_stores) {
         th_rewriter rw (m);
         TRACE ("spacer",
                 tout << "Before projection:\n";
@@ -1464,8 +1467,9 @@ namespace spacer {
             // project arrays
             {
                 scoped_no_proof _sp (m);
-                qe::array_project_eqs (*M, array_vars, fml);
-                qe::array_project_selects (*M, array_vars, fml, project_all_arr_stores);
+                qe::array_project_eqs (*M.get (), array_vars, fml);
+                qe::array_project_selects (*M.get (), array_vars, fml, 
+                                           project_all_arr_stores);
             }
 
             TRACE ("spacer",
@@ -1496,7 +1500,7 @@ namespace spacer {
                   );
             {
                 scoped_no_proof _sp (m);
-                qe::arith_project (*M, arith_vars, fml);
+                qe::arith_project (*M.get (), arith_vars, fml);
             }
 
             TRACE ("spacer",
@@ -1604,7 +1608,7 @@ namespace spacer {
           });
   }
 
-  void compute_implicant_literals (model_evaluator &mev, model_ref &model, 
+  void compute_implicant_literals (model_evaluator &mev, const model_ref &model, 
                                    expr_ref_vector &formula, expr_ref_vector &res)
   {
     qe::flatten_and (formula);

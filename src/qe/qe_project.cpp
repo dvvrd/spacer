@@ -2721,7 +2721,8 @@ namespace qe {
      * }
      */
 
-    void array_project_selects (model& mdl, app_ref_vector& vars, expr_ref& fml, bool project_all_stores) {
+    void array_project_selects (model& mdl, app_ref_vector& vars, 
+                                expr_ref& fml, bool project_all_stores) {
         ast_manager& m = vars.get_manager ();
         array_project_selects_util ap (m);
         ap (mdl, vars, fml, project_all_stores);

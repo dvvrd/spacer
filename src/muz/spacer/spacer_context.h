@@ -112,7 +112,8 @@ namespace spacer {
 
         obj_map<expr, reach_fact_just*>     m_reach_fact_justs;
 
-      expr_ref eval (model_ref &model, expr * v);
+      /// evaluate v in a model
+      expr_ref eval (const model_ref &model, expr * v);
       
         void init_sig();
         void ensure_level(unsigned level);
@@ -161,15 +162,18 @@ namespace spacer {
         void collect_statistics(statistics& st) const;
         void reset_statistics();
 
-        bool is_reachable_known (expr* state, model_ref* M = 0);
-        void get_used_reach_fact (model_ref& M, expr_ref& reach_fact);
-        void get_used_o_reach_fact (model_ref& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact);
+        bool is_reachable_known (expr* state, model_ref* model = 0);
+        void get_used_reach_fact (const model_ref& M, expr_ref& reach_fact);
+        void get_used_o_reach_fact (const model_ref& M, unsigned oidx, 
+                                    expr_ref& o_reach_fact, expr_ref& n_reach_fact);
         datalog::rule const* get_just_rule (expr* fact);
         expr_ref_vector const* get_just_pred_facts (expr* fact);
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
-        datalog::rule const* find_rule(model_ref model, bool& is_concrete, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
+        datalog::rule const* find_rule(const model_ref &model, bool& is_concrete, 
+                                       vector<bool>& reach_pred_used, 
+                                       unsigned& num_reuse_reach);
         expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
         ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }
 
@@ -219,7 +223,8 @@ namespace spacer {
 
         prop_solver& get_solver() { return m_solver; }
 
-        expr_ref get_origin_summary (model_ref model, unsigned level, unsigned oidx, bool must);
+        expr_ref get_origin_summary (const model_ref &model, 
+                                     unsigned level, unsigned oidx, bool must);
     };
 
 
@@ -340,7 +345,7 @@ namespace spacer {
 
     /// -- create next child using given model as the guide
     /// -- returns NULL if there is no next child
-    model_node* create_next_child (model_ref &model);
+    model_node* create_next_child (const model_ref &model);
   public:
     derivation (model_node& parent, datalog::rule const& rule, expr *trans);
     void add_premise (pred_transformer &pt, unsigned oidx, 
@@ -349,7 +354,7 @@ namespace spacer {
     /// creates the first child. Must be called after all the premises
     /// are added. The model must be valid for the premises
     /// Returns NULL if no child exits
-    model_node *create_first_child (model_ref &model);
+    model_node *create_first_child (const model_ref &model);
     
     /// Create the next child. Must summary of the currently active
     /// premise must be consistent with the transition relation
@@ -448,10 +453,10 @@ namespace spacer {
                          unsigned& uses_level, bool& is_concrete, 
                          datalog::rule const*& r, vector<bool>& reach_pred_used, 
                          unsigned& num_reuse_reach);
-      void mk_reach_fact (model_node& n, model_ref &model, 
+      void mk_reach_fact (model_node& n, const model_ref &model, 
                           datalog::rule const& r, expr_ref& result, 
                           expr_ref_vector& child_reach_facts);
-      void create_children(model_node& n, datalog::rule const& r, model_ref model, 
+      void create_children(model_node& n, datalog::rule const& r, const model_ref model, 
                            const vector<bool>& reach_pred_used);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;

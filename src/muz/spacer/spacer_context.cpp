@@ -147,7 +147,7 @@ namespace spacer {
     return res;
   }
   
-  expr_ref pred_transformer::eval (model_ref &model, expr * v)
+  expr_ref pred_transformer::eval (const model_ref &model, expr * v)
   {
     expr_ref res(m);
     if (ctx.get_params ().use_heavy_mev ()) 
@@ -158,7 +158,7 @@ namespace spacer {
   }
   
 
-  void pred_transformer::get_used_reach_fact (model_ref& M, expr_ref& reach_fact) {
+  void pred_transformer::get_used_reach_fact (const model_ref& M, expr_ref& reach_fact) {
     expr_ref bval (m);
     for (unsigned i = 0; i < m_reach_case_assumps.size (); i++) {
       bval = eval (M, m_reach_case_assumps.get (i));
@@ -170,7 +170,7 @@ namespace spacer {
     SASSERT (reach_fact);
   }
   
-  void pred_transformer::get_used_o_reach_fact (model_ref& M, unsigned oidx, 
+  void pred_transformer::get_used_o_reach_fact (const model_ref& M, unsigned oidx, 
                                                 expr_ref& o_reach_fact, 
                                                 expr_ref& n_reach_fact) {
     expr *oassump;
@@ -199,7 +199,8 @@ namespace spacer {
         return &(j->pred_reach_facts);
     }
 
-    datalog::rule const* pred_transformer::find_rule(model_ref model, bool& is_concrete, 
+    datalog::rule const* pred_transformer::find_rule(const model_ref &model, 
+                                                     bool& is_concrete, 
                                                      vector<bool>& reach_pred_used, 
                                                      unsigned& num_reuse_reach) {
         typedef obj_map<expr, datalog::rule const*> tag2rule;
@@ -587,7 +588,7 @@ namespace spacer {
    *
    * returns an implicant of the summary
    */
-  expr_ref pred_transformer::get_origin_summary (model_ref model, 
+  expr_ref pred_transformer::get_origin_summary (const model_ref &model, 
                                                  unsigned level, 
                                                  unsigned oidx,
                                                  bool must)
@@ -1108,14 +1109,14 @@ namespace spacer {
   
 
 
-  model_node *derivation::create_first_child (model_ref &model)
+  model_node *derivation::create_first_child (const model_ref &model)
   {
     if (m_premises.empty ()) return NULL;
     m_active = 0;
     return create_next_child (model);
   }
   
-  model_node *derivation::create_next_child (model_ref &model)
+  model_node *derivation::create_next_child (const model_ref &model)
   {
     
     expr_ref_vector summaries (m);
@@ -2280,7 +2281,7 @@ namespace spacer {
         }
     }
 
-  void context::mk_reach_fact (model_node& n, model_ref &M, 
+  void context::mk_reach_fact (model_node& n, const model_ref &M,
                                const datalog::rule& r, expr_ref& result, 
                                expr_ref_vector& child_reach_facts) {
         pred_transformer& pt = n.pt ();

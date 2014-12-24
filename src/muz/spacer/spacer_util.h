@@ -105,7 +105,7 @@ namespace spacer {
         
 
         void reset();
-        void setup_model(model_ref& model);
+        void setup_model(const model_ref& model);
         void assign_value(expr* e, expr* v);
         void collect(ptr_vector<expr> const& formulas, ptr_vector<expr>& tocollect);
         void process_formula(app* e, ptr_vector<expr>& todo, ptr_vector<expr>& tocollect);
@@ -157,18 +157,19 @@ namespace spacer {
 
           \pre model satisfies formulas
        */
-       void minimize_literals(ptr_vector<expr> const & formulas, model_ref& mdl, expr_ref_vector& result);
+       void minimize_literals(ptr_vector<expr> const & formulas, const model_ref& mdl, 
+                              expr_ref_vector& result);
 
        /** 
            for_each_expr visitor.
        */
        void operator()(expr* e) {} 
 
-       void eval_heavy (model_ref& mdl, expr* fml, expr_ref& result);
+       void eval_heavy (const model_ref& mdl, expr* fml, expr_ref& result);
 
-       expr_ref eval(model_ref& mdl, expr* e);
+       expr_ref eval(const model_ref& mdl, expr* e);
 
-       expr_ref eval(model_ref& mdl, func_decl* d);
+       expr_ref eval(const model_ref& mdl, func_decl* d);
     };
 
     /**
@@ -194,14 +195,14 @@ namespace spacer {
      * 2. for remaining boolean vars, substitute using M
      * 3. for remaining arith vars, use LW projection
      */
-    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, bool project_all_arr_stores = false);
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, 
+                     const model_ref& M, bool project_all_arr_stores = false);
 
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
 
   void expand_literals(ast_manager &m, expr_ref_vector& conjs);
-  void compute_implicant_literals (model_evaluator &mev, model_ref &model, expr_ref_vector &formula, expr_ref_vector &res);
-  
-  
+  void compute_implicant_literals (model_evaluator &mev, const model_ref &model, 
+                                   expr_ref_vector &formula, expr_ref_vector &res);
 }
 
 #endif
