@@ -1122,7 +1122,7 @@ namespace spacer {
     app_ref_vector vars (m);
     
     // -- find first may premise
-    while (m_active < m_premises.size () && !m_premises[m_active].is_must ())
+    while (m_active < m_premises.size () && m_premises[m_active].is_must ())
     {
       summaries.push_back (m_premises[m_active].get_summary ());
       vars.append (m_premises[m_active].get_ovars ());
@@ -1130,7 +1130,7 @@ namespace spacer {
     }
     if (m_active >= m_premises.size ()) return NULL;
     
-    // -- update m_trans with the pre-image of m_trans over the summaries
+    // -- update m_trans with the pre-image of m_trans over the must summaries
     summaries.push_back (m_trans);
     m_trans = m_sm.mk_and (summaries);
     summaries.reset ();
