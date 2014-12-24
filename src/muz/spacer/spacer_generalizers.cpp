@@ -115,8 +115,8 @@ namespace spacer {
     
     void core_farkas_generalizer::operator()(model_node& n, expr_ref_vector& core, 
                                              unsigned& uses_level) {
-        ast_manager& m  = n.pt().get_manager();
-        manager& pm = n.pt().get_spacer_manager();
+        ast_manager& m  = n.pt().get_ast_manager();
+        manager& pm = n.pt().get_manager();
         if (core.empty()) return;
         expr_ref A(m), B(pm.mk_and(core)), C(m);
         expr_ref_vector Bs(m);

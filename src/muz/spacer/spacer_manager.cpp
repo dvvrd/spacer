@@ -181,6 +181,7 @@ namespace spacer {
     void manager::add_new_state(func_decl * s) {
         SASSERT(s->get_arity()==0); //we currently don't support non-constant states
         decl_vector vect;
+
         SASSERT(o_index(0)==1); //we assume this in the number of retrieved symbols
         m_mux.create_tuple(s, s->get_arity(), s->get_domain(), s->get_range(), 2, vect);
         m_o0_preds.push_back(vect[o_index(0)]);

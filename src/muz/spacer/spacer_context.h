@@ -112,6 +112,8 @@ namespace spacer {
 
         obj_map<expr, reach_fact_just*>     m_reach_fact_justs;
 
+      expr_ref eval (model_ref &model, expr * v);
+      
         void init_sig();
         void ensure_level(unsigned level);
         bool add_property1(expr * lemma, unsigned lvl);  // add property 'p' to state at level lvl.
@@ -154,27 +156,20 @@ namespace spacer {
         void     add_cover(unsigned level, expr* property);
         expr* get_reach ();
 
-        // add all lemmas from level up to infty to forms;
-        // use the o-index idx while adding
-        void add_o_lemmas (int level, int idx, expr_ref_vector& forms) const;
-
         std::ostream& display(std::ostream& strm) const;
 
         void collect_statistics(statistics& st) const;
         void reset_statistics();
 
         bool is_reachable_known (expr* state, model_ref* M = 0);
-        bool is_reachable_with_reach_facts (model_node& n, datalog::rule const& r);
         void get_used_reach_fact (model_ref& M, expr_ref& reach_fact);
         void get_used_o_reach_fact (model_ref& M, unsigned oidx, expr_ref& o_reach_fact, expr_ref& n_reach_fact);
-        void get_all_used_o_reach_facts (model_ref& M, unsigned oidx, expr_ref& reach_fact);
         datalog::rule const* get_just_rule (expr* fact);
         expr_ref_vector const* get_just_pred_facts (expr* fact);
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
-        datalog::rule const* find_rule(model& model, bool& is_concrete, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
-        void find_rules (model_core const& model, svector<datalog::rule const*>& rules) const;
+        datalog::rule const* find_rule(model_ref model, bool& is_concrete, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
         expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
         ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }
 
@@ -192,7 +187,7 @@ namespace spacer {
         expr* get_reach_facts_assump () const;
         expr* get_o_reach_facts_assump (unsigned oidx) const;
 
-        lbool is_reachable(model_node& n, expr_ref_vector* core, 
+        lbool is_reachable(model_node& n, expr_ref_vector* core, model_ref *model,
                            unsigned& uses_level, bool& is_concrete, 
                            datalog::rule const*& r, 
                            vector<bool>& reach_pred_used, 
@@ -228,35 +223,43 @@ namespace spacer {
     };
 
 
-    /**
-     */
+  /**
+   * A node in the search tree.
+   */
   class model_node {
+    /// parent node
     model_node*             m_parent;
+    /// predicate transformer
     pred_transformer&       m_pt;
+    /// post-condition decided by this node
     expr_ref                m_post;
+    /// level at which to decide the post 
     unsigned                m_level;       
       
-    /// whether a concrete answer to the goal is found
+    /// whether a concrete answer to the post is found
     bool                    m_open;     
+    /// when the node is closed, whether it is reachable
     bool                    m_reachable;
     
+    /// optional derivation corresponding to non-linear uninterpreted
+    /// part of some rule of pt
     scoped_ptr<derivation>   m_derivation;
 
   public:
     model_node (model_node* parent, pred_transformer& pt, unsigned level):
       m_parent (parent), m_pt (pt), 
-      m_post (m), m_level (level), m_open (true), m_reachable(false) {}
+      m_post (m_pt.get_ast_manager ()), m_level (level), 
+      m_open (true), m_reachable(false) {}
 
     bool is_reachable () {return !m_open && m_reachable;}
     bool is_unreachable () {return !m_open && !m_reachable;}
     void set_reachable (bool v) {close (); m_reachable = v;}
     
     
-    void set_derviation (derivation *d) {m_derivation = d;}
+    void set_derivation (derivation *d) {m_derivation = d;}
     bool has_derivation () const {return (bool)m_derivation;}
-    derivation &get_derivation const () {return *m_derivation;}
-    
-    void reset_derivation () {set_derviation (NULL);}
+    derivation &get_derivation() const {return *m_derivation.get ();}
+    void reset_derivation () {set_derivation (NULL);}
     
     model_node* parent () const { return m_parent; }
     bool is_root () const {return (bool)m_parent;}
@@ -266,14 +269,14 @@ namespace spacer {
     manager& get_manager () const { return m_pt.get_manager (); }
     context& get_context () const {return m_pt.get_context ();}
       
-    expr_ref const& post () const { return m_post; }
+    expr* post () const { return m_post.get (); }
     unsigned level () const { return m_level; }
 
-    void set_post (expr_ref const& post) { m_post = post; }
+    void set_post (expr* post) { m_post = post; }
 
     void reset () 
     {
-      derivation = NULL;
+      m_derivation = NULL;
       m_open = true;
     }
     
@@ -285,9 +288,10 @@ namespace spacer {
   };
 
 
-    /**
-     */
+  /**
+   */
   class derivation {
+    /// a single premise of a derivation
     struct premise
     {
       pred_transformer &m_pt;
@@ -298,13 +302,12 @@ namespace spacer {
       ///  whether this is a must or may premise
       bool m_must;
       app_ref_vector m_ovars;
-      app_ref_vector m_nvars;
       
-      premise (ast_manager &m, pred_transformer pt);
+      premise (pred_transformer &pt, unsigned oidx, expr *summary, bool must);
       premise (const premise &p);
       
       bool is_must () {return m_must;}
-      expr * get_summary () {return m_summary;}
+      expr * get_summary () {return m_summary.get ();}
       app_ref_vector &get_ovars () {return m_ovars;}
       unsigned get_oidx () {return m_oidx;}
       pred_transformer &pt () {return m_pt;} 
@@ -323,10 +326,10 @@ namespace spacer {
       
     ast_manager&                        m;
     manager&                            m_sm;
-    context const&                      m_ctx;
+    const context&                      m_ctx;
     
     /// the rule corresponding to this derivation
-    datalog::rule const&                m_rule; 
+    const datalog::rule &m_rule; 
       
     /// the premises
     vector<premise>                     m_premises;
@@ -339,7 +342,7 @@ namespace spacer {
     /// -- returns NULL if there is no next child
     model_node* create_next_child (model_ref &model);
   public:
-    derivation (model_node& parent, datalog::rule const& rule, expr_ref trans);
+    derivation (model_node& parent, datalog::rule const& rule, expr *trans);
     void add_premise (pred_transformer &pt, unsigned oidx, 
                       expr * summary, bool must);
     
@@ -353,32 +356,27 @@ namespace spacer {
     model_node *create_next_child ();
 
     datalog::rule const& get_rule () const { return m_rule; }
-    model_node& get_parent () const { return *m_parent; }
+    model_node& get_parent () const { return m_parent; }
   };
 
-
-
-    // TODO: this is just a wrapper around model_node_ptr_queue -- get rid off it?
-    class model_search {
-        scoped_ptr<model_node>   m_root;
-        ptr_vector<model_node> m_leaves;
+  class model_search {
+    scoped_ptr<model_node>   m_root;
+    ptr_vector<model_node> m_leaves;
       
-      // add leaf to priority queue.
-        void enqueue_leaf(model_node& n); 
-    public:
-        model_search(): m_root(NULL) {}
-        ~model_search();
+  public:
+    model_search(): m_root(NULL) {}
+    ~model_search();
 
-        void reset();
-        model_node* next();
-        void add_leaf(model_node& n); // add fresh node.
-        void erase_leaf(model_node& n);
+    void reset();
+    model_node* next();
+    void enqueue_leaf(model_node& n); 
+    void erase_leaf(model_node& n);
 
-        void set_root(model_node& n);
-        model_node& get_root() const { return *(m_root->get ()); }
-        //std::ostream& display(std::ostream& out) const; 
-        expr_ref get_trace(context const& ctx);
-    };
+    void set_root(model_node& n);
+    model_node& get_root() const { return *(m_root.get ()); }
+    //std::ostream& display(std::ostream& out) const; 
+    expr_ref get_trace(context const& ctx);
+  };
 
 
     struct model_exception { };
@@ -446,18 +444,18 @@ namespace spacer {
         void close_node(model_node& n);
         void check_pre_closed(model_node& n);
         void expand_node(model_node& n);
-        lbool expand_state(model_node& n, expr_ref_vector& cube, unsigned& uses_level, bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach);
-        void mk_reach_fact (model_node& n, datalog::rule const& r, expr_ref& result, expr_ref_vector& child_reach_facts);
-        //void mk_reach_fact_from_deriv (derivation& deriv, expr_ref& result);
-        void create_children(model_node& n, datalog::rule const& r, vector<bool> const& reach_pred_used);
+      lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 
+                         unsigned& uses_level, bool& is_concrete, 
+                         datalog::rule const*& r, vector<bool>& reach_pred_used, 
+                         unsigned& num_reuse_reach);
+      void mk_reach_fact (model_node& n, model_ref &model, 
+                          datalog::rule const& r, expr_ref& result, 
+                          expr_ref_vector& child_reach_facts);
+      void create_children(model_node& n, datalog::rule const& r, model_ref model, 
+                           const vector<bool>& reach_pred_used);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;
 
-        void report_unreach (model_node& ch); // ch's post is unreachable
-        void report_reach (model_node& ch); // ch's post is concretely reachable
-        void updt_as_reachable (model_node& n, datalog::rule const& r);
-        bool redo_at_higher_level (model_node const& ch, derivation const* d, model_node const& par) const;
-        
         // Generate inductive property
         void get_level_property(unsigned lvl, expr_ref_vector& res, vector<relation_info> & rs) const;
 

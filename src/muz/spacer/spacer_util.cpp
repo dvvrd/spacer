@@ -1,4 +1,4 @@
-)/*+
+/**
 Copyright (c) 2011 Microsoft Corporation
 
 Module Name:
@@ -1610,7 +1610,6 @@ namespace spacer {
     qe::flatten_and (formula);
     ptr_vector<expr> f (formula.size (), formula.c_ptr ());
     mev.minimize_literals (f, model, res);
-    mev.reset();
   }
   
 }
