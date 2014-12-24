@@ -1867,21 +1867,30 @@ namespace qe {
     class array_project_eqs_util {
         ast_manager&                m;
         array_util                  m_arr_u;
-        ast_mark                    m_has_stores;
+        model_ref                   M;
+        app_ref                     m_v;    // array var to eliminate
+        ast_mark                    m_has_stores_v; // has stores for m_v
+        expr_ref                    m_subst_term_v; // subst term for m_v
+        expr_safe_replace           m_true_sub_v; // subst for true equalities
+        expr_safe_replace           m_false_sub_v; // subst for false equalities
         app_ref_vector              m_aux_vars;
         expr_ref_vector             m_aux_lits;
         expr_ref_vector             m_idx_lits;
-        model_ref                   M;
         model_evaluator_array_util  m_mev;
-        app_ref                     m_v;    // array var to eliminate
-        expr_safe_replace           m_true_sub;
-        expr_safe_replace           m_false_sub;
-        expr_ref                    m_subst_term;
 
         struct cant_project {};
 
+        void reset_v () {
+            m_v = 0;
+            m_has_stores_v.reset ();
+            m_subst_term_v = 0;
+            m_true_sub_v.reset ();
+            m_false_sub_v.reset ();
+        }
+
         void reset () {
-            m_has_stores.reset ();
+            M = 0;
+            reset_v ();
             m_aux_vars.reset ();
             m_aux_lits.reset ();
             m_idx_lits.reset ();
@@ -1913,7 +1922,7 @@ namespace qe {
                         all_done = false;
                         todo.push_back (to_app (arg));
                     }
-                    else if (!args_have_stores && m_has_stores.is_marked (arg)) {
+                    else if (!args_have_stores && m_has_stores_v.is_marked (arg)) {
                         args_have_stores = true;
                     }
                 }
@@ -1923,7 +1932,7 @@ namespace qe {
                 // mark if a has stores
                 if ((!m_arr_u.is_select (a) && args_have_stores) ||
                         (m_arr_u.is_store (a) && (a->get_arg (0) == m_v))) {
-                    m_has_stores.mark (a, true);
+                    m_has_stores_v.mark (a, true);
 
                     TRACE ("qe",
                             tout << "has stores:\n";
@@ -1936,7 +1945,7 @@ namespace qe {
                     expr* a0 = to_app (a)->get_arg (0);
                     expr* a1 = to_app (a)->get_arg (1);
                     if (a0 == m_v || a1 == m_v ||
-                            (m_arr_u.is_array (a0) && m_has_stores.is_marked (a))) {
+                            (m_arr_u.is_array (a0) && m_has_stores_v.is_marked (a))) {
                         eqs.push_back (a);
                     }
                 }
@@ -1988,7 +1997,7 @@ namespace qe {
 
                 // if a_new is select on m_v, introduce new constant
                 if (m_arr_u.is_select (a) &&
-                        (args.get (0) == m_v || m_has_stores.is_marked (args.get (0)))) {
+                        (args.get (0) == m_v || m_has_stores_v.is_marked (args.get (0)))) {
                     sort* val_sort = get_array_range (m.get_sort (m_v));
                     app_ref val_const (m.mk_fresh_const ("sel", val_sort), m);
                     m_aux_vars.push_back (val_const);
@@ -2025,6 +2034,7 @@ namespace qe {
             peq p (to_app (p_exp), m);
             app_ref_vector diff_val_consts (m);
             p.mk_eq (diff_val_consts, eq, stores_on_rhs);
+            m_aux_vars.append (diff_val_consts);
             // extend M to include diff_val_consts
             expr_ref arr (m);
             expr_ref_vector I (m);
@@ -2068,10 +2078,10 @@ namespace qe {
                 peq p (p_exp, m);
                 expr_ref lhs (m), rhs (m);
                 p.lhs (lhs); p.rhs (rhs);
-                if (!m_has_stores.is_marked (lhs)) {
+                if (!m_has_stores_v.is_marked (lhs)) {
                     std::swap (lhs, rhs);
                 }
-                if (m_has_stores.is_marked (lhs)) {
+                if (m_has_stores_v.is_marked (lhs)) {
                     /** project using the equivalence:
                      *
                      *  (store(arr0,idx,x) ==I arr1) <->
@@ -2185,11 +2195,11 @@ namespace qe {
                 }
                 app_ref eq (m);
                 convert_peq_to_eq (p_exp, eq, stores_on_rhs);
-                m_subst_term = eq->get_arg (1);
+                m_subst_term_v = eq->get_arg (1);
 
                 TRACE ("qe",
                         tout << "subst term found:\n";
-                        tout << mk_pp (m_subst_term, m) << "\n";
+                        tout << mk_pp (m_subst_term_v, m) << "\n";
                       );
             }
         }
@@ -2212,7 +2222,7 @@ namespace qe {
 
             // find subst term
             // TODO: better ordering of eqs?
-            for (unsigned i = 0; !m_subst_term && i < eqs.size (); i++) {
+            for (unsigned i = 0; !m_subst_term_v && i < eqs.size (); i++) {
                 TRACE ("qe",
                         tout << "array equality:\n";
                         tout << mk_pp (eqs.get (i), m) << "\n";
@@ -2235,10 +2245,10 @@ namespace qe {
                       );
 
                 if (m.is_false (val)) {
-                    m_false_sub.insert (curr_eq, m.mk_false ());
+                    m_false_sub_v.insert (curr_eq, m.mk_false ());
                 }
                 else {
-                    m_true_sub.insert (curr_eq, m.mk_true ());
+                    m_true_sub_v.insert (curr_eq, m.mk_true ());
                     // try to find subst term
                     find_subst_term (to_app (curr_eq));
                 }
@@ -2256,13 +2266,13 @@ namespace qe {
             lits.push_back (fml);
             fml = m.mk_and (lits.size (), lits.c_ptr ());
 
-            if (m_subst_term) {
-                m_true_sub.insert (m_v, m_subst_term);
-                m_true_sub (fml);
+            if (m_subst_term_v) {
+                m_true_sub_v.insert (m_v, m_subst_term_v);
+                m_true_sub_v (fml);
             }
             else {
-                m_true_sub (fml);
-                m_false_sub (fml);
+                m_true_sub_v (fml);
+                m_false_sub_v (fml);
             }
         }
 
@@ -2271,44 +2281,45 @@ namespace qe {
         array_project_eqs_util (ast_manager& m):
             m (m),
             m_arr_u (m),
+            m_v (m),
+            m_subst_term_v (m),
+            m_true_sub_v (m),
+            m_false_sub_v (m),
             m_aux_vars (m),
             m_aux_lits (m),
             m_idx_lits (m),
-            m_mev (m),
-            m_v (m),
-            m_true_sub (m),
-            m_false_sub (m),
-            m_subst_term (m)
+            m_mev (m)
         {}
 
         void operator () (model& mdl, app_ref_vector& vars, expr_ref& fml) {
-            app_ref_vector new_vars (m);
+            reset ();
+            app_ref_vector rem_vars (m); // remaining vars
             M = &mdl;
             for (unsigned i = 0; i < vars.size (); i++) {
+                reset_v ();
                 m_v = vars.get (i);
                 if (!m_arr_u.is_array (m_v)) {
                     TRACE ("qe",
                             tout << "not an array variable: " << mk_pp (m_v, m) << "\n";
                           );
-                    new_vars.push_back (m_v);
+                    rem_vars.push_back (m_v);
                     continue;
                 }
                 TRACE ("qe",
                         tout << "projecting variable: " << mk_pp (m_v, m) << "\n";
                       );
                 try {
-                    reset ();
                     project (fml);
                     mk_result (fml);
-                    new_vars.append (m_aux_vars);
                 }
                 catch (cant_project) {
                     IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(m_v, m) << "\n";);
-                    new_vars.push_back(m_v);
+                    rem_vars.push_back(m_v);
                 }
             }
             vars.reset ();
-            vars.append (new_vars);
+            vars.append (rem_vars);
+            vars.append (m_aux_vars);
         }
     };
 
