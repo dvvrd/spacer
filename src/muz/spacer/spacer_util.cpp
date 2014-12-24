@@ -1608,6 +1608,8 @@ namespace spacer {
                                    expr_ref_vector &formula, expr_ref_vector &res)
   {
     qe::flatten_and (formula);
+    if (formula.empty ()) return;
+    
     ptr_vector<expr> f (formula.size (), formula.c_ptr ());
     mev.minimize_literals (f, model, res);
   }
