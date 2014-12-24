@@ -262,7 +262,7 @@ namespace spacer {
     void reset_derivation () {set_derivation (NULL);}
     
     model_node* parent () const { return m_parent; }
-    bool is_root () const {return (bool)m_parent;}
+    bool is_root () const {return !(bool)m_parent;}
     
     pred_transformer& pt () const { return m_pt; }
     ast_manager& get_ast_manager () const { return m_pt.get_ast_manager (); }
