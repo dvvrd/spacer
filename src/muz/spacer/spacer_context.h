@@ -92,13 +92,12 @@ namespace spacer {
         //reachable_cache              m_reachable; 
         ptr_vector<func_decl>        m_predicates;
         stats                        m_stats;
-        expr_ref_vector              m_reach_case_assumps; // aux vars for asserting reach facts in m_reach_ctx and children's m_solver's incrementally
-        vector<u_map<expr*> >        m_o_reach_case_maps;
-                                        // maps from o-idx to o-versions of the assumptions;
-                                        // #o-indices = max number of times this
-                                        // predicate appears as a body predicate
-                                        // in any rule
-        expr_ref_vector              _o_reach_case_assumps; // dummy to have references to the o-versions
+      
+        /// Auxiliary variables to represent different disjunctive
+        /// cases of must summaries. Stored over 'n' (a.k.a. new)
+        /// versions of the variables
+        expr_ref_vector              m_reach_case_vars; 
+      
         model_evaluator              m_mev;
 
         // reach fact justification
@@ -134,7 +133,7 @@ namespace spacer {
         
         void add_premises(decl2rel const& pts, unsigned lvl, datalog::rule& rule, expr_ref_vector& r);
 
-        expr* mk_fresh_reach_case_assump () const;
+        expr* mk_fresh_reach_case_var ();
 
     public:
         pred_transformer(context& ctx, manager& pm, func_decl* head);
@@ -180,16 +179,12 @@ namespace spacer {
         bool propagate_to_next_level(unsigned level);
         void propagate_to_infinity(unsigned level);
         void add_property(expr * lemma, unsigned lvl);  // add property 'p' to state at level.
-        expr* mk_o_reach_case_assump (unsigned idx, unsigned oidx);
-      expr* reach_case_assump_n2o (unsigned assumption_id, unsigned oidx);
-      
-        expr* get_reach_case_assump (unsigned idx) const;
-        unsigned get_num_reach_cases () const;
+        expr* get_reach_case_var (unsigned idx) const;
+        unsigned get_num_reach_vars () const;
 
         void add_reach_fact (expr* fact, datalog::rule const& r, expr_ref_vector const& child_reach_facts);  // add reachability fact
         expr* get_last_reach_fact () const { return m_reach_facts.back (); }
         expr* get_reach_facts_assump () const;
-        expr* get_o_reach_facts_assump (unsigned oidx) const;
 
         lbool is_reachable(model_node& n, expr_ref_vector* core, model_ref *model,
                            unsigned& uses_level, bool& is_concrete, 
