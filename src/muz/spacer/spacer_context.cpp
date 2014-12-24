@@ -401,45 +401,48 @@ namespace spacer {
     bool pred_transformer::add_property1(expr * lemma, unsigned lvl) {        
         if (is_infty_level(lvl)) {
             if (!m_invariants.contains(lemma)) {
-                TRACE("spacer", tout << "property1: " << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
+                TRACE("spacer", tout << "property1: " 
+                      << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
                 m_invariants.push_back(lemma);
                 m_prop2level.insert(lemma, lvl);
                 m_solver.add_formula(lemma);
                 return true;
             }
-            else {
-                TRACE("spacer", tout << "already contained: " << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
-                return false;
-            }
+            
+            TRACE("spacer", tout << "already contained: " 
+                  << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
+            return false;
         }
+        
         ensure_level(lvl);        
         unsigned old_level;
         if (!m_prop2level.find(lemma, old_level) || old_level < lvl) {
-            TRACE("spacer", tout << "property1: " << pp_level(lvl) << " " << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
+            TRACE("spacer", tout << "property1: " << pp_level(lvl) 
+                  << " " << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
             m_levels[lvl].push_back(lemma);
             m_prop2level.insert(lemma, lvl);
             m_solver.add_level_formula(lemma, lvl);
             return true;
         }
-        else {
-            TRACE("spacer", tout << "old-level: " << pp_level(old_level) << " " << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
-            return false;
-        }
+        
+        TRACE("spacer", tout << "old-level: " << pp_level(old_level) 
+              << " " << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
+        return false;
     }
 
-    void pred_transformer::add_child_property(pred_transformer& child, expr* lemma, unsigned lvl, bool is_reach_fact) {
-        ensure_level(lvl);
-        expr_ref_vector fmls(m);
-        mk_assumptions(child.head(), lemma, fmls, is_reach_fact);
-        for (unsigned i = 0; i < fmls.size(); ++i) {
-            TRACE("spacer", tout << "child property: " << mk_pp(fmls[i].get(), m) << "\n";);
-            if (is_infty_level(lvl)) {
-                m_solver.add_formula(fmls[i].get());
-            }
-            else {
-                m_solver.add_level_formula(fmls[i].get(), lvl);
-            }
-        }
+    void pred_transformer::add_child_property(pred_transformer& child, 
+                                              expr* lemma, unsigned lvl, 
+                                              bool is_reach_fact) {
+      ensure_level(lvl);
+      expr_ref_vector fmls(m);
+      mk_assumptions(child.head(), lemma, fmls, is_reach_fact);
+      for (unsigned i = 0; i < fmls.size(); ++i) {
+        TRACE("spacer_detail", tout << "child property: " << mk_pp(fmls[i].get(), m) << "\n";);
+        if (is_infty_level(lvl)) 
+          m_solver.add_formula(fmls[i].get());
+        else 
+          m_solver.add_level_formula(fmls[i].get(), lvl);
+      }
     }
 
     void pred_transformer::add_property(expr* lemma, unsigned lvl) {
@@ -448,7 +451,8 @@ namespace spacer {
         for (unsigned i = 0; i < lemmas.size(); ++i) {
             expr* lemma_i = lemmas[i].get();
             if (add_property1(lemma_i, lvl)) {
-                IF_VERBOSE(2, verbose_stream() << pp_level(lvl) << " " << mk_pp(lemma_i, m) << "\n";);
+                IF_VERBOSE(2, verbose_stream() << pp_level(lvl) << " " 
+                           << mk_pp(lemma_i, m) << "\n";);
                 for (unsigned j = 0; j < m_use.size(); ++j) {
                     m_use[j]->add_child_property(*this, lemma_i, next_level(lvl));
                 }
@@ -789,16 +793,17 @@ namespace spacer {
         expr_ref tmp1(m), tmp2(m);
         expr_substitution sub (m);
         proof_ref pr (m.mk_asserted (m.mk_true ()), m);
-        obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
+        obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), 
+          end = m_tag2rule.end();
         for (; it != end; ++it) {
-            expr* pred = it->m_key;
+            expr* tag = it->m_key;
             datalog::rule const* r = it->m_value;
             if (!r) continue;
             find_predecessors(*r, m_predicates);
             for (unsigned i = 0; i < m_predicates.size(); i++) {
                 func_decl* d = m_predicates[i];
                 if (d == head) {
-                    tmp1 = m.mk_implies(pred, fml);
+                    tmp1 = m.mk_implies(tag, fml);
                     pm.formula_n2o(tmp1, tmp2, i);
 
                     if (is_reach_fact) {
