@@ -142,7 +142,7 @@ namespace spacer {
   {
     expr_ref res(m);
     if (ctx.get_params ().use_heavy_mev ()) 
-      m_mev.eval_heavy (model, v, res);
+      res = m_mev.eval_heavy (model, v);
     else 
       res = m_mev.eval (model, v);
     return res;
@@ -1934,7 +1934,7 @@ namespace spacer {
                     expr_ref sig_arg (m), sig_val (m);
                     sig_arg = m.mk_const (ch_pt.get_manager ().o2o (ch_pt.sig (j), 0, i));
                     if (m_params.use_heavy_mev ()) {
-                        m_mev.eval_heavy (local_mdl, sig_arg, sig_val);
+                        sig_val = m_mev.eval_heavy (local_mdl, sig_arg);
                     }
                     else {
                         sig_val = m_mev.eval (local_mdl, sig_arg);
@@ -2307,7 +2307,6 @@ namespace spacer {
     void context::create_children(model_node& n, datalog::rule const& r, 
                                   model_ref M,
                                   const vector<bool> &reach_pred_used) {
-        bool use_model_generalizer = m_params.use_model_generalizer();
  
         pred_transformer& pt = n.pt();
         expr* T   = pt.get_transition(r);
@@ -2341,12 +2340,8 @@ namespace spacer {
         qe::flatten_and(forms);        
         ptr_vector<expr> forms1(forms.size(), forms.c_ptr());
         model_evaluator mev(m);
-        if (use_model_generalizer) {
-            Phi.append(mev.minimize_model(forms1, M));
-        }
-        else {
-            mev.minimize_literals(forms1, M, Phi);
-        }
+        mev.minimize_literals(forms1, M, Phi);
+        
         //pt.remove_predecessors (Phi);
 
         app_ref_vector vars(m);

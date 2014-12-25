@@ -147,28 +147,6 @@ namespace spacer {
         m_model = 0;
     }
     
-    expr_ref_vector model_evaluator::minimize_model(ptr_vector<expr> const & formulas, model_ref& mdl) {
-        setup_model(mdl);
-        
-        TRACE("spacer_verbose", 
-              tout << "formulas:\n";
-              for (unsigned i = 0; i < formulas.size(); ++i) tout << mk_pp(formulas[i], m) << "\n"; 
-              );
-        
-        expr_ref_vector model = prune_by_cone_of_influence(formulas);
-        TRACE("spacer_verbose",
-              tout << "pruned model:\n";
-              for (unsigned i = 0; i < model.size(); ++i) tout << mk_pp(model[i].get(), m) << "\n";);
-        
-        reset();
-        
-        DEBUG_CODE(
-            setup_model(mdl);
-            VERIFY(check_model(formulas));
-            reset(););
-        
-        return model;
-    }
     
     void model_evaluator::minimize_literals(ptr_vector<expr> const& formulas, 
                                             const model_ref& mdl, expr_ref_vector& result) {
@@ -333,32 +311,6 @@ namespace spacer {
             }
         }
         m_visited.reset();
-    }
-    
-    expr_ref_vector model_evaluator::prune_by_cone_of_influence(ptr_vector<expr> const & formulas) {
-        ptr_vector<expr> tocollect;
-        collect(formulas, tocollect);
-        m1.reset();
-        m2.reset();
-        for (unsigned i = 0; i < tocollect.size(); ++i) {     
-            TRACE("spacer_verbose", tout << "collect: " << mk_pp(tocollect[i], m) << "\n";);
-            for_each_expr(*this, m_visited, tocollect[i]);
-        }
-        unsigned sz = m_model->get_num_constants();
-        expr_ref e(m), eq(m), val(m);
-        expr_ref_vector model(m);
-        for (unsigned i = 0; i < sz; i++) {
-            e = m.mk_const(m_model->get_constant(i));
-            if (m_visited.is_marked(e)) {
-                val = eval(m_model, e);
-                eq = m.mk_eq(e, val);
-                model.push_back(eq);
-            }
-        }
-        m_visited.reset();
-        TRACE("spacer", tout << sz << " ==> " << model.size() << "\n";);
-        return model;
-        
     }
     
     void model_evaluator::eval_arith(app* e) {
@@ -921,7 +873,10 @@ namespace spacer {
         return !has_x;
     }
 
-    void model_evaluator::eval_heavy (const model_ref& model, expr* fml, expr_ref& result) {
+    expr_ref model_evaluator::eval_heavy (const model_ref& model, expr* fml) 
+    {
+      expr_ref result (model->get_manager ());
+      
         setup_model (model);
         ptr_vector<expr> fmls; fmls.push_back (fml);
         eval_fmls (fmls);
@@ -938,6 +893,8 @@ namespace spacer {
             result = get_value (fml);
         }
         reset ();
+        
+        return result;
     }
 
     expr_ref model_evaluator::eval(const model_ref& model, func_decl* d) {
@@ -1531,7 +1488,7 @@ namespace spacer {
 
         DEBUG_CODE (
             model_evaluator mev (m);
-            mev.eval_heavy (M, fml, bval);
+            bval = mev.eval_heavy (M, fml);
             SASSERT (m.is_true (bval));
         );
 
