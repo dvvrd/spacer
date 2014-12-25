@@ -141,10 +141,11 @@ namespace spacer {
   expr_ref pred_transformer::eval (const model_ref &model, expr * v)
   {
     expr_ref res(m);
+    m_mev = model;
     if (ctx.get_params ().use_heavy_mev ()) 
-      res = m_mev.eval_heavy (model, v);
+      res = m_mev.eval_heavy (v);
     else 
-      res = m_mev.eval (model, v);
+      res = m_mev.eval (v);
     return res;
   }
   
@@ -605,7 +606,8 @@ namespace spacer {
     
     // -- pick an implicant
     expr_ref_vector literals (m);
-    compute_implicant_literals (m_mev, model, summary, literals);
+    m_mev = model;
+    compute_implicant_literals (m_mev, summary, literals);
     
     return get_manager ().mk_and (literals);
   }
@@ -1154,8 +1156,9 @@ namespace spacer {
     // get an implicant of the summary
     model_evaluator mev (m);
     expr_ref_vector u(m), lits (m);
+    mev = model;
     u.push_back (v);
-    compute_implicant_literals (mev, model, u, lits);
+    compute_implicant_literals (mev, u, lits);
     v = m_sm.mk_and (lits);
     
     expr_ref s(m);
@@ -1933,11 +1936,12 @@ namespace spacer {
                 for (unsigned j = 0; j < sig_size; j++) {
                     expr_ref sig_arg (m), sig_val (m);
                     sig_arg = m.mk_const (ch_pt.get_manager ().o2o (ch_pt.sig (j), 0, i));
+                    m_mev = local_mdl;
                     if (m_params.use_heavy_mev ()) {
-                        sig_val = m_mev.eval_heavy (local_mdl, sig_arg);
+                        sig_val = m_mev.eval_heavy (sig_arg);
                     }
                     else {
-                        sig_val = m_mev.eval (local_mdl, sig_arg);
+                        sig_val = m_mev.eval (sig_arg);
                     }
                     ground_fact_conjs.push_back (m.mk_eq (sig_arg, sig_val));
                     ground_arg_vals.push_back (sig_val);
@@ -2338,9 +2342,9 @@ namespace spacer {
         forms.push_back(phi);
 
         qe::flatten_and(forms);        
-        ptr_vector<expr> forms1(forms.size(), forms.c_ptr());
         model_evaluator mev(m);
-        mev.minimize_literals(forms1, M, Phi);
+        mev = M;
+        mev.pick_implicant (forms, Phi);
         
         //pt.remove_predecessors (Phi);
 

@@ -102,7 +102,7 @@ namespace spacer {
     expr_mark      m1;
     expr_mark      m2;
     
-    /// used by collect() 
+    /// used by pick_literals() 
     expr_mark      m_visited;
         
 
@@ -115,7 +115,7 @@ namespace spacer {
     void assign_value(expr* e, expr* v);
     
     /// extracts an implicant of the conjunction of formulas
-    void collect(ptr_vector<expr> const& formulas, ptr_vector<expr>& tocollect);
+    void pick_literals(const expr_ref_vector& formulas, ptr_vector<expr>& lits);
       
     /// one-round of extracting an implicant of e. The implicant
     /// literals are stored in tocollect. The worklist is stored in todo
@@ -126,24 +126,18 @@ namespace spacer {
     void eval_array_eq(app* e, expr* arg1, expr* arg2);
     void inherit_value(expr* e, expr* v);
         
-    bool is_unknown(expr* x)  { return !m1.is_marked(x) && !m2.is_marked(x); }
     void set_unknown(expr* x)  { m1.mark(x, false); m2.mark(x, false); }
-    bool is_x(expr* x)  { return !m1.is_marked(x) && m2.is_marked(x); }
-    bool is_false(expr* x)  { return m1.is_marked(x) && !m2.is_marked(x); }
-    bool is_true(expr* x)  { return m1.is_marked(x) && m2.is_marked(x); }
-    void set_x(expr* x) { SASSERT(is_unknown(x)); m2.mark(x); }
-    void set_v(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); }
-    void set_false(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); }
-    void set_true(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); m2.mark(x); }
+    void set_x(expr* x) { SASSERT(is_unknown(x)); m2.mark(x); m_refs.push_back (x); }
+    void set_v(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); m_refs.push_back (x); }
+    void set_false(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); m_refs.push_back (x); }
+    void set_true(expr* x) { set_false (x); m2.mark(x); }
     void set_bool(expr* x, bool v) { if (v) { set_true(x); } else { set_false(x); } }
-    rational const& get_number(expr* x) const { return m_numbers.find(x); }
-    void set_number(expr* x, rational const& v) 
+    void set_number(expr* x, const rational &v) 
     { 
       set_v(x); 
       m_numbers.insert(x,v); 
       TRACE("spacer_verbose", tout << mk_pp(x,m) << " " << v << "\n";); 
     }
-    expr* get_value(expr* x) { return m_values.find(x); }
     void set_value(expr* x, expr* v) 
     { set_v(x); m_refs.push_back(v); m_values.insert(x, v); }
         
@@ -163,20 +157,59 @@ namespace spacer {
         
   public:
     model_evaluator(ast_manager& m) : m(m), m_arith(m), m_array(m), m_refs(m) {}
+    
+    /// initialize with a given model. All previous state is lost. model can be NULL
+    void reset (const model_ref &model);
+    
+    model_evaluator &operator= (const model_ref &model)
+    {
+      reset (model);
+      return *this;
+    }
+    
+    /// compute values of all the terms in all the formulas in the input
+    /// clients must ensure that the terms are not deleted
+    void eval_terms (const expr_ref_vector &formulas)
+    {
+      for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
+        eval_terms (formulas.get (i));
+    }
+    
+    /// compute values of all the terms in all the formulas in the input
+    /// clients must ensure that the terms are not deleted
+    void eval_terms (const ptr_vector<expr> &f)
+    {
+      for (unsigned i = 0, sz = f.size (); i < sz; ++i)
+        eval_terms (f[i]);
+    }
+    
+    /// compute values of all the terms in the given formula
+    /// clients must ensure that the terms are not deleted
+    void eval_terms (expr * formula);
+    
+    bool is_unknown(expr* x)  { return !m1.is_marked(x) && !m2.is_marked(x); }
+    bool is_x(expr* x)  { return !m1.is_marked(x) && m2.is_marked(x); }
+    bool is_false(expr* x)  { return m1.is_marked(x) && !m2.is_marked(x); }
+    bool is_true(expr* x)  { return m1.is_marked(x) && m2.is_marked(x); }
+    const rational & get_number(expr* x) const { return m_numbers.find(x); }
+    expr* get_value(expr* x) { return m_values.find(x); }
             
-            
+
+    
+    /// evaluates a function declaration
+    expr_ref eval(func_decl* d);
+    /// evaluates an expression
+    expr_ref eval(expr* e);
+    /// evaluates an expression by evaluating all of its sub-terms
+    expr_ref eval_heavy (expr* fml);
+
     /**
-       \brief extract literals from formulas that satisfy formulas.
+       \brief Extracts an implicant of the conjunction of the formulas 
 
-       \pre model satisfies formulas
+       \pre current model satisfies the formulas
     */
-    void minimize_literals(ptr_vector<expr> const & formulas, const model_ref& mdl, 
-                           expr_ref_vector& result);
+    void pick_implicant (const expr_ref_vector& formulas, expr_ref_vector& result);
 
-    expr_ref eval_heavy (const model_ref& mdl, expr* fml);
-
-    expr_ref eval(const model_ref& mdl, expr* e);
-    expr_ref eval(const model_ref& mdl, func_decl* d);
   };
 
     /**
@@ -208,7 +241,7 @@ namespace spacer {
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
 
   void expand_literals(ast_manager &m, expr_ref_vector& conjs);
-  void compute_implicant_literals (model_evaluator &mev, const model_ref &model, 
+  void compute_implicant_literals (model_evaluator &mev, 
                                    expr_ref_vector &formula, expr_ref_vector &res);
 }
 

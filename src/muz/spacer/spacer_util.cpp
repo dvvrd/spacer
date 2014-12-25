@@ -51,6 +51,7 @@ Notes:
 #include "datatype_decl_plugin.h"
 #include "bv_decl_plugin.h"
 
+#include "old_mev.h"
 
 namespace spacer {
 
@@ -103,382 +104,208 @@ namespace spacer {
 
     void model_evaluator::assign_value(expr* e, expr* val) {
         rational r;
-        if (m.is_true(val)) {
-            set_true(e);
-        }
-        else if (m.is_false(val)) {
-            set_false(e);
-        }
-        else if (m_arith.is_numeral(val, r)) {
-            set_number(e, r);
-        }
-        else if (m.is_value(val)) {
-            set_value(e, val);
-        }
-        else {
+        if (m.is_true(val)) set_true(e);
+        else if (m.is_false(val)) set_false(e);
+        else if (m_arith.is_numeral(val, r)) set_number(e, r);
+        else if (m.is_value(val)) set_value(e, val);
+        else 
+        {
             IF_VERBOSE(3, verbose_stream() << "Not evaluated " << mk_pp(e, m) << "\n";);
             TRACE("spacer", tout << "Variable is not tracked: " << mk_pp(e, m) << "\n";);
             set_x(e);
         }
     }
 
-    void model_evaluator::setup_model(const model_ref& model) {
-        m_numbers.reset();
-        m_values.reset();
-        m_model = model.get ();
-        rational r;
-        unsigned sz = model->get_num_constants();
-        for (unsigned i = 0; i < sz; i++) {
-            func_decl * d = model->get_constant(i); 
-            expr* val = model->get_const_interp(d);
-            expr* e = m.mk_const(d);
-            m_refs.push_back(e);
-            assign_value(e, val);
-        }
+    void model_evaluator::reset (const model_ref& model) 
+    {
+      m1.reset();
+      m2.reset();
+      m_values.reset();
+      m_visited.reset();
+      m_numbers.reset();
+      m_refs.reset();
+      m_model = model.get ();
+      if (!m_model) return;
+      
+      unsigned sz = model->get_num_constants();
+      for (unsigned i = 0; i < sz; i++) {
+        func_decl * d = model->get_constant(i); 
+        expr* val = model->get_const_interp(d);
+        expr* e = m.mk_const(d);
+        m_refs.push_back(e);
+        assign_value(e, val);
+      }
     }
-    
-    void model_evaluator::reset() {
-        m1.reset();
-        m2.reset();
-        m_values.reset();
-        m_visited.reset();
-        m_numbers.reset();
-        m_refs.reset();
-        m_model = 0;
-    }
-    
-    
-    void model_evaluator::minimize_literals(ptr_vector<expr> const& formulas, 
-                                            const model_ref& mdl, expr_ref_vector& result) {
-        
-        TRACE("spacer", 
-              tout << "formulas:\n";
-              for (unsigned i = 0; i < formulas.size(); ++i) tout << mk_pp(formulas[i], m) << "\n"; 
-              );
-        
-        expr_ref tmp(m);
-        ptr_vector<expr> tocollect;
-        
-        setup_model(mdl);
-        collect(formulas, tocollect);
-        for (unsigned i = 0; i < tocollect.size(); ++i) {
-            expr* e = tocollect[i];
-            expr* e1, *e2;
-            SASSERT(m.is_bool(e));
-            SASSERT(is_true(e) || is_false(e));
-            if (is_true(e)) {
-                result.push_back(e);
-            }
-            // hack to break disequalities for arithmetic variables.
-            else if (m.is_eq(e, e1, e2) && m_arith.is_int_real(e1)) {
-                if (get_number(e1) < get_number(e2)) {
-                    result.push_back(m_arith.mk_lt(e1,e2));
-                }
-                else {
-                    result.push_back(m_arith.mk_lt(e2,e1));
-                }
-            }
-            else {
-                result.push_back(m.mk_not(e));
-            }
-        }
-        reset();
-        TRACE("spacer", 
-              tout << "minimized model:\n";
-              for (unsigned i = 0; i < result.size(); ++i) tout << mk_pp(result[i].get(), m) << "\n"; 
-              );
-    }
-    
-    void model_evaluator::process_formula(app* e, ptr_vector<expr>& todo, ptr_vector<expr>& tocollect) {
-        SASSERT(m.is_bool(e));
-        SASSERT(is_true(e) || is_false(e));
-        unsigned v = is_true(e);
-        unsigned sz = e->get_num_args();
-        expr* const* args = e->get_args();
-        if (e->get_family_id() == m.get_basic_family_id()) {
-            switch(e->get_decl_kind()) {
-            case OP_TRUE:
-                break;
-            case OP_FALSE:
-                break;
-            case OP_EQ:
-            case OP_IFF:
-                if (args[0] == args[1]) {
-                    SASSERT(v);
-                    // no-op                    
-                }
-                else if (m.is_bool(args[0])) {
-                    todo.append(sz, args);
-                }
-                else {
-                    tocollect.push_back(e);
-                }
-                break;                              
-            case OP_DISTINCT:
-                tocollect.push_back(e);
-                break;
-            case OP_ITE:
-                if (args[1] == args[2]) {
-                    tocollect.push_back(args[1]);
-                }
-                else if (is_true(args[1]) && is_true(args[2])) {
-                    todo.append(2, args+1);
-                }
-                else if (is_false(args[1]) && is_false(args[2])) {
-                    todo.append(2, args+1);
-                }
-                else if (is_true(args[0])) {
-                    todo.append(2, args);
-                }
-                else {
-                    SASSERT(is_false(args[0]));
-                    todo.push_back(args[0]);
-                    todo.push_back(args[2]);
-                }
-                break;
-            case OP_AND:
-                if (v) {
-                    todo.append(sz, args);
-                }
-                else {
-                    unsigned i = 0;
-                    for (; !is_false(args[i]) && i < sz; ++i);     
-                    if (i == sz) {
-                        fatal_error(1);
-                    }
-                    VERIFY(i < sz);
-                    todo.push_back(args[i]);
-                }
-                break;
-            case OP_OR:
-                if (v) {
-                    unsigned i = 0;
-                    for (; !is_true(args[i]) && i < sz; ++i);
-                    if (i == sz) {
-                        fatal_error(1);
-                    }
-                    VERIFY(i < sz);
-                    todo.push_back(args[i]);
-                }
-                else {
-                    todo.append(sz, args);
-                }
-                break;
-            case OP_XOR: 
-            case OP_NOT:
-                todo.append(sz, args);
-                break;
-            case OP_IMPLIES:
-                if (v) {
-                    if (is_true(args[1])) {
-                        todo.push_back(args[1]);
-                    }
-                    else if (is_false(args[0])) {
-                        todo.push_back(args[0]);
-                    }
-                    else {
-                        IF_VERBOSE(0, verbose_stream() << "Term not handled " << mk_pp(e, m) << "\n";);
-                        UNREACHABLE();
-                    }
-                }
-                else {
-                    todo.append(sz, args);
-                }
-                break;
-            default:
-                IF_VERBOSE(0, verbose_stream() << "Term not handled " << mk_pp(e, m) << "\n";);
-                UNREACHABLE();
-            }
-        }
-        else {
-            tocollect.push_back(e);
-        }
-    }
-    
-    void model_evaluator::collect(ptr_vector<expr> const& formulas, ptr_vector<expr>& tocollect) {
-        ptr_vector<expr> todo;
-        todo.append(formulas);
-        m_visited.reset();
-        
-        VERIFY(check_model(formulas));
-        
-        while (!todo.empty()) {
-            app*  e = to_app(todo.back());
-            todo.pop_back();
-            if (!m_visited.is_marked(e)) {
-                process_formula(e, todo, tocollect);
-                m_visited.mark(e, true);
-            }
-        }
-        m_visited.reset();
-    }
-    
-    void model_evaluator::eval_arith(app* e) {
-        rational r, r2;
+  
+  void model_evaluator::eval_arith(app* e) {
+    rational r, r2;
         
 #define ARG1 e->get_arg(0)
 #define ARG2 e->get_arg(1)     
         
-        unsigned arity = e->get_num_args();
-        for (unsigned i = 0; i < arity; ++i) {
-            expr* arg = e->get_arg(i);
-            if (is_x(arg)) {
-                set_x(e);
-                return;
-            }
-            SASSERT(!is_unknown(arg));
-        }
-        switch(e->get_decl_kind()) {
-        case OP_NUM: 
-            VERIFY(m_arith.is_numeral(e, r));
-            set_number(e, r);
-            break;                
-        case OP_IRRATIONAL_ALGEBRAIC_NUM:  
-            set_x(e);
-            break;
-        case OP_LE:
-            set_bool(e, get_number(ARG1) <= get_number(ARG2));
-            break;
-        case OP_GE:
-            set_bool(e, get_number(ARG1) >= get_number(ARG2));
-            break;
-        case OP_LT:
-            set_bool(e, get_number(ARG1) < get_number(ARG2));
-            break;
-        case OP_GT:
-            set_bool(e, get_number(ARG1) > get_number(ARG2));
-            break;
-        case OP_ADD: 
-            r = rational::zero();
-            for (unsigned i = 0; i < arity; ++i) {
-                r += get_number(e->get_arg(i));
-            }
-            set_number(e, r);
-            break;                                    
-        case OP_SUB: 
-            r = get_number(e->get_arg(0));
-            for (unsigned i = 1; i < arity; ++i) {
-                r -= get_number(e->get_arg(i));
-            }
-            set_number(e, r);
-            break;                            
-        case OP_UMINUS: 
-            SASSERT(arity == 1);
-            set_number(e, -get_number(e->get_arg(0)));
-            break;                
-        case OP_MUL: 
-            r = rational::one();
-            for (unsigned i = 0; i < arity; ++i) {
-                r *= get_number(e->get_arg(i));
-            }
-            set_number(e, r);
-            break;                
-        case OP_DIV: 
-            SASSERT(arity == 2);
-            r = get_number(ARG2);
-            if (r.is_zero()) {
-                set_x(e);
-            }
-            else {
-                set_number(e, get_number(ARG1) / r);
-            }
-            break;                
-        case OP_IDIV: 
-            SASSERT(arity == 2);
-            r = get_number(ARG2);
-            if (r.is_zero()) {
-                set_x(e);
-            }
-            else {
-                set_number(e, div(get_number(ARG1), r));
-            }
-            break;                
-        case OP_REM: 
-            // rem(v1,v2) = if v2 >= 0 then mod(v1,v2) else -mod(v1,v2)
-            SASSERT(arity == 2);
-            r = get_number(ARG2);
-            if (r.is_zero()) {
-                set_x(e);
-            }
-            else {
-                r2 = mod(get_number(ARG1), r);
-                if (r.is_neg()) r2.neg();
-                set_number(e, r2);
-            }
-            break;
-        case OP_MOD: 
-            SASSERT(arity == 2);
-            r = get_number(ARG2);
-            if (r.is_zero()) {
-                set_x(e);
-            }
-            else {
-                set_number(e, mod(get_number(ARG1), r));
-            }
-            break;                   
-        case OP_TO_REAL: 
-            SASSERT(arity == 1);
-            set_number(e, get_number(ARG1));
-            break;                
-        case OP_TO_INT: 
-            SASSERT(arity == 1);
-            set_number(e, floor(get_number(ARG1)));
-            break;                
-        case OP_IS_INT: 
-            SASSERT(arity == 1);
-            set_bool(e, get_number(ARG1).is_int());
-            break;
-        case OP_POWER:
-            set_x(e);
-            break;
-        default:
-            IF_VERBOSE(0, verbose_stream() << "Term not handled " << mk_pp(e, m) << "\n";);
-            UNREACHABLE();
-            break;
-        }
+    unsigned arity = e->get_num_args();
+    for (unsigned i = 0; i < arity; ++i) {
+      expr* arg = e->get_arg(i);
+      if (is_x (arg)) {
+        set_x(e);
+        return;
+      }
+      SASSERT(!is_unknown(arg));
     }
+    switch(e->get_decl_kind()) {
+    case OP_NUM: 
+      VERIFY(m_arith.is_numeral(e, r));
+      set_number(e, r);
+      break;                
+    case OP_IRRATIONAL_ALGEBRAIC_NUM:  
+      set_x(e);
+      break;
+    case OP_LE:
+      set_bool(e, get_number(ARG1) <= get_number(ARG2));
+      break;
+    case OP_GE:
+      set_bool(e, get_number(ARG1) >= get_number(ARG2));
+      break;
+    case OP_LT:
+      set_bool(e, get_number(ARG1) < get_number(ARG2));
+      break;
+    case OP_GT:
+      set_bool(e, get_number(ARG1) > get_number(ARG2));
+      break;
+    case OP_ADD: 
+      r = rational::zero();
+      for (unsigned i = 0; i < arity; ++i) {
+        r += get_number(e->get_arg(i));
+      }
+      set_number(e, r);
+      break;                                    
+    case OP_SUB: 
+      r = get_number(e->get_arg(0));
+      for (unsigned i = 1; i < arity; ++i) {
+        r -= get_number(e->get_arg(i));
+      }
+      set_number(e, r);
+      break;                            
+    case OP_UMINUS: 
+      SASSERT(arity == 1);
+      set_number(e, -get_number(e->get_arg(0)));
+      break;                
+    case OP_MUL: 
+      r = rational::one();
+      for (unsigned i = 0; i < arity; ++i) {
+        r *= get_number(e->get_arg(i));
+      }
+      set_number(e, r);
+      break;                
+    case OP_DIV: 
+      SASSERT(arity == 2);
+      r = get_number(ARG2);
+      if (r.is_zero()) {
+        set_x(e);
+      }
+      else {
+        set_number(e, get_number(ARG1) / r);
+      }
+      break;                
+    case OP_IDIV: 
+      SASSERT(arity == 2);
+      r = get_number(ARG2);
+      if (r.is_zero()) {
+        set_x(e);
+      }
+      else {
+        set_number(e, div(get_number(ARG1), r));
+      }
+      break;                
+    case OP_REM: 
+      // rem(v1,v2) = if v2 >= 0 then mod(v1,v2) else -mod(v1,v2)
+      SASSERT(arity == 2);
+      r = get_number(ARG2);
+      if (r.is_zero()) {
+        set_x(e);
+      }
+      else {
+        r2 = mod(get_number(ARG1), r);
+        if (r.is_neg()) r2.neg();
+        set_number(e, r2);
+      }
+      break;
+    case OP_MOD: 
+      SASSERT(arity == 2);
+      r = get_number(ARG2);
+      if (r.is_zero()) {
+        set_x(e);
+      }
+      else {
+        set_number(e, mod(get_number(ARG1), r));
+      }
+      break;                   
+    case OP_TO_REAL: 
+      SASSERT(arity == 1);
+      set_number(e, get_number(ARG1));
+      break;                
+    case OP_TO_INT: 
+      SASSERT(arity == 1);
+      set_number(e, floor(get_number(ARG1)));
+      break;                
+    case OP_IS_INT: 
+      SASSERT(arity == 1);
+      set_bool(e, get_number(ARG1).is_int());
+      break;
+    case OP_POWER:
+      set_x(e);
+      break;
+    default:
+      IF_VERBOSE(0, verbose_stream() << "Term not handled " << mk_pp(e, m) << "\n";);
+      UNREACHABLE();
+      break;
+    }
+  }
     
-    void model_evaluator::inherit_value(expr* e, expr* v) {
-        expr* w;
-        SASSERT(!is_unknown(v));
-        SASSERT(m.get_sort(e) == m.get_sort(v));
-        if (is_x(v)) {
-            set_x(e);
-        }
-        else if (m.is_bool(e)) {
-            SASSERT(m.is_bool(v));
-            if (is_true(v)) set_true(e);
-            else if (is_false(v)) set_false(e);
-            else {
-                TRACE("spacer", tout << "not inherited:\n" << mk_pp(e, m) << "\n" << mk_pp(v, m) << "\n";);
-                set_x(e);
-            }
-        }
-        else if (m_arith.is_int_real(e)) {
-            set_number(e, get_number(v));
-        }
-        else if (m.is_value(v)) {
-            set_value(e, v);
-        }
-        else if (m_values.find(v, w)) {
-            set_value(e, w);
-        }
-        else {
-            TRACE("spacer", tout << "not inherited:\n" << mk_pp(e, m) << "\n" << mk_pp(v, m) << "\n";);
-            set_x(e);
-        }
+  void model_evaluator::inherit_value(expr* e, expr* v) {
+    expr* w;
+    SASSERT(!is_unknown(v));
+    SASSERT(m.get_sort(e) == m.get_sort(v));
+    if (is_x(v)) {
+      set_x(e);
     }
+    else if (m.is_bool(e)) {
+      SASSERT(m.is_bool(v));
+      if (is_true(v)) set_true(e);
+      else if (is_false(v)) set_false(e);
+      else {
+        TRACE("spacer", tout << "not inherited:\n" << mk_pp(e, m) << "\n" 
+              << mk_pp(v, m) << "\n";);
+        set_x(e);
+      }
+    }
+    else if (m_arith.is_int_real(e)) {
+      set_number(e, get_number(v));
+    }
+    else if (m.is_value(v)) {
+      set_value(e, v);
+    }
+    else if (m_values.find(v, w)) {
+      set_value(e, w);
+    }
+    else {
+      TRACE("spacer", tout << "not inherited:\n" << mk_pp(e, m) << "\n" 
+            << mk_pp(v, m) << "\n";);
+      set_x(e);
+    }
+  }
 
-    void model_evaluator::eval_exprs(expr_ref_vector& es) {
-        model_ref mr(m_model);
-        for (unsigned j = 0; j < es.size(); ++j) {
-            if (m_array.is_as_array(es[j].get())) {
-                es[j] = eval(mr, es[j].get());
-            }
+    void model_evaluator::eval_exprs(expr_ref_vector& es) 
+    {
+        for (unsigned j = 0, sz = es.size (); j < sz; ++j) {
+            if (m_array.is_as_array(es.get (j))) 
+              es[j] = eval(es.get (j));
         }
     }
     
-    bool model_evaluator::extract_array_func_interp(expr* a, vector<expr_ref_vector>& stores, expr_ref& else_case) {
+    bool model_evaluator::extract_array_func_interp(expr* a, 
+                                                    vector<expr_ref_vector>& stores, 
+                                                    expr_ref& else_case) {
         SASSERT(m_array.is_array(a));
         
         TRACE("spacer", tout << mk_pp(a, m) << "\n";);
@@ -507,7 +334,9 @@ namespace spacer {
                 store.push_back(fe->get_result());
                 for (unsigned j = 0; j < store.size(); ++j) {
                     if (!is_ground(store[j].get())) {
-                        TRACE("spacer", tout << "could not extract array interpretation: " << mk_pp(a, m) << "\n" << mk_pp(store[j].get(), m) << "\n";);
+                        TRACE("spacer", tout << 
+                              "could not extract array interpretation: " << mk_pp(a, m) 
+                              << "\n" << mk_pp(store[j].get(), m) << "\n";);
                         return false;
                     }
                 }
@@ -520,12 +349,12 @@ namespace spacer {
                 return false;
             }
             if (!is_ground(else_case)) {
-                TRACE("spacer", tout << "non-ground else case " << mk_pp(a, m) << "\n" << mk_pp(else_case, m) << "\n";);
+                TRACE("spacer", tout << "non-ground else case " << mk_pp(a, m) << "\n" 
+                      << mk_pp(else_case, m) << "\n";);
                 return false;
             }
             if (m_array.is_as_array(else_case)) {
-                model_ref mr(m_model);
-                else_case = eval(mr, else_case);
+                else_case = eval(else_case);
             }
             TRACE("spacer", tout << "else case: " << mk_pp(else_case, m) << "\n";);
             return true;
@@ -550,7 +379,8 @@ namespace spacer {
         sort* s = m.get_sort(arg1);
         sort* r = get_array_range(s);
         // give up evaluating finite domain/range arrays
-        if (!r->is_infinite() && !r->is_very_big() && !s->is_infinite() && !s->is_very_big()) {
+        if (!r->is_infinite() && !r->is_very_big() && 
+            !s->is_infinite() && !s->is_very_big()) {
             TRACE("spacer", tout << "equality is unknown: " << mk_pp(e, m) << "\n";);
             set_x(e);
             return;
@@ -651,7 +481,8 @@ namespace spacer {
                 set_bool(e, true);
             }
             else {
-                TRACE("spacer", tout << "not value equal:\n" << mk_pp(e1, m) << "\n" << mk_pp(e2, m) << "\n";);
+                TRACE("spacer", tout << "not value equal:\n" << mk_pp(e1, m) 
+                      << "\n" << mk_pp(e2, m) << "\n";);
                 set_x(e);
             }
         }
@@ -807,135 +638,291 @@ namespace spacer {
         }
     }
 
-    void model_evaluator::eval_fmls (ptr_vector<expr> const& formulas) {
-        ptr_vector<expr> todo(formulas);
+  void model_evaluator::eval_terms (expr * formula)
+  {
+    ptr_vector<expr> todo;
+    todo.push_back (formula);
+    while (!todo.empty ())
+    {
+      expr * e = todo.back ();
+      if (!is_app (e) || !is_unknown (e)) 
+      {
+        todo.pop_back ();
+        continue;
+      }
+      app * a = to_app (e);
+      
+      unsigned arity = a->get_num_args ();
+      for (unsigned i = 0; i < arity; ++i)
+        if (is_unknown (a->get_arg (i))) todo.push_back (a->get_arg (i));
+      if (todo.back () != e) continue;
+      
+      todo.pop_back ();
+      if (a->get_family_id () == m_arith.get_family_id ()) eval_arith (a);
+      else if (a->get_family_id () == m.get_basic_family_id ()) eval_basic (a);
+      else
+      {
+        expr_ref v(m);
+        m_model->eval (e, v);
+        assign_value (e, v);
+      }
+      SASSERT (!is_unknown (e));
+    }
+  }
+  
+  expr_ref model_evaluator::eval_heavy (expr* fml) 
+  {
+    SASSERT (m_model);
+    
+    expr_ref res (m_model->get_manager ());
+      
+    eval_terms (fml);
+    if (is_unknown (fml) || is_x (fml)) res = fml;
+    if (is_false (fml)) res = m.mk_false ();
+    else if (is_true (fml)) res = m.mk_true ();
+    else if (m_arith.is_int_real (fml)) 
+      res = m_arith.mk_numeral (get_number (fml), m_arith.is_int (fml));
+    else res = get_value (fml);
         
-        while (!todo.empty()) {
-            expr * curr_e = todo.back();
-            
-            if (!is_app(curr_e)) { 
-                todo.pop_back();
-                continue;
-            }
-            app * curr = to_app(curr_e);
-            
-            if (!is_unknown(curr)) { 
-                todo.pop_back();
-                continue;
-            }
-            unsigned arity = curr->get_num_args();
-            for (unsigned i = 0; i < arity; ++i) {
-                if (is_unknown(curr->get_arg(i))) {
-                    todo.push_back(curr->get_arg(i));
+    return res;
+  }
+
+  expr_ref model_evaluator::eval(func_decl* d) 
+  {
+    SASSERT(d->get_arity() == 0);
+    expr_ref result(m);
+    if (m_array.is_array(d->get_range())) {
+      expr_ref e(m);
+      e = m.mk_const(d);
+      result = eval(e);
+    }
+    else {
+      result = m_model->get_const_interp(d);
+    }
+    return result;
+  }
+
+  
+  expr_ref model_evaluator::eval(expr* e) {
+    expr_ref result(m);
+    VERIFY(m_model->eval(e, result, true));
+    if (m_array.is_array(e)) {
+      vector<expr_ref_vector> stores;
+      expr_ref_vector args(m);
+      expr_ref else_case(m);
+      if (extract_array_func_interp(result, stores, else_case)) {
+        result = m_array.mk_const_array(m.get_sort(e), else_case);
+        while (!stores.empty() && stores.back().back() == else_case) {
+          stores.pop_back();
+        }
+        for (unsigned i = stores.size(); i > 0; ) {
+          --i;
+          args.resize(1);
+          args[0] = result;
+          args.append(stores[i]);
+          result = m_array.mk_store(args.size(), args.c_ptr());
+        }
+        return result;
+      }
+    }
+    return result;
+  }
+  
+  void model_evaluator::pick_implicant (const expr_ref_vector& formulas, 
+                                        expr_ref_vector& result2) {
+        
+        
+    
+    TRACE("spacer", 
+          tout << "formulas:\n";
+          for (unsigned i = 0; i < formulas.size(); ++i) 
+            tout << mk_pp(formulas.get (i), m) << "\n"; 
+          );
+        
+    expr_ref tmp(m);
+    ptr_vector<expr> lits;
+        
+    // 1. evaluate all the terms 
+    eval_terms (formulas);
+    
+    // 2. pick literals in the implicant
+    pick_literals (formulas, lits);
+    
+    // 3. add appropriate signs
+    for (unsigned i = 0, sz = lits.size (); i < sz; ++i) {
+      expr* e = lits [i];
+      expr* e1, *e2;
+      SASSERT(m.is_bool(e));
+      SASSERT(is_true(e) || is_false(e));
+      if (is_true(e)) result2.push_back(e);
+      
+      // XXX factor this out into a separate method
+      // hack to break disequalities for arithmetic variables.
+      else if (m.is_eq(e, e1, e2) && m_arith.is_int_real(e1)) {
+        if (get_number(e1) < get_number(e2)) result2.push_back(m_arith.mk_lt(e1,e2));
+        else result2.push_back(m_arith.mk_lt(e2,e1));
+      }
+      
+      else 
+        result2.push_back(m.mk_not(e));
+      
+    }
+    
+    TRACE("spacer", 
+          tout << "implicant:\n";
+          for (unsigned i = 0; i < result2.size(); ++i) 
+            tout << mk_pp(result2.get (i), m) << "\n"; 
+          );
+    
+    return;
+    expr_ref_vector result (m);
+    old::model_evaluator old_mev (m);
+    ptr_vector<expr> vv (formulas.size (), formulas.c_ptr ());
+    old_mev.minimize_literals (vv, m_model, result);
+
+    SASSERT (result.size () == result2.size ());
+    for (unsigned i = 0, sz = result2.size (); i < sz; ++i)
+      SASSERT (result.get (i) == result2.get (i));
+      
+  }
+    
+    void model_evaluator::process_formula(app* e, 
+                                          ptr_vector<expr>& todo, 
+                                          ptr_vector<expr>& tocollect) {
+        SASSERT(m.is_bool(e));
+        SASSERT(is_true(e) || is_false(e));
+        unsigned v = is_true(e);
+        unsigned sz = e->get_num_args();
+        expr* const* args = e->get_args();
+        if (e->get_family_id() == m.get_basic_family_id()) {
+            switch(e->get_decl_kind()) {
+            case OP_TRUE:
+                break;
+            case OP_FALSE:
+                break;
+            case OP_EQ:
+            case OP_IFF:
+                if (args[0] == args[1]) {
+                    SASSERT(v);
+                    // no-op                    
                 }
+                else if (m.is_bool(args[0])) {
+                    todo.append(sz, args);
+                }
+                else {
+                    tocollect.push_back(e);
+                }
+                break;                              
+            case OP_DISTINCT:
+                tocollect.push_back(e);
+                break;
+            case OP_ITE:
+                if (args[1] == args[2]) {
+                    tocollect.push_back(args[1]);
+                }
+                else if (is_true(args[1]) && is_true(args[2])) {
+                    todo.append(2, args+1);
+                }
+                else if (is_false(args[1]) && is_false(args[2])) {
+                    todo.append(2, args+1);
+                }
+                else if (is_true(args[0])) {
+                    todo.append(2, args);
+                }
+                else {
+                    SASSERT(is_false(args[0]));
+                    todo.push_back(args[0]);
+                    todo.push_back(args[2]);
+                }
+                break;
+            case OP_AND:
+                if (v) {
+                    todo.append(sz, args);
+                }
+                else {
+                    unsigned i = 0;
+                    for (; !is_false(args[i]) && i < sz; ++i);     
+                    if (i == sz) {
+                        fatal_error(1);
+                    }
+                    VERIFY(i < sz);
+                    todo.push_back(args[i]);
+                }
+                break;
+            case OP_OR:
+                if (v) {
+                    unsigned i = 0;
+                    for (; !is_true(args[i]) && i < sz; ++i);
+                    if (i == sz) {
+                        fatal_error(1);
+                    }
+                    VERIFY(i < sz);
+                    todo.push_back(args[i]);
+                }
+                else {
+                    todo.append(sz, args);
+                }
+                break;
+            case OP_XOR: 
+            case OP_NOT:
+                todo.append(sz, args);
+                break;
+            case OP_IMPLIES:
+                if (v) {
+                    if (is_true(args[1])) {
+                        todo.push_back(args[1]);
+                    }
+                    else if (is_false(args[0])) {
+                        todo.push_back(args[0]);
+                    }
+                    else {
+                        IF_VERBOSE(0, verbose_stream() 
+                                   << "Term not handled " << mk_pp(e, m) << "\n";);
+                        UNREACHABLE();
+                    }
+                }
+                else {
+                    todo.append(sz, args);
+                }
+                break;
+            default:
+                IF_VERBOSE(0, verbose_stream() 
+                           << "Term not handled " << mk_pp(e, m) << "\n";);
+                UNREACHABLE();
             }
-            if (todo.back() != curr) {
-                continue;
-            }
-            todo.pop_back();
-            if (curr->get_family_id() == m_arith.get_family_id()) {
-                eval_arith(curr);
-            }
-            else if (curr->get_family_id() == m.get_basic_family_id()) {
-                eval_basic(curr);
-            }
-            else {
-                expr_ref vl(m);
-                m_model->eval(curr, vl);
-                assign_value(curr, vl);
-            }
-            
-            IF_VERBOSE(35,verbose_stream() << "assigned "<<mk_pp(curr_e,m) 
-                       <<(is_true(curr_e) ? "true" : is_false(curr_e) ? "false" : "unknown") << "\n";);
-            SASSERT(!is_unknown(curr));
+        }
+        else {
+            tocollect.push_back(e);
         }
     }
     
-    bool model_evaluator::check_model(ptr_vector<expr> const& formulas) {
-        eval_fmls (formulas);
-        bool has_x = false;
-        for (unsigned i = 0; i < formulas.size(); ++i) {
-            expr * form = formulas[i];
-            SASSERT(!is_unknown(form));
-            TRACE("spacer_verbose", 
-                  tout << "formula is " << (is_true(form) ? "true" : is_false(form) ? "false" : "unknown") << "\n" <<mk_pp(form, m)<< "\n";);
-            
-            if (is_false(form)) {
-                IF_VERBOSE(0, verbose_stream() << "formula false in model: " << mk_pp(form, m) << "\n";);
-                UNREACHABLE();
-            }
-            if (is_x(form)) {
-                IF_VERBOSE(0, verbose_stream() << "formula undetermined in model: " << mk_pp(form, m) << "\n";);
-                TRACE("spacer", model_smt2_pp(tout, m, *m_model, 0);); 
-                has_x = true;
-            }
-        }
-        return !has_x;
-    }
-
-    expr_ref model_evaluator::eval_heavy (const model_ref& model, expr* fml) 
+    void model_evaluator::pick_literals (const expr_ref_vector& formulas, 
+                                         ptr_vector<expr>& lits) 
     {
-      expr_ref result (model->get_manager ());
+      ptr_vector<expr> todo;
+      for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
+      {
+        expr * e = formulas.get (i);
+        SASSERT (is_true (e) || is_false (e));
+        todo.push_back (e);
+      }
       
-        setup_model (model);
-        ptr_vector<expr> fmls; fmls.push_back (fml);
-        eval_fmls (fmls);
-        if (is_false (fml)) {
-            result = m.mk_false ();
-        }
-        else if (is_true (fml) || is_x (fml)) {
-            result = m.mk_true ();
-        }
-        else if (m_arith.is_int_real (fml)) {
-            result = m_arith.mk_numeral (get_number (fml), m_arith.is_int (fml));
-        }
-        else {
-            result = get_value (fml);
-        }
-        reset ();
+  
+      m_visited.reset();
         
-        return result;
+      while (!todo.empty()) {
+        app*  e = to_app (todo.back());
+        todo.pop_back ();
+        if (!m_visited.is_marked (e)) {
+          process_formula (e, todo, lits);
+          m_visited.mark(e, true);
+        }
+      }
+      m_visited.reset();
     }
+    
+    
 
-    expr_ref model_evaluator::eval(const model_ref& model, func_decl* d) {
-        SASSERT(d->get_arity() == 0);
-        expr_ref result(m);
-        if (m_array.is_array(d->get_range())) {
-            expr_ref e(m);
-            e = m.mk_const(d);
-            result = eval(model, e);
-        }
-        else {
-            result = model->get_const_interp(d);
-        }
-        return result;
-    }
-
-    expr_ref model_evaluator::eval(const model_ref& model, expr* e) {
-        expr_ref result(m);
-        m_model = model.get ();
-        VERIFY(m_model->eval(e, result, true));
-        if (m_array.is_array(e)) {
-            vector<expr_ref_vector> stores;
-            expr_ref_vector args(m);
-            expr_ref else_case(m);
-            if (extract_array_func_interp(result, stores, else_case)) {
-                result = m_array.mk_const_array(m.get_sort(e), else_case);
-                while (!stores.empty() && stores.back().back() == else_case) {
-                    stores.pop_back();
-                }
-                for (unsigned i = stores.size(); i > 0; ) {
-                    --i;
-                    args.resize(1);
-                    args[0] = result;
-                    args.append(stores[i]);
-                    result = m_array.mk_store(args.size(), args.c_ptr());
-                }
-                return result;
-            }
-        }
-        return result;
-    }
 
 
     void reduce_disequalities(model& model, unsigned threshold, expr_ref& fml) {
@@ -1338,10 +1325,11 @@ namespace spacer {
                      const model_ref& M, expr_ref& fml) {
         expr_safe_replace sub (m);
         model_evaluator mev (m);
+        mev.reset (M);
         for (unsigned i = 0; i < vars.size (); i++) {
             app* v = vars.get (i);
             expr_ref val (m);
-            val = mev.eval (M, v);
+            val = mev.eval (v);
             sub.insert (v, val);
         }
         sub (fml);
@@ -1488,7 +1476,8 @@ namespace spacer {
 
         DEBUG_CODE (
             model_evaluator mev (m);
-            bval = mev.eval_heavy (M, fml);
+            mev.reset (M);
+            bval = mev.eval_heavy (fml);
             SASSERT (m.is_true (bval));
         );
 
@@ -1573,14 +1562,13 @@ namespace spacer {
                 });
     }
 
-  void compute_implicant_literals (model_evaluator &mev, const model_ref &model, 
-                                   expr_ref_vector &formula, expr_ref_vector &res)
+  void compute_implicant_literals (model_evaluator &mev, expr_ref_vector &formula, 
+                                   expr_ref_vector &res)
   {
     qe::flatten_and (formula);
     if (formula.empty ()) return;
     
-    ptr_vector<expr> f (formula.size (), formula.c_ptr ());
-    mev.minimize_literals (f, model, res);
+    mev.pick_implicant (formula, res);
   }
   
 }
