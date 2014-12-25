@@ -45,6 +45,8 @@ Notes:
 #include "poly_rewriter_def.h"
 #include "arith_rewriter.h"
 #include "scoped_proof.h"
+#include "qe_lite.h"
+#include "qe_arith.h"
 
 
 
@@ -1437,6 +1439,72 @@ namespace pdr {
         expr_ref tmp(m);
         rw(t, tmp);
         t = tmp;                
+    }
+
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M) {
+        th_rewriter rw (m);
+
+        // qe-lite; TODO: use qe_lite aggressively
+        qe_lite qe (m);
+        qe (vars, fml);
+        rw (fml);
+
+        TRACE ("pdr",
+                tout << "After qe_lite:\n";
+                tout << mk_pp (fml, m) << "\n";
+                tout << "Vars:\n";
+                for (unsigned i = 0; i < vars.size(); ++i) {
+                    tout << mk_pp(vars.get (i), m) << "\n";
+                }
+              );
+
+        // substitute model values for booleans and
+        // use LW projection for arithmetic variables
+        if (!vars.empty ()) {
+            app_ref_vector arith_vars (m);
+            expr_substitution sub (m);
+            proof_ref pr (m.mk_asserted (m.mk_true ()), m);
+            expr_ref bval (m);
+            for (unsigned i = 0; i < vars.size (); i++) {
+                if (m.is_bool (vars.get (i))) {
+                    // obtain the interpretation of the ith var using model completion
+                    VERIFY (M->eval (vars.get (i), bval, true));
+                    sub.insert (vars.get (i), bval, pr);
+                }
+                else {
+                    arith_vars.push_back (vars.get (i));
+                }
+            }
+            if (!sub.empty ()) {
+                scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
+                rep->set_substitution (&sub);
+                (*rep)(fml);
+                rw (fml);
+                TRACE ("pdr",
+                        tout << "Projected Boolean vars:\n" << mk_pp (fml, m) << "\n";
+                      );
+            }
+            // model based projection
+            if (!arith_vars.empty ()) {
+                TRACE ("pdr",
+                        tout << "Arith vars:\n";
+                        for (unsigned i = 0; i < arith_vars.size (); ++i) {
+                            tout << mk_pp (arith_vars.get (i), m) << "\n";
+                        }
+                      );
+                {
+                    scoped_no_proof _sp (m);
+                    qe::arith_project (*M, arith_vars, fml);
+                }
+                SASSERT (arith_vars.empty ());
+                TRACE ("pdr",
+                        tout << "Projected arith vars:\n" << mk_pp (fml, m) << "\n";
+                      );
+            }
+            SASSERT (M->eval (fml, bval, true) && m.is_true (bval)); // M |= fml
+            vars.reset ();
+            vars.append (arith_vars);
+        }
     }
 
 }

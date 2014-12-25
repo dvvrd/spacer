@@ -42,6 +42,9 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--order-children', dest='order_children',
                     help='0 (rtol), 1 (ltor)', default=0)
+    p.add_argument ('--use-qe-projection', dest='use_qe_projection',
+                    help='use mbp (only for pdr)',
+                    action='store_true', default=False)
     p.add_argument ('--bit-blast', dest='bit_blast',
                     help='blast bitvectors into bits',
                     action='store_true', default=False)
@@ -75,6 +78,8 @@ def main (argv):
     if args.dfs: fp.set (bfs_model_search=False)
 
     fp.set (order_children=int(args.order_children))
+
+    fp.set (use_qe_projection=args.use_qe_projection)
 
     with stats.timer ('Parse'):
         q = fp.parse_file (args.file)

@@ -2107,40 +2107,48 @@ namespace pdr {
         vars.append(aux_vars.size(), aux_vars.c_ptr());
 
         scoped_ptr<expr_replacer> rep;
-        qe_lite qe(m);
         expr_ref phi1 = m_pm.mk_and(Phi);
-        qe(vars, phi1);
-        TRACE("pdr", tout << "Eliminated\n" << mk_pp(phi1, m) << "\n";);
-        if (!use_model_generalizer) {
-            reduce_disequalities(*M, 3, phi1);
-            TRACE("pdr", tout  << "Reduced-eq\n" << mk_pp(phi1, m) << "\n";);
+        if (m_params.use_qe_projection ()) {
+            qe_project (m, vars, phi1, M);
+            SASSERT (vars.empty ());
+            TRACE("pdr", tout << "Eliminated\n" << mk_pp(phi1, m) << "\n";);
         }
-        get_context().get_rewriter()(phi1);
-
-        TRACE("pdr", 
-              tout << "Vars:\n";
-              for (unsigned i = 0; i < vars.size(); ++i) {
-                  tout << mk_pp(vars[i].get(), m) << "\n";
-              }
-              tout << "Literals\n";
-              tout << mk_pp(m_pm.mk_and(Phi), m) << "\n";
-              tout << "Reduced\n" << mk_pp(phi1, m) << "\n";);
-        
-        if (!vars.empty()) {
-            // also fresh names for auxiliary variables in body?
-            expr_substitution sub(m);
-            expr_ref tmp(m);
-            proof_ref pr(m);
-            pr = m.mk_asserted(m.mk_true());
-            for (unsigned i = 0; i < vars.size(); ++i) {    
-                tmp = mev.eval(M, vars[i].get());
-                sub.insert(vars[i].get(), tmp, pr);
+        else {
+            qe_lite qe(m);
+            qe(vars, phi1);
+            TRACE("pdr", tout << "Eliminated\n" << mk_pp(phi1, m) << "\n";);
+            if (!use_model_generalizer) {
+                reduce_disequalities(*M, 3, phi1);
+                TRACE("pdr", tout  << "Reduced-eq\n" << mk_pp(phi1, m) << "\n";);
             }
-            if (!rep) rep = mk_expr_simp_replacer(m);
-            rep->set_substitution(&sub);
-            (*rep)(phi1);
-            TRACE("pdr", tout << "Projected:\n" << mk_pp(phi1, m) << "\n";);
+            get_context().get_rewriter()(phi1);
+
+            TRACE("pdr", 
+                    tout << "Vars:\n";
+                    for (unsigned i = 0; i < vars.size(); ++i) {
+                        tout << mk_pp(vars[i].get(), m) << "\n";
+                    }
+                    tout << "Literals\n";
+                    tout << mk_pp(m_pm.mk_and(Phi), m) << "\n";
+                    tout << "Reduced\n" << mk_pp(phi1, m) << "\n";);
+
+            if (!vars.empty()) {
+                // also fresh names for auxiliary variables in body?
+                expr_substitution sub(m);
+                expr_ref tmp(m);
+                proof_ref pr(m);
+                pr = m.mk_asserted(m.mk_true());
+                for (unsigned i = 0; i < vars.size(); ++i) {    
+                    tmp = mev.eval(M, vars[i].get());
+                    sub.insert(vars[i].get(), tmp, pr);
+                }
+                if (!rep) rep = mk_expr_simp_replacer(m);
+                rep->set_substitution(&sub);
+                (*rep)(phi1);
+                TRACE("pdr", tout << "Projected:\n" << mk_pp(phi1, m) << "\n";);
+            }
         }
+
         Phi.reset();
         qe::flatten_and(phi1, Phi);
         unsigned_vector indices;

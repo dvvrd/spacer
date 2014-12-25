@@ -42,6 +42,9 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--order-children', dest='order_children',
                     help='0 (rtol), 1 (ltor)', default=0)
+    p.add_argument ('--use-qe-projection', dest='use_qe_projection',
+                    help='use mbp (only for pdr)',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -118,6 +121,9 @@ def main (argv):
 
     if int(args.order_children)==1:
         z3_args += ' fixedpoint.order_children=1'
+
+    if args.use_qe_projection:
+        z3_args += ' fixedpoint.use_qe_projection=true'
 
     z3_args += ' ' + args.file
 
