@@ -133,7 +133,7 @@ namespace qe {
                 s = m.get_sort(e1);
                 is_strict = !is_not;
             }
-            else if (m.is_eq(lit, e1, e2)) {
+            else if (m.is_eq(lit, e1, e2) && a.is_int_real (e1)) {
                 expr *t, *num;
                 rational num_val, d_val, z;
                 bool is_int;
