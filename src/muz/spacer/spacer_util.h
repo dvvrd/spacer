@@ -165,18 +165,22 @@ namespace spacer {
     
     /// compute values of all the terms in all the formulas in the input
     /// clients must ensure that the terms are not deleted
-    void eval_terms (const expr_ref_vector &formulas)
+    void eval_terms (const expr_ref_vector &v)
     {
-      for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
-        eval_terms (formulas.get (i));
+      // for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
+      //   eval_terms (formulas.get (i));
+      for (unsigned i = v.size (); i > 0; --i)
+        eval_terms (v.get (i-1));
     }
     
     /// compute values of all the terms in all the formulas in the input
     /// clients must ensure that the terms are not deleted
-    void eval_terms (const ptr_vector<expr> &f)
+    void eval_terms (const ptr_vector<expr> &v)
     {
-      for (unsigned i = 0, sz = f.size (); i < sz; ++i)
-        eval_terms (f[i]);
+      // for (unsigned i = 0, sz = f.size (); i < sz; ++i)
+      //   eval_terms (f[i]);
+      for (unsigned i = v.size (); i > 0; --i)
+        eval_terms (v[i]);
     }
     
     /// compute values of all the terms in the given formula
