@@ -51,7 +51,8 @@ void test (ast_manager& m, std::string const& str) {
     std::cout << "Model:" << "\n";
     model_smt2_pp (std::cout, m, *md, 0);
 
-    qe::array_project (*md, vars, fml);
+    app_ref_vector aux_vars (m);
+    qe::array_project (*md, vars, fml, aux_vars);
 
     std::cout << "After projection: " << mk_pp (fml, m) << "\n";
 }
