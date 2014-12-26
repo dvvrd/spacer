@@ -1110,760 +1110,6 @@ namespace qe {
     };
 
 
-//    class array_project_util {
-//        ast_manager&                m;
-//        array_util                  m_arr_u;
-//        arith_util                  m_ari_u;
-//        expr_map                    m_elim_stores_cache;
-//        ast_mark                    m_elim_stores_done;
-//        ast_mark                    m_has_stores;
-//        expr_ref_vector             _tmp;   // to ensure a reference
-//        app_ref_vector              m_aux_vars;
-//        expr_ref_vector             m_aux_lits;
-//        model_ref                   M;
-//        model_evaluator_array_util  m_mev;
-//
-//        struct cant_project {};
-//
-//        void reset () {
-//            m_elim_stores_cache.reset ();
-//            m_elim_stores_done.reset ();
-//            m_has_stores.reset ();
-//            _tmp.reset ();
-//            m_aux_vars.reset ();
-//            m_aux_lits.reset ();
-//        }
-//
-//        /**
-//         * convert partial equality expression p_exp to an equality by
-//         * recursively adding stores on diff indices
-//         *
-//         * add stores on lhs or rhs depending on whether stores_on_rhs is false/true
-//         */
-//        void convert_peq_to_eq (expr* p_exp, app_ref& eq, bool stores_on_rhs = true) {
-//            peq p (to_app (p_exp), m);
-//            app_ref_vector diff_val_consts (m);
-//            p.mk_eq (diff_val_consts, eq, stores_on_rhs);
-//            // extend M to include diff_val_consts
-//            expr_ref arr (m);
-//            p.lhs (arr);
-//            expr_ref_vector I (m);
-//            p.get_diff_indices (I);
-//            expr_ref val (m);
-//            unsigned num_diff = diff_val_consts.size ();
-//            SASSERT (num_diff == I.size ());
-//            for (unsigned i = 0; i < num_diff; i++) {
-//                // mk val term
-//                ptr_vector<expr> sel_args;
-//                sel_args.push_back (arr);
-//                sel_args.push_back (I.get (i));
-//                expr_ref val_term (m_arr_u.mk_select (sel_args.size (), sel_args.c_ptr ()), m);
-//                // evaluate and assign to ith diff_val_const
-//                m_mev.eval (*M, val_term, val);
-//                M->register_decl (diff_val_consts.get (i)->get_decl (), val);
-//            }
-//        }
-//
-//        /**
-//         * mk (e0 ==indices e1)
-//         *
-//         * result has stores if either e0 or e1 or an index term has stores
-//         */
-//        void mk_peq_and_mark_stores (expr* e0, expr* e1, unsigned num_indices, expr* const* indices, app_ref& result) {
-//            peq p (e0, e1, num_indices, indices, m);
-//            p.mk_peq (result);
-//            // mark stores
-//            bool has_stores = m_has_stores.is_marked (e0) || m_has_stores.is_marked (e1);
-//            for (unsigned i = 0; !has_stores && i < num_indices; i++) {
-//                if (m_has_stores.is_marked (indices [i])) {
-//                    has_stores = true;
-//                }
-//            }
-//            if (has_stores) {
-//                m_has_stores.mark (result.get (), true);
-//            }
-//        }
-//
-//        /**
-//         * walk down the ast of fml and mark (in m_has_stores) all terms containing stores on or of v
-//         *
-//         * also populate all equalities
-//         */
-//        void mark_stores (expr_ref const& fml, app* v, expr_ref_vector& eqs) {
-//            ast_mark done;
-//            expr_ref_vector todo (m);
-//            todo.push_back (fml);
-//            while (!todo.empty ()) {
-//                expr_ref e (todo.back (), m);
-//                if (done.is_marked (e) || !is_app (e)) {
-//                    todo.pop_back ();
-//                    continue;
-//                }
-//
-//                app* a = to_app (e);
-//
-//                bool all_done = true;
-//                unsigned num_args = a->get_num_args ();
-//                for (unsigned i = 0; i < num_args; i++) {
-//                    expr* arg = a->get_arg (i);
-//                    if (!done.is_marked (arg)) {
-//                        all_done = false;
-//                        todo.push_back (arg);
-//                    }
-//                }
-//                if (!all_done) continue;
-//                todo.pop_back ();
-//
-//                // check and mark if a has stores on/of v
-//                bool args_have_stores = false;
-//                expr_ref_vector eq_args (m);
-//                for (unsigned i = 0; i < num_args; i++) {
-//                    expr* arg = a->get_arg (i);
-//                    if (!args_have_stores && m_has_stores.is_marked (arg)) {
-//                        args_have_stores = true;
-//                    }
-//                }
-//                if (args_have_stores ||
-//                        (m_arr_u.is_store (a) && (a->get_arg (0) == v || a->get_arg (2) == v))) {
-//                    m_has_stores.mark (a, true);
-//
-//                    TRACE ("qe",
-//                            tout << "has stores:\n";
-//                            tout << mk_pp (a, m) << "\n";
-//                          );
-//                }
-//
-//                // check if a is a relevant array equality
-//                if (m.is_eq (a)) {
-//                    expr* a0 = to_app (a)->get_arg (0);
-//                    expr* a1 = to_app (a)->get_arg (1);
-//                    if (a0 == v || a1 == v ||
-//                            (m_arr_u.is_array (a0) && m_has_stores.is_marked (a))) {
-//                        eqs.push_back (a);
-//                    }
-//                }
-//                // else, we can check for disequalities and handle them using extensionality,
-//                // but it's not necessary
-//
-//                done.mark (a, true);
-//            }
-//        }
-//
-//        /**
-//         * reduce select after stores based on the model
-//         *
-//         * eq_to_exclude are array equalities which shouldn't be touched,
-//         *  as they are processed separately
-//         */
-//        void project_sel_after_stores (expr_ref& fml, app* v, unsigned num_eq_to_exclude = 0, expr* const* eq_to_exclude = 0) {
-//            if (!is_app (fml) || !m_has_stores.is_marked (fml)) return;
-//
-//            if (m_elim_stores_done.is_marked (fml)) {
-//                expr* e_new = 0; proof* pr;
-//                m_elim_stores_cache.get (fml, e_new, pr);
-//                if (e_new) {
-//                    fml = e_new;
-//                }
-//                return;
-//            }
-//
-//            // process arguments
-//            app* a = to_app (fml);
-//
-//            if (m.is_eq (a)) {
-//                for (unsigned i = 0; i < num_eq_to_exclude; i++) {
-//                    if (a == eq_to_exclude [i]) {
-//                        return;
-//                    }
-//                }
-//            }
-//
-//            expr_ref_vector args (m);
-//            bool args_have_stores = false;
-//            bool args_changed = false;
-//            for (unsigned i = 0; i < a->get_num_args (); i++) {
-//                expr_ref arg (a->get_arg (i), m);
-//                project_sel_after_stores (arg, v, num_eq_to_exclude, eq_to_exclude);
-//                args.push_back (arg);
-//                if (!args_changed && arg != a->get_arg (i)) {
-//                    args_changed = true;
-//                }
-//                // does arg have stores?
-//                if (!args_have_stores && m_has_stores.is_marked (arg)) {
-//                    args_have_stores = true;
-//                }
-//            }
-//
-//            expr_ref a_new (fml, m); // initialize to fml
-//            if (m_arr_u.is_select (a->get_decl ()) && m_arr_u.is_store (args.get (0))
-//                    && m_has_stores.is_marked (args.get (0))) {
-//                // sel-after-store
-//                // (store arr i val)[j]
-//                app* store = to_app (args.get (0));
-//                expr* arr = store->get_arg (0);
-//                expr* i = store->get_arg (1);
-//                expr* val = store->get_arg (2);
-//                expr* j = args.get (1);
-//
-//                expr_ref val_i (m), val_j (m);
-//                m_mev.eval (*M, i, val_i);
-//                m_mev.eval (*M, j, val_j);
-//                if (val_i == val_j) {
-//                    // (store arr i val)[i] --> val
-//                    a_new = val;
-//                    m_aux_lits.push_back (m.mk_eq (i, j));
-//                }
-//                else {
-//                    // (store arr i val)[j] /\ i!=j --> arr[j]
-//                    expr_ref_vector sel_args (m);
-//                    sel_args.push_back (arr);
-//                    sel_args.push_back (j);
-//                    a_new = m_arr_u.mk_select (sel_args.size (), sel_args.c_ptr ());
-//                    // update m_has_stores
-//                    if (m_has_stores.is_marked (arr)) {
-//                        m_has_stores.mark (a_new, true);
-//                    }
-//                    m_aux_lits.push_back (m.mk_not (m.mk_eq (i, j)));
-//                    // we need to store it as a_new might get deleted otherwise,
-//                    // in which case, the keys in the expr_map's and ast_mark's
-//                    // (m_has_stores, m_elim_stores_done, m_elim_stores_cache)
-//                    // become stale (by assigning same ids to newly created
-//                    // asts, or creating asts at the same address as the deleted
-//                    // ones) and cause conflicts
-//                    _tmp.push_back (a_new);
-//                    // recursively eliminate sel-after-stores
-//                    project_sel_after_stores (a_new, v);
-//                }
-//            }
-//            else if (args_changed) {
-//                // update with new args
-//                a_new = m.mk_app (a->get_decl (), args.size (), args.c_ptr ());
-//
-//                // mark if there are stores on a variable being eliminated
-//                if (args_have_stores ||
-//                        (m_arr_u.is_store (a_new) && (args.get (0) == v || args.get (2) == v))) {
-//                    m_has_stores.mark (a_new, true);
-//                }
-//            }
-//            m_elim_stores_done.mark (fml, true);
-//            if (fml != a_new) {
-//                m_elim_stores_cache.insert (fml, a_new, 0);
-//                _tmp.push_back (a_new);
-//                fml = a_new;
-//            }
-//        }
-//
-//        /**
-//         * factor out select terms on v using fresh consts
-//         *
-//         * this is only used when a substitution term is found for v, so we
-//         * don't bother about marking stores for newly created terms
-//         */
-//        void factor_selects (expr_ref& fml, app* v) {
-//            expr_map sel_cache (m);
-//            ast_mark done;
-//            expr_ref_vector todo (m);
-//            expr_ref_vector _tmp (m); // to ensure a reference
-//            todo.push_back (fml);
-//            while (!todo.empty ()) {
-//                expr_ref e (todo.back (), m);
-//                if (done.is_marked (e) || !is_app (e)) {
-//                    todo.pop_back ();
-//                    continue;
-//                }
-//
-//                app* a = to_app (e);
-//                expr_ref_vector args (m);
-//                bool all_done = true;
-//                for (unsigned i = 0; i < a->get_num_args (); i++) {
-//                    expr* arg = a->get_arg (i);
-//                    if (!done.is_marked (arg)) {
-//                        all_done = false;
-//                        todo.push_back (arg);
-//                    }
-//                    else if (all_done) { // all done so far..
-//                        expr* arg_new = 0; proof* pr;
-//                        sel_cache.get (arg, arg_new, pr);
-//                        if (!arg_new) {
-//                            arg_new = arg;
-//                        }
-//                        args.push_back (arg_new);
-//                    }
-//                }
-//                if (!all_done) continue;
-//                todo.pop_back ();
-//
-//                expr_ref a_new (m.mk_app (a->get_decl (), args.size (), args.c_ptr ()), m);
-//
-//                // if a_new is select on v, introduce new constant
-//                if (m_arr_u.is_select (a->get_decl ()) && args.get (0) == v) {
-//                    sort* val_sort = get_array_range (m.get_sort (v));
-//                    app_ref val_const (m.mk_fresh_const ("sel", val_sort), m);
-//                    m_aux_vars.push_back (val_const);
-//                    // extend M to include val_const
-//                    expr_ref val (m);
-//                    m_mev.eval (*M, a_new, val);
-//                    M->register_decl (val_const->get_decl (), val);
-//                    // add equality
-//                    m_aux_lits.push_back (m.mk_eq (val_const, a_new));
-//                    // replace select by const
-//                    a_new = val_const;
-//                }
-//
-//                if (a != a_new) {
-//                    sel_cache.insert (e, a_new, 0);
-//                    _tmp.push_back (a_new);
-//                }
-//                done.mark (e, true);
-//            }
-//            expr* res = 0; proof* pr;
-//            sel_cache.get (fml, res, pr);
-//            if (res) {
-//                fml = res;
-//            }
-//        }
-//
-//        void find_subst_term (expr_ref_vector& peqs, app* v, expr_ref& subst_term) {
-//            expr_ref p_exp (m);
-//            bool subst_eq_found = false;
-//            while (!peqs.empty ()) {
-//                p_exp = peqs.back ();
-//                peqs.pop_back ();
-//                // we store this for the same reason as in
-//                // project_sel_after_stores: the keys in the maps and marks
-//                // might become stale otherwise
-//                _tmp.push_back (p_exp);
-//
-//                TRACE ("qe",
-//                        tout << "processing peq:\n";
-//                        tout << mk_pp (p_exp, m) << "\n";
-//                      );
-//
-//                // project sel-after-stores from p_exp (lhs, rhs, and diff indices)
-//                project_sel_after_stores (p_exp, v);
-//
-//                TRACE ("qe",
-//                        tout << "after projecting stores:\n";
-//                        tout << mk_pp (p_exp, m) << "\n";
-//                      );
-//
-//                // expand p_exp if needed
-//                peq p (to_app (p_exp), m);
-//                expr_ref lhs (m), rhs (m);
-//                p.lhs (lhs); p.rhs (rhs);
-//                if (!m_has_stores.is_marked (lhs)) {
-//                    std::swap (lhs, rhs);
-//                }
-//                if (m_has_stores.is_marked (lhs)) {
-//                    /** project using the equivalence:
-//                     *
-//                     *  (Store(arr0,i,x) ==I arr1) <->
-//                     *
-//                     *  (i \in I => (arr0 ==I arr1)) /\
-//                     *  (i \not\in I => (arr0 ==I+i arr1) /\ (arr1[i] == x)))
-//                     */
-//                    expr_ref_vector I (m);
-//                    p.get_diff_indices (I);
-//                    app* a_lhs = to_app (lhs);
-//                    expr* arr0 = a_lhs->get_arg (0);
-//                    expr* i = a_lhs->get_arg (1);
-//                    expr* x = a_lhs->get_arg (2);
-//                    expr* arr1 = rhs;
-//                    // check if (i \in I) in M
-//                    bool i_in_I = false;
-//                    if (!I.empty ()) {
-//                        expr_ref i_val (m);
-//                        m_mev.eval (*M, i, i_val);
-//                        for (unsigned j = 0; j < I.size (); j++) {
-//                            expr_ref val (m);
-//                            m_mev.eval (*M, I.get (j), val);
-//                            if (i_val == val) {
-//                                i_in_I = true;
-//
-//                                TRACE ("qe",
-//                                        tout << "store index in diff indices:\n";
-//                                        tout << mk_pp (i, m) << "\n";
-//                                      );
-//
-//                                break;
-//                            }
-//                        }
-//                    }
-//                    if (i_in_I) {
-//                        // arr0 ==I arr1
-//                        app_ref p1_exp (m);
-//                        mk_peq_and_mark_stores (arr0, arr1, I.size (), I.c_ptr (), p1_exp);
-//                        peqs.push_back (p1_exp.get ());
-//
-//                        TRACE ("qe",
-//                                tout << "new peq:\n";
-//                                tout << mk_pp (p1_exp, m) << "\n";
-//                              );
-//                    }
-//                    else {
-//                        // arr0 ==I+i arr1
-//                        I.push_back (i);
-//                        app_ref p1_exp (m);
-//                        mk_peq_and_mark_stores (arr0, arr1, I.size (), I.c_ptr (), p1_exp);
-//                        peqs.push_back (p1_exp.get ());
-//
-//                        TRACE ("qe",
-//                                tout << "new peq:\n";
-//                                tout << mk_pp (p1_exp, m) << "\n";
-//                              );
-//
-//                        // arr1[i] == x
-//                        ptr_vector<expr> sel_args;
-//                        sel_args.push_back (arr1);
-//                        sel_args.push_back (i);
-//                        expr_ref arr1_i (m_arr_u.mk_select (sel_args.size (), sel_args.c_ptr ()), m);
-//                        // update m_has_stores
-//                        if (m_has_stores.is_marked (arr1)) {
-//                            m_has_stores.mark (arr1_i, true);
-//                        }
-//
-//                        if (m_arr_u.is_array (x)) {
-//                            // array equality
-//                            app_ref p2_exp (m);
-//                            mk_peq_and_mark_stores (arr1_i, x, 0, 0, p2_exp);
-//                            peqs.push_back (p2_exp.get ());
-//
-//                            TRACE ("qe",
-//                                    tout << "new peq:\n";
-//                                    tout << mk_pp (p2_exp, m) << "\n";
-//                                  );
-//                        }
-//                        else {
-//                            // not an array equality
-//                            expr_ref eq (m.mk_eq (arr1_i, x), m);
-//                            m_aux_lits.push_back (eq);
-//                            if (m_has_stores.is_marked (arr1_i) || m_has_stores.is_marked (x)) {
-//                                m_has_stores.mark (eq, true);
-//                            }
-//
-//                            TRACE ("qe",
-//                                    tout << "new eq:\n";
-//                                    tout << mk_pp (eq, m) << "\n";
-//                                  );
-//                        }
-//                    }
-//                }
-//                else if (lhs == rhs) { // trivial peq (a ==I a)
-//                    TRACE ("qe",
-//                            tout << "trivial peq -- dropping it\n";
-//                          );
-//                    continue;
-//                }
-//                else if (lhs == v || rhs == v) {
-//                    subst_eq_found = true;
-//                    TRACE ("qe",
-//                            tout << "subst eq found!\n";
-//                          );
-//                    break;
-//                }
-//                else {
-//                    app_ref eq (m);
-//                    convert_peq_to_eq (p_exp, eq);
-//                    m_aux_lits.push_back (eq);
-//                    // no stores on eq -- no need to mark
-//
-//                    TRACE ("qe",
-//                            tout << "no stores/eqs on v -- converting to equality:\n";
-//                            tout << mk_pp (eq, m) << "\n";
-//                          );
-//                }
-//            }
-//            // factor out select terms on v from p_exp
-//            if (subst_eq_found) {
-//                m_aux_lits.reset ();
-//                factor_selects (p_exp, v);
-//
-//                TRACE ("qe",
-//                        tout << "after factoring selects:\n";
-//                        tout << mk_pp (p_exp, m) << "\n";
-//                        for (unsigned i = 0; i < m_aux_lits.size (); i++) {
-//                            tout << mk_pp (m_aux_lits.get (i), m) << "\n";
-//                        }
-//                      );
-//
-//                // find subst_term
-//                bool stores_on_rhs = true;
-//                app* a = to_app (p_exp);
-//                if (a->get_arg (1) == v) {
-//                    stores_on_rhs = false;
-//                }
-//                app_ref eq (m);
-//                convert_peq_to_eq (p_exp, eq, stores_on_rhs);
-//                subst_term = eq->get_arg (1);
-//                // no stores on eq -- no need to mark (no need anyway at this point)
-//
-//                TRACE ("qe",
-//                        tout << "subst term found:\n";
-//                        tout << mk_pp (subst_term, m) << "\n";
-//                      );
-//            }
-//        }
-//
-//        /**
-//         * replace all select terms on v by fresh constants, one per value of the index
-//         *      terms in M
-//         * for index terms that evlauate to the same value in M, add equalities
-//         * for index terms that evaluate differently in M, add disequalities
-//         * (the transitivity of equalities helps reduce the number of generated
-//         *  literals -- without equalities, we need to add disequalities for
-//         *  every pair of index terms in distinct equivalence classes)
-//         *
-//         * no need to mark stores for newly created terms
-//         */
-//        void project_selects (expr_ref& fml, app* v) {
-//            expr_safe_replace sub (m); // for all select terms
-//
-//            // representative indices for distinct values
-//            expr_ref_vector idx_reprs (m);
-//            expr_ref_vector idx_vals (m);
-//            app_ref_vector sel_consts (m);
-//
-//            // eqs and diseqs over idx terms
-//            expr_ref_vector aux_lits (m);
-//
-//            expr_ref_vector todo (m);
-//            todo.push_back (fml);
-//            ast_mark done;
-//            while (!todo.empty ()) {
-//                expr_ref e (todo.back (), m);
-//                if (done.is_marked (e) || !is_app (e)) {
-//                    todo.pop_back ();
-//                    continue;
-//                }
-//
-//                app* a = to_app (e);
-//
-//                bool all_done = true;
-//                unsigned num_args = a->get_num_args ();
-//                for (unsigned i = 0; i < num_args; i++) {
-//                    expr* arg = a->get_arg (i);
-//                    if (!done.is_marked (arg)) {
-//                        all_done = false;
-//                        todo.push_back (arg);
-//                    }
-//                }
-//                if (!all_done) continue;
-//                todo.pop_back ();
-//
-//                if (m_arr_u.is_select (a) && a->get_arg (0) == v) {
-//                    expr* idx = a->get_arg (1);
-//                    expr_ref val (m);
-//                    m_mev.eval (*M, idx, val);
-//                    bool is_new = true;
-//                    for (unsigned i = 0; i < idx_vals.size (); i++) {
-//                        if (idx_vals.get (i) == val) {
-//                            // val already found; use existing sel const and add
-//                            // equality (idx == repr)
-//                            expr* repr = idx_reprs.get (i);
-//                            aux_lits.push_back (m.mk_eq (idx, repr));
-//                            expr* c = sel_consts.get (i);
-//                            sub.insert (a, c);
-//                            is_new = false;
-//                            break;
-//                        }
-//                    }
-//                    if (is_new) {
-//                        // new repr, val, and sel const
-//                        idx_reprs.push_back (idx);
-//                        idx_vals.push_back (val);
-//                        sort* val_sort = get_array_range (m.get_sort (v));
-//                        app_ref c (m.mk_fresh_const ("sel", val_sort), m);
-//                        sel_consts.push_back (c);
-//                        sub.insert (a, c);
-//                        // extend M to include c
-//                        m_mev.eval (*M, a, val);
-//                        M->register_decl (c->get_decl (), val);
-//                    }
-//                }
-//
-//                done.mark (a, true);
-//            }
-//
-//            TRACE ("qe",
-//                    tout << "idx reprs:\n";
-//                    for (unsigned i = 0; i < idx_reprs.size (); i++) {
-//                        tout << mk_pp (idx_reprs.get (i), m) << "\n";
-//                    }
-//                  );
-//
-//            // add disequalities for all pairs of reprs
-//            for (unsigned i = 0; i < idx_reprs.size (); i++) {
-//                for (unsigned j = i+1; j < idx_reprs.size (); j++) {
-//                    expr* idx_1 = idx_reprs.get (i);
-//                    expr* idx_2 = idx_reprs.get (j);
-//                    // if both indices are numerals, the disequality is redundant
-//                    if (m_ari_u.is_numeral (idx_1) && m_ari_u.is_numeral (idx_2)) continue;
-//                    expr_ref eq (m.mk_eq (idx_1, idx_2), m);
-//                    aux_lits.push_back (m.mk_not (eq));
-//                }
-//            }
-//
-//            sub (fml);
-//            if (!aux_lits.empty ()) {
-//                aux_lits.push_back (fml);
-//                fml = m.mk_and (aux_lits.size (), aux_lits.c_ptr ());
-//            }
-//            m_aux_vars.append (sel_consts);
-//        }
-//
-//        /**
-//         * 1. find all array equalities true in M
-//         * 2. try to find a substitution term using array equalities
-//         * 3. if none found, simplify sel-after-store and Ackermannize, w.r.t. M
-//         */
-//        void project (app* v, expr_ref& fml) {
-//            // mark stores on/of v
-//            expr_ref_vector eqs (m); // array equalities
-//            mark_stores (fml, v, eqs);
-//
-//            TRACE ("qe",
-//                    tout << "array equalities:\n";
-//                    for (unsigned i = 0; i < eqs.size (); i++) {
-//                        tout << mk_pp (eqs.get (i), m) << "\n";
-//                    }
-//                  );
-//
-//            // substitution for equalities, in case no substitution term is found
-//            expr_safe_replace eq_sub (m);
-//            // convert all true eqs to peqs
-//            expr_ref_vector peqs (m);
-//            for (unsigned j = 0; j < eqs.size (); j++) {
-//                TRACE ("qe",
-//                        tout << "array equality:\n";
-//                        tout << mk_pp (eqs.get (j), m) << "\n";
-//                      );
-//                app* a = to_app (eqs.get (j));
-//                expr_ref val (m);
-//                m_mev.eval_array_eq (*M, a, a->get_arg (0), a->get_arg (1), val);
-//                if (!val) {
-//                    // unable to evaluate. set to true?
-//                    val = m.mk_true ();
-//                }
-//                SASSERT (m.is_true (val) || m.is_false (val));
-//                eq_sub.insert (a, val);
-//                TRACE ("qe",
-//                        tout << "true in model:\n";
-//                        tout << mk_pp (val, m) << "\n";
-//                      );
-//                if (m.is_false (val)) {
-//                    continue;
-//                }
-//                app_ref p_exp (m);
-//                mk_peq_and_mark_stores (a->get_arg (0), a->get_arg (1), 0, 0, p_exp);
-//                peqs.push_back (p_exp.get ());
-//            }
-//
-//            // find a substitution term for v using peqs
-//            expr_ref subst_term (m);
-//            find_subst_term (peqs, v, subst_term);
-//            if (!m_aux_lits.empty ()) {
-//                // conjoin aux lits with fml
-//                m_aux_lits.push_back (fml);
-//                fml = m.mk_and (m_aux_lits.size (), m_aux_lits.c_ptr ());
-//
-//                // mark fml for stores
-//                bool fml_has_stores = false;
-//                for (unsigned i = 0; !fml_has_stores && i < m_aux_lits.size (); i++) {
-//                    if (m_has_stores.is_marked (m_aux_lits.get (i))) {
-//                        fml_has_stores = true;
-//                    }
-//                }
-//                if (fml_has_stores) {
-//                    m_has_stores.mark (fml, true);
-//                }
-//                // done with aux lits for now
-//                m_aux_lits.reset ();
-//            }
-//
-//            if (subst_term) {
-//                expr_safe_replace eq_sub (m);
-//                eq_sub.insert (v, subst_term);
-//                eq_sub (fml);
-//            }
-//            else {
-//                // all true equalities (if any) are useless
-//                // e.g. of a useless equality: (v=v), (v=store(v,i,x)), etc.
-//                // elim stores and selects
-//                // postpone the substitution for equalities, as it's going to mess with the ast marking
-//                project_sel_after_stores (fml, v, eqs.size (), eqs.c_ptr ());
-//                if (!m_aux_lits.empty ()) {
-//                    // add them in
-//                    m_aux_lits.push_back (fml);
-//                    fml = m.mk_and (m_aux_lits.size (), m_aux_lits.c_ptr ());
-//                    m_aux_lits.reset ();
-//                }
-//
-//                TRACE ("qe",
-//                        tout << "after projecting stores:\n";
-//                        tout << mk_pp (fml, m) << "\n";
-//                      );
-//
-//                eq_sub (fml);
-//
-//                TRACE ("qe",
-//                        tout << "after substituting for equalities:\n";
-//                        tout << mk_pp (fml, m) << "\n";
-//                      );
-//
-//                // stores eliminated; ackermannize
-//                project_selects (fml, v);
-//
-//                TRACE ("qe",
-//                        tout << "after projecting selects:\n";
-//                        tout << mk_pp (fml, m) << "\n";
-//                      );
-//            }
-//        }
-//
-//    public:
-//
-//        array_project_util (ast_manager& m):
-//            m (m),
-//            m_arr_u (m),
-//            m_ari_u (m),
-//            m_elim_stores_cache (m),
-//            _tmp (m),
-//            m_aux_vars (m),
-//            m_aux_lits (m),
-//            m_mev (m)
-//        {}
-//
-//        void operator () (model& mdl, app_ref_vector& vars, expr_ref& fml) {
-//            app_ref_vector new_vars (m);
-//            M = &mdl;
-//            for (unsigned i = 0; i < vars.size (); i++) {
-//                app* v = vars.get (i);
-//                if (!m_arr_u.is_array (v)) {
-//                    TRACE ("qe",
-//                            tout << "not an array variable: " << mk_pp (v, m) << "\n";
-//                          );
-//                    new_vars.push_back (v);
-//                    continue;
-//                }
-//                TRACE ("qe",
-//                        tout << "projecting variable: " << mk_pp (v, m) << "\n";
-//                      );
-//                try {
-//                    reset ();
-//                    project (v, fml);
-//                    new_vars.append (m_aux_vars);
-//                }
-//                catch (cant_project) {
-//                    IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
-//                    new_vars.push_back(v);
-//                }
-//            }
-//            vars.reset ();
-//            vars.append (new_vars);
-//        }
-//    };
-
-
     class array_project_eqs_util {
         ast_manager&                m;
         array_util                  m_arr_u;
@@ -2330,38 +1576,30 @@ namespace qe {
         }
     };
 
-    class array_project_selects_util {
+
+    class array_select_reducer {
         ast_manager&                m;
         array_util                  m_arr_u;
-        arith_util                  m_ari_u;
-        obj_map<expr, expr*>        m_elim_stores_cache;
-        // representative indices for eliminating selects
-        expr_ref_vector             m_idx_reprs;
-        expr_ref_vector             m_idx_vals;
-        app_ref_vector              m_sel_consts;
+        obj_map<expr, expr*>        m_cache;
         expr_ref_vector             m_pinned;   // to ensure a reference
         expr_ref_vector             m_idx_lits;
         model_ref                   M;
         model_evaluator_array_util  m_mev;
         th_rewriter                 m_rw;
-        expr_safe_replace           m_sub;
         ast_mark                    m_arr_test;
         ast_mark                    m_has_stores;
-        bool                        m_project_all_stores;
+        bool                        m_reduce_all_selects;
 
         struct cant_project {};
 
         void reset () {
-            m_elim_stores_cache.reset ();
-            m_idx_reprs.reset ();
-            m_idx_vals.reset ();
-            m_sel_consts.reset ();
+            m_cache.reset ();
             m_pinned.reset ();
             m_idx_lits.reset ();
             M = 0;
-            m_sub.reset ();
             m_arr_test.reset ();
             m_has_stores.reset ();
+            m_reduce_all_selects = false;
         }
 
         bool is_equals (expr *e1, expr *e2) {
@@ -2378,23 +1616,23 @@ namespace qe {
         }
 
         bool has_stores (expr* e) {
-            if (m_project_all_stores) return true;
+            if (m_reduce_all_selects) return true;
             return m_has_stores.is_marked (e);
         }
 
         void mark_stores (app* a, bool args_have_stores) {
-            if (m_project_all_stores) return;
+            if (m_reduce_all_selects) return;
             if (args_have_stores ||
                     (m_arr_u.is_store (a) && m_arr_test.is_marked (a->get_arg (0)))) {
                 m_has_stores.mark (a, true);
             }
         }
 
-        expr* sel_after_stores (expr *e) {
+        expr* reduce (expr *e) {
             if (!is_app (e)) return e;
 
             expr *r = 0;
-            if (m_elim_stores_cache.find (e, r)) return r;
+            if (m_cache.find (e, r)) return r;
 
             ptr_vector<app> todo;
             todo.push_back (to_app (e));
@@ -2411,7 +1649,7 @@ namespace qe {
                     expr *narg = 0;
 
                     if (!is_app (arg)) args.push_back (arg);
-                    else if (m_elim_stores_cache.find (arg, narg)) { 
+                    else if (m_cache.find (arg, narg)) { 
                         args.push_back (narg);
                         dirty |= (arg != narg);
                         if (!args_have_stores && has_stores (narg)) {
@@ -2433,20 +1671,20 @@ namespace qe {
                 else r = a;
 
                 if (m_arr_u.is_select (r) && has_stores (to_app (r)->get_arg (0))) {
-                    r = sel_after_stores_core (to_app(r));
+                    r = reduce_core (to_app(r));
                 }
                 else {
                     mark_stores (to_app (r), args_have_stores);
                 }
 
-                m_elim_stores_cache.insert (a, r);
+                m_cache.insert (a, r);
             }
 
             SASSERT (r);
             return r;
         }
 
-        expr* sel_after_stores_core (app *a) {
+        expr* reduce_core (app *a) {
             if (!m_arr_u.is_store (a->get_arg (0))) return a;
 
             SASSERT (a->get_num_args () == 2 && "Multi-dimensional arrays are not supported");
@@ -2476,10 +1714,89 @@ namespace qe {
             return r;
         }
 
+        void mk_result (expr_ref& fml) {
+            // conjoin idx lits
+            expr_ref_vector lits (m);
+            lits.append (m_idx_lits);
+            lits.push_back (fml);
+            fml = m.mk_and (lits.size (), lits.c_ptr ());
+
+            TRACE ("qe",
+                    tout << "after reducing selects:\n";
+                    tout << mk_pp (fml, m) << "\n";
+                  );
+        }
+
+    public:
+
+        array_select_reducer (ast_manager& m):
+            m (m),
+            m_arr_u (m),
+            m_pinned (m),
+            m_idx_lits (m),
+            m_mev (m),
+            m_rw (m),
+            m_reduce_all_selects (false)
+        {}
+
+        void operator () (model& mdl, app_ref_vector const& arr_vars, expr_ref& fml, bool reduce_all_selects = false) {
+            if (!reduce_all_selects && arr_vars.empty ()) return;
+
+            reset ();
+            M = &mdl;
+            m_reduce_all_selects = reduce_all_selects;
+
+            // mark vars to eliminate
+            for (unsigned i = 0; i < arr_vars.size (); i++) {
+                m_arr_test.mark (arr_vars.get (i), true);
+            }
+
+            // assume all arr_vars are of array sort
+            // and assume no store equalities on arr_vars
+            try {
+                reduce (fml);
+                mk_result (fml);
+            }
+            catch (cant_project) {
+                IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
+            }
+        }
+    };
+
+    class array_project_selects_util {
+        typedef obj_map<app, ptr_vector<app>*> sel_map;
+
+        ast_manager&                m;
+        array_util                  m_arr_u;
+        arith_util                  m_ari_u;
+        sel_map                     m_sel_terms;
+        // representative indices for eliminating selects
+        expr_ref_vector             m_idx_reprs;
+        expr_ref_vector             m_idx_vals;
+        app_ref_vector              m_sel_consts;
+        expr_ref_vector             m_idx_lits;
+        model_ref                   M;
+        model_evaluator_array_util  m_mev;
+        expr_safe_replace           m_sub;
+        ast_mark                    m_arr_test;
+
+        struct cant_project {};
+
+        void reset () {
+            m_sel_terms.reset ();
+            m_idx_reprs.reset ();
+            m_idx_vals.reset ();
+            m_sel_consts.reset ();
+            m_idx_lits.reset ();
+            M = 0;
+            m_sub.reset ();
+            m_arr_test.reset ();
+        }
+
         /**
          * collect sel terms on array vars as given by m_arr_test
          */
-        void collect_selects (expr* fml, obj_map<app, ptr_vector<app>*>& sel_terms) {
+        void collect_selects (expr* fml) {
             if (!is_app (fml)) return;
             ast_mark done;
             ptr_vector<app> todo;
@@ -2504,7 +1821,7 @@ namespace qe {
                 if (m_arr_u.is_select (a)) {
                     expr* arr = a->get_arg (0);
                     if (m_arr_test.is_marked (arr)) {
-                        ptr_vector<app>* lst = sel_terms.find (to_app (arr));;
+                        ptr_vector<app>* lst = m_sel_terms.find (to_app (arr));;
                         lst->push_back (a);
                     }
                 }
@@ -2594,67 +1911,8 @@ namespace qe {
             }
         }
 
-        /**
-         * project selects
-         * populates idx lits and obtains substitution for sel terms
-         */
-        void project (app_ref_vector& vars, expr_ref& fml) {
-            if (!m_project_all_stores && vars.empty ()) return;
-            typedef obj_map<app, ptr_vector<app>*> sel_map;
-
-            // 1. proj sel after stores
-            fml = sel_after_stores (fml);
-
-            TRACE ("qe",
-                    tout << "after projecting sel after stores:\n";
-                    tout << mk_pp (fml, m) << "\n";
-                    for (unsigned i = 0; i < m_idx_lits.size (); i++) {
-                        tout << mk_pp (m_idx_lits.get (i), m) << "\n";
-                    }
-                  );
-
-            if (vars.empty ()) return;
-
-            // 2. proj selects over vars
-
-            // empty map from array var to sel terms over it
-            sel_map sel_terms;
-            for (unsigned i = 0; i < vars.size (); i++) {
-                ptr_vector<app>* lst = alloc (ptr_vector<app>);
-                sel_terms.insert (vars.get (i), lst);
-            }
-
-            // collect sel terms -- populate the map
-            collect_selects (fml, sel_terms);
-            for (unsigned i = 0; i < m_idx_lits.size (); i++) {
-                collect_selects (m_idx_lits.get (i), sel_terms);
-            }
-
-            // model based ackermannization
-            sel_map::iterator begin = sel_terms.begin (),
-                              end = sel_terms.end ();
-            for (sel_map::iterator it = begin; it != end; it++) {
-                TRACE ("qe",
-                        tout << "ackermann for var: " << mk_pp (it->m_key, m) << "\n";
-                      );
-                ackermann (*(it->m_value));
-            }
-
-            TRACE ("qe",
-                    tout << "idx lits after ackermannization:\n";
-                    for (unsigned i = 0; i < m_idx_lits.size (); i++) {
-                        tout << mk_pp (m_idx_lits.get (i), m) << "\n";
-                    }
-                  );
-
-            // dealloc
-            for (sel_map::iterator it = begin; it != end; it++) {
-                dealloc (it->m_value);
-            }
-        }
-
         void mk_result (expr_ref& fml) {
-            // conjoin aux lits
+            // conjoin idx lits
             expr_ref_vector lits (m);
             lits.append (m_idx_lits);
             lits.push_back (fml);
@@ -2669,6 +1927,32 @@ namespace qe {
                   );
         }
 
+        /**
+         * project selects
+         * populates idx lits and obtains substitution for sel terms
+         */
+        void project (expr_ref& fml) {
+            // collect sel terms -- populate the map m_sel_terms
+            collect_selects (fml);
+
+            // model based ackermannization
+            sel_map::iterator begin = m_sel_terms.begin (),
+                              end = m_sel_terms.end ();
+            for (sel_map::iterator it = begin; it != end; it++) {
+                TRACE ("qe",
+                        tout << "ackermann for var: " << mk_pp (it->m_key, m) << "\n";
+                      );
+                ackermann (*(it->m_value));
+            }
+
+            TRACE ("qe",
+                    tout << "idx lits:\n";
+                    for (unsigned i = 0; i < m_idx_lits.size (); i++) {
+                        tout << mk_pp (m_idx_lits.get (i), m) << "\n";
+                    }
+                  );
+        }
+
     public:
 
         array_project_selects_util (ast_manager& m):
@@ -2678,28 +1962,30 @@ namespace qe {
             m_idx_reprs (m),
             m_idx_vals (m),
             m_sel_consts (m),
-            m_pinned (m),
             m_idx_lits (m),
             m_mev (m),
-            m_rw (m),
-            m_sub (m),
-            m_project_all_stores (false)
+            m_sub (m)
         {}
 
-        void operator () (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool project_all_stores = false) {
+        void operator () (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars) {
             reset ();
             M = &mdl;
-            m_project_all_stores = project_all_stores;
 
             // mark vars to eliminate
             for (unsigned i = 0; i < arr_vars.size (); i++) {
                 m_arr_test.mark (arr_vars.get (i), true);
             }
 
+            // alloc empty map from array var to sel terms over it
+            for (unsigned i = 0; i < arr_vars.size (); i++) {
+                ptr_vector<app>* lst = alloc (ptr_vector<app>);
+                m_sel_terms.insert (arr_vars.get (i), lst);
+            }
+
             // assume all arr_vars are of array sort
-            // and assume no store equalities on arr_vars
+            // and they only appear in select terms
             try {
-                project (arr_vars, fml);
+                project (fml);
                 mk_result (fml);
                 aux_vars.append (m_sel_consts);
                 arr_vars.reset ();
@@ -2707,8 +1993,396 @@ namespace qe {
             catch (cant_project) {
                 IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
             }
+
+            // dealloc
+            sel_map::iterator begin = m_sel_terms.begin (),
+                              end = m_sel_terms.end ();
+            for (sel_map::iterator it = begin; it != end; it++) {
+                dealloc (it->m_value);
+            }
+            m_sel_terms.reset ();
         }
     };
+
+//    class array_project_selects_util {
+//        ast_manager&                m;
+//        array_util                  m_arr_u;
+//        arith_util                  m_ari_u;
+//        obj_map<expr, expr*>        m_elim_stores_cache;
+//        // representative indices for eliminating selects
+//        expr_ref_vector             m_idx_reprs;
+//        expr_ref_vector             m_idx_vals;
+//        app_ref_vector              m_sel_consts;
+//        expr_ref_vector             m_pinned;   // to ensure a reference
+//        expr_ref_vector             m_idx_lits;
+//        model_ref                   M;
+//        model_evaluator_array_util  m_mev;
+//        th_rewriter                 m_rw;
+//        expr_safe_replace           m_sub;
+//        ast_mark                    m_arr_test;
+//        ast_mark                    m_has_stores;
+//        bool                        m_project_all_stores;
+//
+//        struct cant_project {};
+//
+//        void reset () {
+//            m_elim_stores_cache.reset ();
+//            m_idx_reprs.reset ();
+//            m_idx_vals.reset ();
+//            m_sel_consts.reset ();
+//            m_pinned.reset ();
+//            m_idx_lits.reset ();
+//            M = 0;
+//            m_sub.reset ();
+//            m_arr_test.reset ();
+//            m_has_stores.reset ();
+//        }
+//
+//        bool is_equals (expr *e1, expr *e2) {
+//            if (e1 == e2) return true;
+//            expr_ref val1 (m), val2 (m);
+//            m_mev.eval (*M, e1, val1);
+//            m_mev.eval (*M, e2, val2);
+//            return (val1 == val2);
+//        }
+//
+//        void add_idx_cond (expr_ref& cond) {
+//            m_rw (cond);
+//            if (!m.is_true (cond)) m_idx_lits.push_back (cond);
+//        }
+//
+//        bool has_stores (expr* e) {
+//            if (m_project_all_stores) return true;
+//            return m_has_stores.is_marked (e);
+//        }
+//
+//        void mark_stores (app* a, bool args_have_stores) {
+//            if (m_project_all_stores) return;
+//            if (args_have_stores ||
+//                    (m_arr_u.is_store (a) && m_arr_test.is_marked (a->get_arg (0)))) {
+//                m_has_stores.mark (a, true);
+//            }
+//        }
+//
+//        expr* sel_after_stores (expr *e) {
+//            if (!is_app (e)) return e;
+//
+//            expr *r = 0;
+//            if (m_elim_stores_cache.find (e, r)) return r;
+//
+//            ptr_vector<app> todo;
+//            todo.push_back (to_app (e));
+//
+//            while (!todo.empty ()) {
+//                app *a = todo.back ();
+//                unsigned sz = todo.size ();
+//                expr_ref_vector args (m);
+//                bool dirty = false;
+//                bool args_have_stores = false;
+//
+//                for (unsigned i = 0; i < a->get_num_args (); ++i) {
+//                    expr *arg = a->get_arg (i);
+//                    expr *narg = 0;
+//
+//                    if (!is_app (arg)) args.push_back (arg);
+//                    else if (m_elim_stores_cache.find (arg, narg)) { 
+//                        args.push_back (narg);
+//                        dirty |= (arg != narg);
+//                        if (!args_have_stores && has_stores (narg)) {
+//                            args_have_stores = true;
+//                        }
+//                    }
+//                    else {
+//                        todo.push_back (to_app (arg));
+//                    }
+//                }
+//
+//                if (todo.size () > sz) continue;
+//                todo.pop_back ();
+//
+//                if (dirty) {
+//                    r = m.mk_app (a->get_decl (), args.size (), args.c_ptr ());
+//                    m_pinned.push_back (r);
+//                }
+//                else r = a;
+//
+//                if (m_arr_u.is_select (r) && has_stores (to_app (r)->get_arg (0))) {
+//                    r = sel_after_stores_core (to_app(r));
+//                }
+//                else {
+//                    mark_stores (to_app (r), args_have_stores);
+//                }
+//
+//                m_elim_stores_cache.insert (a, r);
+//            }
+//
+//            SASSERT (r);
+//            return r;
+//        }
+//
+//        expr* sel_after_stores_core (app *a) {
+//            if (!m_arr_u.is_store (a->get_arg (0))) return a;
+//
+//            SASSERT (a->get_num_args () == 2 && "Multi-dimensional arrays are not supported");
+//            expr* array = a->get_arg (0);
+//            expr* j = a->get_arg (1);
+//
+//            while (m_arr_u.is_store (array)) {
+//                a = to_app (array);
+//                expr* idx = a->get_arg (1);
+//                expr_ref cond (m);
+//
+//                if (is_equals (idx, j)) {
+//                    cond = m.mk_eq (idx, j);
+//                    add_idx_cond (cond);
+//                    return a->get_arg (2);
+//                }
+//                else {
+//                    cond = m.mk_not (m.mk_eq (idx, j));
+//                    add_idx_cond (cond);
+//                    array = a->get_arg (0);
+//                }
+//            }
+//
+//            expr* args[2] = {array, j};
+//            expr* r = m_arr_u.mk_select (2, args);
+//            m_pinned.push_back (r);
+//            return r;
+//        }
+//
+//        /**
+//         * collect sel terms on array vars as given by m_arr_test
+//         */
+//        void collect_selects (expr* fml, obj_map<app, ptr_vector<app>*>& sel_terms) {
+//            if (!is_app (fml)) return;
+//            ast_mark done;
+//            ptr_vector<app> todo;
+//            todo.push_back (to_app (fml));
+//            while (!todo.empty ()) {
+//                app* a = todo.back ();
+//                if (done.is_marked (a)) {
+//                    todo.pop_back ();
+//                    continue;
+//                }
+//                unsigned num_args = a->get_num_args ();
+//                bool all_done = true;
+//                for (unsigned i = 0; i < num_args; i++) {
+//                    expr* arg = a->get_arg (i);
+//                    if (!done.is_marked (arg) && is_app (arg)) {
+//                        todo.push_back (to_app (arg));
+//                        all_done = false;
+//                    }
+//                }
+//                if (!all_done) continue;
+//                todo.pop_back ();
+//                if (m_arr_u.is_select (a)) {
+//                    expr* arr = a->get_arg (0);
+//                    if (m_arr_test.is_marked (arr)) {
+//                        ptr_vector<app>* lst = sel_terms.find (to_app (arr));;
+//                        lst->push_back (a);
+//                    }
+//                }
+//                done.mark (a, true);
+//            }
+//        }
+//
+//        /**
+//         * model based ackermannization for sel terms of some array
+//         *
+//         * update sub with val consts for sel terms
+//         */
+//        void ackermann (ptr_vector<app> const& sel_terms) {
+//            if (sel_terms.empty ()) return;
+//
+//            expr* v = sel_terms.get (0)->get_arg (0); // array variable
+//            sort* v_sort = m.get_sort (v);
+//            sort* val_sort = get_array_range (v_sort);
+//            sort* idx_sort = get_array_domain (v_sort, 0);
+//
+//            unsigned start = m_idx_reprs.size (); // append at the end
+//
+//            for (unsigned i = 0; i < sel_terms.size (); i++) {
+//                app* a = sel_terms.get (i);
+//                expr* idx = a->get_arg (1);
+//                expr_ref val (m);
+//                m_mev.eval (*M, idx, val);
+//
+//                bool is_new = true;
+//                for (unsigned j = start; j < m_idx_vals.size (); j++) {
+//                    if (m_idx_vals.get (j) == val) {
+//                        // idx belongs to the jth equivalence class;
+//                        // substitute sel term with ith sel const
+//                        expr* c = m_sel_consts.get (j);
+//                        m_sub.insert (a, c);
+//                        // add equality (idx == repr)
+//                        expr* repr = m_idx_reprs.get (j);
+//                        m_idx_lits.push_back (m.mk_eq (idx, repr));
+//
+//                        is_new = false;
+//                        break;
+//                    }
+//                }
+//                if (is_new) {
+//                    // new repr, val, and sel const
+//                    m_idx_reprs.push_back (idx);
+//                    m_idx_vals.push_back (val);
+//                    app_ref c (m.mk_fresh_const ("sel", val_sort), m);
+//                    m_sel_consts.push_back (c);
+//                    // substitute sel term with new const
+//                    m_sub.insert (a, c);
+//                    // extend M to include c
+//                    m_mev.eval (*M, a, val);
+//                    M->register_decl (c->get_decl (), val);
+//                }
+//            }
+//
+//            // sort reprs by their value and add a chain of strict inequalities
+//
+//            unsigned num_reprs = m_idx_reprs.size () - start;
+//            if (num_reprs == 0) return;
+//
+//            SASSERT ((m_ari_u.is_real (idx_sort) || m_ari_u.is_int (idx_sort))
+//                        && "Unsupported index sort: neither real nor int");
+//
+//            // using insertion sort
+//            unsigned end = start + num_reprs;
+//            for (unsigned i = start+1; i < end; i++) {
+//                expr* repr = m_idx_reprs.get (i);
+//                expr* val = m_idx_vals.get (i);
+//                unsigned j = i;
+//                for (; j > start; j--) {
+//                    rational j_val, jm1_val;
+//                    VERIFY (m_ari_u.is_numeral (val, j_val));
+//                    VERIFY (m_ari_u.is_numeral (m_idx_vals.get (j-1), jm1_val));
+//                    if (j_val >= jm1_val) break;
+//                    m_idx_reprs[j] = m_idx_reprs.get (j-1);
+//                    m_idx_vals[j] = m_idx_vals.get (j-1);
+//                }
+//                m_idx_reprs[j] = repr;
+//                m_idx_vals[j] = val;
+//            }
+//
+//            for (unsigned i = start; i < end-1; i++) {
+//                m_idx_lits.push_back (m_ari_u.mk_lt (m_idx_reprs.get (i),
+//                                                     m_idx_reprs.get (i+1)));
+//            }
+//        }
+//
+//        /**
+//         * project selects
+//         * populates idx lits and obtains substitution for sel terms
+//         */
+//        void project (app_ref_vector& vars, expr_ref& fml) {
+//            if (!m_project_all_stores && vars.empty ()) return;
+//            typedef obj_map<app, ptr_vector<app>*> sel_map;
+//
+//            // 1. proj sel after stores
+//            fml = sel_after_stores (fml);
+//
+//            TRACE ("qe",
+//                    tout << "after projecting sel after stores:\n";
+//                    tout << mk_pp (fml, m) << "\n";
+//                    for (unsigned i = 0; i < m_idx_lits.size (); i++) {
+//                        tout << mk_pp (m_idx_lits.get (i), m) << "\n";
+//                    }
+//                  );
+//
+//            if (vars.empty ()) return;
+//
+//            // 2. proj selects over vars
+//
+//            // empty map from array var to sel terms over it
+//            sel_map sel_terms;
+//            for (unsigned i = 0; i < vars.size (); i++) {
+//                ptr_vector<app>* lst = alloc (ptr_vector<app>);
+//                sel_terms.insert (vars.get (i), lst);
+//            }
+//
+//            // collect sel terms -- populate the map
+//            collect_selects (fml, sel_terms);
+//            for (unsigned i = 0; i < m_idx_lits.size (); i++) {
+//                collect_selects (m_idx_lits.get (i), sel_terms);
+//            }
+//
+//            // model based ackermannization
+//            sel_map::iterator begin = sel_terms.begin (),
+//                              end = sel_terms.end ();
+//            for (sel_map::iterator it = begin; it != end; it++) {
+//                TRACE ("qe",
+//                        tout << "ackermann for var: " << mk_pp (it->m_key, m) << "\n";
+//                      );
+//                ackermann (*(it->m_value));
+//            }
+//
+//            TRACE ("qe",
+//                    tout << "idx lits after ackermannization:\n";
+//                    for (unsigned i = 0; i < m_idx_lits.size (); i++) {
+//                        tout << mk_pp (m_idx_lits.get (i), m) << "\n";
+//                    }
+//                  );
+//
+//            // dealloc
+//            for (sel_map::iterator it = begin; it != end; it++) {
+//                dealloc (it->m_value);
+//            }
+//        }
+//
+//        void mk_result (expr_ref& fml) {
+//            // conjoin aux lits
+//            expr_ref_vector lits (m);
+//            lits.append (m_idx_lits);
+//            lits.push_back (fml);
+//            fml = m.mk_and (lits.size (), lits.c_ptr ());
+//
+//            // substitute for sel terms
+//            m_sub (fml);
+//
+//            TRACE ("qe",
+//                    tout << "after projection of selects:\n";
+//                    tout << mk_pp (fml, m) << "\n";
+//                  );
+//        }
+//
+//    public:
+//
+//        array_project_selects_util (ast_manager& m):
+//            m (m),
+//            m_arr_u (m),
+//            m_ari_u (m),
+//            m_idx_reprs (m),
+//            m_idx_vals (m),
+//            m_sel_consts (m),
+//            m_pinned (m),
+//            m_idx_lits (m),
+//            m_mev (m),
+//            m_rw (m),
+//            m_sub (m),
+//            m_project_all_stores (false)
+//        {}
+//
+//        void operator () (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool project_all_stores = false) {
+//            reset ();
+//            M = &mdl;
+//            m_project_all_stores = project_all_stores;
+//
+//            // mark vars to eliminate
+//            for (unsigned i = 0; i < arr_vars.size (); i++) {
+//                m_arr_test.mark (arr_vars.get (i), true);
+//            }
+//
+//            // assume all arr_vars are of array sort
+//            // and assume no store equalities on arr_vars
+//            try {
+//                project (arr_vars, fml);
+//                mk_result (fml);
+//                aux_vars.append (m_sel_consts);
+//                arr_vars.reset ();
+//            }
+//            catch (cant_project) {
+//                IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
+//            }
+//        }
+//    };
 
 
     expr_ref arith_project(model& mdl, app_ref_vector& vars, expr_ref_vector const& lits) {
@@ -2737,23 +2411,63 @@ namespace qe {
         ap(mdl, vars, fml, map);
     }
 
-    /**
-     * void array_project (model& mdl, app_ref_vector& vars, expr_ref& fml) {
-     *     ast_manager& m = vars.get_manager ();
-     *     array_project_util ap (m);
-     *     ap (mdl, vars, fml);
-     * }
-     */
-
-    void array_project_selects (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool project_all_stores) {
-        ast_manager& m = arr_vars.get_manager ();
-        array_project_selects_util ap (m);
-        ap (mdl, arr_vars, fml, aux_vars, project_all_stores);
-    }
-
     void array_project_eqs (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars) {
         ast_manager& m = arr_vars.get_manager ();
         array_project_eqs_util ap (m);
         ap (mdl, arr_vars, fml, aux_vars);
     }
+
+    void reduce_array_selects (model& mdl, app_ref_vector const& arr_vars, expr_ref& fml, bool reduce_all_selects) {
+        ast_manager& m = arr_vars.get_manager ();
+        array_select_reducer ap (m);
+        ap (mdl, arr_vars, fml, reduce_all_selects);
+    }
+
+    void reduce_array_selects (model& mdl, expr_ref& fml) {
+        ast_manager& m = fml.get_manager ();
+        app_ref_vector _tmp (m);
+        reduce_array_selects (mdl, _tmp, fml, true);
+    }
+
+    void array_project_selects (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars) {
+        ast_manager& m = arr_vars.get_manager ();
+        array_project_selects_util ap (m);
+        ap (mdl, arr_vars, fml, aux_vars);
+    }
+
+    void array_project (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars) {
+        // 1. project array equalities
+        array_project_eqs (mdl, arr_vars, fml, aux_vars);
+        TRACE ("qe",
+                ast_manager& m = fml.get_manager ();
+                tout << "Projected array eqs:\n" << mk_pp (fml, m) << "\n";
+                tout << "Remaining array vars:\n";
+                for (unsigned i = 0; i < arr_vars.size (); i++) {
+                    tout << mk_pp (arr_vars.get (i), m) << "\n";
+                }
+                tout << "Aux vars:\n";
+                for (unsigned i = 0; i < aux_vars.size (); i++) {
+                    tout << mk_pp (aux_vars.get (i), m) << "\n";
+                }
+              );
+
+        // 2. reduce selects
+        reduce_array_selects (mdl, arr_vars, fml);
+        TRACE ("qe",
+                ast_manager& m = fml.get_manager ();
+                tout << "Reduced selects:\n" << mk_pp (fml, m) << "\n";
+              );
+
+        // 3. project selects using model based ackermannization
+        array_project_selects (mdl, arr_vars, fml, aux_vars);
+        TRACE ("qe",
+                ast_manager& m = fml.get_manager ();
+                tout << "Projected array selects:\n" << mk_pp (fml, m) << "\n";
+                tout << "All aux vars:\n";
+                for (unsigned i = 0; i < aux_vars.size (); i++) {
+                    tout << mk_pp (aux_vars.get (i), m) << "\n";
+                }
+              );
+    }
+
 }

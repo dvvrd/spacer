@@ -1392,7 +1392,7 @@ namespace spacer {
      * eliminate simple equalities using qe_lite
      * then, MBP for Booleans (substitute), reals (based on LW), ints (based on Cooper), and arrays
      */
-    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, bool project_all_arr_stores) {
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M) {
         th_rewriter rw (m);
         TRACE ("spacer",
                 tout << "Before projection:\n";
@@ -1466,30 +1466,7 @@ namespace spacer {
             // project arrays
             {
                 scoped_no_proof _sp (m);
-                qe::array_project_eqs (*M, array_vars, fml, vars);
-
-                TRACE ("spacer",
-                        tout << "Projected array eqs:\n" << mk_pp (fml, m) << "\n";
-                        tout << "Remaining array vars:\n";
-                        for (unsigned i = 0; i < array_vars.size (); i++) {
-                            tout << mk_pp (array_vars.get (i), m) << "\n";
-                        }
-                        tout << "Aux vars:\n";
-                        for (unsigned i = 0; i < vars.size (); i++) {
-                            tout << mk_pp (vars.get (i), m) << "\n";
-                        }
-                      );
-
-                qe::array_project_selects (*M, array_vars, fml, vars, project_all_arr_stores);
-
-                TRACE ("spacer",
-                        tout << "Projected array selects:\n" << mk_pp (fml, m) << "\n";
-                        tout << "All aux vars:\n";
-                        for (unsigned i = 0; i < vars.size (); i++) {
-                            tout << mk_pp (vars.get (i), m) << "\n";
-                        }
-                      );
-
+                qe::array_project (*M, array_vars, fml, vars);
                 SASSERT (array_vars.empty ());
             }
 
