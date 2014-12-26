@@ -776,7 +776,11 @@ namespace spacer {
             tout << mk_pp(result2.get (i), m) << "\n"; 
           );
     
-    return;
+    return; // disables old code
+    // XXX Running old model_evaluator code changes the overall
+    // verification result, while it does not change the output of the
+    // function. Need to trace this down more.
+
     expr_ref_vector result (m);
     old::model_evaluator old_mev (m);
     ptr_vector<expr> vv (formulas.size (), formulas.c_ptr ());
