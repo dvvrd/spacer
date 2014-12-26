@@ -2291,35 +2291,42 @@ namespace qe {
             m_mev (m)
         {}
 
-        void operator () (model& mdl, app_ref_vector& vars, expr_ref& fml) {
+        void operator () (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars) {
             reset ();
-            app_ref_vector rem_vars (m); // remaining vars
+            app_ref_vector rem_arr_vars (m); // remaining arr vars
             M = &mdl;
-            for (unsigned i = 0; i < vars.size (); i++) {
+            for (unsigned i = 0; i < arr_vars.size (); i++) {
                 reset_v ();
-                m_v = vars.get (i);
+                m_v = arr_vars.get (i);
                 if (!m_arr_u.is_array (m_v)) {
                     TRACE ("qe",
                             tout << "not an array variable: " << mk_pp (m_v, m) << "\n";
                           );
-                    rem_vars.push_back (m_v);
+                    aux_vars.push_back (m_v);
                     continue;
                 }
                 TRACE ("qe",
-                        tout << "projecting variable: " << mk_pp (m_v, m) << "\n";
+                        tout << "projecting equalities on variable: " << mk_pp (m_v, m) << "\n";
                       );
                 try {
                     project (fml);
                     mk_result (fml);
+                    if (!m_subst_term_v) {
+                        rem_arr_vars.push_back (m_v);
+                    }
+                    TRACE ("qe",
+                            tout << "after projection: \n";
+                            tout << mk_pp (fml, m) << "\n";
+                          );
                 }
                 catch (cant_project) {
                     IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(m_v, m) << "\n";);
-                    rem_vars.push_back(m_v);
+                    rem_arr_vars.push_back(m_v);
                 }
             }
-            vars.reset ();
-            vars.append (rem_vars);
-            vars.append (m_aux_vars);
+            arr_vars.reset ();
+            arr_vars.append (rem_arr_vars);
+            aux_vars.append (m_aux_vars);
         }
     };
 
@@ -2671,29 +2678,27 @@ namespace qe {
             m_project_all_stores (false)
         {}
 
-        void operator () (model& mdl, app_ref_vector& vars, expr_ref& fml, bool project_all_stores = false) {
-            app_ref_vector new_vars (m);
+        void operator () (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool project_all_stores = false) {
             M = &mdl;
             m_project_all_stores = project_all_stores;
 
             // mark vars to eliminate
-            for (unsigned i = 0; i < vars.size (); i++) {
-                m_arr_test.mark (vars.get (i), true);
+            for (unsigned i = 0; i < arr_vars.size (); i++) {
+                m_arr_test.mark (arr_vars.get (i), true);
             }
 
-            // assume all vars are of array sort
+            // assume all arr_vars are of array sort
+            // and assume no store equalities on arr_vars
             try {
                 reset ();
-                project (vars, fml);
+                project (arr_vars, fml);
                 mk_result (fml);
-                new_vars.append (m_sel_consts);
+                aux_vars.append (m_sel_consts);
+                arr_vars.reset ();
             }
             catch (cant_project) {
                 IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
-                new_vars.append(vars);
             }
-            vars.reset ();
-            vars.append (new_vars);
         }
     };
 
@@ -2732,15 +2737,15 @@ namespace qe {
      * }
      */
 
-    void array_project_selects (model& mdl, app_ref_vector& vars, expr_ref& fml, bool project_all_stores) {
-        ast_manager& m = vars.get_manager ();
+    void array_project_selects (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool project_all_stores) {
+        ast_manager& m = arr_vars.get_manager ();
         array_project_selects_util ap (m);
-        ap (mdl, vars, fml, project_all_stores);
+        ap (mdl, arr_vars, fml, aux_vars, project_all_stores);
     }
 
-    void array_project_eqs (model& mdl, app_ref_vector& vars, expr_ref& fml) {
-        ast_manager& m = vars.get_manager ();
+    void array_project_eqs (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars) {
+        ast_manager& m = arr_vars.get_manager ();
         array_project_eqs_util ap (m);
-        ap (mdl, vars, fml);
+        ap (mdl, arr_vars, fml, aux_vars);
     }
 }
