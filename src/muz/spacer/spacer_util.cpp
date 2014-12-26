@@ -1345,8 +1345,7 @@ namespace spacer {
      * eliminate simple equalities using qe_lite
      * then, MBP for Booleans (substitute), reals (based on LW), ints (based on Cooper), and arrays
      */
-    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, 
-                     const model_ref& M, bool project_all_arr_stores) {
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, const model_ref& M) {
         th_rewriter rw (m);
         TRACE ("spacer",
                 tout << "Before projection:\n";
@@ -1415,38 +1414,25 @@ namespace spacer {
                     }
                   );
 
+            vars.reset ();
+
             // project arrays
             {
                 scoped_no_proof _sp (m);
-                qe::array_project_eqs (*M.get(), array_vars, fml);
-
-                TRACE ("spacer",
-                        tout << "Projected array eqs:\n" << mk_pp (fml, m) << "\n";
-                      );
-
-                qe::array_project_selects (*M.get(), array_vars, fml, project_all_arr_stores);
-
-                TRACE ("spacer",
-                        tout << "Projected array selects:\n" << mk_pp (fml, m) << "\n";
-                      );
-
+                qe::array_project (*M.get (), array_vars, fml, vars);
+                SASSERT (array_vars.empty ());
             }
 
             TRACE ("spacer",
                     tout << "extended model:\n";
                     model_pp (tout, *M);
                     tout << "Auxiliary variables of index and value sorts:\n";
-                    for (unsigned i = 0; i < array_vars.size (); i++) {
-                        tout << mk_pp (array_vars.get (i), m) << "\n";
+                    for (unsigned i = 0; i < vars.size (); i++) {
+                        tout << mk_pp (vars.get (i), m) << "\n";
                     }
                   );
 
-            if (array_vars.empty ()) break;
-
-            // collect new vars
-            vars.reset ();
-            vars.append (array_vars);
-            array_vars.reset ();
+            if (vars.empty ()) break;
         }
 
         // project reals and ints

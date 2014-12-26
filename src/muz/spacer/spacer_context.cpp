@@ -44,6 +44,7 @@ Notes:
 #include "smt_value_sort.h"
 #include "proof_utils.h"
 #include "scoped_proof.h"
+#include "qe_project.h"
 
 namespace spacer {
     
@@ -1099,7 +1100,13 @@ namespace spacer {
     m_trans = get_manager ().mk_and (summaries);
     summaries.reset ();
     
-    if (!vars.empty ()) qe_project (m, vars, m_trans, model, true);
+    if (!vars.empty ()) 
+    {
+      qe_project (m, vars, m_trans, model);
+      qe::reduce_array_selects (*model.get (), m_trans);
+    }
+    
+        
     
     
     // create the post condition by compute post-image over summaries
@@ -1115,7 +1122,12 @@ namespace spacer {
     expr_ref post(m);
     post = get_manager ().mk_and (summaries);
     summaries.reset ();
-    if (!vars.empty ()) qe_project (m, vars, post, model, true);
+    if (!vars.empty ()) 
+    {
+      qe_project (m, vars, post, model);
+      qe::reduce_array_selects (*model.get (), post);
+    }
+    
     get_manager ().formula_o2n (post.get (), post, m_premises [m_active].get_oidx ());
     
     model_node *n = alloc (model_node, &m_parent, 
@@ -2357,7 +2369,8 @@ namespace spacer {
         vars.append(aux_vars.size(), aux_vars.c_ptr());
 
         expr_ref phi1 = m_pm.mk_and (Phi);
-        qe_project (m, vars, phi1, M, true);
+        qe_project (m, vars, phi1, M);
+        qe::reduce_array_selects (*M, phi1);
         SASSERT (vars.empty ());
 
         TRACE ("spacer",

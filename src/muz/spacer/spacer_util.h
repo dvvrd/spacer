@@ -224,10 +224,11 @@ namespace spacer {
      * do the following in sequence
      * 1. use qe_lite to cheaply eliminate vars
      * 2. for remaining boolean vars, substitute using M
-     * 3. for remaining arith vars, use LW projection
+     * 3. use MBP for remaining array and arith variables
+     * 4. for any remaining arith variables, substitute using M
      */
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, 
-                     const model_ref& M, bool project_all_arr_stores = false);
+                     const model_ref& M);
 
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
 

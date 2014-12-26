@@ -17,11 +17,15 @@ namespace qe {
 
     void arith_project(model& model, app_ref_vector& vars, expr_ref& fml, expr_map& map);
 
-    //void array_project (model& model, app_ref_vector& vars, expr_ref& fml);
+    void array_project_eqs (model& model, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars);
 
-    void array_project_selects (model& model, app_ref_vector& vars, expr_ref& fml, bool project_all_stores = false);
+    void reduce_array_selects (model& mdl, app_ref_vector const& arr_vars, expr_ref& fml, bool reduce_all_selects = false);
 
-    void array_project_eqs (model& model, app_ref_vector& vars, expr_ref& fml);
+    void reduce_array_selects (model& mdl, expr_ref& fml);
+
+    void array_project_selects (model& model, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars);
+
+    void array_project (model& model, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars);
 };
 
 #endif
