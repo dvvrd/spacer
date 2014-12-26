@@ -324,10 +324,6 @@ namespace spacer {
     /// parent model node
     model_node&                         m_parent;
       
-    ast_manager&                        m;
-    manager&                            m_sm;
-    const context&                      m_ctx;
-    
     /// the rule corresponding to this derivation
     const datalog::rule &m_rule; 
       
@@ -357,6 +353,9 @@ namespace spacer {
 
     datalog::rule const& get_rule () const { return m_rule; }
     model_node& get_parent () const { return m_parent; }
+    ast_manager &get_ast_manager () const {return m_parent.get_ast_manager ();}
+    manager &get_manager () const {return m_parent.get_manager ();}
+    
   };
 
   class model_search {

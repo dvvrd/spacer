@@ -1038,13 +1038,10 @@ namespace spacer {
   derivation::derivation (model_node& parent, datalog::rule const& rule,
                           expr * trans) :
         m_parent (parent),
-        m (m_parent.get_ast_manager ()),
-        m_sm (m_parent.get_manager ()),
-        m_ctx (m_parent.get_context ()),
         m_rule (rule),
         m_premises (),
         m_active (0),
-        m_trans (trans, m) {} 
+        m_trans (trans, m_parent.get_ast_manager ()) {} 
   
   derivation::premise::premise (pred_transformer &pt, unsigned oidx, 
                                      expr *summary, bool must) : 
@@ -1084,6 +1081,7 @@ namespace spacer {
   model_node *derivation::create_next_child (const model_ref &model)
   {
     
+    ast_manager &m = get_ast_manager ();
     expr_ref_vector summaries (m);
     app_ref_vector vars (m);
     
@@ -1098,7 +1096,7 @@ namespace spacer {
     
     // -- update m_trans with the pre-image of m_trans over the must summaries
     summaries.push_back (m_trans);
-    m_trans = m_sm.mk_and (summaries);
+    m_trans = get_manager ().mk_and (summaries);
     summaries.reset ();
     
     if (!vars.empty ()) qe_project (m, vars, m_trans, model, true);
@@ -1115,10 +1113,10 @@ namespace spacer {
     summaries.push_back (m_trans);
     
     expr_ref post(m);
-    post = m_sm.mk_and (summaries);
+    post = get_manager ().mk_and (summaries);
     summaries.reset ();
     if (!vars.empty ()) qe_project (m, vars, post, model, true);
-    m_sm.formula_o2n (post.get (), post, m_premises [m_active].get_oidx ());
+    get_manager ().formula_o2n (post.get (), post, m_premises [m_active].get_oidx ());
     
     model_node *n = alloc (model_node, &m_parent, 
                            m_premises[m_active].pt (), 
@@ -1137,6 +1135,7 @@ namespace spacer {
     pred_transformer &pt = m_premises[m_active].pt ();
     model_ref model;
     
+    ast_manager &m = get_ast_manager ();
     expr_ref_vector summaries (m);
     
     for (unsigned i = m_active + 1; i < m_premises.size (); ++i)
@@ -1144,11 +1143,11 @@ namespace spacer {
     
     // -- orient transition relation towards m_active premise
     expr_ref v(m);
-    m_sm.formula_o2n (m_trans, v, m_premises[m_active].get_oidx (), false);
+    get_manager ().formula_o2n (m_trans, v, m_premises[m_active].get_oidx (), false);
     summaries.push_back (v);
     
     /// must be true, otherwise no suitable must summary found
-    VERIFY (pt.is_reachable_known (m_sm.mk_and (summaries), &model));
+    VERIFY (pt.is_reachable_known (get_manager ().mk_and (summaries), &model));
     
     // find must summary used
     pt.get_used_reach_fact (model, v);
@@ -1159,10 +1158,10 @@ namespace spacer {
     mev = model;
     u.push_back (v);
     compute_implicant_literals (mev, u, lits);
-    v = m_sm.mk_and (lits);
+    v = get_manager ().mk_and (lits);
     
     expr_ref s(m);
-    m_sm.formula_n2o (v, s, m_premises[m_active].get_oidx ());
+    get_manager ().formula_n2o (v, s, m_premises[m_active].get_oidx ());
     m_premises[m_active].set_summary (s, true);
     
     return create_next_child (model);
