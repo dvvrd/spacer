@@ -299,7 +299,11 @@ namespace spacer {
     {
         for (unsigned j = 0, sz = es.size (); j < sz; ++j) {
             if (m_array.is_as_array(es.get (j))) 
-              es[j] = eval(es.get (j));
+            {
+              expr_ref v (m);
+              v = eval (es.get (j));
+              es[j] = v;
+            }
         }
     }
     
