@@ -1873,9 +1873,9 @@ namespace qe {
         expr_ref                    m_subst_term_v; // subst term for m_v
         expr_safe_replace           m_true_sub_v; // subst for true equalities
         expr_safe_replace           m_false_sub_v; // subst for false equalities
+        expr_ref_vector             m_aux_lits_v;
+        expr_ref_vector             m_idx_lits_v;
         app_ref_vector              m_aux_vars;
-        expr_ref_vector             m_aux_lits;
-        expr_ref_vector             m_idx_lits;
         model_evaluator_array_util  m_mev;
 
         struct cant_project {};
@@ -1886,14 +1886,14 @@ namespace qe {
             m_subst_term_v = 0;
             m_true_sub_v.reset ();
             m_false_sub_v.reset ();
+            m_aux_lits_v.reset ();
+            m_idx_lits_v.reset ();
         }
 
         void reset () {
             M = 0;
             reset_v ();
             m_aux_vars.reset ();
-            m_aux_lits.reset ();
-            m_idx_lits.reset ();
         }
 
         /**
@@ -2006,7 +2006,7 @@ namespace qe {
                     m_mev.eval (*M, a_new, val);
                     M->register_decl (val_const->get_decl (), val);
                     // add equality
-                    m_aux_lits.push_back (m.mk_eq (val_const, a_new));
+                    m_aux_lits_v.push_back (m.mk_eq (val_const, a_new));
                     // replace select by const
                     a_new = val_const;
                 }
@@ -2113,7 +2113,7 @@ namespace qe {
                                 m_mev.eval (*M, idx1, val1);
                                 if (val == val1) {
                                     idx_in_I = true;
-                                    m_idx_lits.push_back (idx_eq);
+                                    m_idx_lits_v.push_back (idx_eq);
                                 }
                                 else {
                                     idx_diseq.push_back (m.mk_not (idx_eq));
@@ -2124,7 +2124,7 @@ namespace qe {
                     if (idx_in_I) {
                         TRACE ("qe",
                                 tout << "store index in diff indices:\n";
-                                tout << mk_pp (m_idx_lits.back (), m) << "\n";
+                                tout << mk_pp (m_idx_lits_v.back (), m) << "\n";
                               );
 
                         // arr0 ==I arr1
@@ -2136,7 +2136,7 @@ namespace qe {
                               );
                     }
                     else {
-                        m_idx_lits.append (idx_diseq);
+                        m_idx_lits_v.append (idx_diseq);
                         // arr0 ==I+idx arr1
                         I.push_back (idx);
                         mk_peq (arr0, arr1, I.size (), I.c_ptr (), p_exp);
@@ -2152,7 +2152,7 @@ namespace qe {
                         sel_args.push_back (idx);
                         expr_ref arr1_idx (m_arr_u.mk_select (sel_args.size (), sel_args.c_ptr ()), m);
                         expr_ref eq (m.mk_eq (arr1_idx, x), m);
-                        m_aux_lits.push_back (eq);
+                        m_aux_lits_v.push_back (eq);
 
                         TRACE ("qe",
                                 tout << "new eq:\n";
@@ -2182,8 +2182,8 @@ namespace qe {
                 TRACE ("qe",
                         tout << "after factoring selects:\n";
                         tout << mk_pp (p_exp, m) << "\n";
-                        for (unsigned i = m_aux_lits.size () - m_aux_vars.size (); i < m_aux_lits.size (); i++) {
-                            tout << mk_pp (m_aux_lits.get (i), m) << "\n";
+                        for (unsigned i = m_aux_lits_v.size () - m_aux_vars.size (); i < m_aux_lits_v.size (); i++) {
+                            tout << mk_pp (m_aux_lits_v.get (i), m) << "\n";
                         }
                       );
 
@@ -2261,8 +2261,8 @@ namespace qe {
             // TODO: eliminate possible duplicates, especially in idx_lits
             //       theory rewriting is a possibility, but not sure if it
             //          introduces unwanted terms such as ite's
-            lits.append (m_idx_lits);
-            lits.append (m_aux_lits);
+            lits.append (m_idx_lits_v);
+            lits.append (m_aux_lits_v);
             lits.push_back (fml);
             fml = m.mk_and (lits.size (), lits.c_ptr ());
 
@@ -2285,9 +2285,9 @@ namespace qe {
             m_subst_term_v (m),
             m_true_sub_v (m),
             m_false_sub_v (m),
+            m_aux_lits_v (m),
+            m_idx_lits_v (m),
             m_aux_vars (m),
-            m_aux_lits (m),
-            m_idx_lits (m),
             m_mev (m)
         {}
 
