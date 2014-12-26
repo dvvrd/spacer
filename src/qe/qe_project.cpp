@@ -2358,6 +2358,7 @@ namespace qe {
             m_sel_consts.reset ();
             m_pinned.reset ();
             m_idx_lits.reset ();
+            M = 0;
             m_sub.reset ();
             m_arr_test.reset ();
             m_has_stores.reset ();
@@ -2679,6 +2680,7 @@ namespace qe {
         {}
 
         void operator () (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool project_all_stores = false) {
+            reset ();
             M = &mdl;
             m_project_all_stores = project_all_stores;
 
@@ -2690,7 +2692,6 @@ namespace qe {
             // assume all arr_vars are of array sort
             // and assume no store equalities on arr_vars
             try {
-                reset ();
                 project (arr_vars, fml);
                 mk_result (fml);
                 aux_vars.append (m_sel_consts);
