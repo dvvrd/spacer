@@ -105,12 +105,7 @@ namespace spacer {
     /// used by pick_literals() 
     expr_mark      m_visited;
         
-
     
-    void reset();
-    
-    /// caches the values of all constants in the given model
-    void setup_model(const model_ref& model);
     /// caches the value of an expression
     void assign_value(expr* e, expr* v);
     
@@ -126,7 +121,6 @@ namespace spacer {
     void eval_array_eq(app* e, expr* arg1, expr* arg2);
     void inherit_value(expr* e, expr* v);
         
-    void set_unknown(expr* x)  { m1.mark(x, false); m2.mark(x, false); }
     void set_x(expr* x) { SASSERT(is_unknown(x)); m2.mark(x); m_refs.push_back (x); }
     void set_v(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); m_refs.push_back (x); }
     void set_false(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); m_refs.push_back (x); }
@@ -164,7 +158,6 @@ namespace spacer {
     }
     
     /// compute values of all the terms in all the formulas in the input
-    /// clients must ensure that the terms are not deleted
     void eval_terms (const expr_ref_vector &v)
     {
       // for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
@@ -174,7 +167,6 @@ namespace spacer {
     }
     
     /// compute values of all the terms in all the formulas in the input
-    /// clients must ensure that the terms are not deleted
     void eval_terms (const ptr_vector<expr> &v)
     {
       // for (unsigned i = 0, sz = f.size (); i < sz; ++i)
@@ -184,15 +176,14 @@ namespace spacer {
     }
     
     /// compute values of all the terms in the given formula
-    /// clients must ensure that the terms are not deleted
     void eval_terms (expr * formula);
     
-    bool is_unknown(expr* x)  { return !m1.is_marked(x) && !m2.is_marked(x); }
-    bool is_x(expr* x)  { return !m1.is_marked(x) && m2.is_marked(x); }
-    bool is_false(expr* x)  { return m1.is_marked(x) && !m2.is_marked(x); }
-    bool is_true(expr* x)  { return m1.is_marked(x) && m2.is_marked(x); }
+    bool is_unknown(expr* x) const { return !m1.is_marked(x) && !m2.is_marked(x); }
+    bool is_x(expr* x)  const { return !m1.is_marked(x) && m2.is_marked(x); }
+    bool is_false(expr* x)  const { return m1.is_marked(x) && !m2.is_marked(x); }
+    bool is_true(expr* x)  const { return m1.is_marked(x) && m2.is_marked(x); }
     const rational & get_number(expr* x) const { return m_numbers.find(x); }
-    expr* get_value(expr* x) { return m_values.find(x); }
+    expr* get_value(expr* x) const { return m_values.find(x); }
             
 
     
