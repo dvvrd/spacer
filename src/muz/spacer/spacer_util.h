@@ -146,10 +146,6 @@ namespace spacer {
     /// Caches the result
     void eval_fmls(ptr_vector<expr> const & formulas);
 
-    /// calls eval_fmls(). Then checks whether all formulas are
-    /// TRUE. Returns false if at lest one formula is unknown (X)
-    bool check_model(ptr_vector<expr> const & formulas);
-
     bool extract_array_func_interp(expr* a, vector<expr_ref_vector>& stores, 
                                    expr_ref& else_case);
 
