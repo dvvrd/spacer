@@ -158,7 +158,7 @@ namespace spacer {
 
     core_arith_inductive_generalizer::core_arith_inductive_generalizer(context& ctx):
         core_generalizer(ctx), 
-        m(ctx.get_manager()),
+        m(ctx.get_ast_manager()),
         a(m),
         m_refs(m) {}
 
@@ -500,7 +500,7 @@ namespace spacer {
 
 
     public:
-        imp(context& ctx): m_ctx(ctx), pm(ctx.get_spacer_manager()), m(ctx.get_manager()) {}
+        imp(context& ctx): m_ctx(ctx), pm(ctx.get_manager()), m(ctx.get_ast_manager()) {}
 
         // 
         // not exists y . F(x,y)

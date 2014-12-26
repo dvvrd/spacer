@@ -1195,7 +1195,7 @@ namespace spacer {
        The resulting trace 
      */
     expr_ref model_search::get_trace(context const& ctx) {
-        ast_manager& m = ctx.get_manager ();
+        ast_manager& m = ctx.get_ast_manager ();
         return expr_ref (m.mk_true (), m);
     }
   
@@ -1258,7 +1258,8 @@ namespace spacer {
             func_decl* pred = dit->m_key;
             TRACE("spacer", tout << mk_pp(pred, m) << "\n";);
             SASSERT(!rels.contains(pred));
-            e = rels.insert_if_not_there2(pred, alloc(pred_transformer, *this, get_spacer_manager(), pred));            
+            e = rels.insert_if_not_there2(pred, alloc(pred_transformer, *this, 
+                                                      get_manager(), pred));            
             datalog::rule_vector const& pred_rules = *dit->m_value;            
             for (unsigned i = 0; i < pred_rules.size(); ++i) {
                 e->get_data().m_value->add_rule(pred_rules[i]);
@@ -1272,7 +1273,7 @@ namespace spacer {
             for (unsigned i = 0; i < utz; ++i) {
                 func_decl* pred = r->get_decl(i);
                 if (!rels.find(pred, pt)) {
-                    pt = alloc(pred_transformer, *this, get_spacer_manager(), pred);
+                    pt = alloc(pred_transformer, *this, get_manager(), pred);
                     rels.insert(pred, pt);                
                 }
             }
@@ -1343,7 +1344,7 @@ namespace spacer {
     void context::add_cover(int level, func_decl* p, expr* property) {
         pred_transformer* pt = 0;
         if (!m_rels.find(p, pt)) {
-            pt = alloc(pred_transformer, *this, get_spacer_manager(), p);
+            pt = alloc(pred_transformer, *this, get_manager(), p);
             m_rels.insert(p, pt);
             IF_VERBOSE(10, verbose_stream() << "did not find predicate " << p->get_name() << "\n";);
         }

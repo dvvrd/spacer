@@ -440,24 +440,24 @@ namespace spacer {
         void solve_impl();
         void solve_impl_from_lvl (unsigned from_lvl);
         bool check_reachability(unsigned level);        
-      void propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, unsigned full_prop_lvl);
-        void close_node(model_node& n);
-        void check_pre_closed(model_node& n);
+        void propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
+                       unsigned full_prop_lvl);
         void expand_node(model_node& n);
-      lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 
-                         unsigned& uses_level, bool& is_concrete, 
-                         datalog::rule const*& r, vector<bool>& reach_pred_used, 
-                         unsigned& num_reuse_reach);
-      void mk_reach_fact (model_node& n, const model_ref &model, 
-                          datalog::rule const& r, expr_ref& result, 
-                          expr_ref_vector& child_reach_facts);
-      void create_children(model_node& n, datalog::rule const& r, const model_ref model, 
-                           const vector<bool>& reach_pred_used);
+        lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 
+                           unsigned& uses_level, bool& is_concrete, 
+                           datalog::rule const*& r, vector<bool>& reach_pred_used, 
+                           unsigned& num_reuse_reach);
+        void mk_reach_fact (model_node& n, const model_ref &model, 
+                            datalog::rule const& r, expr_ref& result, 
+                            expr_ref_vector& child_reach_facts);
+        void create_children(model_node& n, datalog::rule const& r, const model_ref model, 
+                             const vector<bool>& reach_pred_used);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;
 
         // Generate inductive property
-        void get_level_property(unsigned lvl, expr_ref_vector& res, vector<relation_info> & rs) const;
+        void get_level_property(unsigned lvl, expr_ref_vector& res, 
+                                vector<relation_info> & rs) const;
 
 
         // Initialization
@@ -493,11 +493,13 @@ namespace spacer {
         
         smt_params&       get_fparams() const { return m_fparams; }
         fixedpoint_params const& get_params() const { return m_params; }
-        ast_manager&      get_manager() const { return m; }
-        manager&          get_spacer_manager() { return m_pm; }
+        ast_manager&      get_ast_manager() const { return m; }
+        manager&          get_manager() { return m_pm; }
         decl2rel const&   get_pred_transformers() const { return m_rels; }
-        pred_transformer& get_pred_transformer(func_decl* p) const { return *m_rels.find(p); }
-        datalog::context& get_context() const { SASSERT(m_context); return *m_context; }
+        pred_transformer& get_pred_transformer(func_decl* p) const 
+        { return *m_rels.find(p); }
+        datalog::context& get_datalog_context() const 
+        { SASSERT(m_context); return *m_context; }
         expr_ref          get_answer();
         /**
          * get bottom-up (from query) sequence of ground predicate instances
