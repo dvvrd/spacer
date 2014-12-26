@@ -2576,7 +2576,11 @@ namespace qe {
                 expr* repr = m_idx_reprs.get (i);
                 expr* val = m_idx_vals.get (i);
                 unsigned j = i;
-                for (; j > start && val < m_idx_vals.get (j-1); j--) {
+                for (; j > start; j--) {
+                    rational j_val, jm1_val;
+                    VERIFY (m_ari_u.is_numeral (val, j_val));
+                    VERIFY (m_ari_u.is_numeral (m_idx_vals.get (j-1), jm1_val));
+                    if (j_val >= jm1_val) break;
                     m_idx_reprs[j] = m_idx_reprs.get (j-1);
                     m_idx_vals[j] = m_idx_vals.get (j-1);
                 }
@@ -2630,6 +2634,9 @@ namespace qe {
             sel_map::iterator begin = sel_terms.begin (),
                               end = sel_terms.end ();
             for (sel_map::iterator it = begin; it != end; it++) {
+                TRACE ("qe",
+                        tout << "ackermann for var: " << mk_pp (it->m_key, m) << "\n";
+                      );
                 ackermann (*(it->m_value));
             }
 
