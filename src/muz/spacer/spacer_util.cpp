@@ -1461,38 +1461,48 @@ namespace spacer {
                     }
                   );
 
+            vars.reset ();
+
             // project arrays
             {
                 scoped_no_proof _sp (m);
-                qe::array_project_eqs (*M, array_vars, fml);
+                qe::array_project_eqs (*M, array_vars, fml, vars);
 
                 TRACE ("spacer",
                         tout << "Projected array eqs:\n" << mk_pp (fml, m) << "\n";
+                        tout << "Remaining array vars:\n";
+                        for (unsigned i = 0; i < array_vars.size (); i++) {
+                            tout << mk_pp (array_vars.get (i), m) << "\n";
+                        }
+                        tout << "Aux vars:\n";
+                        for (unsigned i = 0; i < vars.size (); i++) {
+                            tout << mk_pp (vars.get (i), m) << "\n";
+                        }
                       );
 
-                qe::array_project_selects (*M, array_vars, fml, project_all_arr_stores);
+                qe::array_project_selects (*M, array_vars, fml, vars, project_all_arr_stores);
 
                 TRACE ("spacer",
                         tout << "Projected array selects:\n" << mk_pp (fml, m) << "\n";
+                        tout << "All aux vars:\n";
+                        for (unsigned i = 0; i < vars.size (); i++) {
+                            tout << mk_pp (vars.get (i), m) << "\n";
+                        }
                       );
 
+                SASSERT (array_vars.empty ());
             }
 
             TRACE ("spacer",
                     tout << "extended model:\n";
                     model_pp (tout, *M);
                     tout << "Auxiliary variables of index and value sorts:\n";
-                    for (unsigned i = 0; i < array_vars.size (); i++) {
-                        tout << mk_pp (array_vars.get (i), m) << "\n";
+                    for (unsigned i = 0; i < vars.size (); i++) {
+                        tout << mk_pp (vars.get (i), m) << "\n";
                     }
                   );
 
-            if (array_vars.empty ()) break;
-
-            // collect new vars
-            vars.reset ();
-            vars.append (array_vars);
-            array_vars.reset ();
+            if (vars.empty ()) break;
         }
 
         // project reals and ints

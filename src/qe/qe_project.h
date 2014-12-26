@@ -19,9 +19,9 @@ namespace qe {
 
     //void array_project (model& model, app_ref_vector& vars, expr_ref& fml);
 
-    void array_project_selects (model& model, app_ref_vector& vars, expr_ref& fml, bool project_all_stores = false);
+    void array_project_selects (model& model, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool project_all_stores = false);
 
-    void array_project_eqs (model& model, app_ref_vector& vars, expr_ref& fml);
+    void array_project_eqs (model& model, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars);
 };
 
 #endif
