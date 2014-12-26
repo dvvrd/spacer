@@ -646,6 +646,7 @@ namespace spacer {
   {
     ptr_vector<expr> todo;
     todo.push_back (formula);
+    
     while (!todo.empty ())
     {
       expr * e = todo.back ();
@@ -678,7 +679,7 @@ namespace spacer {
   {
     SASSERT (m_model);
     
-    expr_ref res (m_model->get_manager ());
+    expr_ref res (m);
       
     eval_terms (fml);
     if (is_unknown (fml) || is_x (fml)) res = fml;
@@ -734,9 +735,6 @@ namespace spacer {
   
   void model_evaluator::pick_implicant (const expr_ref_vector& formulas, 
                                         expr_ref_vector& result2) {
-        
-        
-    
     TRACE("spacer", 
           tout << "formulas:\n";
           for (unsigned i = 0; i < formulas.size(); ++i) 
@@ -790,140 +788,140 @@ namespace spacer {
       
   }
     
-    void model_evaluator::process_formula(app* e, 
-                                          ptr_vector<expr>& todo, 
-                                          ptr_vector<expr>& tocollect) {
-        SASSERT(m.is_bool(e));
-        SASSERT(is_true(e) || is_false(e));
-        unsigned v = is_true(e);
-        unsigned sz = e->get_num_args();
-        expr* const* args = e->get_args();
-        if (e->get_family_id() == m.get_basic_family_id()) {
-            switch(e->get_decl_kind()) {
-            case OP_TRUE:
-                break;
-            case OP_FALSE:
-                break;
-            case OP_EQ:
-            case OP_IFF:
-                if (args[0] == args[1]) {
-                    SASSERT(v);
-                    // no-op                    
-                }
-                else if (m.is_bool(args[0])) {
-                    todo.append(sz, args);
-                }
-                else {
-                    tocollect.push_back(e);
-                }
-                break;                              
-            case OP_DISTINCT:
-                tocollect.push_back(e);
-                break;
-            case OP_ITE:
-                if (args[1] == args[2]) {
-                    tocollect.push_back(args[1]);
-                }
-                else if (is_true(args[1]) && is_true(args[2])) {
-                    todo.append(2, args+1);
-                }
-                else if (is_false(args[1]) && is_false(args[2])) {
-                    todo.append(2, args+1);
-                }
-                else if (is_true(args[0])) {
-                    todo.append(2, args);
-                }
-                else {
-                    SASSERT(is_false(args[0]));
-                    todo.push_back(args[0]);
-                    todo.push_back(args[2]);
-                }
-                break;
-            case OP_AND:
-                if (v) {
-                    todo.append(sz, args);
-                }
-                else {
-                    unsigned i = 0;
-                    for (; !is_false(args[i]) && i < sz; ++i);     
-                    if (i == sz) {
-                        fatal_error(1);
-                    }
-                    VERIFY(i < sz);
-                    todo.push_back(args[i]);
-                }
-                break;
-            case OP_OR:
-                if (v) {
-                    unsigned i = 0;
-                    for (; !is_true(args[i]) && i < sz; ++i);
-                    if (i == sz) {
-                        fatal_error(1);
-                    }
-                    VERIFY(i < sz);
-                    todo.push_back(args[i]);
-                }
-                else {
-                    todo.append(sz, args);
-                }
-                break;
-            case OP_XOR: 
-            case OP_NOT:
-                todo.append(sz, args);
-                break;
-            case OP_IMPLIES:
-                if (v) {
-                    if (is_true(args[1])) {
-                        todo.push_back(args[1]);
-                    }
-                    else if (is_false(args[0])) {
-                        todo.push_back(args[0]);
-                    }
-                    else {
-                        IF_VERBOSE(0, verbose_stream() 
-                                   << "Term not handled " << mk_pp(e, m) << "\n";);
-                        UNREACHABLE();
-                    }
-                }
-                else {
-                    todo.append(sz, args);
-                }
-                break;
-            default:
-                IF_VERBOSE(0, verbose_stream() 
-                           << "Term not handled " << mk_pp(e, m) << "\n";);
-                UNREACHABLE();
-            }
+  void model_evaluator::process_formula(app* e, 
+                                        ptr_vector<expr>& todo, 
+                                        ptr_vector<expr>& tocollect) {
+    SASSERT(m.is_bool(e));
+    SASSERT(is_true(e) || is_false(e));
+    unsigned v = is_true(e);
+    unsigned sz = e->get_num_args();
+    expr* const* args = e->get_args();
+    if (e->get_family_id() == m.get_basic_family_id()) {
+      switch(e->get_decl_kind()) {
+      case OP_TRUE:
+        break;
+      case OP_FALSE:
+        break;
+      case OP_EQ:
+      case OP_IFF:
+        if (args[0] == args[1]) {
+          SASSERT(v);
+          // no-op                    
+        }
+        else if (m.is_bool(args[0])) {
+          todo.append(sz, args);
         }
         else {
-            tocollect.push_back(e);
+          tocollect.push_back(e);
         }
-    }
-    
-    void model_evaluator::pick_literals (const expr_ref_vector& formulas, 
-                                         ptr_vector<expr>& lits) 
-    {
-      ptr_vector<expr> todo;
-      for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
-      {
-        expr * e = formulas.get (i);
-        SASSERT (is_true (e) || is_false (e));
-        todo.push_back (e);
+        break;                              
+      case OP_DISTINCT:
+        tocollect.push_back(e);
+        break;
+      case OP_ITE:
+        if (args[1] == args[2]) {
+          tocollect.push_back(args[1]);
+        }
+        else if (is_true(args[1]) && is_true(args[2])) {
+          todo.append(2, args+1);
+        }
+        else if (is_false(args[1]) && is_false(args[2])) {
+          todo.append(2, args+1);
+        }
+        else if (is_true(args[0])) {
+          todo.append(2, args);
+        }
+        else {
+          SASSERT(is_false(args[0]));
+          todo.push_back(args[0]);
+          todo.push_back(args[2]);
+        }
+        break;
+      case OP_AND:
+        if (v) {
+          todo.append(sz, args);
+        }
+        else {
+          unsigned i = 0;
+          for (; !is_false(args[i]) && i < sz; ++i);     
+          if (i == sz) {
+            fatal_error(1);
+          }
+          SASSERT(i < sz);
+          todo.push_back(args[i]);
+        }
+        break;
+      case OP_OR:
+        if (v) {
+          unsigned i = 0;
+          for (; !is_true(args[i]) && i < sz; ++i);
+          if (i == sz) {
+            fatal_error(1);
+          }
+          VERIFY(i < sz);
+          todo.push_back(args[i]);
+        }
+        else {
+          todo.append(sz, args);
+        }
+        break;
+      case OP_XOR: 
+      case OP_NOT:
+        todo.append(sz, args);
+        break;
+      case OP_IMPLIES:
+        if (v) {
+          if (is_true(args[1])) {
+            todo.push_back(args[1]);
+          }
+          else if (is_false(args[0])) {
+            todo.push_back(args[0]);
+          }
+          else {
+            IF_VERBOSE(0, verbose_stream() 
+                       << "Term not handled " << mk_pp(e, m) << "\n";);
+            UNREACHABLE();
+          }
+        }
+        else {
+          todo.append(sz, args);
+        }
+        break;
+      default:
+        IF_VERBOSE(0, verbose_stream() 
+                   << "Term not handled " << mk_pp(e, m) << "\n";);
+        UNREACHABLE();
       }
+    }
+    else {
+      tocollect.push_back(e);
+    }
+  }
+    
+  void model_evaluator::pick_literals (const expr_ref_vector& formulas, 
+                                       ptr_vector<expr>& lits) 
+  {
+    ptr_vector<expr> todo;
+    for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
+    {
+      expr * e = formulas.get (i);
+      SASSERT (is_true (e) || is_false (e));
+      todo.push_back (e);
+    }
       
   
-      m_visited.reset();
+    m_visited.reset();
         
-      while (!todo.empty()) {
-        app*  e = to_app (todo.back());
-        todo.pop_back ();
-        if (!m_visited.is_marked (e)) {
-          process_formula (e, todo, lits);
-          m_visited.mark(e, true);
-        }
+    while (!todo.empty()) {
+      app*  e = to_app (todo.back());
+      todo.pop_back ();
+      if (!m_visited.is_marked (e)) {
+        process_formula (e, todo, lits);
+        m_visited.mark(e, true);
       }
-      m_visited.reset();
     }
+    m_visited.reset();
+  }
     
     
 
