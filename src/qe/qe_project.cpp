@@ -1720,6 +1720,8 @@ namespace qe {
             lits.append (m_idx_lits);
             lits.push_back (fml);
             fml = m.mk_and (lits.size (), lits.c_ptr ());
+            // simplify all trivial expressions introduced 
+            m_rw (fml);
 
             TRACE ("qe",
                     tout << "after reducing selects:\n";
