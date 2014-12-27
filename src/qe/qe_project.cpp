@@ -1754,8 +1754,8 @@ namespace qe {
             // assume all arr_vars are of array sort
             // and assume no store equalities on arr_vars
             try {
-                reduce (fml);
-                mk_result (fml);
+              fml = reduce (fml.get ());
+              mk_result (fml);
             }
             catch (cant_project) {
                 IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
