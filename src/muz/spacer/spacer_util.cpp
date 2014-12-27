@@ -679,11 +679,12 @@ namespace spacer {
   {
     SASSERT (m_model);
     
-    expr_ref res (m);
       
-    eval_terms (fml);
-    if (is_unknown (fml) || is_x (fml)) res = fml;
-    if (is_false (fml)) res = m.mk_false ();
+    if (is_unknown (fml)) eval_terms (fml);
+    
+    expr_ref res (m);
+    if (is_x (fml)) res = fml;
+    else if (is_false (fml)) res = m.mk_false ();
     else if (is_true (fml)) res = m.mk_true ();
     else if (m_arith.is_int_real (fml)) 
       res = m_arith.mk_numeral (get_number (fml), m_arith.is_int (fml));
