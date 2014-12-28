@@ -123,8 +123,9 @@ namespace spacer {
         
     void set_x(expr* x) { SASSERT(is_unknown(x)); m2.mark(x); m_refs.push_back (x); }
     void set_v(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); m_refs.push_back (x); }
-    void set_false(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); m_refs.push_back (x); }
-    void set_true(expr* x) { set_false (x); m2.mark(x); }
+    bool is_v (expr *x) const {return m1.is_marked (x);}
+    void set_false(expr* x) { set_v (x); }
+    void set_true(expr* x) { set_v (x); m2.mark(x); }
     void set_bool(expr* x, bool v) { if (v) { set_true(x); } else { set_false(x); } }
     void set_number(expr* x, const rational &v) 
     { 

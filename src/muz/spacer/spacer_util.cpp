@@ -682,13 +682,18 @@ namespace spacer {
       
     if (is_unknown (fml)) eval_terms (fml);
     
+    SASSERT (!is_unknown (fml));
+    
+    if (is_x (fml)) return expr_ref (fml, m);
+    
     expr_ref res (m);
-    if (is_x (fml)) res = fml;
-    else if (is_false (fml)) res = m.mk_false ();
-    else if (is_true (fml)) res = m.mk_true ();
-    else if (m_arith.is_int_real (fml)) 
+    SASSERT (is_v (fml));
+    if (m.is_bool (fml))
+      res = is_false (fml) ? m.mk_false () : m.mk_true ();
+    else if (m_arith.is_int_real (fml))
       res = m_arith.mk_numeral (get_number (fml), m_arith.is_int (fml));
     else res = get_value (fml);
+    
         
     return res;
   }
