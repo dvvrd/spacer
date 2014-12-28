@@ -433,7 +433,6 @@ namespace spacer {
         volatile bool        m_cancel;
         model_converter_ref  m_mc;
         proof_converter_ref  m_pc;
-        model_evaluator      m_mev;
         
         // Functions used by search.
         void solve_impl();

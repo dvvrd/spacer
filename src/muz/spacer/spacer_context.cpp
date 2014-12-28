@@ -1236,8 +1236,7 @@ namespace spacer {
           m_last_result(l_undef),
           m_inductive_lvl(0),
           m_expanded_lvl(0),
-          m_cancel(false),
-          m_mev (m)
+          m_cancel(false)
     {
     }
 
@@ -1940,6 +1939,7 @@ namespace spacer {
             cex_ctx->get_model (local_mdl);
             cex_ctx->pop (1);
 
+            model_evaluator mev (m, local_mdl);
             for (unsigned i = 0; i < child_pts.size (); i++) {
                 pred_transformer& ch_pt = *(child_pts.get (i));
                 unsigned sig_size = ch_pt.sig_size ();
@@ -1948,12 +1948,11 @@ namespace spacer {
                 for (unsigned j = 0; j < sig_size; j++) {
                     expr_ref sig_arg (m), sig_val (m);
                     sig_arg = m.mk_const (ch_pt.get_manager ().o2o (ch_pt.sig (j), 0, i));
-                    m_mev = local_mdl;
                     if (m_params.use_heavy_mev ()) {
-                        sig_val = m_mev.eval_heavy (sig_arg);
+                        sig_val = mev.eval_heavy (sig_arg);
                     }
                     else {
-                        sig_val = m_mev.eval (sig_arg);
+                        sig_val = mev.eval (sig_arg);
                     }
                     ground_fact_conjs.push_back (m.mk_eq (sig_arg, sig_val));
                     ground_arg_vals.push_back (sig_val);
