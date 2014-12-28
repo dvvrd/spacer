@@ -147,12 +147,13 @@ namespace spacer {
     void eval_exprs(expr_ref_vector& es);
         
   public:
-    model_evaluator(ast_manager& m, model_ref model = model_ref (0) ) : 
-      m(m), m_arith(m), m_array(m), m_refs(m) 
+    model_evaluator(ast_manager& m, model_ref model = model_ref () ) : m(m), m_arith(m), m_array(m), m_refs(m) 
     { reset (model); }
     
     /// initialize with a given model. All previous state is lost. model can be NULL
     void reset (const model_ref &model);
+    
+    model* get_model () {return m_model.get ();}
     
     model_evaluator &operator= (const model_ref &model)
     {

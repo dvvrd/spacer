@@ -58,8 +58,7 @@ namespace spacer {
         m_reach_ctx (pm.mk_fresh ()),
         m_reach_facts (m), m_invariants(m), m_transition(m), m_initial_state(m), 
         m_all_init (false),
-        m_reach_case_vars (m),
-        m_mev (m)
+        m_reach_case_vars (m)
     { init_sig (); }
 
     pred_transformer::~pred_transformer() {
@@ -139,21 +138,20 @@ namespace spacer {
     }
 
   
-  expr_ref pred_transformer::eval (const model_ref &model, expr * v)
+  expr_ref pred_transformer::eval (model_evaluator &mev, expr * v)
   {
     expr_ref res(m);
-    m_mev = model;
     if (ctx.get_params ().use_heavy_mev ()) 
-      res = m_mev.eval_heavy (v);
+      res = mev.eval_heavy (v);
     else 
-      res = m_mev.eval (v);
+      res = mev.eval (v);
     return res;
   }
   
-  void pred_transformer::get_used_reach_fact (const model_ref& M, expr_ref& reach_fact) {
+  void pred_transformer::get_used_reach_fact (model_evaluator& mev, expr_ref& reach_fact) {
     expr_ref bval (m);
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
-      bval = eval (M, m_reach_case_vars.get (i));
+      bval = eval (mev, m_reach_case_vars.get (i));
       if (m.is_false (bval)) {
         reach_fact = m_reach_facts.get (i);
         break;
@@ -162,7 +160,7 @@ namespace spacer {
     SASSERT (reach_fact);
   }
   
-  void pred_transformer::get_used_o_reach_fact (const model_ref& M, unsigned oidx, 
+  void pred_transformer::get_used_o_reach_fact (model_evaluator& mev, unsigned oidx, 
                                                 expr_ref& o_reach_fact, 
                                                 expr_ref& n_reach_fact) {
     expr_ref bval (m);
@@ -171,7 +169,7 @@ namespace spacer {
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
       a = m_reach_case_vars.get (i);
       pm.formula_n2o (a.get (), a, oidx);
-      bval = eval (M, a);
+      bval = eval (mev, a);
       
       if (m.is_false (bval)) {
         n_reach_fact = m_reach_facts.get (i);
@@ -193,7 +191,7 @@ namespace spacer {
         return &(j->pred_reach_facts);
     }
 
-    datalog::rule const* pred_transformer::find_rule(const model_ref &model, 
+    datalog::rule const* pred_transformer::find_rule(model &model, 
                                                      bool& is_concrete, 
                                                      vector<bool>& reach_pred_used, 
                                                      unsigned& num_reuse_reach) {
@@ -216,7 +214,7 @@ namespace spacer {
         tag2rule::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
         for (; it != end; ++it) {
             expr* tag = it->m_key;
-            if (model->eval(to_app(tag)->get_decl(), vl) && m.is_true(vl)) {
+            if (model.eval(to_app(tag)->get_decl(), vl) && m.is_true(vl)) {
                 r = it->m_value;
                 is_concrete = true;
                 num_reuse_reach = 0;
@@ -230,7 +228,7 @@ namespace spacer {
                     if (!reach_assump) is_concrete = false;
                     else {
                       pm.formula_n2o (reach_assump.get (), reach_assump, i);
-                      vl = eval (model, reach_assump);
+                      model.eval (to_app (reach_assump.get ())->get_decl (), vl);
                       used = m.is_true (vl);
                       is_concrete = is_concrete && used;
                     }
@@ -569,7 +567,7 @@ namespace spacer {
    *
    * returns an implicant of the summary
    */
-  expr_ref pred_transformer::get_origin_summary (const model_ref &model, 
+  expr_ref pred_transformer::get_origin_summary (model_evaluator &mev, 
                                                  unsigned level, 
                                                  unsigned oidx,
                                                  bool must)
@@ -585,7 +583,7 @@ namespace spacer {
       {
         v = m_reach_case_vars.get (i);
         pm.formula_n2o (v.get (), v, oidx);
-        v = eval (model, v);
+        v = eval (mev, v);
         
         if (m.is_false (v))
         {
@@ -607,8 +605,7 @@ namespace spacer {
     
     // -- pick an implicant
     expr_ref_vector literals (m);
-    m_mev = model;
-    compute_implicant_literals (m_mev, summary, literals);
+    compute_implicant_literals (mev, summary, literals);
     
     return get_manager ().mk_and (literals);
   }
@@ -646,9 +643,12 @@ namespace spacer {
 
   lbool pred_transformer::is_reachable(model_node& n, expr_ref_vector* core, 
                                        model_ref* model, unsigned& uses_level, 
-                                         bool& is_concrete, datalog::rule const*& r, vector<bool>& reach_pred_used, unsigned& num_reuse_reach) {
+                                         bool& is_concrete, datalog::rule const*& r, 
+                                       vector<bool>& reach_pred_used, 
+                                       unsigned& num_reuse_reach) {
         TRACE("spacer", 
-              tout << "is-reachable: " << head()->get_name() << " level: " << n.level() << "\n";
+              tout << "is-reachable: " << head()->get_name() << " level: " 
+              << n.level() << "\n";
               tout << mk_pp(n.post(), m) << "\n";);
 
         ensure_level(n.level());        
@@ -710,7 +710,7 @@ namespace spacer {
             core->reset();
             TRACE ("spacer", tout << "reachable\n";);
             SASSERT ((bool)model);
-            r = find_rule (*model, is_concrete, reach_pred_used, num_reuse_reach);
+            r = find_rule (**model, is_concrete, reach_pred_used, num_reuse_reach);
             return l_true;
         }
         if (is_sat == l_false) {
@@ -1072,14 +1072,14 @@ namespace spacer {
   
 
 
-  model_node *derivation::create_first_child (const model_ref &model)
+  model_node *derivation::create_first_child (model_evaluator &mev)
   {
     if (m_premises.empty ()) return NULL;
     m_active = 0;
-    return create_next_child (model);
+    return create_next_child (mev);
   }
   
-  model_node *derivation::create_next_child (const model_ref &model)
+  model_node *derivation::create_next_child (model_evaluator &mev)
   {
     
     ast_manager &m = get_ast_manager ();
@@ -1102,8 +1102,8 @@ namespace spacer {
     
     if (!vars.empty ()) 
     {
-      qe_project (m, vars, m_trans, model);
-      qe::reduce_array_selects (*model.get (), m_trans);
+      qe_project (m, vars, m_trans, mev.get_model ());
+      qe::reduce_array_selects (*mev.get_model (), m_trans);
     }
     
         
@@ -1124,8 +1124,8 @@ namespace spacer {
     summaries.reset ();
     if (!vars.empty ()) 
     {
-      qe_project (m, vars, post, model);
-      qe::reduce_array_selects (*model.get (), post);
+      qe_project (m, vars, post, mev.get_model ());
+      qe::reduce_array_selects (*mev.get_model (), post);
     }
     
     get_manager ().formula_o2n (post.get (), post, m_premises [m_active].get_oidx ());
@@ -1161,13 +1161,12 @@ namespace spacer {
     /// must be true, otherwise no suitable must summary found
     VERIFY (pt.is_reachable_known (get_manager ().mk_and (summaries), &model));
     
+    model_evaluator mev (m, model);
     // find must summary used
-    pt.get_used_reach_fact (model, v);
+    pt.get_used_reach_fact (mev, v);
     
     // get an implicant of the summary
-    model_evaluator mev (m);
     expr_ref_vector u(m), lits (m);
-    mev = model;
     u.push_back (v);
     compute_implicant_literals (mev, u, lits);
     v = get_manager ().mk_and (lits);
@@ -1176,7 +1175,7 @@ namespace spacer {
     get_manager ().formula_n2o (v, s, m_premises[m_active].get_oidx ());
     m_premises[m_active].set_summary (s, true);
     
-    return create_next_child (model);
+    return create_next_child (mev);
   }
   
     // ----------------
@@ -2125,13 +2124,14 @@ namespace spacer {
         // update stats
         m_stats.m_num_reuse_reach += num_reuse_reach;
 
+        model_evaluator mev (m, model);
         // must-reachable
         if (is_concrete) 
         {
           // -- update must summary
           expr_ref reach_fact (m);
           expr_ref_vector child_reach_facts (m);
-          mk_reach_fact (n, model, *r, reach_fact, child_reach_facts);
+          mk_reach_fact (n, mev, *r, reach_fact, child_reach_facts);
           n.pt ().add_reach_fact (reach_fact, *r, child_reach_facts);
           
           if (n.is_root ()) n.set_reachable (true);
@@ -2144,7 +2144,7 @@ namespace spacer {
         }
         //otherwise pick the first OA and create a sub-goal
         else 
-          create_children (n, *r, model, reach_pred_used);
+          create_children (n, *r, mev, reach_pred_used);
         break;
       }
         // n is unreachable, create new summary facts
@@ -2259,7 +2259,7 @@ namespace spacer {
         }
     }
 
-  void context::mk_reach_fact (model_node& n, const model_ref &M,
+  void context::mk_reach_fact (model_node& n, model_evaluator &mev,
                                const datalog::rule& r, expr_ref& result, 
                                expr_ref_vector& child_reach_facts) {
         pred_transformer& pt = n.pt ();
@@ -2276,7 +2276,7 @@ namespace spacer {
             pred_transformer& ch_pt = get_pred_transformer (pred);
             // get a reach fact of body preds used in the model
             expr_ref ch_reach (m), n_ch_reach (m);
-            ch_pt.get_used_o_reach_fact (M, i, ch_reach, n_ch_reach);
+            ch_pt.get_used_o_reach_fact (mev, i, ch_reach, n_ch_reach);
             path_cons.push_back (ch_reach);
             child_reach_facts.push_back (n_ch_reach);
             // collect o-vars to eliminate
@@ -2299,7 +2299,7 @@ namespace spacer {
                 }
               );
 
-        qe_project (m, vars, result, M);
+        qe_project (m, vars, result, mev.get_model ());
 
         TRACE ("spacer",
                 tout << "Reach fact, after QE project:\n";
@@ -2320,7 +2320,7 @@ namespace spacer {
        \brief create children states from model cube.
     */
     void context::create_children(model_node& n, datalog::rule const& r, 
-                                  model_ref M,
+                                  model_evaluator &mev,
                                   const vector<bool> &reach_pred_used) {
  
         pred_transformer& pt = n.pt();
@@ -2329,7 +2329,7 @@ namespace spacer {
 
         TRACE("spacer", 
               tout << "Model:\n";
-              model_smt2_pp(tout, m, *M, 0);
+              model_smt2_pp(tout, m, *mev.get_model (), 0);
               tout << "\n";
               tout << "Transition:\n" << mk_pp(T, m) << "\n";
               tout << "Phi:\n" << mk_pp(phi, m) << "\n";);
@@ -2353,8 +2353,6 @@ namespace spacer {
         forms.push_back(phi);
 
         qe::flatten_and(forms);        
-        model_evaluator mev(m);
-        mev = M;
         mev.pick_implicant (forms, Phi);
         
         //pt.remove_predecessors (Phi);
@@ -2368,8 +2366,8 @@ namespace spacer {
         vars.append(aux_vars.size(), aux_vars.c_ptr());
 
         expr_ref phi1 = m_pm.mk_and (Phi);
-        qe_project (m, vars, phi1, M);
-        qe::reduce_array_selects (*M, phi1);
+        qe_project (m, vars, phi1, mev.get_model ());
+        qe::reduce_array_selects (*mev.get_model (), phi1);
         SASSERT (vars.empty ());
 
         TRACE ("spacer",
@@ -2397,14 +2395,14 @@ namespace spacer {
         {
           pred_transformer &pt = get_pred_transformer (preds [i]);
           deriv->add_premise (pt, i, 
-                              pt.get_origin_summary (M, prev_level (n.level ()),
+                              pt.get_origin_summary (mev, prev_level (n.level ()),
                                                      i, reach_pred_used [i]),
                               reach_pred_used [i]);
         }
         n.set_derivation (deriv);
 
         // create post for the first child and add to queue
-        model_node* ch = deriv->create_first_child (M);
+        model_node* ch = deriv->create_first_child (mev);
         SASSERT (ch);
         
         m_search.enqueue_leaf (*ch);
