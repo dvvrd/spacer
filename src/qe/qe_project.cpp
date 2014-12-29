@@ -1628,11 +1628,14 @@ namespace qe {
             }
         }
 
-        expr* reduce (expr *e) {
-            if (!is_app (e)) return e;
+        void reduce (expr_ref& e) {
+            if (!is_app (e)) return;
 
             expr *r = 0;
-            if (m_cache.find (e, r)) return r;
+            if (m_cache.find (e, r)) {
+                e = r;
+                return;
+            }
 
             ptr_vector<app> todo;
             todo.push_back (to_app (e));
@@ -1681,7 +1684,7 @@ namespace qe {
             }
 
             SASSERT (r);
-            return r;
+            e = r;
         }
 
         expr* reduce_core (app *a) {
