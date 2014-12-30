@@ -661,8 +661,15 @@ namespace spacer {
         expr_ref_vector post (m), reach_assumps (m);
         post.push_back (n.post ());
 
-        // populate reach_assumps
-        if (ctx.get_params ().eager_reach_check () && n.level () > 0 && !m_all_init) {
+        // populate reach_assumps 
+
+        // XXX eager_reach_check must always be
+        // XXX enabled. Otherwise, we can get into an infinite loop in
+        // XXX which a model is consistent with a must-summary, but the
+        // XXX appropriate assumption is not set correctly by the model.
+        // XXX Original code handled reachability-events differently.
+        if (/* ctx.get_params ().eager_reach_check () && */
+            n.level () > 0 && !m_all_init) {
             obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin (),
                 end = m_tag2rule.end ();
             for (; it != end; ++it) {
