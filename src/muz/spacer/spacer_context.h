@@ -183,7 +183,8 @@ namespace spacer {
 
         void add_reach_fact (expr* fact, datalog::rule const& r, expr_ref_vector const& child_reach_facts);  // add reachability fact
         expr* get_last_reach_fact () const { return m_reach_facts.back (); }
-        expr* get_reach_facts_assump () const;
+        expr* get_last_reach_case_var () const;
+      
 
         lbool is_reachable(model_node& n, expr_ref_vector* core, model_ref *model,
                            unsigned& uses_level, bool& is_concrete, 

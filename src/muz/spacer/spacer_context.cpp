@@ -123,16 +123,19 @@ namespace spacer {
         }
     }
 
-    bool pred_transformer::is_reachable_known (expr* state, model_ref* M) {
+    bool pred_transformer::is_reachable_known (expr* state, model_ref* model) {
         SASSERT (state);
-        expr_ref assump (get_reach_facts_assump (), m);
-        if (!assump) return false;
+        // XXX This seems to mis-handle the case when state is
+        // reachable using the init rule of the current transformer
+        if (m_reach_facts.empty ()) return false;
+        
         m_reach_ctx->push ();
         m_reach_ctx->assert_expr (state);
         expr_ref_vector assumps (m);
-        assumps.push_back (assump);
+        assumps.push_back (m.mk_not (m_reach_case_vars.back ()));
+        // XXX why use check-with-assumptions here?
         lbool res = m_reach_ctx->check (assumps);
-        if (M) m_reach_ctx->get_model (*M);
+        if (model) m_reach_ctx->get_model (*model);
         m_reach_ctx->pop ();
         return (res == l_true);
     }
@@ -224,12 +227,12 @@ namespace spacer {
                     bool used = false;
                     func_decl* d = r->get_tail(i)->get_decl();
                     pred_transformer const& pt = ctx.get_pred_transformer (d);
-                    expr_ref reach_assump (pt.get_reach_facts_assump (), m);
-                    if (!reach_assump) is_concrete = false;
+                    expr_ref reach_var (pt.get_last_reach_case_var (), m);
+                    if (!reach_var) is_concrete = false;
                     else {
-                      pm.formula_n2o (reach_assump.get (), reach_assump, i);
-                      model.eval (to_app (reach_assump.get ())->get_decl (), vl);
-                      used = m.is_true (vl);
+                      pm.formula_n2o (reach_var.get (), reach_var, i);
+                      model.eval (to_app (reach_var.get ())->get_decl (), vl);
+                      used = m.is_false (vl);
                       is_concrete = is_concrete && used;
                     }
 
@@ -512,12 +515,11 @@ namespace spacer {
         return m.mk_or (m_reach_facts.size (), m_reach_facts.c_ptr ());
     }
 
-    expr* pred_transformer::get_reach_facts_assump () const {
-        if (m_reach_case_vars.empty ()) return ((expr *)0);
-        // return the negation of the last case
-        return m.mk_not (m_reach_case_vars.back ());
-    }
-
+  expr* pred_transformer::get_last_reach_case_var () const 
+  {
+    return m_reach_case_vars.empty () ? NULL : m_reach_case_vars.back ();
+  }
+  
     expr_ref pred_transformer::get_cover_delta(func_decl* p_orig, int level) {
         expr_ref result(m.mk_true(), m), v(m), c(m);
         if (level == -1) {
@@ -680,11 +682,11 @@ namespace spacer {
                 for (unsigned i = 0; i < m_predicates.size(); i++) {
                     const pred_transformer &pt = 
                       ctx.get_pred_transformer (m_predicates [i]);
-                    expr_ref a (pt.get_reach_facts_assump (), m);
+                    expr_ref a (pt.get_last_reach_case_var (), m);
                     if (a) 
                     {
                       pm.formula_n2o (a.get (), a, i);
-                      reach_assumps.push_back (a);
+                      reach_assumps.push_back (m.mk_not (a));
                     }
                 }
             }
