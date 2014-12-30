@@ -48,6 +48,9 @@ def parseArgs (argv):
     p.add_argument ('--bit-blast', dest='bit_blast',
                     help='blast bitvectors into bits',
                     action='store_true', default=False)
+    p.add_argument ('--rule-stats', dest='rule_stats',
+                    help='print rule statistics and exit',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -80,6 +83,8 @@ def main (argv):
     fp.set (order_children=int(args.order_children))
 
     fp.set (use_qe_projection=args.use_qe_projection)
+
+    fp.set (rule_stats=args.rule_stats)
 
     with stats.timer ('Parse'):
         q = fp.parse_file (args.file)

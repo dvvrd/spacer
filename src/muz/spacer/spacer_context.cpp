@@ -2190,6 +2190,58 @@ namespace spacer {
             rel.initialize(rels);
             TRACE("spacer", rel.display(tout); );
         }
+
+        if (m_params.rule_stats ()) {
+            // collect and print some stats about rules
+            // 1. avg, max non-linearity
+            unsigned nl_max = 0, nl_sum = 0;
+            double nl_avg;
+            rit = rules.begin(), rend = rules.end();
+            for (; rit != rend; rit++) {
+                datalog::rule* r = *rit;
+                if (r->get_decl () == m_query_pred) continue;
+                unsigned nl = r->get_uninterpreted_tail_size ();
+                if (nl > nl_max) nl_max = nl;
+                nl_sum += nl;
+            }
+            nl_avg = (1.0 * nl_sum)/(rules.get_num_rules ()-1);
+            // 2. avg, max reuse of any given predicate
+            obj_map<func_decl, unsigned> reuse_map;
+            rit = rules.begin(), rend = rules.end();
+            for (; rit != rend; ++rit) {
+                datalog::rule* r = *rit;
+                if (r->get_decl () == m_query_pred) continue;
+                unsigned utz = r->get_uninterpreted_tail_size();
+                for (unsigned i = 0; i < utz; ++i) {
+                    func_decl* pred = r->get_decl(i);
+                    unsigned reuse_cnt = 1;
+                    if (reuse_map.find (pred, reuse_cnt)) {
+                        reuse_cnt++;
+                    }
+                    reuse_map.insert (pred, reuse_cnt);
+                    TRACE ("spacer",
+                            tout << mk_pp (pred, m) << " " << reuse_cnt << "\n";
+                          );
+                }
+            }
+            unsigned reuse_max = 0, reuse_sum = 0;
+            double reuse_avg;
+            for (obj_map<func_decl, unsigned>::iterator uit = reuse_map.begin ();
+                    uit != reuse_map.end (); uit++) {
+                unsigned cnt = uit->m_value;
+                if (cnt > reuse_max) reuse_max = cnt;
+                reuse_sum += cnt;
+            }
+            reuse_avg = (1.0 * reuse_sum)/(rels.size ()-1);
+            // brunch out
+            verbose_stream () << "BRUNCH_STAT nl_avg " << nl_avg << "\n";
+            verbose_stream () << "BRUNCH_STAT nl_max " << nl_max << "\n";
+            verbose_stream () << "BRUNCH_STAT reuse_avg " << reuse_avg << "\n";
+            verbose_stream () << "BRUNCH_STAT reuse_max " << reuse_max << "\n";
+
+            // exit
+            throw default_exception (std::string ("rule stats"));
+        }
     }
 
     void context::update_rules(datalog::rule_set& rules) {

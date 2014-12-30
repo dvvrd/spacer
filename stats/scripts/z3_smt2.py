@@ -45,6 +45,9 @@ def parseArgs (argv):
     p.add_argument ('--use-qe-projection', dest='use_qe_projection',
                     help='use mbp (only for pdr)',
                     action='store_true', default=False)
+    p.add_argument ('--rule-stats', dest='rule_stats',
+                    help='print rule statistics and exit',
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -124,6 +127,9 @@ def main (argv):
 
     if args.use_qe_projection:
         z3_args += ' fixedpoint.use_qe_projection=true'
+
+    if args.rule_stats:
+        z3_args += ' fixedpoint.rule_stats=true'
 
     z3_args += ' ' + args.file
 
