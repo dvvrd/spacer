@@ -798,6 +798,11 @@ namespace spacer {
       
   }
     
+  void model_evaluator::add_literal (expr *e, ptr_vector<expr> &out)
+  {
+    out.push_back (e);
+  }
+  
   void model_evaluator::process_formula(app* e, 
                                         ptr_vector<expr>& todo, 
                                         ptr_vector<expr>& tocollect) {
@@ -822,15 +827,15 @@ namespace spacer {
           todo.append(sz, args);
         }
         else {
-          tocollect.push_back(e);
+          add_literal (e, tocollect);
         }
         break;                              
       case OP_DISTINCT:
-        tocollect.push_back(e);
+        add_literal (e, tocollect);
         break;
       case OP_ITE:
         if (args[1] == args[2]) {
-          tocollect.push_back(args[1]);
+          add_literal (args [1], tocollect);
         }
         else if (is_true(args[1]) && is_true(args[2])) {
           todo.append(2, args+1);
@@ -904,7 +909,7 @@ namespace spacer {
       }
     }
     else {
-      tocollect.push_back(e);
+      add_literal (e, tocollect);
     }
   }
     

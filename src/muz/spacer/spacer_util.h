@@ -115,6 +115,7 @@ namespace spacer {
     /// one-round of extracting an implicant of e. The implicant
     /// literals are stored in tocollect. The worklist is stored in todo
     void process_formula(app* e, ptr_vector<expr>& todo, ptr_vector<expr>& tocollect);
+    void add_literal (expr *e, ptr_vector<expr>& out);
     void eval_arith(app* e);
     void eval_basic(app* e);
     void eval_eq(app* e, expr* arg1, expr* arg2);
