@@ -239,6 +239,8 @@ namespace spacer {
     /// level at which to decide the post 
     unsigned                m_level;       
       
+    unsigned                m_depth;
+    
     /// whether a concrete answer to the post is found
     bool                    m_open;     
     /// when the node is closed, whether it is reachable
@@ -249,15 +251,16 @@ namespace spacer {
     scoped_ptr<derivation>   m_derivation;
 
   public:
-    model_node (model_node* parent, pred_transformer& pt, unsigned level):
+    model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
       m_parent (parent), m_pt (pt), 
-      m_post (m_pt.get_ast_manager ()), m_level (level), 
+      m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth),
       m_open (true), m_reachable(false) {}
 
     bool is_reachable () {return !m_open && m_reachable;}
     bool is_unreachable () {return !m_open && !m_reachable;}
     void set_reachable (bool v) {close (); m_reachable = v;}
     
+    void inc_level () {m_level++; m_depth++;}
     
     void set_derivation (derivation *d) {m_derivation = d;}
     bool has_derivation () const {return (bool)m_derivation;}
@@ -274,6 +277,8 @@ namespace spacer {
       
     expr* post () const { return m_post.get (); }
     unsigned level () const { return m_level; }
+    unsigned depth () const {return m_depth;}
+    
 
     void set_post (expr* post) { m_post = post; }
 
@@ -291,6 +296,34 @@ namespace spacer {
   };
 
 
+  struct model_node_lt : 
+    public std::binary_function<const model_node*, const model_node*, bool>
+  {
+    bool operator() (const model_node *pn1, const model_node *pn2) const
+    {
+      SASSERT (pn1);
+      SASSERT (pn2);
+      const model_node& n1 = *pn1; 
+      const model_node& n2 = *pn2;
+      
+      if (n1.level () < n2.level ()) return true;
+      if (n1.level () > n2.level ()) return false;
+      
+      if (n1.depth () < n2.depth ()) return true;
+      if (n1.depth () > n2.depth ()) return false;
+      
+      return &n1 < &n2;
+    }
+  };
+  
+  struct model_node_gt : 
+    public std::binary_function<const model_node*, const model_node*, bool>
+  {
+    model_node_lt lt;
+    bool operator() (const model_node *n1, const model_node *n2) const
+    {return lt(n2, n1);}
+  };    
+  
   /**
    */
   class derivation {
@@ -361,9 +394,10 @@ namespace spacer {
     
   };
 
+  
   class model_search {
     scoped_ptr<model_node>   m_root;
-    ptr_vector<model_node> m_leaves;
+    std::priority_queue<model_node*, std::vector<model_node*>, model_node_gt> m_leaves;
       
   public:
     model_search(): m_root(NULL) {}
@@ -371,9 +405,8 @@ namespace spacer {
 
     void reset();
     model_node* next();
-    void enqueue_leaf(model_node& n); 
-    void erase_leaf(model_node& n);
-
+    void enqueue_leaf(model_node& n) {m_leaves.push (&n);}
+    
     void set_root(model_node& n);
     model_node& get_root() const { return *(m_root.get ()); }
     //std::ostream& display(std::ostream& out) const; 

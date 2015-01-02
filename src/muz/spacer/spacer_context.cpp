@@ -1182,20 +1182,16 @@ namespace spacer {
   model_node* model_search::next () {
     if (m_leaves.empty ()) return NULL;
       
-    model_node* result = m_leaves.back ();
-    m_leaves.pop_back ();
+    model_node* result = m_leaves.top ();
+    m_leaves.pop ();
     return result;
   }
-
-    void model_search::enqueue_leaf(model_node& n) {m_leaves.push_back (&n);}
 
     void model_search::set_root (model_node& root) {
         reset();
         m_root = &root;
         enqueue_leaf(root);
     }
-
-    void model_search::erase_leaf (model_node& n) {m_leaves.erase (&n);}
 
     /**
        Extract trace comprising of constraints 
@@ -1210,7 +1206,7 @@ namespace spacer {
     model_search::~model_search() {reset();}
 
     void model_search::reset() {
-        m_leaves.reset ();
+        while (!m_leaves.empty ()) m_leaves.pop ();
         m_root = NULL;
     }
   
