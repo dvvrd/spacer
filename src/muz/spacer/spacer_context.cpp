@@ -1924,29 +1924,23 @@ namespace spacer {
     ///this is where everything starts
     bool context::solve_core (unsigned from_lvl) 
     {
-        //if there is no query predicate, abort
+      //if there is no query predicate, abort
       if (!m_rels.find(m_query_pred, m_query)) return false;
 
-        //this is the outer loop of RECMC
-        unsigned lvl = from_lvl; //this is stack depth bound
-        while (true) {
-            checkpoint();
-            m_expanded_lvl = lvl;
-            m_stats.m_max_query_lvl = lvl;
-            //model_node::reset_count (); // fresh counter for node ids
+      unsigned lvl = from_lvl; //this is stack depth bound
+      while (true) {
+        checkpoint();
+        m_expanded_lvl = lvl;
+        m_stats.m_max_query_lvl = lvl;
 
-            if (check_reachability(lvl)) return true;
-
-            //if bounded-safe, the check if summaries are
-            //inductive. throws an exception if inductive
-            if (lvl > 0 && propagate(m_expanded_lvl, lvl, UINT_MAX)) return false;
+        if (check_reachability(lvl)) return true;
             
-            //this means summaries are not inductive. increase stack
-            //depth bound and continue.
-            lvl++;
-            m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
-            IF_VERBOSE(1,verbose_stream() << "Entering level "<<lvl << "\n";);
-        }
+        if (lvl > 0 && propagate(m_expanded_lvl, lvl, UINT_MAX)) return false;
+            
+        lvl++;
+        m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
+        IF_VERBOSE(1,verbose_stream() << "Entering level "<<lvl << "\n";);
+      }
     }
 
 
