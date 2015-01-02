@@ -1647,7 +1647,7 @@ namespace spacer {
     lbool context::solve(unsigned from_lvl) {
         m_last_result = l_undef;
         try {
-          if (solve_impl(from_lvl))
+          if (solve_core (from_lvl))
           {        
             //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
             m_last_result = l_true;
@@ -1929,7 +1929,7 @@ namespace spacer {
     }
 
     ///this is where everything starts
-    bool context::solve_impl(unsigned from_lvl) 
+    bool context::solve_core (unsigned from_lvl) 
     {
         //if there is no query predicate, abort
       if (!m_rels.find(m_query_pred, m_query)) return false;
