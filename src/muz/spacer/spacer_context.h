@@ -435,8 +435,7 @@ namespace spacer {
         proof_converter_ref  m_pc;
         
         // Functions used by search.
-        void solve_impl();
-        void solve_impl_from_lvl (unsigned from_lvl);
+        void solve_impl(unsigned from_lvl = 0);
         bool check_reachability(unsigned level);        
         void propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
                        unsigned full_prop_lvl);
@@ -515,7 +514,7 @@ namespace spacer {
 
         void display_certificate(std::ostream& strm) const;
 
-        lbool solve();
+        lbool solve(unsigned from_lvl = 0);
 
         lbool solve_from_lvl (unsigned from_lvl);
 

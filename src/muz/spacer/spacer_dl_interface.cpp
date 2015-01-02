@@ -255,7 +255,7 @@ lbool dl_interface::query_from_lvl (expr * query, unsigned lvl) {
         return l_false;
     }
         
-    return m_context->solve_from_lvl (lvl);
+    return m_context->solve (lvl);
 
 }
 
