@@ -161,9 +161,14 @@ namespace spacer {
         void reset_statistics();
 
         bool is_reachable_known (expr* state, model_ref* model = 0);
+        /// \brief Returns reachability fact active in the given model
         void get_used_reach_fact (model_evaluator& mev, expr_ref& reach_fact);
-        void get_used_o_reach_fact (model_evaluator& mev, unsigned oidx, 
-                                    expr_ref& o_reach_fact, expr_ref& n_reach_fact);
+        /// \brief Returns reachability fact active in the origin of the given model
+        void get_used_origin_reach_fact (model_evaluator &mev, unsigned oidx, 
+                                         expr_ref &res);
+        expr_ref get_origin_summary (model_evaluator &mev, 
+                                     unsigned level, unsigned oidx, bool must);
+
         datalog::rule const* get_just_rule (expr* fact);
         expr_ref_vector const* get_just_pred_facts (expr* fact);
         void remove_predecessors(expr_ref_vector& literals);
@@ -218,8 +223,6 @@ namespace spacer {
 
         prop_solver& get_solver() { return m_solver; }
 
-        expr_ref get_origin_summary (model_evaluator &mev, 
-                                     unsigned level, unsigned oidx, bool must);
     };
 
 

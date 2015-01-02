@@ -152,35 +152,34 @@ namespace spacer {
   }
   
   void pred_transformer::get_used_reach_fact (model_evaluator& mev, expr_ref& reach_fact) {
-    expr_ref bval (m);
+    expr_ref v (m);
+    
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
-      bval = eval (mev, m_reach_case_vars.get (i));
-      if (m.is_false (bval)) {
+      v = mev.eval (m_reach_case_vars.get (i));
+      if (m.is_false (v)) {
         reach_fact = m_reach_facts.get (i);
         break;
       }
     }
+    
     SASSERT (reach_fact);
   }
   
-  void pred_transformer::get_used_o_reach_fact (model_evaluator& mev, unsigned oidx, 
-                                                expr_ref& o_reach_fact, 
-                                                expr_ref& n_reach_fact) {
-    expr_ref bval (m);
-    expr_ref a(m);
+  void pred_transformer::get_used_origin_reach_fact (model_evaluator& mev, unsigned oidx, 
+                                                     expr_ref& res) {
+    expr_ref b(m), v(m);
     
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
-      a = m_reach_case_vars.get (i);
-      pm.formula_n2o (a.get (), a, oidx);
-      bval = eval (mev, a);
+      v = m_reach_case_vars.get (i);
+      pm.formula_n2o (v.get (), v, oidx);
+      b = mev.eval (v);
       
-      if (m.is_false (bval)) {
-        n_reach_fact = m_reach_facts.get (i);
-        pm.formula_n2o (n_reach_fact, o_reach_fact, oidx);
+      if (m.is_false (b)) {
+        res = m_reach_facts.get (i);
         break;
       }
     }
-    SASSERT (o_reach_fact);
+    SASSERT (res);
   }
 
     datalog::rule const* pred_transformer::get_just_rule (expr* fact) {
@@ -580,22 +579,12 @@ namespace spacer {
       summary.push_back (get_formulas (level, false));
     else // find must summary to use
     {
-      for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; ++i)
-      {
-        v = m_reach_case_vars.get (i);
-        pm.formula_n2o (v.get (), v, oidx);
-        v = eval (mev, v);
-        
-        if (m.is_false (v))
-        {
-          summary.push_back (m_reach_facts.get (i));
-          break;
-        }
-      }
+      get_used_origin_reach_fact (mev, oidx, v);
+      summary.push_back (v);
+      v.reset ();
     }
     
     SASSERT (!summary.empty ());
-    
 
     // -- convert to origin
     for (unsigned i = 0; i < summary.size (); ++i)
@@ -2178,9 +2167,10 @@ namespace spacer {
             func_decl* pred = preds[i];
             pred_transformer& ch_pt = get_pred_transformer (pred);
             // get a reach fact of body preds used in the model
-            expr_ref ch_reach (m), n_ch_reach (m);
-            ch_pt.get_used_o_reach_fact (mev, i, ch_reach, n_ch_reach);
-            path_cons.push_back (ch_reach);
+            expr_ref o_ch_reach (m), n_ch_reach (m);
+            ch_pt.get_used_origin_reach_fact (mev, i, n_ch_reach);
+            m_pm.formula_n2o (n_ch_reach, o_ch_reach, i);
+            path_cons.push_back (o_ch_reach);
             child_reach_facts.push_back (n_ch_reach);
             // collect o-vars to eliminate
             for (unsigned j = 0; j < pred->get_arity (); j++) {
