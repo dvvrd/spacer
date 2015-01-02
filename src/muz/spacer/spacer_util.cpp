@@ -1559,8 +1559,6 @@ namespace spacer {
         // 2. pick literals in the implicant
         pick_literals (in, out);
     
-        // 3. split arithmetic dis-equalities
-        reduce_arith_disequalities (m_mev, out);
     
         TRACE("spacer", 
               tout << "implicant:\n";
@@ -1572,6 +1570,9 @@ namespace spacer {
         // XXX Running old model_evaluator code changes the overall
         // verification result, while it does not change the output of the
         // function. Need to trace this down more.
+        
+        // 3. split arithmetic dis-equalities
+        reduce_arith_disequalities (m_mev, out);
 
         expr_ref_vector result (m);
         old::model_evaluator old_mev (m);
@@ -1600,6 +1601,10 @@ namespace spacer {
     
     implicant_picker p (mev);
     p (formula, res);
+    
+    // split arithmetic dis-equalities
+    reduce_arith_disequalities (mev, res);
+
   }
   
 }
