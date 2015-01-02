@@ -427,11 +427,10 @@ namespace spacer {
     }
 
     void pred_transformer::add_child_property(pred_transformer& child, 
-                                              expr* lemma, unsigned lvl, 
-                                              bool is_reach_fact) {
+                                              expr* lemma, unsigned lvl) {
       ensure_level(lvl);
       expr_ref_vector fmls(m);
-      mk_assumptions(child.head(), lemma, fmls, is_reach_fact);
+      mk_assumptions(child.head(), lemma, fmls);
       for (unsigned i = 0; i < fmls.size(); ++i) {
         TRACE("spacer_detail", tout << "child property: " << mk_pp(fmls[i].get(), m) << "\n";);
         if (is_infty_level(lvl)) 
@@ -504,7 +503,7 @@ namespace spacer {
 
       // update users; reach facts are independent of levels
       for (unsigned i = 0; i < m_use.size(); ++i) {
-        m_use[i]->add_child_property (*this, fml, infty_level (), true);
+        m_use[i]->add_child_property (*this, fml, infty_level ());
       }
     }
 
@@ -783,7 +782,8 @@ namespace spacer {
         return res == l_false;
     }
 
-    void pred_transformer::mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result, bool is_reach_fact) {
+    void pred_transformer::mk_assumptions(func_decl* head, expr* fml, 
+                                          expr_ref_vector& result) {
         expr_ref tmp1(m), tmp2(m);
         expr_substitution sub (m);
         proof_ref pr (m.mk_asserted (m.mk_true ()), m);

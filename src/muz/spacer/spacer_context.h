@@ -116,8 +116,8 @@ namespace spacer {
         void init_sig();
         void ensure_level(unsigned level);
         bool add_property1(expr * lemma, unsigned lvl);  // add property 'p' to state at level lvl.
-        void add_child_property(pred_transformer& child, expr* lemma, unsigned lvl, bool is_reach_fact = false); 
-        void mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result, bool is_reach_fact = false);
+        void add_child_property(pred_transformer& child, expr* lemma, unsigned lvl); 
+        void mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result);
 
         // Initialization
         void init_rules(decl2rel const& pts, expr_ref& init, expr_ref& transition);
