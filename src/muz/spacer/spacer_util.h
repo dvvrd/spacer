@@ -162,7 +162,7 @@ namespace spacer {
      * 3. use MBP for remaining array and arith variables
      * 4. for any remaining arith variables, substitute using M
      */
-    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M);
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, bool reduce_all_selects = false);
 
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
 

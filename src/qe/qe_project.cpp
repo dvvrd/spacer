@@ -2438,7 +2438,7 @@ namespace qe {
         ap (mdl, arr_vars, fml, aux_vars);
     }
 
-    void array_project (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars) {
+    void array_project (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool reduce_all_selects) {
         // 1. project array equalities
         array_project_eqs (mdl, arr_vars, fml, aux_vars);
         TRACE ("qe",
@@ -2455,7 +2455,12 @@ namespace qe {
               );
 
         // 2. reduce selects
-        reduce_array_selects (mdl, arr_vars, fml);
+        if (reduce_all_selects) {
+            reduce_array_selects (mdl, fml);
+        }
+        else {
+            reduce_array_selects (mdl, arr_vars, fml);
+        }
         TRACE ("qe",
                 ast_manager& m = fml.get_manager ();
                 tout << "Reduced selects:\n" << mk_pp (fml, m) << "\n";

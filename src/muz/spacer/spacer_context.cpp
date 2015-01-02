@@ -1605,8 +1605,7 @@ namespace spacer {
         fmls.push_back (n_trans);
         fmls.push_back (impl);
         m_trans = m_sm.mk_and (fmls);
-        qe_project (m, m_nvars [curr_idx ()], m_trans, M);
-        qe::reduce_array_selects (*M, m_trans);
+        qe_project (m, m_nvars [curr_idx ()], m_trans, M, true);
     }
 
     model_node* derivation::mk_next () {
@@ -1644,8 +1643,7 @@ namespace spacer {
         jump_facts.push_back (m_trans);
         m_trans = m_sm.mk_and (jump_facts);
         if (!vars.empty ()) {
-            qe_project (m, vars, m_trans, M);
-            qe::reduce_array_selects (*M, m_trans);
+            qe_project (m, vars, m_trans, M, true);
             TRACE ("spacer",
                     tout << "Updated post of derivation:\n"
                          << mk_pp (m_trans, m) << "\n";
@@ -1661,8 +1659,7 @@ namespace spacer {
             vars.append (m_ovars [i]);
         }
         expr_ref sib_post (m_sm.mk_and (fmls), m);
-        qe_project (m, vars, sib_post, M);
-        qe::reduce_array_selects (*M, sib_post);
+        qe_project (m, vars, sib_post, M, true);
         m_sm.formula_o2n (sib_post, sib_post, curr_o_idx ());
 
         // update sib
@@ -3352,8 +3349,7 @@ namespace spacer {
         vars.append(aux_vars.size(), aux_vars.c_ptr());
 
         expr_ref phi1 = m_pm.mk_and (Phi);
-        qe_project (m, vars, phi1, M);
-        qe::reduce_array_selects (*M, phi1);
+        qe_project (m, vars, phi1, M, true);
         SASSERT (vars.empty ());
 
         TRACE ("spacer",

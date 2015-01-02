@@ -1392,7 +1392,7 @@ namespace spacer {
      * eliminate simple equalities using qe_lite
      * then, MBP for Booleans (substitute), reals (based on LW), ints (based on Cooper), and arrays
      */
-    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M) {
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, bool reduce_all_selects) {
         th_rewriter rw (m);
         TRACE ("spacer",
                 tout << "Before projection:\n";
@@ -1466,7 +1466,7 @@ namespace spacer {
             // project arrays
             {
                 scoped_no_proof _sp (m);
-                qe::array_project (*M, array_vars, fml, vars);
+                qe::array_project (*M, array_vars, fml, vars, reduce_all_selects);
                 SASSERT (array_vars.empty ());
             }
 
