@@ -378,10 +378,6 @@ namespace spacer {
   };
 
 
-    struct model_exception { };
-    struct inductive_exception {};
-
-
     // 'state' is unsatisfiable at 'level' with 'core'. 
     // Minimize or weaken core.
     class core_generalizer {
@@ -435,9 +431,9 @@ namespace spacer {
         proof_converter_ref  m_pc;
         
         // Functions used by search.
-        void solve_impl(unsigned from_lvl = 0);
+        bool solve_impl(unsigned from_lvl = 0);
         bool check_reachability(unsigned level);        
-        void propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
+        bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
                        unsigned full_prop_lvl);
         void expand_node(model_node& n);
         lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 

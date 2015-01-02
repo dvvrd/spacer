@@ -1647,57 +1647,52 @@ namespace spacer {
     lbool context::solve(unsigned from_lvl) {
         m_last_result = l_undef;
         try {
-            solve_impl(from_lvl);
-            UNREACHABLE();
-        }
-        catch (model_exception) {        
+          if (solve_impl(from_lvl))
+          {        
             //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
             m_last_result = l_true;
             validate();
 
             if (m_params.print_statistics ()) {
-                statistics st;
-                collect_statistics (st);
-                st.display_smt2 (verbose_stream ());
+              statistics st;
+              collect_statistics (st);
+              st.display_smt2 (verbose_stream ());
             }
-
-            return l_true;
-        }
-        catch (inductive_exception) {
+          }
+          else 
+          {
             simplify_formulas();
             m_last_result = l_false;
             //TRACE("spacer",  display_certificate(tout););      
             IF_VERBOSE(1, {
-                    expr_ref_vector refs(m);
-                    vector<relation_info> rs;
-                    get_level_property(m_inductive_lvl, refs, rs);    
-                    model_converter_ref mc;
-                    inductive_property ex(m, mc, rs);
-                    verbose_stream() << ex.to_string();
-                });
+                expr_ref_vector refs(m);
+                vector<relation_info> rs;
+                get_level_property(m_inductive_lvl, refs, rs);    
+                model_converter_ref mc;
+                inductive_property ex(m, mc, rs);
+                verbose_stream() << ex.to_string();
+              });
             
             // upgrade invariants that are known to be inductive.
-            decl2rel::iterator it = m_rels.begin (), end = m_rels.end ();
-            for (; m_inductive_lvl > 0 && it != end; ++it) {
-                if (it->m_value->head() != m_query_pred) {
-                    it->m_value->propagate_to_infinity (m_inductive_lvl);	
-                }
-            }
+            // decl2rel::iterator it = m_rels.begin (), end = m_rels.end ();
+            // for (; m_inductive_lvl > 0 && it != end; ++it) {
+            //   if (it->m_value->head() != m_query_pred) {
+            //     it->m_value->propagate_to_infinity (m_inductive_lvl);	
+            //   }
+            // }
             validate();
 
             if (m_params.print_statistics ()) {
-                statistics st;
-                collect_statistics (st);
-                st.display_smt2 (verbose_stream ());
+              statistics st;
+              collect_statistics (st);
+              st.display_smt2 (verbose_stream ());
             }
 
-            return l_false;
+          }            
         }
-        catch (unknown_exception) {
-            return l_undef;
-        }
-        UNREACHABLE();
-        return l_undef;
+        catch (unknown_exception) 
+        {}
+        return m_last_result;
     }
 
 
@@ -1934,33 +1929,25 @@ namespace spacer {
     }
 
     ///this is where everything starts
-    void context::solve_impl(unsigned from_lvl) 
+    bool context::solve_impl(unsigned from_lvl) 
     {
         //if there is no query predicate, abort
-        if (!m_rels.find(m_query_pred, m_query)) {
-            throw inductive_exception();            
-        }
+      if (!m_rels.find(m_query_pred, m_query)) return false;
 
         //this is the outer loop of RECMC
         unsigned lvl = from_lvl; //this is stack depth bound
-        bool reachable = false;
         while (true) {
             checkpoint();
             m_expanded_lvl = lvl;
             m_stats.m_max_query_lvl = lvl;
             //model_node::reset_count (); // fresh counter for node ids
 
-            reachable = check_reachability(lvl); //check bounded safety
-            if (reachable) {
-                throw model_exception();
-            }
+            if (check_reachability(lvl)) return true;
 
             //if bounded-safe, the check if summaries are
             //inductive. throws an exception if inductive
-            if (lvl != 0) {
-              propagate(m_expanded_lvl, lvl, UINT_MAX);
-            }
-
+            if (lvl > 0 && propagate(m_expanded_lvl, lvl, UINT_MAX)) return false;
+            
             //this means summaries are not inductive. increase stack
             //depth bound and continue.
             lvl++;
@@ -2140,7 +2127,7 @@ namespace spacer {
                                  r, reach_pred_used, num_reuse_reach);
     }
 
-  void context::propagate(unsigned min_prop_lvl, 
+  bool context::propagate(unsigned min_prop_lvl, 
                           unsigned max_prop_lvl, unsigned full_prop_lvl) {    
     if (full_prop_lvl < max_prop_lvl) full_prop_lvl = max_prop_lvl;
     
@@ -2163,7 +2150,6 @@ namespace spacer {
 
       if (all_propagated)
       {
-        // XXX this can negatively affect convergence bound
         for (it = m_rels.begin (); it != end; ++it)
         {
           pred_transformer& r = *it->m_value;
@@ -2172,20 +2158,21 @@ namespace spacer {
         if (lvl <= max_prop_lvl)
         {
           m_inductive_lvl = lvl;
-          throw inductive_exception ();
+          return true;
         }
         break;
       }
             
       if (all_propagated && lvl == max_prop_lvl) {
         m_inductive_lvl = lvl;
-        throw inductive_exception();
+        return true;
       }
       else if (all_propagated && lvl > max_prop_lvl) break;
     }
     if (m_params.simplify_formulas_post()) {            
       simplify_formulas();
     }
+    return false;
   }
 
   void context::mk_reach_fact (model_node& n, model_evaluator &mev,
