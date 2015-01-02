@@ -468,7 +468,7 @@ namespace spacer {
 
         void reset_core_generalizers();
 
-        void validate();
+        bool validate();
 
     public:       
         

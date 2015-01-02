@@ -1470,10 +1470,9 @@ namespace spacer {
         }
     };
 
-    void context::validate() {
-        if (!m_params.validate_result()) {
-            return;
-        }
+    bool context::validate() {
+        if (!m_params.validate_result()) return true;
+        
         std::stringstream msg;
 
         switch(m_last_result) {
@@ -1567,7 +1566,7 @@ namespace spacer {
                     if (res != l_false) {
                         msg << "rule validation failed when checking: " << mk_pp(tmp, m);
                         IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
-                        throw default_exception(msg.str());
+                        return false;
                     }
                 }
             }
@@ -1577,6 +1576,7 @@ namespace spacer {
         default:
             break;
         }
+        return true;
     }
 
 
@@ -1644,56 +1644,49 @@ namespace spacer {
         }        
     }
 
-    lbool context::solve(unsigned from_lvl) {
-        m_last_result = l_undef;
-        try {
-          if (solve_core (from_lvl))
-          {        
-            //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
-            m_last_result = l_true;
-            validate();
-
-            if (m_params.print_statistics ()) {
-              statistics st;
-              collect_statistics (st);
-              st.display_smt2 (verbose_stream ());
-            }
-          }
-          else 
-          {
-            simplify_formulas();
-            m_last_result = l_false;
-            //TRACE("spacer",  display_certificate(tout););      
-            IF_VERBOSE(1, {
-                expr_ref_vector refs(m);
-                vector<relation_info> rs;
-                get_level_property(m_inductive_lvl, refs, rs);    
-                model_converter_ref mc;
-                inductive_property ex(m, mc, rs);
-                verbose_stream() << ex.to_string();
-              });
+  lbool context::solve(unsigned from_lvl) {
+    m_last_result = l_undef;
+    try {
+      if (solve_core (from_lvl))
+      {        
+        //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
+        m_last_result = l_true;
+      }
+      else 
+      {
+        simplify_formulas();
+        m_last_result = l_false;
+        //TRACE("spacer",  display_certificate(tout););      
+        IF_VERBOSE(1, {
+            expr_ref_vector refs(m);
+            vector<relation_info> rs;
+            get_level_property(m_inductive_lvl, refs, rs);    
+            model_converter_ref mc;
+            inductive_property ex(m, mc, rs);
+            verbose_stream() << ex.to_string();
+          });
             
-            // upgrade invariants that are known to be inductive.
-            // decl2rel::iterator it = m_rels.begin (), end = m_rels.end ();
-            // for (; m_inductive_lvl > 0 && it != end; ++it) {
-            //   if (it->m_value->head() != m_query_pred) {
-            //     it->m_value->propagate_to_infinity (m_inductive_lvl);	
-            //   }
-            // }
-            validate();
-
-            if (m_params.print_statistics ()) {
-              statistics st;
-              collect_statistics (st);
-              st.display_smt2 (verbose_stream ());
-            }
-
-          }            
-        }
-        catch (unknown_exception) 
-        {}
-        return m_last_result;
+        // upgrade invariants that are known to be inductive.
+        // decl2rel::iterator it = m_rels.begin (), end = m_rels.end ();
+        // for (; m_inductive_lvl > 0 && it != end; ++it) {
+        //   if (it->m_value->head() != m_query_pred) {
+        //     it->m_value->propagate_to_infinity (m_inductive_lvl);	
+        //   }
+        // }
+      }            
+      VERIFY (validate ());
     }
+    catch (unknown_exception) 
+    {}
+        
+    if (m_params.print_statistics ()) {
+      statistics st;
+      collect_statistics (st);
+      st.display_smt2 (verbose_stream ());
+    }
+
+    return m_last_result;
+  }
 
 
     void context::cancel() {
