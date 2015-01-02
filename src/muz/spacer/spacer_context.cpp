@@ -2140,52 +2140,53 @@ namespace spacer {
                                  r, reach_pred_used, num_reuse_reach);
     }
 
-  void context::propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, unsigned full_prop_lvl) {    
+  void context::propagate(unsigned min_prop_lvl, 
+                          unsigned max_prop_lvl, unsigned full_prop_lvl) {    
     if (full_prop_lvl < max_prop_lvl) full_prop_lvl = max_prop_lvl;
     
-        if (m_params.simplify_formulas_pre()) {
-            simplify_formulas();
-        }
-        for (unsigned lvl = min_prop_lvl; lvl <= full_prop_lvl; lvl++) {
-            checkpoint();
-            CTRACE ("spacer", lvl > max_prop_lvl && lvl == max_prop_lvl + 1, 
-                    tout << "In full propagation\n";);
-            
-            bool all_propagated = true;
-            decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
-            for (; it != end; ++it) {
-                checkpoint();            
-                pred_transformer& r = *it->m_value;
-                all_propagated = r.propagate_to_next_level(lvl) && all_propagated;
-            }
-            //CASSERT("spacer", check_invariant(lvl));
-
-            if (all_propagated)
-            {
-              // XXX this can negatively affect convergence bound
-              for (it = m_rels.begin (); it != end; ++it)
-              {
-                pred_transformer& r = *it->m_value;
-                r.propagate_to_infinity (lvl);
-              }
-              if (lvl <= max_prop_lvl)
-              {
-                m_inductive_lvl = lvl;
-                throw inductive_exception ();
-              }
-              break;
-            }
-            
-            if (all_propagated && lvl == max_prop_lvl) {
-                m_inductive_lvl = lvl;
-                throw inductive_exception();
-            }
-            else if (all_propagated && lvl > max_prop_lvl) break;
-        }
-        if (m_params.simplify_formulas_post()) {            
-            simplify_formulas();
-        }
+    if (m_params.simplify_formulas_pre()) {
+      simplify_formulas();
     }
+    for (unsigned lvl = min_prop_lvl; lvl <= full_prop_lvl; lvl++) {
+      checkpoint();
+      CTRACE ("spacer", lvl > max_prop_lvl && lvl == max_prop_lvl + 1, 
+              tout << "In full propagation\n";);
+            
+      bool all_propagated = true;
+      decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
+      for (; it != end; ++it) {
+        checkpoint();            
+        pred_transformer& r = *it->m_value;
+        all_propagated = r.propagate_to_next_level(lvl) && all_propagated;
+      }
+      //CASSERT("spacer", check_invariant(lvl));
+
+      if (all_propagated)
+      {
+        // XXX this can negatively affect convergence bound
+        for (it = m_rels.begin (); it != end; ++it)
+        {
+          pred_transformer& r = *it->m_value;
+          r.propagate_to_infinity (lvl);
+        }
+        if (lvl <= max_prop_lvl)
+        {
+          m_inductive_lvl = lvl;
+          throw inductive_exception ();
+        }
+        break;
+      }
+            
+      if (all_propagated && lvl == max_prop_lvl) {
+        m_inductive_lvl = lvl;
+        throw inductive_exception();
+      }
+      else if (all_propagated && lvl > max_prop_lvl) break;
+    }
+    if (m_params.simplify_formulas_post()) {            
+      simplify_formulas();
+    }
+  }
 
   void context::mk_reach_fact (model_node& n, model_evaluator &mev,
                                const datalog::rule& r, expr_ref& result, 
