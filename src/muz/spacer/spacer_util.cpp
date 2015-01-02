@@ -756,17 +756,7 @@ namespace spacer {
     pick_literals (formulas, result2);
     
     // 3. split arithmetic dis-equalities
-    for (unsigned i = 0, sz = result2.size (); i < sz; ++i) {
-      expr *e = result2.get (i);
-      expr *ne, *e1, *e2;
-      SASSERT(m.is_bool(e));
-      SASSERT(is_true(e) || is_false(e));
-      if (m.is_not (e, ne) && m.is_eq (ne, e1, e2) && m_arith.is_int_real (e1))
-      {
-        if (get_number (e1) < get_number (e2)) result2 [i] = m_arith.mk_lt (e1, e2);
-        else result2 [i] = m_arith.mk_lt (e2, e1);
-      }
-    }
+    reduce_arith_disequalities (*this, result2);
     
     TRACE("spacer", 
           tout << "implicant:\n";
@@ -937,11 +927,30 @@ namespace spacer {
     }
     m_visited.reset();
   }
+
+  void reduce_arith_disequalities (model_evaluator &mev, expr_ref_vector &fml)
+  {
+    expr *e, *ne, *e1, *e2;
     
-    
-
-
-
+    ast_manager &m = mev.get_ast_manager ();
+    arith_util &arith = mev.arith ();
+    for (unsigned i = 0, sz = fml.size (); i < sz; ++i)
+    {
+      e = fml.get (i);
+      if (m.is_not (e, ne) && m.is_eq (ne, e1, e2) && arith.is_int_real (e1))
+      {
+        if (mev.get_number (e1) < mev.get_number (e2)) fml[i] = arith.mk_lt (e1, e2);
+        else if (mev.get_number (e1) > mev.get_number (e2)) fml[i] = arith.mk_lt (e2, e1);
+        else
+        {
+          fml.reset ();
+          fml.push_back (m.mk_false ());
+          return;
+        }
+      }
+    }
+  }
+  
     void reduce_disequalities(model& model, unsigned threshold, expr_ref& fml) {
         ast_manager& m = fml.get_manager();
         expr_ref_vector conjs(m);

@@ -155,6 +155,8 @@ namespace spacer {
     void reset (const model_ref &model);
     
     model* get_model () {return m_model.get ();}
+    ast_manager& get_ast_manager() {return m;}
+    arith_util &arith () {return m_arith;}
     
     model_evaluator &operator= (const model_ref &model)
     {
@@ -208,6 +210,11 @@ namespace spacer {
 
   };
 
+  /**
+     \brief replaces arithmetic disequalities with a strict inequality true in the model
+   */
+  void reduce_arith_disequalities (model_evaluator &mev, expr_ref_vector &fml);
+  
     /**
        \brief replace variables that are used in many disequalities by
        an equality using the model. 
