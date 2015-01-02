@@ -121,7 +121,6 @@ namespace spacer {
       m1.reset();
       m2.reset();
       m_values.reset();
-      m_visited.reset();
       m_numbers.reset();
       m_refs.reset();
       m_model = model.get ();
@@ -739,194 +738,6 @@ namespace spacer {
     return result;
   }
   
-  void model_evaluator::pick_implicant (const expr_ref_vector& formulas, 
-                                        expr_ref_vector& result2) {
-    TRACE("spacer", 
-          tout << "formulas:\n";
-          for (unsigned i = 0; i < formulas.size(); ++i) 
-            tout << mk_pp(formulas.get (i), m) << "\n"; 
-          );
-        
-    expr_ref tmp(m);
-        
-    // 1. evaluate all the terms 
-    eval_terms (formulas);
-    
-    // 2. pick literals in the implicant
-    pick_literals (formulas, result2);
-    
-    // 3. split arithmetic dis-equalities
-    reduce_arith_disequalities (*this, result2);
-    
-    TRACE("spacer", 
-          tout << "implicant:\n";
-          for (unsigned i = 0; i < result2.size(); ++i) 
-            tout << mk_pp(result2.get (i), m) << "\n"; 
-          );
-    
-    return; // disables old code
-    // XXX Running old model_evaluator code changes the overall
-    // verification result, while it does not change the output of the
-    // function. Need to trace this down more.
-
-    expr_ref_vector result (m);
-    old::model_evaluator old_mev (m);
-    ptr_vector<expr> vv (formulas.size (), formulas.c_ptr ());
-    old_mev.minimize_literals (vv, m_model, result);
-
-    SASSERT (result.size () == result2.size ());
-    for (unsigned i = 0, sz = result2.size (); i < sz; ++i)
-      SASSERT (result.get (i) == result2.get (i));
-      
-  }
-    
-  void model_evaluator::add_literal (expr *e, expr_ref_vector &out)
-  {
-    SASSERT (m.is_bool (e));
-    SASSERT (is_true (e) || is_false (e));
-    expr_ref res (e, m);
-    if (is_false (res))
-    {
-      res = m.mk_not (res);
-      if (is_unknown (res)) set_true (res);
-    }
-    out.push_back (res);
-  }
-  
-  void model_evaluator::process_formula(app* e, 
-                                        ptr_vector<expr>& todo, 
-                                        expr_ref_vector& tocollect) {
-    SASSERT(m.is_bool(e));
-    SASSERT(is_true(e) || is_false(e));
-    unsigned v = is_true(e);
-    unsigned sz = e->get_num_args();
-    expr* const* args = e->get_args();
-    if (e->get_family_id() == m.get_basic_family_id()) {
-      switch(e->get_decl_kind()) {
-      case OP_TRUE:
-        break;
-      case OP_FALSE:
-        break;
-      case OP_EQ:
-      case OP_IFF:
-        if (args[0] == args[1]) {
-          SASSERT(v);
-          // no-op                    
-        }
-        else if (m.is_bool(args[0])) {
-          todo.append(sz, args);
-        }
-        else {
-          add_literal (e, tocollect);
-        }
-        break;                              
-      case OP_DISTINCT:
-        add_literal (e, tocollect);
-        break;
-      case OP_ITE:
-        if (args[1] == args[2]) {
-          add_literal (args [1], tocollect);
-        }
-        else if (is_true(args[1]) && is_true(args[2])) {
-          todo.append(2, args+1);
-        }
-        else if (is_false(args[1]) && is_false(args[2])) {
-          todo.append(2, args+1);
-        }
-        else if (is_true(args[0])) {
-          todo.append(2, args);
-        }
-        else {
-          SASSERT(is_false(args[0]));
-          todo.push_back(args[0]);
-          todo.push_back(args[2]);
-        }
-        break;
-      case OP_AND:
-        if (v) {
-          todo.append(sz, args);
-        }
-        else {
-          unsigned i = 0;
-          for (; !is_false(args[i]) && i < sz; ++i);     
-          if (i == sz) {
-            fatal_error(1);
-          }
-          SASSERT(i < sz);
-          todo.push_back(args[i]);
-        }
-        break;
-      case OP_OR:
-        if (v) {
-          unsigned i = 0;
-          for (; !is_true(args[i]) && i < sz; ++i);
-          if (i == sz) {
-            fatal_error(1);
-          }
-          VERIFY(i < sz);
-          todo.push_back(args[i]);
-        }
-        else {
-          todo.append(sz, args);
-        }
-        break;
-      case OP_XOR: 
-      case OP_NOT:
-        todo.append(sz, args);
-        break;
-      case OP_IMPLIES:
-        if (v) {
-          if (is_true(args[1])) {
-            todo.push_back(args[1]);
-          }
-          else if (is_false(args[0])) {
-            todo.push_back(args[0]);
-          }
-          else {
-            IF_VERBOSE(0, verbose_stream() 
-                       << "Term not handled " << mk_pp(e, m) << "\n";);
-            UNREACHABLE();
-          }
-        }
-        else {
-          todo.append(sz, args);
-        }
-        break;
-      default:
-        IF_VERBOSE(0, verbose_stream() 
-                   << "Term not handled " << mk_pp(e, m) << "\n";);
-        UNREACHABLE();
-      }
-    }
-    else {
-      add_literal (e, tocollect);
-    }
-  }
-    
-  void model_evaluator::pick_literals (const expr_ref_vector& formulas, 
-                                       expr_ref_vector& lits) 
-  {
-    ptr_vector<expr> todo;
-    for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
-    {
-      expr * e = formulas.get (i);
-      SASSERT (is_true (e) || is_false (e));
-      todo.push_back (e);
-    }
-      
-  
-    m_visited.reset();
-        
-    while (!todo.empty()) {
-      app*  e = to_app (todo.back());
-      todo.pop_back ();
-      if (!m_visited.is_marked (e)) {
-        process_formula (e, todo, lits);
-        m_visited.mark(e, true);
-      }
-    }
-    m_visited.reset();
-  }
 
   void reduce_arith_disequalities (model_evaluator &mev, expr_ref_vector &fml)
   {
@@ -1574,13 +1385,221 @@ namespace spacer {
                 });
     }
 
+  namespace
+  {
+    class implicant_picker
+    {
+      model_evaluator &m_mev;
+      ast_manager &m;
+      
+      
+      ptr_vector<expr> m_todo;
+      expr_mark m_visited;
+      
+      
+      void add_literal (expr *e, expr_ref_vector &out)
+      {
+        SASSERT (m.is_bool (e));
+        SASSERT (m_mev.is_true (e) || m_mev.is_false (e));
+        
+        expr_ref res (e, m);
+        if (m_mev.is_false (res))
+        {
+          res = m.mk_not (res);
+          if (m_mev.is_unknown (res)) m_mev.eval_terms (res);
+        }
+        out.push_back (res);
+      }        
+      
+      void process_formula(app* e, expr_ref_vector& tocollect) 
+      {
+        SASSERT(m.is_bool(e));
+        SASSERT(m_mev.is_true(e) || m_mev.is_false(e));
+        unsigned v = m_mev.is_true(e);
+        unsigned sz = e->get_num_args();
+        expr* const* args = e->get_args();
+        if (e->get_family_id() == m.get_basic_family_id()) {
+          switch(e->get_decl_kind()) {
+          case OP_TRUE:
+            break;
+          case OP_FALSE:
+            break;
+          case OP_EQ:
+          case OP_IFF:
+            if (args[0] == args[1]) {
+              SASSERT(v);
+              // no-op                    
+            }
+            else if (m.is_bool(args[0])) {
+              m_todo.append(sz, args);
+            }
+            else {
+              add_literal (e, tocollect);
+            }
+            break;                              
+          case OP_DISTINCT:
+            add_literal (e, tocollect);
+            break;
+          case OP_ITE:
+            if (args[1] == args[2]) {
+              add_literal (args [1], tocollect);
+            }
+            else if (m_mev.is_true(args[1]) && m_mev.is_true(args[2])) {
+              m_todo.append(2, args+1);
+            }
+            else if (m_mev.is_false(args[1]) && m_mev.is_false(args[2])) {
+              m_todo.append(2, args+1);
+            }
+            else if (m_mev.is_true(args[0])) {
+              m_todo.append(2, args);
+            }
+            else {
+              SASSERT(m_mev.is_false(args[0]));
+              m_todo.push_back(args[0]);
+              m_todo.push_back(args[2]);
+            }
+            break;
+          case OP_AND:
+            if (v) {
+              m_todo.append(sz, args);
+            }
+            else {
+              unsigned i = 0;
+              for (; !m_mev.is_false(args[i]) && i < sz; ++i);     
+              if (i == sz) {
+                fatal_error (1);
+              }
+              SASSERT(i < sz);
+              m_todo.push_back (args[i]);
+            }
+            break;
+          case OP_OR:
+            if (v) {
+              unsigned i = 0;
+              for (; !m_mev.is_true(args[i]) && i < sz; ++i);
+              if (i == sz) fatal_error (1);
+              
+              SASSERT (i < sz);
+              m_todo.push_back(args[i]);
+            }
+            else {
+              m_todo.append(sz, args);
+            }
+            break;
+          case OP_XOR: 
+          case OP_NOT:
+            m_todo.append(sz, args);
+            break;
+          case OP_IMPLIES:
+            if (v) {
+              if (m_mev.is_true(args[1])) {
+                m_todo.push_back(args[1]);
+              }
+              else if (m_mev.is_false(args[0])) {
+                m_todo.push_back(args[0]);
+              }
+              else {
+                IF_VERBOSE(0, verbose_stream() 
+                           << "Term not handled " << mk_pp(e, m) << "\n";);
+                UNREACHABLE();
+              }
+            }
+            else {
+              m_todo.append(sz, args);
+            }
+            break;
+          default:
+            IF_VERBOSE(0, verbose_stream() 
+                       << "Term not handled " << mk_pp(e, m) << "\n";);
+            UNREACHABLE();
+          }
+        }
+        else {
+          add_literal (e, tocollect);
+        }
+      }
+      
+      void pick_literals (const expr_ref_vector& in, expr_ref_vector& out) 
+      {
+        m_todo.reset ();
+        for (unsigned i = 0, sz = in.size (); i < sz; ++i)
+        {
+          expr * e = in.get (i);
+          SASSERT (m_mev.is_true (e) || m_mev.is_false (e));
+          m_todo.push_back (e);
+        }
+      
+        m_visited.reset();
+        
+        while (!m_todo.empty()) {
+          app*  e = to_app (m_todo.back());
+          m_todo.pop_back ();
+          if (!m_visited.is_marked (e)) {
+            process_formula (e, out);
+            m_visited.mark (e, true);
+          }
+        }
+        
+        m_visited.reset();
+      }        
+      
+      void pick_implicant (const expr_ref_vector& in, expr_ref_vector& out) 
+      {
+        TRACE("spacer", 
+              tout << "formulas:\n";
+              for (unsigned i = 0, sz = in.size (); i < sz; ++i) 
+                tout << mk_pp(in.get (i), m) << "\n"; 
+              );
+        
+        expr_ref tmp(m);
+        
+        // 1. evaluate all the terms 
+        m_mev.eval_terms (in);
+    
+        // 2. pick literals in the implicant
+        pick_literals (in, out);
+    
+        // 3. split arithmetic dis-equalities
+        reduce_arith_disequalities (m_mev, out);
+    
+        TRACE("spacer", 
+              tout << "implicant:\n";
+              for (unsigned i = 0; i < out.size(); ++i) 
+                tout << mk_pp(out.get (i), m) << "\n"; 
+              );
+    
+        return; // disables old code
+        // XXX Running old model_evaluator code changes the overall
+        // verification result, while it does not change the output of the
+        // function. Need to trace this down more.
+
+        expr_ref_vector result (m);
+        old::model_evaluator old_mev (m);
+        ptr_vector<expr> vv (in.size (), in.c_ptr ());
+        old_mev.minimize_literals (vv, m_mev.get_model (), result);
+
+        SASSERT (result.size () == out.size ());
+        for (unsigned i = 0, sz = out.size (); i < sz; ++i)
+          SASSERT (result.get (i) == out.get (i));
+      }
+      
+    public:
+      implicant_picker (model_evaluator &mev) : 
+        m_mev (mev), m (m_mev.get_ast_manager ()) {}
+      
+      void operator() (expr_ref_vector &in, expr_ref_vector& out)
+      {pick_implicant (in, out);}
+    };
+  }
+  
   void compute_implicant_literals (model_evaluator &mev, expr_ref_vector &formula, 
                                    expr_ref_vector &res)
   {
     qe::flatten_and (formula);
     if (formula.empty ()) return;
     
-    mev.pick_implicant (formula, res);
+    implicant_picker p (mev);
+    p (formula, res);
   }
   
 }

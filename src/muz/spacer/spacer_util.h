@@ -102,20 +102,10 @@ namespace spacer {
     expr_mark      m1;
     expr_mark      m2;
     
-    /// used by pick_literals() 
-    expr_mark      m_visited;
-        
-    
     /// caches the value of an expression
     void assign_value(expr* e, expr* v);
     
-    /// extracts an implicant of the conjunction of formulas
-    void pick_literals(const expr_ref_vector& formulas, expr_ref_vector& lits);
       
-    /// one-round of extracting an implicant of e. The implicant
-    /// literals are stored in tocollect. The worklist is stored in todo
-    void process_formula(app* e, ptr_vector<expr>& todo, expr_ref_vector& tocollect);
-    void add_literal (expr *e, expr_ref_vector& out);
     void eval_arith(app* e);
     void eval_basic(app* e);
     void eval_eq(app* e, expr* arg1, expr* arg2);
@@ -148,7 +138,8 @@ namespace spacer {
     void eval_exprs(expr_ref_vector& es);
         
   public:
-    model_evaluator(ast_manager& m, model_ref model = model_ref () ) : m(m), m_arith(m), m_array(m), m_refs(m) 
+    model_evaluator(ast_manager& m, model_ref model = model_ref () ) : 
+      m(m), m_arith(m), m_array(m), m_refs(m) 
     { reset (model); }
     
     /// initialize with a given model. All previous state is lost. model can be NULL

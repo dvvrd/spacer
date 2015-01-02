@@ -2361,8 +2361,7 @@ namespace spacer {
         forms.push_back(T);
         forms.push_back(phi);
 
-        qe::flatten_and(forms);        
-        mev.pick_implicant (forms, Phi);
+        compute_implicant_literals (mev, forms, Phi);
         
         //pt.remove_predecessors (Phi);
 

@@ -103,9 +103,10 @@ extern "C"
     qe::flatten_and (facts);
     
     spacer::model_evaluator mev (mk_c(c)->m());
-    expr_ref_vector lits (mk_c(c)->m());
     mev.reset (model);
-    mev.pick_implicant (facts, lits);
+    
+    expr_ref_vector lits (mk_c(c)->m());
+    spacer::compute_implicant_literals (mev, facts, lits);
     
     expr_ref result (mk_c(c)->m ());
     result = qe::mk_and (lits);
