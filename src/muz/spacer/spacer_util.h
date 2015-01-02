@@ -110,12 +110,12 @@ namespace spacer {
     void assign_value(expr* e, expr* v);
     
     /// extracts an implicant of the conjunction of formulas
-    void pick_literals(const expr_ref_vector& formulas, ptr_vector<expr>& lits);
+    void pick_literals(const expr_ref_vector& formulas, expr_ref_vector& lits);
       
     /// one-round of extracting an implicant of e. The implicant
     /// literals are stored in tocollect. The worklist is stored in todo
-    void process_formula(app* e, ptr_vector<expr>& todo, ptr_vector<expr>& tocollect);
-    void add_literal (expr *e, ptr_vector<expr>& out);
+    void process_formula(app* e, ptr_vector<expr>& todo, expr_ref_vector& tocollect);
+    void add_literal (expr *e, expr_ref_vector& out);
     void eval_arith(app* e);
     void eval_basic(app* e);
     void eval_eq(app* e, expr* arg1, expr* arg2);

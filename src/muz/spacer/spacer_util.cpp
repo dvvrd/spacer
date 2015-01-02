@@ -748,32 +748,24 @@ namespace spacer {
           );
         
     expr_ref tmp(m);
-    ptr_vector<expr> lits;
         
     // 1. evaluate all the terms 
     eval_terms (formulas);
     
     // 2. pick literals in the implicant
-    pick_literals (formulas, lits);
+    pick_literals (formulas, result2);
     
-    // 3. add appropriate signs
-    for (unsigned i = 0, sz = lits.size (); i < sz; ++i) {
-      expr* e = lits [i];
-      expr* e1, *e2;
+    // 3. split arithmetic dis-equalities
+    for (unsigned i = 0, sz = result2.size (); i < sz; ++i) {
+      expr *e = result2.get (i);
+      expr *ne, *e1, *e2;
       SASSERT(m.is_bool(e));
       SASSERT(is_true(e) || is_false(e));
-      if (is_true(e)) result2.push_back(e);
-      
-      // XXX factor this out into a separate method
-      // hack to break disequalities for arithmetic variables.
-      else if (m.is_eq(e, e1, e2) && m_arith.is_int_real(e1)) {
-        if (get_number(e1) < get_number(e2)) result2.push_back(m_arith.mk_lt(e1,e2));
-        else result2.push_back(m_arith.mk_lt(e2,e1));
+      if (m.is_not (e, ne) && m.is_eq (ne, e1, e2) && m_arith.is_int_real (e1))
+      {
+        if (get_number (e1) < get_number (e2)) result2 [i] = m_arith.mk_lt (e1, e2);
+        else result2 [i] = m_arith.mk_lt (e2, e1);
       }
-      
-      else 
-        result2.push_back(m.mk_not(e));
-      
     }
     
     TRACE("spacer", 
@@ -798,14 +790,22 @@ namespace spacer {
       
   }
     
-  void model_evaluator::add_literal (expr *e, ptr_vector<expr> &out)
+  void model_evaluator::add_literal (expr *e, expr_ref_vector &out)
   {
-    out.push_back (e);
+    SASSERT (m.is_bool (e));
+    SASSERT (is_true (e) || is_false (e));
+    expr_ref res (e, m);
+    if (is_false (res))
+    {
+      res = m.mk_not (res);
+      if (is_unknown (res)) set_true (res);
+    }
+    out.push_back (res);
   }
   
   void model_evaluator::process_formula(app* e, 
                                         ptr_vector<expr>& todo, 
-                                        ptr_vector<expr>& tocollect) {
+                                        expr_ref_vector& tocollect) {
     SASSERT(m.is_bool(e));
     SASSERT(is_true(e) || is_false(e));
     unsigned v = is_true(e);
@@ -914,7 +914,7 @@ namespace spacer {
   }
     
   void model_evaluator::pick_literals (const expr_ref_vector& formulas, 
-                                       ptr_vector<expr>& lits) 
+                                       expr_ref_vector& lits) 
   {
     ptr_vector<expr> todo;
     for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
