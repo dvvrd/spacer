@@ -2024,8 +2024,8 @@ namespace spacer {
           if (n.is_root ()) n.set_reachable (true);
           else
           {
-            dealloc (&n);
             m_search.enqueue_leaf (*n.parent ());
+            dealloc (&n);
           }
           
         }
