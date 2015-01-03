@@ -1457,6 +1457,7 @@ namespace qe {
          */
         void project (expr_ref const& fml) {
             expr_ref_vector eqs (m);
+            ptr_vector<app> true_eqs; // subset of eqs; eqs ensures references
 
             find_arr_eqs (fml, eqs);
             TRACE ("qe",
@@ -1466,18 +1467,17 @@ namespace qe {
                     }
                   );
 
-            // find subst term
-            // TODO: better ordering of eqs?
-            for (unsigned i = 0; !m_subst_term_v && i < eqs.size (); i++) {
+            // evaluate eqs in M
+            for (unsigned i = 0; i < eqs.size (); i++) {
                 TRACE ("qe",
                         tout << "array equality:\n";
                         tout << mk_pp (eqs.get (i), m) << "\n";
                       );
 
-                expr* curr_eq = eqs.get (i);
+                expr* eq = eqs.get (i);
 
-                // evaluate curr_eq in M
-                app* a = to_app (curr_eq);
+                // evaluate eq in M
+                app* a = to_app (eq);
                 expr_ref val (m);
                 m_mev.eval_array_eq (*M, a, a->get_arg (0), a->get_arg (1), val);
                 if (!val) {
@@ -1491,13 +1491,72 @@ namespace qe {
                       );
 
                 if (m.is_false (val)) {
-                    m_false_sub_v.insert (curr_eq, m.mk_false ());
+                    m_false_sub_v.insert (eq, m.mk_false ());
                 }
                 else {
-                    m_true_sub_v.insert (curr_eq, m.mk_true ());
-                    // try to find subst term
-                    find_subst_term (to_app (curr_eq));
+                    true_eqs.push_back (to_app (eq));
                 }
+            }
+
+            // compute nesting depths of stores on m_v in true_eqs, as follows:
+            // 0 if m_v appears on both sides of equality
+            // 1 if equality is (m_v=t)
+            // 2 if equality is (store(m_v,i,v)=t)
+            // ...
+            unsigned num_true_eqs = true_eqs.size ();
+            vector<unsigned> nds (num_true_eqs);
+            for (unsigned i = 0; i < num_true_eqs; i++) {
+                app* eq = true_eqs.get (i);
+                expr* lhs = eq->get_arg (0);
+                expr* rhs = eq->get_arg (1);
+                bool lhs_has_v = (lhs == m_v || m_has_stores_v.is_marked (lhs));
+                bool rhs_has_v = (rhs == m_v || m_has_stores_v.is_marked (rhs));
+                app* store = 0;
+
+                SASSERT (lhs_has_v || rhs_has_v);
+
+                if (!lhs_has_v) {
+                    store = to_app (rhs);
+                }
+                else if (!rhs_has_v) {
+                    store = to_app (lhs);
+                }
+                // else v appears on both sides -- trivial equality
+                // put it in the beginning to simplify it away
+
+                unsigned nd = 0; // nesting depth
+                if (store) {
+                    for (nd = 1; m_arr_u.is_store (store); nd++, store = to_app (store->get_arg (0)));
+                    SASSERT (store == m_v);
+                }
+                nds.push_back (nd);
+            }
+
+            // sort true_eqs according to nesting depth
+            // use insertion sort
+            for (unsigned i = 1; i < num_true_eqs; i++) {
+                app* eq = true_eqs.get (i);
+                unsigned nd = nds.get (i);
+                unsigned j = i;
+                for (; nds.get (j-1) > nd && j > 0; j--) {
+                    true_eqs.set (j, true_eqs.get (j-1));
+                    nds.set (j, nds.get (j-1));
+                }
+                if (j < i) {
+                    true_eqs.set (j, eq);
+                    nds.set (j, nd);
+                    TRACE ("qe",
+                            tout << "changing eq order!\n";
+                          );
+                }
+            }
+
+            // search for subst term
+            for (unsigned i = 0; !m_subst_term_v && i < num_true_eqs; i++) {
+                app* eq = true_eqs.get (i);
+                m_true_sub_v.insert (eq, m.mk_true ());
+                // try to find subst term
+                find_subst_term (eq);
             }
         }
 
