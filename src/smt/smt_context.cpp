@@ -3216,7 +3216,7 @@ namespace smt {
             inc_limits();
             if (force_restart || !m_fparams.m_restart_adaptive || m_agility < m_fparams.m_restart_agility_threshold) {
                 SASSERT(!inconsistent());
-                IF_VERBOSE(1, verbose_stream() << "(smt.restarting :propagations " << m_stats.m_num_propagations 
+                IF_VERBOSE(2, verbose_stream() << "(smt.restarting :propagations " << m_stats.m_num_propagations 
                            << " :decisions " << m_stats.m_num_decisions
                            << " :conflicts " << m_stats.m_num_conflicts << " :restart " << m_restart_threshold;
                            if (m_fparams.m_restart_strategy == RS_IN_OUT_GEOMETRIC) {
