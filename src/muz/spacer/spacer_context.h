@@ -225,13 +225,15 @@ namespace spacer {
 
     };
 
-
+  typedef ref<model_node> model_node_ref;
+  
   /**
    * A node in the search tree.
    */
   class model_node {
+    unsigned m_ref_count;
     /// parent node
-    model_node*             m_parent;
+    model_node_ref          m_parent;
     /// predicate transformer
     pred_transformer&       m_pt;
     /// post-condition decided by this node
@@ -252,6 +254,7 @@ namespace spacer {
 
   public:
     model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
+      m_ref_count (0),
       m_parent (parent), m_pt (pt), 
       m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth),
       m_open (true), m_reachable(false) {}
@@ -267,7 +270,7 @@ namespace spacer {
     derivation &get_derivation() const {return *m_derivation.get ();}
     void reset_derivation () {set_derivation (NULL);}
     
-    model_node* parent () const { return m_parent; }
+    model_node* parent () const { return m_parent.get (); }
     bool is_root () const {return !(bool)m_parent;}
     
     pred_transformer& pt () const { return m_pt; }
@@ -293,6 +296,14 @@ namespace spacer {
     
     void close () {reset (); m_open = false;}
     void open () { reset (); }
+    void inc_ref () {++m_ref_count;}
+    void dec_ref ()
+    {
+      --m_ref_count;
+      if (m_ref_count == 0) dealloc (this);
+    }
+    
+    
   };
 
 
@@ -323,6 +334,15 @@ namespace spacer {
     bool operator() (const model_node *n1, const model_node *n2) const
     {return lt(n2, n1);}
   };    
+  
+  struct model_node_ref_gt :
+    public std::binary_function<const model_node_ref&, const model_ref &, bool>
+  {
+    model_node_gt gt;
+    bool operator() (const model_node_ref &n1, const model_node_ref &n2) const
+    {return gt (n1.get (), n2.get ());} 
+  };
+    
   
   /**
    */
@@ -396,19 +416,22 @@ namespace spacer {
 
   
   class model_search {
-    scoped_ptr<model_node>   m_root;
-    std::priority_queue<model_node*, std::vector<model_node*>, model_node_gt> m_leaves;
+    model_node_ref  m_root;
+    unsigned m_max_level;
+    std::priority_queue<model_node_ref, std::vector<model_node_ref>, 
+                        model_node_ref_gt>     m_obligations;
       
   public:
-    model_search(): m_root(NULL) {}
+    model_search(): m_root(NULL), m_max_level(0) {}
     ~model_search();
 
     void reset();
-    model_node* next();
-    void enqueue_leaf(model_node& n) {m_leaves.push (&n);}
-    
+    model_node_ref next();
+    void enqueue_leaf(model_node& n) {m_obligations.push (&n);}
     void set_root(model_node& n);
-    model_node& get_root() const { return *(m_root.get ()); }
+    model_node& get_root() const { return *m_root.get (); }
+    unsigned max_level () {return m_max_level;}
+    
     //std::ostream& display(std::ostream& out) const; 
     expr_ref get_trace(context const& ctx);
   };

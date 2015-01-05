@@ -1179,17 +1179,18 @@ namespace spacer {
     // ----------------
     // model_search
 
-  model_node* model_search::next () {
-    if (m_leaves.empty ()) return NULL;
+  model_node_ref model_search::next () {
+    if (m_obligations.empty ()) return NULL;
       
-    model_node* result = m_leaves.top ();
-    m_leaves.pop ();
+    model_node_ref result = m_obligations.top ();
+    m_obligations.pop ();
     return result;
   }
 
     void model_search::set_root (model_node& root) {
         reset();
         m_root = &root;
+        m_max_level = root.level ();
         enqueue_leaf(root);
     }
 
@@ -1206,7 +1207,7 @@ namespace spacer {
     model_search::~model_search() {reset();}
 
     void model_search::reset() {
-        while (!m_leaves.empty ()) m_leaves.pop ();
+        while (!m_obligations.empty ()) m_obligations.pop ();
         m_root = NULL;
     }
   
@@ -1945,7 +1946,7 @@ namespace spacer {
         root->set_post (post);
         m_search.set_root(*root);            
         
-        while (model_node* node = m_search.next ()) 
+        while (model_node_ref node = m_search.next ()) 
         {
             IF_VERBOSE(2, 
                        verbose_stream() << "Expand node: " 
@@ -2022,11 +2023,7 @@ namespace spacer {
           n.pt ().add_reach_fact (reach_fact, *r, child_reach_facts);
           
           if (n.is_root ()) n.set_reachable (true);
-          else
-          {
-            m_search.enqueue_leaf (*n.parent ());
-            dealloc (&n);
-          }
+          else m_search.enqueue_leaf (*n.parent ());
           
         }
         //otherwise pick the first OA and create a sub-goal
@@ -2072,7 +2069,12 @@ namespace spacer {
           model_node &p = *n.parent ();
           p.reset_derivation ();
           m_search.enqueue_leaf (p);
-          dealloc (&n);
+          // if (n.level () < m_search.max_level ())
+          // {
+          //   n.inc_level ();
+          //   m_search.enqueue_leaf (n);
+          // }
+          // else dealloc (&n);
         }
         break;
       }
