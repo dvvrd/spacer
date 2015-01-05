@@ -95,7 +95,7 @@ namespace qe {
                 ts.push_back(a.mk_numeral(mul*mul1, m.get_sort(t)));
             }
             else if ((*m_var)(t)) {
-                IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(t, m) << "\n";);
+                IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(t, m) << "\n";);
                 throw cant_project();
             }
             else if (mul.is_one()) {
@@ -165,7 +165,7 @@ namespace qe {
                 s = m.get_sort(e1);
             }
             else {
-                IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(lit, m) << "\n";);
+                IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(lit, m) << "\n";);
                 throw cant_project();
             }
 
@@ -1011,7 +1011,7 @@ namespace qe {
                 m_var = alloc(contains_app, m, v);
                 try {
                     if (a.is_int (v)) {
-                        IF_VERBOSE(1, verbose_stream() << "can't project int vars:" << mk_pp(v, m) << "\n";);
+                        IF_VERBOSE(2, verbose_stream() << "can't project int vars:" << mk_pp(v, m) << "\n";);
                         throw cant_project ();
                     }
                     project(mdl, result);
@@ -1021,7 +1021,7 @@ namespace qe {
                           });
                 }
                 catch (cant_project) {
-                    IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
+                    IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
 
                     new_vars.push_back(v);
                 }
@@ -1099,7 +1099,7 @@ namespace qe {
                      */
                 }
                 catch (cant_project) {
-                    IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
+                    IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
                     new_vars.push_back(v);
                 }
             }
@@ -1566,7 +1566,7 @@ namespace qe {
                           );
                 }
                 catch (cant_project) {
-                    IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(m_v, m) << "\n";);
+                    IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(m_v, m) << "\n";);
                     rem_arr_vars.push_back(m_v);
                 }
             }
@@ -1760,7 +1760,7 @@ namespace qe {
               mk_result (fml);
             }
             catch (cant_project) {
-                IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
+                IF_VERBOSE(2, verbose_stream() << "can't project arrays:" << "\n";);
             }
         }
     };
@@ -1993,7 +1993,7 @@ namespace qe {
                 arr_vars.reset ();
             }
             catch (cant_project) {
-                IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
+                IF_VERBOSE(2, verbose_stream() << "can't project arrays:" << "\n";);
             }
 
             // dealloc
