@@ -445,9 +445,8 @@ namespace spacer {
     model_node_ref next();
     model_node * top ();
     void pop () {m_obligations.pop ();}
-    void push (model_node &n) {m_obligations.push (&n);}
+    void push (model_node &n) {if (n.level () <= m_max_level) m_obligations.push (&n);}
     
-    void enqueue_leaf(model_node& n) {m_obligations.push (&n);}
     void set_root(model_node& n);
     bool is_root (model_node& n) const {return m_root.get () == &n;}
     

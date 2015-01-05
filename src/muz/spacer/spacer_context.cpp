@@ -2005,7 +2005,7 @@ namespace spacer {
             if (m_search.is_root (*node)) return false;
             
             node->inc_level ();
-            if (get_params ().flexible_trace () && node->level () <= m_search.max_level ())
+            if (get_params ().flexible_trace ())
               m_search.push (*node);
             break;
           case l_undef:
