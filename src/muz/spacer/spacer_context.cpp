@@ -2152,6 +2152,10 @@ namespace spacer {
 
   bool context::propagate(unsigned min_prop_lvl, 
                           unsigned max_prop_lvl, unsigned full_prop_lvl) {    
+    
+    timeit _timer (get_verbosity_level () >= 1, "spacer::context::propagate", 
+                   verbose_stream ());
+    
     if (full_prop_lvl < max_prop_lvl) full_prop_lvl = max_prop_lvl;
     
     if (m_params.simplify_formulas_pre()) {
