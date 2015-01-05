@@ -225,13 +225,15 @@ namespace spacer {
 
     };
 
-
+  typedef ref<model_node> model_node_ref;
+  
   /**
    * A node in the search tree.
    */
   class model_node {
+    unsigned m_ref_count;
     /// parent node
-    model_node*             m_parent;
+    model_node_ref          m_parent;
     /// predicate transformer
     pred_transformer&       m_pt;
     /// post-condition decided by this node
@@ -243,23 +245,24 @@ namespace spacer {
     
     /// whether a concrete answer to the post is found
     bool                    m_open;     
-    /// when the node is closed, whether it is reachable
-    bool                    m_reachable;
     
     /// optional derivation corresponding to non-linear uninterpreted
     /// part of some rule of pt
     scoped_ptr<derivation>   m_derivation;
+    
+    ptr_vector<model_node>  m_kids;
 
   public:
     model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
+      m_ref_count (0),
       m_parent (parent), m_pt (pt), 
       m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth),
-      m_open (true), m_reachable(false) {}
-
-    bool is_reachable () {return !m_open && m_reachable;}
-    bool is_unreachable () {return !m_open && !m_reachable;}
-    void set_reachable (bool v) {close (); m_reachable = v;}
+      m_open (true)
+    {if (m_parent) m_parent->add_child (*this);}
     
+    ~model_node() {if (m_parent) m_parent->erase_child (*this);}
+    
+
     void inc_level () {m_level++; m_depth++;}
     
     void set_derivation (derivation *d) {m_derivation = d;}
@@ -267,8 +270,7 @@ namespace spacer {
     derivation &get_derivation() const {return *m_derivation.get ();}
     void reset_derivation () {set_derivation (NULL);}
     
-    model_node* parent () const { return m_parent; }
-    bool is_root () const {return !(bool)m_parent;}
+    model_node* parent () const { return m_parent.get (); }
     
     pred_transformer& pt () const { return m_pt; }
     ast_manager& get_ast_manager () const { return m_pt.get_ast_manager (); }
@@ -291,8 +293,30 @@ namespace spacer {
     bool is_open () const { return m_open; }
     bool is_closed () const { return !m_open; }
     
-    void close () {reset (); m_open = false;}
+    void close () 
+    {
+      if (!m_open) return;
+      
+      reset (); 
+      m_open = false;
+      for (unsigned i = 0, sz = m_kids.size (); i < sz; ++i)
+        m_kids [i]->close ();
+    }
+    
     void open () { reset (); }
+    
+    void add_child (model_node &v) {m_kids.push_back (&v);}
+    void erase_child (model_node &v) {m_kids.erase (&v);}
+    
+    
+    void inc_ref () {++m_ref_count;}
+    void dec_ref ()
+    {
+      --m_ref_count;
+      if (m_ref_count == 0) dealloc (this);
+    }
+    
+    
   };
 
 
@@ -323,6 +347,15 @@ namespace spacer {
     bool operator() (const model_node *n1, const model_node *n2) const
     {return lt(n2, n1);}
   };    
+  
+  struct model_node_ref_gt :
+    public std::binary_function<const model_node_ref&, const model_ref &, bool>
+  {
+    model_node_gt gt;
+    bool operator() (const model_node_ref &n1, const model_node_ref &n2) const
+    {return gt (n1.get (), n2.get ());} 
+  };
+    
   
   /**
    */
@@ -396,19 +429,28 @@ namespace spacer {
 
   
   class model_search {
-    scoped_ptr<model_node>   m_root;
-    std::priority_queue<model_node*, std::vector<model_node*>, model_node_gt> m_leaves;
+    model_node_ref  m_root;
+    unsigned m_max_level;
+    std::priority_queue<model_node_ref, std::vector<model_node_ref>, 
+                        model_node_ref_gt>     m_obligations;
       
   public:
-    model_search(): m_root(NULL) {}
+    model_search(): m_root(NULL), m_max_level(0) {}
     ~model_search();
 
     void reset();
-    model_node* next();
-    void enqueue_leaf(model_node& n) {m_leaves.push (&n);}
+    model_node_ref next();
+    model_node * top ();
+    void pop () {m_obligations.pop ();}
+    void push (model_node &n) {m_obligations.push (&n);}
     
+    void enqueue_leaf(model_node& n) {m_obligations.push (&n);}
     void set_root(model_node& n);
-    model_node& get_root() const { return *(m_root.get ()); }
+    bool is_root (model_node& n) const {return m_root.get () == &n;}
+    
+    model_node& get_root() const { return *m_root.get (); }
+    unsigned max_level () {return m_max_level;}
+    
     //std::ostream& display(std::ostream& out) const; 
     expr_ref get_trace(context const& ctx);
   };
@@ -471,7 +513,7 @@ namespace spacer {
         bool check_reachability(unsigned level);        
         bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
                        unsigned full_prop_lvl);
-        void expand_node(model_node& n);
+        lbool expand_node(model_node& n);
         lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 
                            unsigned& uses_level, bool& is_concrete, 
                            datalog::rule const*& r, vector<bool>& reach_pred_used, 

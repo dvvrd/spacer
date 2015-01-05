@@ -63,4 +63,106 @@ create next derivation child using a given model, and starting index
 create a next model for a derivation 
 
 
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+// an obligation
+model_node
+  // NULL means root
+  model_node_ref parent
+  model_node_ref_vector kids
+  
+  pred_transformer &predicate
+  expr* condition
+  unsigned level 
+  unsigned depth  
+  // monotonically increasing
+  unsigned id    
+  
+  bool open;
+  
+
+model_node::close ()
+  open = false
+  for k : kids do k.close ()
+
+model_search
+  
+  model_node_ref root;
+  
+  // proof obligations
+  priority_queue m_obligations;
+  model_node_ref m_last_reachable;
+  
+  
+bool model_node::operator< (model_node& other)
+   lexicographic order based on 
+   level<, depth<, id>
+  
+  
+
+assert (!m_last_reachable);
+while (!m_obligations.empty ())
+{
+   // propagate reachability as much as possible
+   while (m_last_reachable)
+   {
+     obl = m_last_reachable
+     m_last_reachable.reset ();
+     if (is_root (obl)) return true;
+     if (discharge_obligation (obl.get_parent ()) == l_true)
+        m_last_reachable = obl.get_parent ();
+   }
+   
+   // at least one obligation is not closed, ow root was reachable        
+   while (m_obligations.top ().is_closed ()) m_obligations.pop ();
+   assert (!m_obligations.empty ());                            
+          
+   // process an obligation
+   assert (!m_last_reachable)
+   obl = m_obligations.top ();
+   switch (discharge_obligation (obl))
+   { 
+     case l_true: 
+        // if reachable, schedule a reachability round
+        m_last_reachable = m_obligations.top ();
+        m_obligations.pop ();
+        break;
+     case l_false:
+        // if unreachable removed from the queue
+        m_obligations.pop ();
+        /// bump level 
+        obl.inc_level ();
+        /// optionally insert back into the queue
+        if (is_active (obl)) m_obligations.push (obl);
+        break;
+     default:
+        assert (m_obligations.top () != obl);
+   }
+}
+return false
+
+/// with priority queue
+bool is_active (model_node obl) { return level <= m_search.max_level (); }
+/// with out priority queue. Discharged obligations are dropped
+bool is_active (model_node obl) { return false; }
+
+discharge_obligation (model_node obl)
+{
+  assert (!obl.is_closed ());
+  switch (check_reachability (obl))
+  {
+    case l_true:
+       obl.close ()
+       update reachability facts
+       return l_true;
+    case l_false:
+       update lemmas 
+       return l_false
+    case l_unknown:
+      create children
+      populate m_obligations queue
+      return l_unknown
+  }
+}
+
 
