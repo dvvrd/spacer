@@ -245,7 +245,8 @@ namespace spacer {
     
     /// whether a concrete answer to the post is found
     bool                    m_open;     
-    
+    /// whether to use farkas generalizer to construct a lemma blocking this node
+    bool                    m_use_farkas;
     /// optional derivation corresponding to non-linear uninterpreted
     /// part of some rule of pt
     scoped_ptr<derivation>   m_derivation;
@@ -257,7 +258,7 @@ namespace spacer {
       m_ref_count (0),
       m_parent (parent), m_pt (pt), 
       m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth),
-      m_open (true)
+      m_open (true), m_use_farkas (true)
     {if (m_parent) m_parent->add_child (*this);}
     
     ~model_node() {if (m_parent) m_parent->erase_child (*this);}
@@ -277,11 +278,13 @@ namespace spacer {
     manager& get_manager () const { return m_pt.get_manager (); }
     context& get_context () const {return m_pt.get_context ();}
       
-    expr* post () const { return m_post.get (); }
     unsigned level () const { return m_level; }
     unsigned depth () const {return m_depth;}
     
-
+    bool use_farkas_generalizer () const {return m_use_farkas;}
+    void set_farkas_generalizer (bool v) {m_use_farkas = v;}
+    
+    expr* post () const { return m_post.get (); }
     void set_post (expr* post) { m_post = post; }
 
     void reset () 

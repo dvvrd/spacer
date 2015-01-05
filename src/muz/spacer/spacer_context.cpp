@@ -46,6 +46,8 @@ Notes:
 #include "scoped_proof.h"
 #include "qe_project.h"
 
+#include "timeit.h"
+
 namespace spacer {
     
     // ----------------
@@ -638,13 +640,14 @@ namespace spacer {
                                        unsigned& num_reuse_reach) {
         TRACE("spacer", 
               tout << "is-reachable: " << head()->get_name() << " level: " 
-              << n.level() << "\n";
+              << n.level() << " depth: " << n.depth () << "\n";
               tout << mk_pp(n.post(), m) << "\n";);
 
         ensure_level(n.level());        
 
         // prepare the solver
         prop_solver::scoped_level _sl(m_solver, n.level());
+        prop_solver::scoped_subset_core _sc (m_solver, !n.use_farkas_generalizer ());
         m_solver.set_core(core);
         m_solver.set_model(model);
 
@@ -759,8 +762,8 @@ namespace spacer {
         mk_assumptions(head(), states, conj);
         fml = pm.mk_and(conj);
         prop_solver::scoped_level _sl(m_solver, level);
+        prop_solver::scoped_subset_core _sc (m_solver, true);
         m_solver.set_core(&core);
-        m_solver.set_subset_based_core(true);
         expr_ref_vector aux (m);
         lbool res = m_solver.check_assumptions_and_formula(lits, aux, fml);
         if (res == l_false) {
@@ -2032,17 +2035,22 @@ namespace spacer {
       }
       
       
+      
       if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
 
       TRACE ("spacer", 
              tout << "expand-node: " << n.pt().head()->get_name() 
-             << " level: " << n.level() << "\n"
+             << " level: " << n.level() 
              << " depth: " << n.depth () << "\n"
              << mk_pp(n.post(), m) << "\n";);
+      
+      stopwatch watch;
       IF_VERBOSE (1, verbose_stream () << "expand: " << n.pt ().head ()->get_name () 
                   << " (" << n.level () << ", " << n.depth () << ") "
                   << &n;
-                  verbose_stream().flush (););
+                  verbose_stream().flush ();
+                  watch.start (););
+      
 
       // check the cache
       // DISABLED FOR NOW
@@ -2082,13 +2090,17 @@ namespace spacer {
           mk_reach_fact (n, mev, *r, reach_fact, child_reach_facts);
           n.pt ().add_reach_fact (reach_fact, *r, child_reach_facts);
           
-          IF_VERBOSE(1, verbose_stream () << " T\n";);
+          IF_VERBOSE(1, verbose_stream () << " T "
+                     << std::fixed << std::setprecision(2) 
+                     << watch.get_seconds () << "\n";);
           return l_true;
         }
         
         //otherwise pick the first OA and create a sub-goal
         create_children (n, *r, mev, reach_pred_used);
-        IF_VERBOSE(1, verbose_stream () << " U\n";);
+        IF_VERBOSE(1, verbose_stream () << " U "
+                   << std::fixed << std::setprecision(2) 
+                   << watch.get_seconds () << "\n";);
         return l_undef;
         
       }
@@ -2124,7 +2136,14 @@ namespace spacer {
         // -- force the parent to recompute reachability status
         if (n.parent ()) n.parent ()->reset_derivation ();
         
-        IF_VERBOSE(1, verbose_stream () << " F\n";);
+        // Optionally check reachability of lemmas
+        // n.set_post (m_pm.mk_and (cores [0].first));
+        // n.set_farkas_generalizer (false);
+        
+        IF_VERBOSE(1, verbose_stream () << " F "
+                   << std::fixed << std::setprecision(2) 
+                   << watch.get_seconds () << "\n";);
+
         return l_false;
       }
         //something went wrong
