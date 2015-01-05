@@ -245,8 +245,6 @@ namespace spacer {
     
     /// whether a concrete answer to the post is found
     bool                    m_open;     
-    /// when the node is closed, whether it is reachable
-    bool                    m_reachable;
     
     /// optional derivation corresponding to non-linear uninterpreted
     /// part of some rule of pt
@@ -259,16 +257,12 @@ namespace spacer {
       m_ref_count (0),
       m_parent (parent), m_pt (pt), 
       m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth),
-      m_open (true), m_reachable(false) 
+      m_open (true)
     {if (m_parent) m_parent->add_child (*this);}
     
     ~model_node() {if (m_parent) m_parent->erase_child (*this);}
     
 
-    bool is_reachable () {return !m_open && m_reachable;}
-    bool is_unreachable () {return !m_open && !m_reachable;}
-    void set_reachable (bool v) {close (); m_reachable = v;}
-    
     void inc_level () {m_level++; m_depth++;}
     
     void set_derivation (derivation *d) {m_derivation = d;}
@@ -277,7 +271,6 @@ namespace spacer {
     void reset_derivation () {set_derivation (NULL);}
     
     model_node* parent () const { return m_parent.get (); }
-    bool is_root () const {return !(bool)m_parent;}
     
     pred_transformer& pt () const { return m_pt; }
     ast_manager& get_ast_manager () const { return m_pt.get_ast_manager (); }
@@ -453,6 +446,8 @@ namespace spacer {
     
     void enqueue_leaf(model_node& n) {m_obligations.push (&n);}
     void set_root(model_node& n);
+    bool is_root (model_node& n) const {return m_root.get () == &n;}
+    
     model_node& get_root() const { return *m_root.get (); }
     unsigned max_level () {return m_max_level;}
     
@@ -518,7 +513,7 @@ namespace spacer {
         bool check_reachability(unsigned level);        
         bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
                        unsigned full_prop_lvl);
-        void expand_node(model_node& n);
+        lbool expand_node(model_node& n);
         lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 
                            unsigned& uses_level, bool& is_concrete, 
                            datalog::rule const*& r, vector<bool>& reach_pred_used, 

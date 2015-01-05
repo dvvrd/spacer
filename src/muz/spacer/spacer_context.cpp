@@ -1130,7 +1130,8 @@ namespace spacer {
     
     model_node *n = alloc (model_node, &m_parent, 
                            m_premises[m_active].pt (), 
-                           prev_level (m_parent.level ()));
+                           prev_level (m_parent.level ()),
+                           m_parent.depth ());
     n->set_post (post);
     return n;
   }
@@ -1179,6 +1180,12 @@ namespace spacer {
     // ----------------
     // model_search
 
+  model_node* model_search::top ()
+  {
+    if (m_obligations.empty ()) return NULL;
+    return m_obligations.top ().get ();
+  }
+  
   model_node_ref model_search::next () {
     if (m_obligations.empty ()) return NULL;
       
@@ -1191,7 +1198,7 @@ namespace spacer {
         reset();
         m_root = &root;
         m_max_level = root.level ();
-        enqueue_leaf(root);
+        push (root);
     }
 
     /**
@@ -1940,49 +1947,102 @@ namespace spacer {
     bool context::check_reachability(unsigned level) 
     {
         expr_ref post (m.mk_true(), m);
+        model_node_ref last_reachable;
 
         //create the initial goal -- this is the INIT rule
         model_node* root = alloc (model_node, 0, *m_query, level);
         root->set_post (post);
         m_search.set_root(*root);            
         
-        while (model_node_ref node = m_search.next ()) 
+        while (m_search.top ())
         {
-            IF_VERBOSE(2, 
-                       verbose_stream() << "Expand node: " 
-                       << node->level() << "\n";);
-            checkpoint();
-            
-            // -- if a node has a derivation, either close it or derive a child
-            if (node->has_derivation ())
+          checkpoint ();
+          model_node_ref node;
+          
+          while (last_reachable)
+          {
+            node = last_reachable;
+            last_reachable = NULL;
+            if (m_search.is_root (*node)) return true;
+            if (expand_node (*node->parent ()) == l_true)
             {
-              model_node *kid = node->get_derivation ().create_next_child ();
-              if (kid) 
-              {
-                m_search.enqueue_leaf (*kid);
-                continue;
-              }
-              else
-                node->reset_derivation ();
+              last_reachable = node->parent ();
+              last_reachable->close ();
             }
+          }
+          
+          SASSERT (m_search.top ());
+          while (m_search.top ()->is_closed ()) 
+          { 
+            model_node *n = m_search.top ();
+            IF_VERBOSE (1,
+                        verbose_stream () << "Deleting closed node: " 
+                        << n->pt ().head ()->get_name ()
+                        << "(" << n->level () << ", " << n->depth () << ")"
+                        << " " << n << "\n";);
+            m_search.pop ();
+            SASSERT (m_search.top ());
+          }
+          
+          SASSERT (m_search.top ());
+          
+          node = m_search.top ();
+          SASSERT (node->level () <= m_search.max_level ());
+          switch (expand_node (*node))
+          {
+          case l_true:
+            SASSERT (m_search.top () == node.get ());
+            m_search.pop ();
+            last_reachable = node;
+            last_reachable->close ();
+            break;
+          case l_false:
+            SASSERT (m_search.top () == node.get ());
+            m_search.pop ();
+            if (m_search.is_root (*node)) return false;
             
-            SASSERT (!node->has_derivation ());
-            expand_node (*node);   
+            node->inc_level ();
+            if (get_params ().flexible_trace () && node->level () <= m_search.max_level ())
+              m_search.push (*node);
+            break;
+          case l_undef:
+            SASSERT (m_search.top () != node.get ());
+            break;
+          }
         }
-        return root->is_reachable ();
+        
+        UNREACHABLE();
+        return false;
     }
 
     //this processes a goal and creates sub-goal
-    void context::expand_node(model_node& n) 
+    lbool context::expand_node(model_node& n) 
     {
       SASSERT(n.is_open());
+      
+      if (n.has_derivation ())
+      {
+        model_node *kid = n.get_derivation ().create_next_child ();
+        if (kid) 
+        { 
+          m_search.push (*kid);
+          return l_undef;
+        }
+        else n.reset_derivation ();
+      }
+      
       
       if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
 
       TRACE ("spacer", 
              tout << "expand-node: " << n.pt().head()->get_name() 
-             << " level: " << n.level() << "\n";
-             tout << mk_pp(n.post(), m) << "\n";);
+             << " level: " << n.level() << "\n"
+             << " depth: " << n.depth () << "\n"
+             << mk_pp(n.post(), m) << "\n";);
+      IF_VERBOSE (1, verbose_stream () << "expand: " << n.pt ().head ()->get_name () 
+                  << " (" << n.level () << ", " << n.depth () << ") "
+                  << &n;
+                  verbose_stream().flush (););
 
       // check the cache
       // DISABLED FOR NOW
@@ -2022,14 +2082,15 @@ namespace spacer {
           mk_reach_fact (n, mev, *r, reach_fact, child_reach_facts);
           n.pt ().add_reach_fact (reach_fact, *r, child_reach_facts);
           
-          if (n.is_root ()) n.set_reachable (true);
-          else m_search.enqueue_leaf (*n.parent ());
-          
+          IF_VERBOSE(1, verbose_stream () << " T\n";);
+          return l_true;
         }
+        
         //otherwise pick the first OA and create a sub-goal
-        else 
-          create_children (n, *r, mev, reach_pred_used);
-        break;
+        create_children (n, *r, mev, reach_pred_used);
+        IF_VERBOSE(1, verbose_stream () << " U\n";);
+        return l_undef;
+        
       }
         // n is unreachable, create new summary facts
       case l_false: {
@@ -2059,24 +2120,12 @@ namespace spacer {
           n.pt().add_property (lemma, uses_level);
         }
         CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
-        n.set_reachable (false);
         
-        if (n.is_root ())
-          n.set_reachable (false);
-        // -- add parent as a leaf
-        else
-        {
-          model_node &p = *n.parent ();
-          p.reset_derivation ();
-          m_search.enqueue_leaf (p);
-          // if (n.level () < m_search.max_level ())
-          // {
-          //   n.inc_level ();
-          //   m_search.enqueue_leaf (n);
-          // }
-          // else dealloc (&n);
-        }
-        break;
+        // -- force the parent to recompute reachability status
+        if (n.parent ()) n.parent ()->reset_derivation ();
+        
+        IF_VERBOSE(1, verbose_stream () << " F\n";);
+        return l_false;
       }
         //something went wrong
       case l_undef: 
@@ -2295,7 +2344,10 @@ namespace spacer {
         model_node* ch = deriv->create_first_child (mev);
         SASSERT (ch);
         
-        m_search.enqueue_leaf (*ch);
+        // Optionally disable derivation optimization
+        // n.reset_derivation ();
+        
+        m_search.push (*ch);
         m_stats.m_num_queries++;
     }
 
