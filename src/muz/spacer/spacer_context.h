@@ -302,6 +302,8 @@ namespace spacer {
     
     void close () 
     {
+      if (!m_open) return;
+      
       reset (); 
       m_open = false;
       for (unsigned i = 0, sz = m_kids.size (); i < sz; ++i)
