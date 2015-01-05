@@ -107,6 +107,20 @@ namespace spacer {
             ~scoped_level() { m_lev = false; }
         };
         
+      class scoped_subset_core
+      {
+        prop_solver &m_ps;
+        bool m_subset_based_core;
+        
+      public: 
+        scoped_subset_core (prop_solver &ps, bool subset_core) : 
+          m_ps(ps), m_subset_based_core (ps.m_subset_based_core)
+        {m_ps.set_subset_based_core (subset_core);}
+        
+        ~scoped_subset_core () 
+        {m_ps.set_subset_based_core (m_subset_based_core);}
+      };
+      
         void add_formula(expr * form);
         void add_level_formula(expr * form, unsigned level);
                 
