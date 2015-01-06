@@ -1205,23 +1205,23 @@ namespace spacer {
 
   model_node* model_search::top ()
   {
+    /// nothing in the queue
     if (m_obligations.empty ()) return NULL;
+    /// top queue element is above max level
+    if (m_obligations.top ()->level () > m_max_level) return NULL;
+    /// top queue element is at the max level, but at a higher than base depth
+    if (m_obligations.top ()->level () == m_max_level && 
+        m_obligations.top ()->depth () > m_min_depth) return NULL;
+    
+    /// there is something good in the queue
     return m_obligations.top ().get ();
   }
   
-  model_node_ref model_search::next () {
-    if (m_obligations.empty ()) return NULL;
-      
-    model_node_ref result = m_obligations.top ();
-    m_obligations.pop ();
-    return result;
-  }
-
     void model_search::set_root (model_node& root) {
-        reset();
         m_root = &root;
         m_max_level = root.level ();
-        push (root);
+        m_min_depth = root.depth ();
+        reset();
     }
 
     /**
@@ -1234,11 +1234,11 @@ namespace spacer {
         return expr_ref (m.mk_true (), m);
     }
   
-    model_search::~model_search() {reset();}
+    model_search::~model_search() {}
 
     void model_search::reset() {
         while (!m_obligations.empty ()) m_obligations.pop ();
-        m_root = NULL;
+        if (m_root) m_obligations.push (m_root);
     }
   
     // ----------------
@@ -1947,40 +1947,35 @@ namespace spacer {
       //if there is no query predicate, abort
       if (!m_rels.find(m_query_pred, m_query)) return false;
 
-      unsigned lvl = from_lvl; //this is stack depth bound
+      unsigned lvl = from_lvl;
+      
+      model_node *root = alloc (model_node, 0, *m_query, from_lvl, 0);
+      root->set_post (m.mk_true ());
+      m_search.set_root (*root);
+      
       while (true) {
         checkpoint();
         m_expanded_lvl = lvl;
         m_stats.m_max_query_lvl = lvl;
 
-        if (check_reachability(lvl)) return true;
+        if (check_reachability()) return true;
             
         if (lvl > 0 && propagate(m_expanded_lvl, lvl, UINT_MAX)) return false;
             
-        lvl++;
+        m_search.inc_level ();
+        lvl = m_search.max_level ();
         m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
-        IF_VERBOSE(1,verbose_stream() << "Entering level "<<lvl << "\n";);
+        IF_VERBOSE(1,verbose_stream() << "Entering level "<< lvl << "\n";);
       }
     }
 
 
     //
-    // Pick a potential counter example state.
-    // Initialize a search tree using that counter-example.
-    // If the counter-example expands to a full model, then
-    // the search tree is a model, otherwise obtain the next
-    // query state.
-    //
-    bool context::check_reachability(unsigned level) 
+    bool context::check_reachability () 
     {
-        expr_ref post (m.mk_true(), m);
         model_node_ref last_reachable;
-
-        //create the initial goal -- this is the INIT rule
-        model_node* root = alloc (model_node, 0, *m_query, level);
-        root->set_post (post);
-        m_search.set_root(*root);            
         
+        if (get_params().reset_obligation_queue ()) m_search.reset ();
         while (m_search.top ())
         {
           checkpoint ();
@@ -2026,11 +2021,11 @@ namespace spacer {
           case l_false:
             SASSERT (m_search.top () == node.get ());
             m_search.pop ();
-            if (m_search.is_root (*node)) return false;
             
             node->inc_level ();
             if (get_params ().flexible_trace ())
               m_search.push (*node);
+            if (m_search.is_root (*node)) return false;
             break;
           case l_undef:
             SASSERT (m_search.top () != node.get ());
@@ -2065,12 +2060,14 @@ namespace spacer {
       TRACE ("spacer", 
              tout << "expand-node: " << n.pt().head()->get_name() 
              << " level: " << n.level() 
-             << " depth: " << n.depth () << "\n"
+             << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
              << mk_pp(n.post(), m) << "\n";);
       
       stopwatch watch;
       IF_VERBOSE (1, verbose_stream () << "expand: " << n.pt ().head ()->get_name () 
-                  << " (" << n.level () << ", " << n.depth () << ") "
+                  << " (" << n.level () << ", " 
+                  << (n.depth () - m_search.min_depth ()) << ") "
+                  << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
                   << &n;
                   verbose_stream().flush ();
                   watch.start (););

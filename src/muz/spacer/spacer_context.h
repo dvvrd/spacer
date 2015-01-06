@@ -435,24 +435,32 @@ namespace spacer {
   class model_search {
     model_node_ref  m_root;
     unsigned m_max_level;
+    unsigned m_min_depth;
+    
     std::priority_queue<model_node_ref, std::vector<model_node_ref>, 
                         model_node_ref_gt>     m_obligations;
       
   public:
-    model_search(): m_root(NULL), m_max_level(0) {}
+    model_search(): m_root(NULL), m_max_level(0), m_min_depth(0) {}
     ~model_search();
 
     void reset();
-    model_node_ref next();
     model_node * top ();
     void pop () {m_obligations.pop ();}
-    void push (model_node &n) {if (n.level () <= m_max_level) m_obligations.push (&n);}
+    void push (model_node &n) {m_obligations.push (&n);}
     
+    void inc_level () 
+    {
+      m_max_level++; m_min_depth++;
+      if (m_root && m_obligations.empty ()) m_obligations.push (m_root);
+    }
+    
+    model_node& get_root() const { return *m_root.get (); }
     void set_root(model_node& n);
     bool is_root (model_node& n) const {return m_root.get () == &n;}
     
-    model_node& get_root() const { return *m_root.get (); }
     unsigned max_level () {return m_max_level;}
+    unsigned min_depth () {return m_min_depth;}
     
     //std::ostream& display(std::ostream& out) const; 
     expr_ref get_trace(context const& ctx);
@@ -513,7 +521,7 @@ namespace spacer {
         
         // Functions used by search.
         bool solve_core (unsigned from_lvl = 0);
-        bool check_reachability(unsigned level);        
+        bool check_reachability ();        
         bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
                        unsigned full_prop_lvl);
         lbool expand_node(model_node& n);
