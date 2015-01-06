@@ -817,7 +817,22 @@ namespace spacer {
               tout << "Transition:    " << mk_pp(m_transition,  m) << "\n";);
         SASSERT(is_app(m_initial_state));
         //m_reachable.add_init(to_app(m_initial_state));
+        
+
     }
+  
+  void pred_transformer::initialize_reach_facts ()
+  {
+    typedef obj_map<expr, datalog::rule const*> tag2rule;
+    tag2rule::iterator it = m_tag2rule.begin (), end = m_tag2rule.end ();
+    for (; it != end; ++it)
+    {
+      expr_ref_vector v(m);
+      add_reach_fact (m.mk_false (), *(it->m_value), v);
+      break;
+    }
+  }
+  
 
     void pred_transformer::init_rules(decl2rel const& pts, expr_ref& init, expr_ref& transition) {
         expr_ref_vector transitions(m);
@@ -1318,6 +1333,10 @@ namespace spacer {
             rel.initialize(rels);
             TRACE("spacer", rel.display(tout); );
         }
+        
+        for (it = rels.begin (), end = rels.end ();
+             get_params().init_reach_facts () && it != end; ++it)
+          it->m_value->initialize_reach_facts ();
     }
 
     void context::update_rules(datalog::rule_set& rules) {
