@@ -708,9 +708,14 @@ namespace spacer {
 
         if (is_sat == l_true && core) {
             core->reset();
-            TRACE ("spacer", tout << "reachable\n";);
             SASSERT ((bool)model);
             r = find_rule (**model, is_concrete, reach_pred_used, num_reuse_reach);
+            TRACE ("spacer", tout << "reachable "
+                   << "is_concrete " << is_concrete << " rused: ";
+                   for (unsigned i = 0, sz = reach_pred_used.size (); i < sz; ++i)
+                     tout << reach_pred_used [i];
+                   tout << "\n";);
+            
             return l_true;
         }
         if (is_sat == l_false) {
