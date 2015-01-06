@@ -76,7 +76,7 @@ def_module_params('fixedpoint',
                           ('dump_aig', SYMBOL, '', 'Dump clauses in AIG text format (AAG) to the given file name'),
                           ('use_lemma_as_cti', BOOL, False, 'SPACER: use a lemma instead of a CTI in flexible_trace'),
                           ('reset_obligation_queue', BOOL, True, 'SPACER: reset obligation queue when entering a new level'),
-                          ('init_reach_facts', BOOL, False, 'SPACER: initialize reachability facts with false'),
+                          ('init_reach_facts', BOOL, True, 'SPACER: initialize reachability facts with false'),
 ))
 
 
