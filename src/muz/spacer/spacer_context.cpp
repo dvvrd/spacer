@@ -2158,8 +2158,12 @@ namespace spacer {
         if (n.parent ()) n.parent ()->reset_derivation ();
         
         // Optionally check reachability of lemmas
-        // n.set_post (m_pm.mk_and (cores [0].first));
-        // n.set_farkas_generalizer (false);
+        if (get_params ().use_lemma_as_cti ())
+        {
+          n.set_post (m_pm.mk_and (cores [0].first));
+          n.set_farkas_generalizer (false);
+        }
+        
         
         IF_VERBOSE(1, verbose_stream () << " F "
                    << std::fixed << std::setprecision(2) 
