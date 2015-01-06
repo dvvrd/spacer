@@ -243,7 +243,7 @@ namespace spacer {
                 if (is_concrete) break;
             }
         }
-        VERIFY (r);
+        SASSERT (r);
         return r;
     }
 
