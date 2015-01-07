@@ -894,7 +894,7 @@ namespace spacer {
             init_atom(pts, rule.get_tail(i), var_reprs, conj, i);
         }                  
         for (unsigned i = ut_size; i < t_size; ++i) {
-            ground_free_vars(rule.get_tail(i), var_reprs, aux_vars);
+          ground_free_vars(rule.get_tail(i), var_reprs, aux_vars, ut_size == 0);
         }
         SASSERT(check_filled(var_reprs));
         expr_ref_vector tail(m);
@@ -945,7 +945,8 @@ namespace spacer {
     }
 
     // create constants for free variables in tail.
-    void pred_transformer::ground_free_vars(expr* e, app_ref_vector& vars, ptr_vector<app>& aux_vars) {
+  void pred_transformer::ground_free_vars(expr* e, app_ref_vector& vars, 
+                                          ptr_vector<app>& aux_vars, bool is_init) {
         ptr_vector<sort> sorts;
         get_free_vars(e, sorts);
         while (vars.size() < sorts.size()) {
@@ -954,6 +955,8 @@ namespace spacer {
         for (unsigned i = 0; i < sorts.size(); ++i) {
             if (sorts[i] && !vars[i].get()) {
                 vars[i] = m.mk_fresh_const("aux", sorts[i]);
+                if (is_init)
+                  vars [i] = m.mk_const (pm.get_n_pred (vars.get (i)->get_decl ()));
                 aux_vars.push_back(vars[i].get());
             }
         }
