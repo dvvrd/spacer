@@ -255,7 +255,8 @@ namespace spacer {
 
         void inherit_properties(pred_transformer& other);
 
-        void ground_free_vars(expr* e, app_ref_vector& vars, ptr_vector<app>& aux_vars);
+      void ground_free_vars(expr* e, app_ref_vector& vars, ptr_vector<app>& aux_vars, 
+                            bool is_init);
 
         prop_solver& get_solver() { return m_solver; }
 
