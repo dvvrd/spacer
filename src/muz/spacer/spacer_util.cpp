@@ -924,11 +924,13 @@ namespace spacer {
         setup_model (model);
         ptr_vector<expr> fmls; fmls.push_back (fml);
         eval_fmls (fmls);
-        if (is_false (fml)) {
-            result = m.mk_false ();
+
+        SASSERT (!is_unknown (fml));
+        if (is_x (fml)) {
+            result = fml;
         }
-        else if (is_true (fml) || is_x (fml)) {
-            result = m.mk_true ();
+        else if (m.is_bool (fml)) {
+            result = is_false (fml) ? m.mk_false () : m.mk_true ();
         }
         else if (m_arith.is_int_real (fml)) {
             result = m_arith.mk_numeral (get_number (fml), m_arith.is_int (fml));
