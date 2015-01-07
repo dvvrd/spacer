@@ -64,39 +64,37 @@ namespace qe {
         svector<bool>    m_eq;
         scoped_ptr<contains_app> m_var;
 
-        struct cant_project {};
-
-        void is_linear(rational const& mul, expr* t, rational& c, expr_ref_vector& ts) {
+        bool is_linear(rational const& mul, expr* t, rational& c, expr_ref_vector& ts) {
             expr* t1, *t2;
             rational mul1;
+            bool res = true;
             if (t == m_var->x()) {
                 c += mul;
             }
             else if (a.is_mul(t, t1, t2) && a.is_numeral(t1, mul1)) {
-                is_linear(mul* mul1, t2, c, ts);
+                res = is_linear(mul* mul1, t2, c, ts);
             }
             else if (a.is_mul(t, t1, t2) && a.is_numeral(t2, mul1)) {
-                is_linear(mul* mul1, t1, c, ts);
+                res = is_linear(mul* mul1, t1, c, ts);
             }
             else if (a.is_add(t)) {
                 app* ap = to_app(t);
-                for (unsigned i = 0; i < ap->get_num_args(); ++i) {
-                    is_linear(mul, ap->get_arg(i), c, ts);
+                for (unsigned i = 0; res && i < ap->get_num_args(); ++i) {
+                    res = is_linear(mul, ap->get_arg(i), c, ts);
                 }
             }
             else if (a.is_sub(t, t1, t2)) {
-                is_linear(mul,  t1, c, ts);
-                is_linear(-mul, t2, c, ts);
+                res = is_linear(mul,  t1, c, ts) && is_linear(-mul, t2, c, ts);
             }
             else if (a.is_uminus(t, t1)) {
-                is_linear(-mul, t1, c, ts);
+                res = is_linear(-mul, t1, c, ts);
             }
             else if (a.is_numeral(t, mul1)) {
                 ts.push_back(a.mk_numeral(mul*mul1, m.get_sort(t)));
             }
             else if ((*m_var)(t)) {
                 IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(t, m) << "\n";);
-                throw cant_project();
+                res = false;
             }
             else if (mul.is_one()) {
                 ts.push_back(t);
@@ -104,13 +102,12 @@ namespace qe {
             else {
                 ts.push_back(a.mk_mul(a.mk_numeral(mul, m.get_sort(t)), t));
             }
+            return res;
         }
 
         // either an equality (cx + t = 0) or an inequality (cx + t <= 0) or a divisibility literal (d | cx + t)
         bool is_linear(expr* lit, rational& c, expr_ref& t, rational& d, bool& is_strict, bool& is_eq, bool& is_diseq) {
-            if (!(*m_var)(lit)) {
-                return false;
-            }
+            SASSERT ((*m_var)(lit));
             expr* e1, *e2;
             c.reset();
             sort* s;
@@ -122,14 +119,14 @@ namespace qe {
             }
             SASSERT(!m.is_not(lit));
             if (a.is_le(lit, e1, e2) || a.is_ge(lit, e2, e1)) {
-                is_linear( mul, e1, c, ts);
-                is_linear(-mul, e2, c, ts);
+                if (!is_linear( mul, e1, c, ts) || !is_linear(-mul, e2, c, ts))
+                    return false;
                 s = m.get_sort(e1);
                 is_strict = is_not;
             }
             else if (a.is_lt(lit, e1, e2) || a.is_gt(lit, e2, e1)) {
-                is_linear( mul, e1, c, ts);
-                is_linear(-mul, e2, c, ts);
+                if (!is_linear( mul, e1, c, ts) || !is_linear(-mul, e2, c, ts))
+                    return false;
                 s = m.get_sort(e1);
                 is_strict = !is_not;
             }
@@ -142,23 +139,23 @@ namespace qe {
                     // divsibility constraint: t % num == 0 <=> num | t
                     if (num_val.is_zero ()) {
                         IF_VERBOSE(1, verbose_stream() << "div by zero" << mk_pp(lit, m) << "\n";);
-                        throw cant_project();
+                        return false;
                     }
                     d = num_val;
-                    is_linear (mul, t, c, ts);
+                    if (!is_linear (mul, t, c, ts)) return false;
                 } else if (a.is_mod (e2, t, num) && a.is_numeral (num, num_val, is_int) && is_int &&
                         a.is_numeral (e1, z) && z.is_zero ()) {
                     // divsibility constraint: 0 == t % num <=> num | t
                     if (num_val.is_zero ()) {
                         IF_VERBOSE(1, verbose_stream() << "div by zero" << mk_pp(lit, m) << "\n";);
-                        throw cant_project();
+                        return false;
                     }
                     d = num_val;
-                    is_linear (mul, t, c, ts);
+                    if (!is_linear (mul, t, c, ts)) return false;
                 } else {
                     // equality or disequality
-                    is_linear( mul, e1, c, ts);
-                    is_linear(-mul, e2, c, ts);
+                    if (!is_linear( mul, e1, c, ts) || !is_linear(-mul, e2, c, ts))
+                        return false;
                     if (is_not) is_diseq = true;
                     else is_eq = true;
                 }
@@ -166,7 +163,7 @@ namespace qe {
             }
             else {
                 IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(lit, m) << "\n";);
-                throw cant_project();
+                return false;
             }
 
             if (ts.empty()) {
@@ -179,7 +176,7 @@ namespace qe {
             return true;
         }
 
-        void project(model& mdl, expr_ref_vector& lits) {
+        bool project(model& mdl, expr_ref_vector& lits) {
             unsigned num_pos = 0;
             unsigned num_neg = 0;
             bool use_eq = false;
@@ -198,6 +195,10 @@ namespace qe {
                 bool is_strict = false;
                 bool is_eq = false;
                 bool is_diseq = false;
+                if (!(*m_var)(lits.get (i))) {
+                    new_lits.push_back(lits.get (i));
+                    continue;
+                }
                 if (is_linear(lits.get (i), c, t, d, is_strict, is_eq, is_diseq)) {
                     if (c.is_zero()) {
                         m_rw(lits.get (i), t);
@@ -243,9 +244,7 @@ namespace qe {
                         }                    
                     }
                 }
-                else {
-                    new_lits.push_back(lits.get (i));
-                }
+                else return false;
             }
             if (use_eq) {
                 TRACE ("qe",
@@ -274,7 +273,7 @@ namespace qe {
             lits.reset();
             lits.append(new_lits);
             if (use_eq || num_pos == 0 || num_neg == 0) {
-                return;
+                return true;
             }
             bool use_pos = num_pos < num_neg;
             unsigned max_t = find_max(mdl, use_pos);
@@ -295,9 +294,10 @@ namespace qe {
                           );
                 }
             }
+            return true;
         }
 
-        void project(model& mdl, app_ref_vector const& lits, expr_map& map, app_ref& div_lit) {
+        bool project(model& mdl, app_ref_vector const& lits, expr_map& map, app_ref& div_lit) {
             unsigned num_pos = 0; // number of positive literals true in the model
             unsigned num_neg = 0; // number of negative literals true in the model
 
@@ -318,6 +318,7 @@ namespace qe {
                 bool is_strict = false;
                 bool is_eq = false;
                 bool is_diseq = false;
+                if (!(*m_var)(lits.get (i))) continue;
                 if (is_linear(lits.get (i), c, t, d, is_strict, is_eq, is_diseq)) {
                     TRACE ("qe",
                             tout << "Literal: " << mk_pp (lits.get (i), m) << "\n";
@@ -392,6 +393,7 @@ namespace qe {
                             tout << "d: " << d << "\n";
                           );
                 }
+                else return false;
             }
 
             rational lcm_coeffs (1), lcm_divs (1);
@@ -464,7 +466,7 @@ namespace qe {
                     }
                 }
 
-                return;
+                return true;
             }
 
             expr_ref new_lit (m);
@@ -519,7 +521,7 @@ namespace qe {
                             tout << "New literal: " << mk_pp (new_lit, m) << "\n";
                           );
                 }
-                return;
+                return true;
             }
 
             bool use_pos = num_pos < num_neg; // pick a side; both are sound
@@ -617,6 +619,7 @@ namespace qe {
                                        z);
                 }
             }
+            return true;
         }
 
         unsigned find_max(model& mdl, bool do_pos) {
@@ -1003,28 +1006,32 @@ namespace qe {
         arith_project_util(ast_manager& m): 
             m(m), a(m), m_rw(m), m_lits (m), m_terms (m) {}
 
+        // OLD AND UNUSED INTERFACE
         expr_ref operator()(model& mdl, app_ref_vector& vars, expr_ref_vector const& lits) {
             app_ref_vector new_vars(m);
             expr_ref_vector result(lits);
             for (unsigned i = 0; i < vars.size(); ++i) {
                 app* v = vars.get (i);
                 m_var = alloc(contains_app, m, v);
-                try {
-                    if (a.is_int (v)) {
-                        IF_VERBOSE(1, verbose_stream() << "can't project int vars:" << mk_pp(v, m) << "\n";);
-                        throw cant_project ();
-                    }
-                    project(mdl, result);
-                    TRACE("qe", tout << "projected: " << mk_pp(v, m) << "\n";
-                          for (unsigned i = 0; i < result.size(); ++i) {
-                              tout << mk_pp(result.get (i), m) << "\n";
-                          });
-                }
-                catch (cant_project) {
-                    IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
+                bool fail = a.is_int (v) || !project (mdl, result);
+                if (fail) new_vars.push_back (v);
 
-                    new_vars.push_back(v);
-                }
+                IF_VERBOSE(1,
+                        if (fail) {
+                            verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";
+                        }
+                );
+                TRACE("qe",
+                        if (!fail) {
+                            tout << "projected: " << mk_pp(v, m) << "\n";
+                            for (unsigned i = 0; i < result.size(); ++i) {
+                                tout << mk_pp(result.get (i), m) << "\n";
+                            }
+                        }
+                        else {
+                            tout << "can't project: " << mk_pp (v, m) << "\n";
+                        }
+                     );
             }
             vars.reset();
             vars.append(new_vars);
@@ -1066,21 +1073,20 @@ namespace qe {
                         tout << "projecting variable: " << mk_pp (v, m) << "\n";
                       );
                 m_var = alloc(contains_app, m, v);
-                try {
-                    map.reset ();
-                    lits.reset ();
-                    if (a.is_int (v)) {
-                        // factor out mod terms using div terms
-                        expr_map mod_map (m);
-                        mod2div (fml, mod_map);
-                        TRACE ("qe",
-                                tout << "after mod2div:" << "\n";
-                                tout << mk_pp (fml, m) << "\n";
-                              );
-                    }
-                    collect_lits (fml, lits);
-                    app_ref div_lit (m);
-                    project (mdl, lits, map, div_lit);
+                map.reset ();
+                lits.reset ();
+                if (a.is_int (v)) {
+                    // factor out mod terms using div terms
+                    expr_map mod_map (m);
+                    mod2div (fml, mod_map);
+                    TRACE ("qe",
+                            tout << "after mod2div:" << "\n";
+                            tout << mk_pp (fml, m) << "\n";
+                          );
+                }
+                collect_lits (fml, lits);
+                app_ref div_lit (m);
+                if (project (mdl, lits, map, div_lit)) {
                     substitute (fml, lits, map);
                     if (div_lit) {
                         fml = m.mk_and (fml, div_lit);
@@ -1089,16 +1095,8 @@ namespace qe {
                             tout << "projected: " << mk_pp(v, m) << " "
                                  << mk_pp(fml, m) << "\n";
                          );
-                    /**
-                     * DEBUG_CODE(
-                     *     expr_ref bval (m);
-                     *     // model evaluation doesn't always work for array
-                     *     // variables
-                     *     SASSERT (mdl.eval (fml, bval, true) && m.is_true (bval));
-                     * );
-                     */
                 }
-                catch (cant_project) {
+                else {
                     IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
                     new_vars.push_back(v);
                 }
