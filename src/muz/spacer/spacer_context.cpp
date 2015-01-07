@@ -1148,7 +1148,7 @@ namespace spacer {
   
   model_node *derivation::create_next_child ()
   {
-    if (m_active >= m_premises.size ()) return NULL;
+    if (m_active /* + 1 */>= m_premises.size ()) return NULL;
     
     // update the summary of the active node to some must summary
     
