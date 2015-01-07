@@ -1122,8 +1122,6 @@ namespace qe {
         app_ref_vector              m_aux_vars;
         model_evaluator_array_util  m_mev;
 
-        struct cant_project {};
-
         void reset_v () {
             m_v = 0;
             m_has_stores_v.reset ();
@@ -1453,7 +1451,7 @@ namespace qe {
          *
          * compute substitution term and aux lits
          */
-        void project (expr_ref const& fml) {
+        bool project (expr_ref const& fml) {
             expr_ref_vector eqs (m);
             ptr_vector<app> true_eqs; // subset of eqs; eqs ensures references
 
@@ -1556,6 +1554,8 @@ namespace qe {
                 // try to find subst term
                 find_subst_term (eq);
             }
+
+            return true;
         }
 
         void mk_result (expr_ref& fml) {
@@ -1611,8 +1611,7 @@ namespace qe {
                 TRACE ("qe",
                         tout << "projecting equalities on variable: " << mk_pp (m_v, m) << "\n";
                       );
-                try {
-                    project (fml);
+                if (project (fml)) {
                     mk_result (fml);
                     if (!m_subst_term_v) {
                         rem_arr_vars.push_back (m_v);
@@ -1622,7 +1621,7 @@ namespace qe {
                             tout << mk_pp (fml, m) << "\n";
                           );
                 }
-                catch (cant_project) {
+                else {
                     IF_VERBOSE(1, verbose_stream() << "can't project:" << mk_pp(m_v, m) << "\n";);
                     rem_arr_vars.push_back(m_v);
                 }
@@ -1646,8 +1645,6 @@ namespace qe {
         ast_mark                    m_arr_test;
         ast_mark                    m_has_stores;
         bool                        m_reduce_all_selects;
-
-        struct cant_project {};
 
         void reset () {
             m_cache.reset ();
@@ -1685,13 +1682,13 @@ namespace qe {
             }
         }
 
-        void reduce (expr_ref& e) {
-            if (!is_app (e)) return;
+        bool reduce (expr_ref& e) {
+            if (!is_app (e)) return true;
 
             expr *r = 0;
             if (m_cache.find (e, r)) {
                 e = r;
-                return;
+                return true;
             }
 
             ptr_vector<app> todo;
@@ -1742,6 +1739,7 @@ namespace qe {
 
             SASSERT (r);
             e = r;
+            return true;
         }
 
         expr* reduce_core (app *a) {
@@ -1813,11 +1811,10 @@ namespace qe {
 
             // assume all arr_vars are of array sort
             // and assume no store equalities on arr_vars
-            try {
-                reduce (fml);
+            if (reduce (fml)) {
                 mk_result (fml);
             }
-            catch (cant_project) {
+            else {
                 IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
             }
         }
@@ -1839,8 +1836,6 @@ namespace qe {
         model_evaluator_array_util  m_mev;
         expr_safe_replace           m_sub;
         ast_mark                    m_arr_test;
-
-        struct cant_project {};
 
         void reset () {
             m_sel_terms.reset ();
@@ -1991,7 +1986,7 @@ namespace qe {
          * project selects
          * populates idx lits and obtains substitution for sel terms
          */
-        void project (expr_ref& fml) {
+        bool project (expr_ref& fml) {
             // collect sel terms -- populate the map m_sel_terms
             collect_selects (fml);
 
@@ -2011,6 +2006,8 @@ namespace qe {
                         tout << mk_pp (m_idx_lits.get (i), m) << "\n";
                     }
                   );
+
+            return true;
         }
 
     public:
@@ -2044,13 +2041,12 @@ namespace qe {
 
             // assume all arr_vars are of array sort
             // and they only appear in select terms
-            try {
-                project (fml);
+            if (project (fml)) {
                 mk_result (fml);
                 aux_vars.append (m_sel_consts);
                 arr_vars.reset ();
             }
-            catch (cant_project) {
+            else {
                 IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
             }
 
