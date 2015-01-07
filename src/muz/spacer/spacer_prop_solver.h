@@ -52,7 +52,10 @@ namespace spacer {
         model_ref*          m_model;
         bool                m_subset_based_core;
         unsigned            m_uses_level;
-        func_decl_set       m_aux_symbols;      
+        func_decl_set       m_aux_symbols;
+        /// if true sets the solver into a delta level, enabling only
+        /// atoms explicitly asserted in m_current_level
+        bool                m_delta_level;
         bool                m_in_level;         
         unsigned            m_current_level;    // set when m_in_level
         bool                m_validate_theory_core;// flag for validating theory cores
@@ -106,6 +109,16 @@ namespace spacer {
             }
             ~scoped_level() { m_lev = false; }
         };
+      
+      class scoped_delta_level : public scoped_level
+      {
+        bool &m_delta;
+      public:
+        scoped_delta_level (prop_solver &ps, unsigned lvl) : 
+          scoped_level (ps, lvl), m_delta (ps.m_delta_level) {m_delta = true;}
+        ~scoped_delta_level() {m_delta = false;}
+      };
+        
         
       class scoped_subset_core
       {

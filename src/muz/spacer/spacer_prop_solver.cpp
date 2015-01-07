@@ -249,6 +249,7 @@ namespace spacer {
         m_core(0),
         m_subset_based_core(false),
         m_uses_level(infty_level ()),
+        m_delta_level(false),
         m_in_level(false),
         m_validate_theory_core (validate_theory_core)
     {
@@ -286,7 +287,7 @@ namespace spacer {
     void prop_solver::push_level_atoms(unsigned level, expr_ref_vector& tgt) const {
         unsigned lev_cnt = level_cnt();
         for (unsigned i=0; i<lev_cnt; i++) {
-            bool active = i>=level;
+            bool active = m_delta_level ? i == level : i>=level;
             app * lev_atom = active ? m_neg_level_atoms[i] : m_pos_level_atoms[i];
             tgt.push_back(lev_atom);
         }
