@@ -57,8 +57,7 @@ namespace spacer {
         pm(pm), m(pm.get_manager()),
         ctx(ctx), m_head(head, m), 
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name(), ctx.get_params ().validate_theory_core ()),
-        m_reach_ctx (pm.mk_fresh ()),
-        m_reach_facts (m), m_invariants(m), m_transition(m), m_initial_state(m), 
+        m_reach_facts (), m_invariants(m), m_transition(m), m_initial_state(m), 
         m_all_init (false),
         m_reach_case_vars (m)
     { init_sig (); }
@@ -71,10 +70,6 @@ namespace spacer {
         rule2expr::iterator it3 = m_rule2transition.begin(), end3 = m_rule2transition.end();
         for (; it3 != end3; ++it3) {
             m.dec_ref(it3->m_value);
-        }
-        obj_map<expr, reach_fact_just*>::iterator it4 = m_reach_fact_justs.begin (), end4 = m_reach_fact_justs.end ();
-        for (; it4 != end4; it4++) {
-            dealloc (it4->m_value);
         }
     }
 
@@ -156,10 +151,14 @@ namespace spacer {
   void pred_transformer::get_used_reach_fact (model_evaluator& mev, expr_ref& reach_fact) {
     expr_ref v (m);
     
+    reach_fact = NULL;
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
       v = mev.eval (m_reach_case_vars.get (i));
       if (m.is_false (v)) {
         reach_fact = m_reach_facts.get (i);
+    reach_fact = NULL;
+    reach_fact = NULL;
+    reach_fact = NULL;
         break;
       }
     }
@@ -167,13 +166,13 @@ namespace spacer {
     SASSERT (reach_fact);
   }
   
-  void pred_transformer::get_used_origin_reach_fact (model_evaluator& mev, unsigned oidx, 
-                                                     expr_ref& res) {
+  reach_fact *pred_transformer::get_used_origin_reach_fact (model_evaluator& mev, 
+                                                            unsigned oidx) {
     expr_ref b(m), v(m);
+    reach_fact *res = NULL;
     
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
-      v = m_reach_case_vars.get (i);
-      pm.formula_n2o (v.get (), v, oidx);
+      pm.formula_n2o (m_reach_case_vars.get (i), v, oidx);
       b = mev.eval (v);
       
       if (m.is_false (b)) {
@@ -182,18 +181,8 @@ namespace spacer {
       }
     }
     SASSERT (res);
+    return res;
   }
-
-    datalog::rule const* pred_transformer::get_just_rule (expr* fact) {
-        reach_fact_just* j = m_reach_fact_justs.find (fact);
-        TRACE ("spacer", tout << "justification: " << j << "\n";);
-        return &(j->r);
-    }
-
-    expr_ref_vector const* pred_transformer::get_just_pred_facts (expr* fact) {
-        reach_fact_just* j = m_reach_fact_justs.find (fact);
-        return &(j->pred_reach_facts);
-    }
 
     datalog::rule const* pred_transformer::find_rule(model &model, 
                                                      bool& is_concrete, 
@@ -228,11 +217,11 @@ namespace spacer {
                     bool used = false;
                     func_decl* d = r->get_tail(i)->get_decl();
                     pred_transformer const& pt = ctx.get_pred_transformer (d);
-                    expr_ref reach_var (pt.get_last_reach_case_var (), m);
-                    if (!reach_var) is_concrete = false;
+                    if (!pt.has_reach_facts ()) is_concrete = false;
                     else {
-                      pm.formula_n2o (reach_var.get (), reach_var, i);
-                      model.eval (to_app (reach_var.get ())->get_decl (), vl);
+                      expr_ref v(m);
+                      pm.formula_n2o (pt.get_last_reach_case_var (), v, i);
+                      model.eval (to_app (v.get ())->get_decl (), vl);
                       used = m.is_false (vl);
                       is_concrete = is_concrete && used;
                     }
@@ -512,7 +501,11 @@ namespace spacer {
         if (m_reach_facts.empty ()) {
             return m.mk_false ();
         }
-        return m.mk_or (m_reach_facts.size (), m_reach_facts.c_ptr ());
+        ptr_vector<expr> v;
+        for (unsigned i = 1, sz = m_reach_facts.size (); i < sz; ++i)
+          v.push_back (m_reach_facts[i]->get ());
+        
+        return m.mk_or (v.size (), v.c_ptr ());
     }
 
   expr* pred_transformer::get_last_reach_case_var () const 
@@ -581,9 +574,8 @@ namespace spacer {
       summary.push_back (get_formulas (level, false));
     else // find must summary to use
     {
-      get_used_origin_reach_fact (mev, oidx, v);
-      summary.push_back (v);
-      v.reset ();
+      reach_fact *f = get_used_origin_reach_fact (mev, oidx);
+      summary.push_back (f->get ());
     }
     
     SASSERT (!summary.empty ());
@@ -673,10 +665,10 @@ namespace spacer {
                 for (unsigned i = 0; i < m_predicates.size(); i++) {
                     const pred_transformer &pt = 
                       ctx.get_pred_transformer (m_predicates [i]);
-                    expr_ref a (pt.get_last_reach_case_var (), m);
-                    if (a) 
+                    if (pt.has_reach_facts ())
                     {
-                      pm.formula_n2o (a.get (), a, i);
+                      expr_ref a(m);
+                      pm.formula_n2o (pt.get_last_reach_case_var (), a, i);
                       reach_assumps.push_back (m.mk_not (a));
                     }
                     else if (ctx.get_params ().init_reach_facts ())
@@ -1726,21 +1718,21 @@ namespace spacer {
         // treat the following as queues: read from left to right and insert at right
         ptr_vector<func_decl> preds;
         ptr_vector<pred_transformer> pts;
-        expr_ref_vector facts (m);
+        reach_fact_ref_vector facts;
 
         // temporary
-        expr_ref fact (m);
+        reach_fact* fact;
         datalog::rule const* r;
         pred_transformer* pt;
 
         // get and discard query rule
-        fact = m.mk_true ();
-        r = m_query->get_just_rule (fact);
+        fact = m_query->get_reach_fact (m.mk_true ());
+        r = fact->get_rule ();
 
         // initialize queues
         // assume that the query is only on a single predicate
         // (i.e. disallow fancy queries for now)
-        facts.append (*(m_query->get_just_pred_facts (fact)));
+        facts.append (fact->get_justifications ());
         if (facts.size () != 1) 
         {
           // XXX AG: Escape if an assertion is about to fail
@@ -1760,13 +1752,13 @@ namespace spacer {
             pt = pts.get (curr);
             fact = facts.get (curr);
             // get rule justifying the derivation of fact at pt
-            r = pt->get_just_rule (fact);
+            r = fact->get_rule ();
             rules.push_back (const_cast<datalog::rule *> (r));
             TRACE ("spacer",
                     tout << "next rule: " << r->name ().str () << "\n";
                   );
             // add child facts and pts
-            facts.append (*(pt->get_just_pred_facts (fact)));
+            facts.append (fact->get_justifications ());
             pt->find_predecessors (*r, preds);
             for (unsigned j = 0; j < preds.size (); j++) {
                 pts.push_back (&(get_pred_transformer (preds[j])));
@@ -1819,24 +1811,24 @@ namespace spacer {
         }
 
         // treat the following as queues: read from left to right and insert at the right
-        expr_ref_vector reach_facts (m);
+        reach_fact_ref_vector reach_facts;
         ptr_vector<func_decl> preds;
         ptr_vector<pred_transformer> pts;
         expr_ref_vector cex (m), // pre-order list of ground instances of predicates
                         cex_facts (m); // equalities for the ground cex using signature constants
 
         // temporary
-        expr_ref reach_fact (m);
+        reach_fact *reach_fact;
         pred_transformer* pt;
         expr_ref cex_fact (m);
         datalog::rule const* r;
 
         // get and discard query rule
-        reach_fact = m.mk_true ();
-        r = m_query->get_just_rule (reach_fact);
+        reach_fact = m_query->get_reach_fact (m.mk_true ());
+        r = reach_fact->get_rule ();
 
         // initialize queues
-        reach_facts.append (*(m_query->get_just_pred_facts (reach_fact)));
+        reach_facts.append (reach_fact->get_justifications ());
         SASSERT (reach_facts.size () == 1);
         m_query->find_predecessors (*r, preds);
         SASSERT (preds.size () == 1);
@@ -1852,22 +1844,23 @@ namespace spacer {
         for (unsigned curr = 0; curr < pts.size (); curr++) {
             // pick next pt, fact, and cex_fact
             pt = pts.get (curr);
-            reach_fact = reach_facts.get (curr);
+            reach_fact = reach_facts[curr];
+            
             cex_fact = cex_facts.get (curr);
 
-            expr_ref_vector const* child_reach_facts;
             ptr_vector<pred_transformer> child_pts;
 
             // get justifying rule and child facts for the derivation of reach_fact at pt
-            r = pt->get_just_rule (reach_fact);
-            child_reach_facts = pt->get_just_pred_facts (reach_fact);
+            r = reach_fact->get_rule ();
+            const reach_fact_ref_vector &child_reach_facts = 
+              reach_fact->get_justifications ();
             // get child pts
             preds.reset (); pt->find_predecessors (*r, preds);
             for (unsigned j = 0; j < preds.size (); j++) {
                 child_pts.push_back (&(get_pred_transformer (preds[j])));
             }
             // update the queues
-            reach_facts.append (*child_reach_facts);
+            reach_facts.append (child_reach_facts);
             pts.append (child_pts);
 
             // update cex and cex_facts by making a local sat check:
@@ -1875,10 +1868,11 @@ namespace spacer {
             cex_ctx->push ();
             cex_ctx->assert_expr (cex_fact);
             unsigned u_tail_sz = r->get_uninterpreted_tail_size ();
-            SASSERT (child_reach_facts->size () == u_tail_sz);
+            SASSERT (child_reach_facts.size () == u_tail_sz);
             for (unsigned i = 0; i < u_tail_sz; i++) {
                 expr_ref ofml (m);
-                child_pts.get (i)->get_manager ().formula_n2o (child_reach_facts->get (i), ofml, i);
+                child_pts.get (i)->get_manager ().formula_n2o 
+                  (child_reach_facts[i]->get (), ofml, i);
                 cex_ctx->assert_expr (ofml);
             }
             cex_ctx->assert_expr (pt->transition ());
@@ -2094,10 +2088,8 @@ namespace spacer {
         if (is_concrete) 
         {
           // -- update must summary
-          expr_ref reach_fact (m);
-          expr_ref_vector child_reach_facts (m);
-          mk_reach_fact (n, mev, *r, reach_fact, child_reach_facts);
-          n.pt ().add_reach_fact (reach_fact, *r, child_reach_facts);
+          reach_fact* rf = mk_reach_fact (n, mev, *r);
+          n.pt ().add_reach_fact (*rf);
           
           IF_VERBOSE(1, verbose_stream () << " T "
                      << std::fixed << std::setprecision(2) 
@@ -2234,9 +2226,11 @@ namespace spacer {
     return false;
   }
 
-  void context::mk_reach_fact (model_node& n, model_evaluator &mev,
-                               const datalog::rule& r, expr_ref& result, 
-                               expr_ref_vector& child_reach_facts) {
+  reach_fact *context::mk_reach_fact (model_node& n, model_evaluator &mev,
+                                      const datalog::rule& r) {
+        expr_ref res(m);
+        reach_fact_ref_vector child_reach_facts;
+        
         pred_transformer& pt = n.pt ();
 
         ptr_vector<func_decl> preds;
@@ -2250,36 +2244,39 @@ namespace spacer {
             func_decl* pred = preds[i];
             pred_transformer& ch_pt = get_pred_transformer (pred);
             // get a reach fact of body preds used in the model
-            expr_ref o_ch_reach (m), n_ch_reach (m);
-            ch_pt.get_used_origin_reach_fact (mev, i, n_ch_reach);
-            m_pm.formula_n2o (n_ch_reach, o_ch_reach, i);
+            expr_ref o_ch_reach (m);
+            reach_fact *kid = ch_pt.get_used_origin_reach_fact (mev, i);
+            child_reach_facts.push_back (kid);
+            m_pm.formula_n2o (kid->get (), o_ch_reach, i);
             path_cons.push_back (o_ch_reach);
-            child_reach_facts.push_back (n_ch_reach);
             // collect o-vars to eliminate
-            for (unsigned j = 0; j < pred->get_arity (); j++) {
+            for (unsigned j = 0; j < pred->get_arity (); j++) 
                 vars.push_back (m.mk_const (m_pm.o2o (ch_pt.sig (j), 0, i)));
-            }
+            
+            const ptr_vector<app> &v = kid->aux_vars (); 
+            for (unsigned j = 0, sz = v.size (); j < sz; ++j)
+              vars.push_back (m.mk_const (m_pm.n2o (v [j]->get_decl (), i)));
         }
         // collect aux vars to eliminate
         ptr_vector<app>& aux_vars = pt.get_aux_vars (r);
         vars.append (aux_vars.size (), aux_vars.c_ptr ());
 
-        result = m_pm.mk_and (path_cons);
+        res = m_pm.mk_and (path_cons);
 
         TRACE ("spacer",
                 tout << "Reach fact, before QE:\n";
-                tout << mk_pp (result, m) << "\n";
+                tout << mk_pp (res, m) << "\n";
                 tout << "Vars:\n";
                 for (unsigned i = 0; i < vars.size(); ++i) {
                     tout << mk_pp(vars.get (i), m) << "\n";
                 }
               );
 
-        qe_project (m, vars, result, mev.get_model ());
+        qe_project (m, vars, res, mev.get_model ());
 
         TRACE ("spacer",
                 tout << "Reach fact, after QE project:\n";
-                tout << mk_pp (result, m) << "\n";
+                tout << mk_pp (res, m) << "\n";
                 tout << "Vars:\n";
                 for (unsigned i = 0; i < vars.size(); ++i) {
                     tout << mk_pp(vars.get (i), m) << "\n";
@@ -2289,6 +2286,11 @@ namespace spacer {
         SASSERT (vars.empty ());
 
         m_stats.m_num_reach_queries++;
+        reach_fact *f = alloc(reach_fact, m, res);
+        f->set_rule (r);
+        for (unsigned i = 0, sz = child_reach_facts.size (); i < sz; ++i)
+          f->add_justification (*child_reach_facts [i]);
+        return f;
     }
 
 

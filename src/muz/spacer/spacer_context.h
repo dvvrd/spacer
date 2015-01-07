@@ -50,6 +50,46 @@ namespace spacer {
     typedef obj_map<datalog::rule const, app_ref_vector*> rule2inst;
     typedef obj_map<func_decl, pred_transformer*> decl2rel;
 
+  class reach_fact;
+  typedef sref_vector<reach_fact> reach_fact_ref_vector;
+  
+  class reach_fact
+  {
+    unsigned m_ref_count;
+    
+    expr_ref m_fact;
+    ptr_vector<app> m_aux_vars;
+    
+    const datalog::rule *m_rule;
+    reach_fact_ref_vector m_justification;
+    
+  public:  
+    reach_fact (ast_manager &m, expr* fact, const ptr_vector<app> &aux_vars) : 
+      m_ref_count (0), m_fact (fact, m), m_aux_vars (aux_vars), m_rule(NULL) {}
+    reach_fact (ast_manager &m, expr* fact) :
+      m_ref_count (0), m_fact (fact, m), m_aux_vars (), m_rule(NULL) {}
+    
+    
+    void set_rule (const datalog::rule &r) {m_rule = &r;}
+    const datalog::rule* get_rule () {return m_rule;}
+    
+    void add_justification (reach_fact &f) {m_justification.push_back (&f);}
+    const reach_fact_ref_vector& get_justifications () {return m_justification;}
+    
+    expr *get () {return m_fact.get ();}
+    const ptr_vector<app> &aux_vars () {return m_aux_vars;}
+    
+    void inc_ref () {++m_ref_count;}
+    void dec_ref ()
+    {
+      SASSERT (m_ref_count > 0);
+      --m_ref_count;
+      if (m_ref_count == 0) dealloc (this);
+    }
+  };
+  
+  
+    
     // 
     // Predicate transformer state.
     // A predicate transformer corresponds to the 
@@ -76,9 +116,8 @@ namespace spacer {
         ptr_vector<pred_transformer> m_use;     // places where 'this' is referenced.
         ptr_vector<datalog::rule>    m_rules;   // rules used to derive transformer
         prop_solver                  m_solver;  // solver context
-        scoped_ptr<smt_context>      m_reach_ctx; // context for reachability facts
         vector<expr_ref_vector>      m_levels;  // level formulas
-        expr_ref_vector              m_reach_facts; // reach facts
+        reach_fact_ref_vector        m_reach_facts; // reach facts
         expr_ref_vector              m_invariants;      // properties that are invariant.
         obj_map<expr, unsigned>      m_prop2level;      // map property to level where it occurs.
         obj_map<expr, datalog::rule const*> m_tag2rule; // map tag predicate to rule. 
@@ -98,17 +137,6 @@ namespace spacer {
         /// versions of the variables
         expr_ref_vector              m_reach_case_vars; 
       
-
-        // reach fact justification
-        struct reach_fact_just {
-            datalog::rule const& r;
-            expr_ref_vector pred_reach_facts; // predecessor reach facts
-            reach_fact_just (datalog::rule const& g_r, expr_ref_vector const& g_facts):
-                r (g_r), pred_reach_facts (g_facts)
-            {}
-        };
-
-        obj_map<expr, reach_fact_just*>     m_reach_fact_justs;
 
       /// evaluate v in a model
       expr_ref eval (model_evaluator &mev, expr * v);
@@ -138,6 +166,14 @@ namespace spacer {
         pred_transformer(context& ctx, manager& pm, func_decl* head);
         ~pred_transformer();
 
+      
+        reach_fact *get_reach_fact (expr *v)
+        {
+          for (unsigned i = 1, sz = m_reach_facts.size (); i < sz; ++i)
+            if (v == m_reach_facts [i]->get ()) return m_reach_facts[i];
+          return NULL;
+        }
+      
         void add_rule(datalog::rule* r) { m_rules.push_back(r); }
         void add_use(pred_transformer* pt) { if (!m_use.contains(pt)) m_use.insert(pt); }
         void initialize(decl2rel const& pts);
@@ -164,13 +200,10 @@ namespace spacer {
         /// \brief Returns reachability fact active in the given model
         void get_used_reach_fact (model_evaluator& mev, expr_ref& reach_fact);
         /// \brief Returns reachability fact active in the origin of the given model
-        void get_used_origin_reach_fact (model_evaluator &mev, unsigned oidx, 
-                                         expr_ref &res);
+        reach_fact* get_used_origin_reach_fact (model_evaluator &mev, unsigned oidx);
         expr_ref get_origin_summary (model_evaluator &mev, 
                                      unsigned level, unsigned oidx, bool must);
 
-        datalog::rule const* get_just_rule (expr* fact);
-        expr_ref_vector const* get_just_pred_facts (expr* fact);
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
         void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
@@ -184,10 +217,12 @@ namespace spacer {
         void propagate_to_infinity(unsigned level);
         void add_property(expr * lemma, unsigned lvl);  // add property 'p' to state at level.
         expr* get_reach_case_var (unsigned idx) const;
-        unsigned get_num_reach_vars () const;
-
-        void add_reach_fact (expr* fact, datalog::rule const& r, expr_ref_vector const& child_reach_facts);  // add reachability fact
-        expr* get_last_reach_fact () const { return m_reach_facts.back (); }
+        bool has_reach_facts () const { return m_reach_facts.size () > 1;}
+      
+        /// initialize reachability facts using initial rules
+        void init_reach_facts ();
+        void add_reach_fact (reach_fact &fact, bool is_init = false);  // add reachability fact
+        expr* get_last_reach_fact () const { return m_reach_facts.back ()->get (); }
         expr* get_last_reach_case_var () const;
       
 
@@ -528,9 +563,8 @@ namespace spacer {
                            unsigned& uses_level, bool& is_concrete, 
                            datalog::rule const*& r, vector<bool>& reach_pred_used, 
                            unsigned& num_reuse_reach);
-        void mk_reach_fact (model_node& n, model_evaluator &mev, 
-                            datalog::rule const& r, expr_ref& result, 
-                            expr_ref_vector& child_reach_facts);
+        reach_fact *mk_reach_fact (model_node& n, model_evaluator &mev, 
+                                   datalog::rule const& r);
         void create_children(model_node& n, datalog::rule const& r, model_evaluator &model, 
                              const vector<bool>& reach_pred_used);
         expr_ref mk_sat_answer() const;
