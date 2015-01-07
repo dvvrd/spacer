@@ -100,7 +100,7 @@ namespace spacer {
         inline expr* get_value(expr* x) { return m_values.find(x); }
         inline void set_value(expr* x, expr* v) { set_v(x); m_refs.push_back(v); m_values.insert(x, v); }
         
-        void eval_fmls(ptr_vector<expr> const & formulas);
+        void eval_fmls(ptr_vector<expr> const & formulas, bool model_completion = false);
 
         bool check_model(ptr_vector<expr> const & formulas);
 
@@ -131,9 +131,9 @@ namespace spacer {
        */
        void operator()(expr* e) {} 
 
-       void eval_heavy (model_ref& mdl, expr* fml, expr_ref& result);
+       void eval_heavy (model_ref& mdl, expr* fml, expr_ref& result, bool model_completion = true);
 
-       expr_ref eval(model_ref& mdl, expr* e);
+       expr_ref eval(model_ref& mdl, expr* e, bool model_completion = true);
 
        expr_ref eval(model_ref& mdl, func_decl* d);
     };

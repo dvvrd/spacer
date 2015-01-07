@@ -854,7 +854,7 @@ namespace spacer {
         }
     }
 
-    void model_evaluator::eval_fmls (ptr_vector<expr> const& formulas) {
+    void model_evaluator::eval_fmls (ptr_vector<expr> const& formulas, bool model_completion) {
         ptr_vector<expr> todo(formulas);
         
         while (!todo.empty()) {
@@ -888,7 +888,7 @@ namespace spacer {
             }
             else {
                 expr_ref vl(m);
-                m_model->eval(curr, vl);
+                m_model->eval(curr, vl, model_completion);
                 assign_value(curr, vl);
             }
             
@@ -920,10 +920,10 @@ namespace spacer {
         return !has_x;
     }
 
-    void model_evaluator::eval_heavy (model_ref& model, expr* fml, expr_ref& result) {
+    void model_evaluator::eval_heavy (model_ref& model, expr* fml, expr_ref& result, bool model_completion) {
         setup_model (model);
         ptr_vector<expr> fmls; fmls.push_back (fml);
-        eval_fmls (fmls);
+        eval_fmls (fmls, model_completion);
 
         SASSERT (!is_unknown (fml));
         if (is_x (fml)) {
@@ -955,10 +955,10 @@ namespace spacer {
         return result;
     }
 
-    expr_ref model_evaluator::eval(model_ref& model, expr* e) {
+    expr_ref model_evaluator::eval(model_ref& model, expr* e, bool model_completion) {
         expr_ref result(m);
         m_model = model;
-        VERIFY(m_model->eval(e, result, true));
+        VERIFY(m_model->eval(e, result, model_completion));
         if (m_array.is_array(e)) {
             vector<expr_ref_vector> stores;
             expr_ref_vector args(m);
