@@ -125,7 +125,7 @@ namespace spacer {
         }
     }
 
-    bool pred_transformer::is_reachable_known (expr* state, model_ref* model) {
+    bool pred_transformer::is_must_reachable (expr* state, model_ref* model) {
         SASSERT (state);
         // XXX This seems to mis-handle the case when state is
         // reachable using the init rule of the current transformer
@@ -1173,7 +1173,7 @@ namespace spacer {
     summaries.push_back (v);
     
     /// must be true, otherwise no suitable must summary found
-    VERIFY (pt.is_reachable_known (get_manager ().mk_and (summaries), &model));
+    VERIFY (pt.is_must_reachable (get_manager ().mk_and (summaries), &model));
     
     model_evaluator mev (m, model);
     // find must summary used
@@ -2063,7 +2063,7 @@ namespace spacer {
 
       // check the cache
       // DISABLED FOR NOW
-      // if (n.pt().is_reachable_known (n.post())) {
+      // if (n.pt().is_must_reachable (n.post())) {
       //     m_stats.m_num_reuse_reach++;
       //     n.set_reachable (true);
       // }

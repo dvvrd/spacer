@@ -160,7 +160,7 @@ namespace spacer {
         void collect_statistics(statistics& st) const;
         void reset_statistics();
 
-        bool is_reachable_known (expr* state, model_ref* model = 0);
+        bool is_must_reachable (expr* state, model_ref* model = 0);
         /// \brief Returns reachability fact active in the given model
         void get_used_reach_fact (model_evaluator& mev, expr_ref& reach_fact);
         /// \brief Returns reachability fact active in the origin of the given model
