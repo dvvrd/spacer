@@ -296,7 +296,8 @@ namespace pdr {
     void prop_solver::add_level_formula(expr * form, unsigned level) {
         ensure_level(level);
         app * lev_atom = m_pos_level_atoms[level].get();
-        app_ref lform(m.mk_or(form, lev_atom), m);
+        app_ref lform(lev_atom, m);
+        if (!m.is_false (form)) lform = m.mk_or (form, lev_atom);
         add_formula(lform.get());
     }
 
