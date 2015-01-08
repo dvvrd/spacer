@@ -218,7 +218,7 @@ namespace spacer {
         void propagate_to_infinity(unsigned level);
         void add_property(expr * lemma, unsigned lvl);  // add property 'p' to state at level.
         expr* get_reach_case_var (unsigned idx) const;
-        bool has_reach_facts () const { return m_reach_facts.size () > 1;}
+      bool has_reach_facts () const { return !m_reach_facts.empty () ;}
       
         /// initialize reachability facts using initial rules
         void init_reach_facts ();
