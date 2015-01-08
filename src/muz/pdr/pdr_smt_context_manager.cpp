@@ -70,7 +70,8 @@ namespace pdr {
             m_pushed = true;
         }
         expr_ref fml(m);
-        fml = m_pushed?e:m.mk_implies(m_pred, e);
+        // fml = m_pushed?e:m.mk_implies(m_pred, e);
+        fml = m_pushed?e:m.mk_or(m.mk_not (m_pred), e);
         m_context.assert_expr(fml);
     }
 
