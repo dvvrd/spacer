@@ -57,11 +57,14 @@ namespace spacer {
         pm(pm), m(pm.get_manager()),
         ctx(ctx), m_head(head, m), 
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name(), ctx.get_params ().validate_theory_core ()),
-        m_reach_ctx (pm.mk_fresh ()),
         m_reach_facts (), m_invariants(m), m_transition(m), m_initial_state(m), 
         m_all_init (false),
         m_reach_case_vars (m)
-    { init_sig (); }
+    { 
+      init_sig (); 
+      mk_fresh_reach_case_var ();
+      m_reach_facts.push_back (NULL);
+    }
 
     pred_transformer::~pred_transformer() {
         rule2inst::iterator it2 = m_rule2inst.begin(), end2 = m_rule2inst.end();
@@ -120,24 +123,6 @@ namespace spacer {
             m_levels.push_back(expr_ref_vector(m));
         }
     }
-
-    bool pred_transformer::is_must_reachable (expr* state, model_ref* model) {
-        SASSERT (state);
-        // XXX This seems to mis-handle the case when state is
-        // reachable using the init rule of the current transformer
-        if (m_reach_facts.empty ()) return false;
-        
-        m_reach_ctx->push ();
-        m_reach_ctx->assert_expr (state);
-        expr_ref_vector assumps (m);
-        assumps.push_back (m.mk_not (m_reach_case_vars.back ()));
-        // XXX why use check-with-assumptions here?
-        lbool res = m_reach_ctx->check (assumps);
-        if (model) m_reach_ctx->get_model (*model);
-        m_reach_ctx->pop ();
-        return (res == l_true);
-    }
-
   
   expr_ref pred_transformer::eval (model_evaluator &mev, expr * v)
   {
@@ -148,6 +133,24 @@ namespace spacer {
       res = mev.eval (v);
     return res;
   }
+
+  bool pred_transformer::is_must_reachable (expr *state, model_ref *model)
+  {
+    if (!has_reach_facts ()) return false;
+    
+    // put the solver in level0 only
+    prop_solver::scoped_delta_level _sl (m_solver, 0);
+    m_solver.set_model (model);
+    m_solver.set_core (NULL);
+    
+    expr_ref bg(m);
+    expr_ref_vector hard(m), soft(m);
+    hard.push_back (state);
+    bg = m.mk_not (m_reach_case_vars.back ());
+    lbool res = m_solver.check_assumptions_and_formula (hard, soft, bg);
+    m_solver.set_model (NULL);
+    return res == l_true;
+  }
   
   void pred_transformer::get_used_reach_fact (model_evaluator& mev, expr_ref& reach_fact) {
     expr_ref v (m);
@@ -156,7 +159,21 @@ namespace spacer {
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
       v = mev.eval (m_reach_case_vars.get (i));
       if (m.is_false (v)) {
-        reach_fact = m_reach_facts[i]->get ();
+        if (i > 0) reach_fact = m_reach_facts[i]->get ();
+        break;
+      }
+    }
+    
+    if (reach_fact) return;
+    
+    // reachable by initial transition
+    rule2expr::iterator it = m_rule2tag.begin (), end = m_rule2tag.end ();
+    for (; it != end; ++it)
+    {
+      v = mev.eval (it->m_value);
+      if (m.is_true (v))
+      {
+        reach_fact = m_rule2transition.find (it->m_key);
         break;
       }
     }
@@ -174,7 +191,8 @@ namespace spacer {
       b = mev.eval (v);
       
       if (m.is_false (b)) {
-        res = m_reach_facts.get (i);
+        SASSERT (i > 0);
+        res = m_reach_facts[i];
         break;
       }
     }
@@ -460,38 +478,39 @@ namespace spacer {
     {return m_reach_case_vars.get (idx);}
 
 
-  void pred_transformer::add_reach_fact (reach_fact &fact, bool is_init) 
+  void pred_transformer::add_reach_fact (reach_fact &fact, bool is_init)
+  {
+    TRACE ("spacer",
+           tout << "add_reach_fact: " << head()->get_name() << " " 
+           << (is_init ? "INIT " : "")
+           << mk_pp(fact.get (), m) << "\n";);
+    m_reach_facts.push_back (&fact);
+    
+    expr* last_var = m_reach_case_vars.back ();
+    expr* new_var = mk_fresh_reach_case_var ();
+    
+    expr_ref f(m);
+    if (is_init) 
     {
-      TRACE ("spacer",
-             tout << "add_reach_fact: " << head()->get_name() << " " 
-             << (is_init ? "INIT " : "")
-             << mk_pp(fact.get (), m) << "\n";);
-      SASSERT (!is_init);
-
-      m_reach_facts.push_back (&fact);
-
-      // update m_reach_ctx
-      expr_ref last_var (m);
-      expr_ref new_var (m);
-      expr_ref fml (m);
-      
-      if (!m_reach_case_vars.empty ()) last_var = m_reach_case_vars.back ();
-      new_var = mk_fresh_reach_case_var ();
-      if (last_var)
-        fml = m.mk_or (m.mk_not (last_var), fact.get (), new_var);
-      else
-        fml = m.mk_or (fact.get (), new_var);
-      
-      m_reach_ctx->assert_expr (fml);
-      TRACE ("spacer",
-             tout << "updating reach ctx: " << mk_pp(fml, m) << "\n";);
-
-      // update users; reach facts are independent of levels
-      for (unsigned i = 0; i < m_use.size(); ++i) {
-        m_use[i]->add_child_property (*this, fml, infty_level ());
-      }
+      f = m.mk_or (m.mk_not (last_var), new_var);
+      m_solver.add_formula (f);
     }
-
+    f = m.mk_or (m.mk_not (last_var), fact.get (), new_var);
+    if (!is_init)  m_solver.add_formula (f);
+    
+    
+    for (unsigned i = 0, sz = m_use.size (); i < sz; ++i)
+    {
+      // special case for the first child reach-fact
+      if (m_reach_facts.size () == 2)
+        m_use [i]->add_child_property (*this, last_var, infty_level ());
+      
+      m_use[i]->add_child_property (*this, f, infty_level ());
+    }
+    
+    
+  }
+  
     expr* pred_transformer::get_reach () {
         if (m_reach_facts.empty ()) {
             return m.mk_false ();
@@ -687,7 +706,9 @@ namespace spacer {
         // check local reachability;
         // result is either sat (with some reach assumps) or
         // unsat (even with no reach assumps)
-        lbool is_sat = m_solver.check_assumptions (post, reach_assumps);
+        expr_ref bg(m);
+        bg = m.mk_not (m_reach_case_vars.back ());
+        lbool is_sat = m_solver.check_assumptions_and_formula (post, reach_assumps, bg);
 
         TRACE ("spacer",
                 if (!reach_assumps.empty ()) {
@@ -738,8 +759,13 @@ namespace spacer {
         tmp = pm.mk_and(conj);
         prop_solver::scoped_level _sl(m_solver, level);
         m_solver.set_core(core);
-        m_solver.set_model(0);
-        lbool r = m_solver.check_conjunction_as_assumptions(tmp);
+        m_solver.set_model(NULL);
+        expr_ref_vector hard(m), soft(m);
+        expr_ref bg(m);
+        hard.push_back (tmp);
+        bg = m.mk_not (m_reach_case_vars.back ());
+        lbool r = m_solver.check_assumptions_and_formula (hard, soft, bg);
+        
         if (r == l_false) {
             solver_level = m_solver.uses_level ();
             CTRACE ("spacer", level < m_solver.uses_level (), 
@@ -757,6 +783,7 @@ namespace spacer {
         expr_ref fml(m), states(m);
         states = m.mk_not(pm.mk_and(lits));
         mk_assumptions(head(), states, conj);
+        conj.push_back (m.mk_not (m_reach_case_vars.back ()));
         fml = pm.mk_and(conj);
         prop_solver::scoped_level _sl(m_solver, level);
         prop_solver::scoped_subset_core _sc (m_solver, true);
@@ -813,6 +840,24 @@ namespace spacer {
 
     }
   
+  void pred_transformer::init_reach_facts ()
+  {
+    expr_ref_vector v(m);
+    reach_fact *fact;
+    
+    rule2expr::iterator it = m_rule2tag.begin (), end = m_rule2tag.end ();
+    for (; it != end; ++it)
+    {
+      const datalog::rule* r = it->m_key;
+      if (r->get_uninterpreted_tail_size () == 0)
+      {
+        fact = alloc (reach_fact, m, m_rule2transition.find (r), get_aux_vars (*r));
+        add_reach_fact (*fact, true);
+      }
+    }
+  }
+  
+  
     void pred_transformer::init_rules(decl2rel const& pts, expr_ref& init, expr_ref& transition) {
         expr_ref_vector transitions(m);
         ptr_vector<datalog::rule const> tr_rules;
@@ -834,14 +879,23 @@ namespace spacer {
             rule = tr_rules[0];
             m_tag2rule.insert(pred, rule);
             m_rule2tag.insert(rule, pred.get());            
-            transitions.push_back(pred);
-            transition = pm.mk_and(transitions);
-            // mk init condition
-            if (!is_init[0]) {
+            
+            if (is_init[0])
+            {
+              transitions.push_back(pred);
+              transitions.push_back (m.mk_not (m_reach_case_vars.back ()));
+            }
+            else  {
+                transitions [0] = m.mk_implies (pred, transitions.get (0));
+                transitions.push_back (m.mk_or (pred, m_reach_case_vars.back ()));
                 init_conds.push_back (m.mk_not (pred));
             }
+            transition = pm.mk_and(transitions);
             break;
         default:
+            // variable to attach reachability facts
+            disj.push_back (m_reach_case_vars.back ());
+
             for (unsigned i = 0; i < transitions.size(); ++i) {
                 pred = m.mk_fresh_const(head()->get_name().str().c_str(), m.mk_bool_sort());
                 rule = tr_rules[i];
@@ -1315,6 +1369,11 @@ namespace spacer {
             rel.initialize(rels);
             TRACE("spacer", rel.display(tout); );
         }
+        
+        // initialize reach facts
+        it = rels.begin (), end = rels.end ();
+        for (; it != end; ++it)
+          it->m_value->init_reach_facts ();
     }
 
     void context::update_rules(datalog::rule_set& rules) {
