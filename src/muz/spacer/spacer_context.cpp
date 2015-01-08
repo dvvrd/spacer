@@ -57,6 +57,7 @@ namespace spacer {
         pm(pm), m(pm.get_manager()),
         ctx(ctx), m_head(head, m), 
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name(), ctx.get_params ().validate_theory_core ()),
+        m_reach_ctx (pm.mk_fresh ()),
         m_reach_facts (), m_invariants(m), m_transition(m), m_initial_state(m), 
         m_all_init (false),
         m_reach_case_vars (m)
@@ -155,10 +156,7 @@ namespace spacer {
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
       v = mev.eval (m_reach_case_vars.get (i));
       if (m.is_false (v)) {
-        reach_fact = m_reach_facts.get (i);
-    reach_fact = NULL;
-    reach_fact = NULL;
-    reach_fact = NULL;
+        reach_fact = m_reach_facts[i]->get ();
         break;
       }
     }
@@ -461,19 +459,16 @@ namespace spacer {
     expr* pred_transformer::get_reach_case_var (unsigned idx) const 
     {return m_reach_case_vars.get (idx);}
 
-    unsigned pred_transformer::get_num_reach_vars () const 
-    {return m_reach_case_vars.size ();}
 
-    void pred_transformer::add_reach_fact (expr* fact, datalog::rule const& r, 
-                                           expr_ref_vector const& child_reach_facts) 
+  void pred_transformer::add_reach_fact (reach_fact &fact, bool is_init) 
     {
       TRACE ("spacer",
              tout << "add_reach_fact: " << head()->get_name() << " " 
-             << mk_pp(fact, m) << "\n";);
+             << (is_init ? "INIT " : "")
+             << mk_pp(fact.get (), m) << "\n";);
+      SASSERT (!is_init);
 
-      m_reach_facts.push_back (fact);
-      reach_fact_just* j = alloc (reach_fact_just, r, child_reach_facts);
-      m_reach_fact_justs.insert (fact, j);
+      m_reach_facts.push_back (&fact);
 
       // update m_reach_ctx
       expr_ref last_var (m);
@@ -483,9 +478,9 @@ namespace spacer {
       if (!m_reach_case_vars.empty ()) last_var = m_reach_case_vars.back ();
       new_var = mk_fresh_reach_case_var ();
       if (last_var)
-        fml = m.mk_or (m.mk_not (last_var), fact, new_var);
+        fml = m.mk_or (m.mk_not (last_var), fact.get (), new_var);
       else
-        fml = m.mk_or (fact, new_var);
+        fml = m.mk_or (fact.get (), new_var);
       
       m_reach_ctx->assert_expr (fml);
       TRACE ("spacer",
