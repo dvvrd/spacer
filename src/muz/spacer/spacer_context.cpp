@@ -58,7 +58,8 @@ namespace spacer {
         ctx(ctx), m_head(head, m), 
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name(), ctx.get_params ().validate_theory_core ()),
         m_reach_ctx (pm.mk_fresh ()),
-        m_reach_facts (), m_invariants(m), m_transition(m), m_initial_state(m), 
+        m_frames (*this), 
+        m_reach_facts (), m_transition(m), m_initial_state(m), 
         m_all_init (false),
         m_reach_case_vars (m)
     { init_sig (); }
@@ -87,11 +88,7 @@ namespace spacer {
         m_solver.collect_statistics(st);
         //m_reachable.collect_statistics(st);
         st.update("SPACER num propagations", m_stats.m_num_propagations);
-        unsigned np = m_invariants.size();
-        for (unsigned i = 0; i < m_levels.size(); ++i) {
-            np += m_levels[i].size();
-        } 
-        st.update("SPACER num properties", np); 
+        st.update("SPACER num properties", m_frames.lemma_size ()); 
     }
 
     void pred_transformer::reset_statistics() {
@@ -112,12 +109,12 @@ namespace spacer {
     }
 
     void pred_transformer::ensure_level(unsigned level) {
-        if (is_infty_level(level)) {
-            return;
-        }
-        while (m_levels.size() <= level) {
-            m_solver.add_level();
-            m_levels.push_back(expr_ref_vector(m));
+        if (is_infty_level(level)) return;
+        
+        while (m_frames.size () <= level)
+        {
+          m_frames.add_frame ();
+          m_solver.add_level ();
         }
     }
 
@@ -270,7 +267,9 @@ namespace spacer {
         }
     }
 
-    void pred_transformer::simplify_formulas(tactic& tac, expr_ref_vector& v) {
+    void pred_transformer::legacy_frames::simplify_formulas (tactic& tac, 
+                                                             expr_ref_vector& v) {
+      ast_manager &m = m_pt.get_ast_manager ();
         goal_ref g(alloc(goal, m, false, false, false));
         for (unsigned j = 0; j < v.size(); ++j) g->assert_expr(v[j].get()); 
         model_converter_ref mc;
@@ -283,25 +282,33 @@ namespace spacer {
         v.reset();
         for (unsigned j = 0; j < r->size(); ++j) v.push_back(r->form(j));            
     }
-
-    void pred_transformer::simplify_formulas() {
+    void pred_transformer::legacy_frames::simplify_formulas() {
+        ast_manager &m = m_pt.get_ast_manager ();
         tactic_ref us = mk_unit_subsumption_tactic(m);
         simplify_formulas(*us, m_invariants);
         for (unsigned i = 0; i < m_levels.size(); ++i) {
             simplify_formulas(*us, m_levels[i]);
         }             
     }
+    void pred_transformer::simplify_formulas() {
+      m_frames.simplify_formulas ();
+    }
 
+  void pred_transformer::legacy_frames::get_frame_geq_lemmas (unsigned lvl, 
+                                                              expr_ref_vector &out)
+  {
+    get_frame_lemmas (infty_level(), out);
+    for (unsigned i = lvl, sz = m_levels.size (); i < sz; ++i)
+      get_frame_lemmas (lvl, out);
+  }
+  
     expr_ref pred_transformer::get_formulas(unsigned level, bool add_axioms) {
         expr_ref_vector res(m);
         if (add_axioms) {
             res.push_back(pm.get_background());
             res.push_back((level == 0)?initial_state():transition());
         }
-        res.append(m_invariants);
-        for (unsigned i = level; i < m_levels.size(); ++i) {
-            res.append(m_levels[i]);
-        }     
+        m_frames.get_frame_geq_lemmas (level, res);
         return pm.mk_and(res);
     }
 
@@ -333,19 +340,23 @@ namespace spacer {
         return pm.mk_and(conj);
     }
 
-    bool pred_transformer::propagate_to_next_level(unsigned src_level) {
+  bool pred_transformer::propagate_to_next_level (unsigned src_level)
+  {return m_frames.propagate_to_next_level (src_level);}
+  
+  bool pred_transformer::legacy_frames::propagate_to_next_level(unsigned src_level) {
       
+    ast_manager &m = m_pt.get_ast_manager ();
       if (m_levels.size () <= src_level) return true;
       if (m_levels [src_level].empty ()) return true;
       
         unsigned tgt_level = next_level(src_level);
-        ensure_level(next_level(tgt_level));
+        m_pt.ensure_level(next_level(tgt_level));
         expr_ref_vector& src = m_levels[src_level];
         
 
         CTRACE("spacer", !src.empty(), 
                tout << "propagating " << src_level << " to " << tgt_level;
-               tout << " for relation " << head()->get_name() << "\n";);
+               tout << " for relation " << m_pt.head()->get_name() << "\n";);
                 
         for (unsigned i = 0; i < src.size(); ) {
             expr * curr = src[i].get();                  
@@ -358,13 +369,13 @@ namespace spacer {
                 src[i] = src.back();
                 src.pop_back();
             }
-            else if (is_invariant(tgt_level, curr, false, solver_level)) {
+            else if (m_pt.is_invariant(tgt_level, curr, false, solver_level)) {
               
-                add_property(curr, solver_level);
+                m_pt.add_property(curr, solver_level);
                 TRACE("spacer", tout << "is invariant: "<< pp_level(solver_level) << " " << mk_pp(curr, m) << "\n";);              
                 src[i] = src.back();
                 src.pop_back();
-                ++m_stats.m_num_propagations;
+                ++m_pt.m_stats.m_num_propagations;
             }
             else {
                 TRACE("spacer", tout << "not propagated: " << mk_pp(curr, m) << "\n";); 
@@ -377,42 +388,53 @@ namespace spacer {
                    });
         CTRACE ("spacer", src.empty (), 
                 tout << "Fully propagated level " 
-                << src_level << " of " << head ()->get_name () << "\n";);
+                << src_level << " of " << m_pt.head ()->get_name () << "\n";);
         
         return src.empty();
     }
 
-    bool pred_transformer::add_property1(expr * lemma, unsigned lvl) {        
-        if (is_infty_level(lvl)) {
-            if (!m_invariants.contains(lemma)) {
-                TRACE("spacer", tout << "property1: " 
-                      << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
-                m_invariants.push_back(lemma);
-                m_prop2level.insert(lemma, lvl);
-                m_solver.add_formula(lemma);
-                return true;
-            }
-            
-            TRACE("spacer", tout << "already contained: " 
-                  << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
-            return false;
-        }
-        
-        ensure_level(lvl);        
-        unsigned old_level;
-        if (!m_prop2level.find(lemma, old_level) || old_level < lvl) {
-            TRACE("spacer", tout << "property1: " << pp_level(lvl) 
-                  << " " << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
-            m_levels[lvl].push_back(lemma);
-            m_prop2level.insert(lemma, lvl);
-            m_solver.add_level_formula(lemma, lvl);
-            return true;
-        }
-        
-        TRACE("spacer", tout << "old-level: " << pp_level(old_level) 
-              << " " << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
-        return false;
+  bool pred_transformer::legacy_frames::add_lemma (expr * lemma, unsigned lvl)
+  {
+    if (is_infty_level (lvl))
+    {
+      if (!m_invariants.contains (lemma))
+      {
+        m_invariants.push_back (lemma);
+        m_prop2level.insert (lemma, lvl);
+        return true;
+      }
+      return false;
     }
+    
+    unsigned old_level;
+    if (!m_prop2level.find (lemma, old_level) || old_level < lvl)
+    {
+      m_levels[lvl].push_back(lemma);
+      m_prop2level.insert(lemma, lvl);
+      return true;
+    }
+    return false;
+  }
+  
+    bool pred_transformer::add_property1 (expr * lemma, unsigned lvl)
+    {
+      if (!is_infty_level (lvl)) ensure_level (lvl);
+      
+      if (m_frames.add_lemma (lemma, lvl))
+      {
+        TRACE("spacer", tout << "property1: " << pp_level(lvl) 
+              << " " << head()->get_name() << " " << mk_pp(lemma, m) << "\n";);
+
+        if (is_infty_level (lvl)) m_solver.add_formula (lemma);
+        else m_solver.add_level_formula (lemma, lvl);
+        
+        return true;
+      }
+      
+      TRACE ("spacer", tout << "already contained: " << mk_pp(lemma, m) << "\n";);
+      return false;
+    }
+  
 
     void pred_transformer::add_child_property(pred_transformer& child, 
                                               expr* lemma, unsigned lvl) {
@@ -431,8 +453,9 @@ namespace spacer {
     void pred_transformer::add_property(expr* lemma, unsigned lvl) {
         expr_ref_vector lemmas(m);
         qe::flatten_and(lemma, lemmas);
-        for (unsigned i = 0; i < lemmas.size(); ++i) {
-            expr* lemma_i = lemmas[i].get();
+        
+        for (unsigned i = 0, sz = lemmas.size (); i < sz; ++i) {
+            expr* lemma_i = lemmas.get (i);
             if (add_property1(lemma_i, lvl)) {
                 IF_VERBOSE(2, verbose_stream() << pp_level(lvl) << " " 
                            << mk_pp(lemma_i, m) << "\n";);
@@ -510,12 +533,11 @@ namespace spacer {
   
     expr_ref pred_transformer::get_cover_delta(func_decl* p_orig, int level) {
         expr_ref result(m.mk_true(), m), v(m), c(m);
-        if (level == -1) {
-            result = pm.mk_and(m_invariants);                       
-        }
-        else if ((unsigned)level < m_levels.size()) {
-            result = pm.mk_and(m_levels[level]);
-        }
+        
+        expr_ref_vector lemmas (m);
+        m_frames.get_frame_lemmas (level == -1 ? infty_level() : level, lemmas);
+        if (!lemmas.empty ()) result = pm.mk_and (lemmas);
+        
         // replace local constants by bound variables.
         expr_substitution sub(m);        
         for (unsigned i = 0; i < sig_size(); ++i) {
@@ -607,9 +629,12 @@ namespace spacer {
         add_property(result, level);        
     }
 
-    void  pred_transformer::propagate_to_infinity(unsigned level) {
+    void pred_transformer::propagate_to_infinity (unsigned level)
+    {m_frames.propagate_to_infinity (level);}
+  
+    void  pred_transformer::legacy_frames::propagate_to_infinity(unsigned level) {
       TRACE ("spacer", tout << "propagating to oo from lvl " << level 
-             << " of " << head ()->get_name () << "\n";);
+             << " of " << m_pt.m_head->get_name () << "\n";);
       
       if (m_levels.empty ()) return;
       
@@ -617,7 +642,7 @@ namespace spacer {
         {
           expr_ref_vector &lemmas = m_levels [i];
           for (unsigned j = 0; j < lemmas.size (); ++j)
-            add_property(lemmas[j].get (), infty_level ());
+            m_pt.add_property(lemmas.get (j), infty_level ());
           lemmas.reset();
         }
     }
@@ -1030,14 +1055,18 @@ namespace spacer {
     }
 
     void pred_transformer::inherit_properties(pred_transformer& other) {
-        SASSERT(m_head == other.m_head);
-        obj_map<expr, unsigned>::iterator it  = other.m_prop2level.begin();
-        obj_map<expr, unsigned>::iterator end = other.m_prop2level.end();        
-        for (; it != end; ++it) {
-            add_property(it->m_key, it->m_value);
-        }
+      m_frames.inherit_frames (other.m_frames);
     }
 
+  void pred_transformer::legacy_frames::inherit_frames (legacy_frames& other)
+  {
+    
+    SASSERT(m_pt.m_head == other.m_pt.m_head);
+    obj_map<expr, unsigned>::iterator it  = other.m_prop2level.begin();
+    obj_map<expr, unsigned>::iterator end = other.m_prop2level.end();        
+    for (; it != end; ++it) m_pt.add_property(it->m_key, it->m_value);
+  }
+  
     // ----------------
     // derivation
 
