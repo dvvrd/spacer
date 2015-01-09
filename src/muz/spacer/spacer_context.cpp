@@ -687,11 +687,13 @@ namespace spacer {
     }
 
     void  pred_transformer::propagate_to_infinity(unsigned level) {
-      TRACE ("spacer", tout << "propagating to oo from lvl " << level 
-             << " of " << head ()->get_name () << "\n";);
+        TRACE ("spacer", tout << "propagating to oo from lvl " << level 
+                << " of " << head ()->get_name () << "\n";);
+      
+        if (m_levels.empty ()) return;
 
         SASSERT (level < m_levels.size ());
-      
+
         for (unsigned i = m_levels.size (); i > level; --i)
         {
           expr_ref_vector &lemmas = m_levels [i-1];
