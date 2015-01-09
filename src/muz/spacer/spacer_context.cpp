@@ -611,6 +611,8 @@ namespace spacer {
       TRACE ("spacer", tout << "propagating to oo from lvl " << level 
              << " of " << head ()->get_name () << "\n";);
       
+      if (m_levels.empty ()) return;
+      
         for (unsigned i = m_levels.size () - 1; i >= level; --i)
         {
           expr_ref_vector &lemmas = m_levels [i];
