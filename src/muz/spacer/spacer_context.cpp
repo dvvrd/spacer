@@ -1997,6 +1997,9 @@ namespace spacer {
     //
     bool context::check_reachability () 
     {
+      timeit _timer (get_verbosity_level () >= 1, "spacer::context::check_reachability", 
+                     verbose_stream ());
+
         model_node_ref last_reachable;
         
         if (get_params().reset_obligation_queue ()) m_search.reset ();
