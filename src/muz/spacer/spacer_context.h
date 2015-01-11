@@ -529,6 +529,7 @@ namespace spacer {
     
     void inc_level () 
     {
+      SASSERT (!m_obligations.empty () || m_root);
       m_max_level++; m_min_depth++;
       if (m_root && m_obligations.empty ()) m_obligations.push (m_root);
     }
