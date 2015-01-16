@@ -24,6 +24,9 @@ Revision History:
 #include <sstream>
 #include "smt_params.h"
 
+#include "scoped_proof.h"
+#include "smt_context.h"
+
 namespace pdr {
 
     smt_context::smt_context(smt_context_manager& p, ast_manager& m, app* pred):
@@ -70,7 +73,18 @@ namespace pdr {
             m_pushed = true;
         }
         expr_ref fml(m);
-        fml = m_pushed?e:m.mk_implies(m_pred, e);
+        // fml = m_pushed?e:m.mk_implies(m_pred, e);
+        fml = m_pushed?e:m.mk_or(m.mk_not (m_pred), e);
+        
+        if (true)
+        {
+          /** pre-simplify and normalize the expression in no_proof 
+              mode before asserting */
+          scoped_no_proof _snp(m);
+          proof_ref pr(m);
+          m_context.get_context().get_simplifier () (fml.get (), fml, pr);
+        }
+        
         m_context.assert_expr(fml);
     }
 

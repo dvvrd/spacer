@@ -34,7 +34,7 @@ namespace spacer {
     // main propositional induction generalizer.
     // drop literals one by one from the core and check if the core is still inductive.
     //    
-    void core_bool_inductive_generalizer::operator()(model_node& n, expr_ref_vector& core, bool& uses_level) {
+    void core_bool_inductive_generalizer::operator()(model_node& n, expr_ref_vector& core, unsigned& uses_level) {
         if (core.size() <= 1) {
             return;
         }
@@ -63,7 +63,8 @@ namespace spacer {
     }
 
 
-    void core_multi_generalizer::operator()(model_node& n, expr_ref_vector& core, bool& uses_level) {
+    void core_multi_generalizer::operator()(model_node& n, expr_ref_vector& core, 
+                                            unsigned& uses_level) {
         UNREACHABLE();
     }
 
@@ -72,10 +73,10 @@ namespace spacer {
        Apply a simple heuristic: find a minimal core, then find minimal cores that exclude at least one
        literal from each of the literals in the minimal cores.
     */
-    void core_multi_generalizer::operator()(model_node& n, expr_ref_vector const& core, bool uses_level, cores& new_cores) {
+    void core_multi_generalizer::operator()(model_node& n, expr_ref_vector const& core, unsigned uses_level, cores& new_cores) {
         ast_manager& m = core.get_manager();
         expr_ref_vector old_core(m), core0(core);
-        bool uses_level1 = uses_level;
+        unsigned uses_level1 = uses_level;
         m_gen(n, core0, uses_level1);
         new_cores.push_back(std::make_pair(core0, uses_level1));
         obj_hashtable<expr> core_exprs, core1_exprs;
@@ -112,7 +113,8 @@ namespace spacer {
         m_farkas_learner(p, m) 
     {}
     
-    void core_farkas_generalizer::operator()(model_node& n, expr_ref_vector& core, bool& uses_level) {
+    void core_farkas_generalizer::operator()(model_node& n, expr_ref_vector& core, 
+                                             unsigned& uses_level) {
         ast_manager& m  = n.pt().get_manager();
         manager& pm = n.pt().get_spacer_manager();
         if (core.empty()) return;
@@ -138,7 +140,7 @@ namespace spacer {
             TRACE("spacer", tout << "prop:\n" << mk_pp(A,m) << "\ngen:" << mk_pp(B, m) << "\nto: " << mk_pp(C, m) << "\n";);
             core.reset();
             qe::flatten_and(C, core);    
-            uses_level = true;
+            uses_level = n.level ();
         }    
     }
 
@@ -160,7 +162,9 @@ namespace spacer {
         a(m),
         m_refs(m) {}
 
-    void core_arith_inductive_generalizer::operator()(model_node& n, expr_ref_vector& core, bool& uses_level) {
+    void core_arith_inductive_generalizer::operator()(model_node& n, 
+                                                      expr_ref_vector& core, 
+                                                      unsigned& uses_level) {
         if (core.size() <= 1) {
             return;
         }
@@ -574,7 +578,9 @@ namespace spacer {
     //
     // Instantiate Peano induction schema.
     // 
-    void core_induction_generalizer::operator()(model_node& n, expr_ref_vector& core, bool& uses_level) {
+    void core_induction_generalizer::operator()(model_node& n, 
+                                                expr_ref_vector& core, 
+                                                unsigned& uses_level) {
         model_node* p = n.parent();
         if (p == 0) {
             return;
@@ -594,7 +600,7 @@ namespace spacer {
             core.reset();
             expr_ref phi = imp.mk_blocked_transition(p->pt(), p->level());
             core.push_back(m.mk_not(phi));
-            uses_level = true;
+            uses_level = n.level ();
         }
     }
 };

@@ -36,6 +36,29 @@ class model_core;
 
 namespace spacer {
 
+  inline unsigned infty_level () {return UINT_MAX;}
+  
+    inline bool is_infty_level(unsigned lvl) 
+    { return lvl == infty_level (); }
+
+    inline unsigned next_level(unsigned lvl) 
+    { return is_infty_level(lvl)?lvl:(lvl+1); }
+
+    struct pp_level {
+        unsigned m_level;
+        pp_level(unsigned l): m_level(l) {}        
+    };
+
+    inline std::ostream& operator<<(std::ostream& out, pp_level const& p) {
+        if (is_infty_level(p.m_level)) {
+            return out << "oo";
+        }
+        else {
+            return out << p.m_level;
+        }
+    }
+
+
     /**
      * Return the ceiling of base 2 logarithm of a number, 
      * or zero if the nmber is zero.
