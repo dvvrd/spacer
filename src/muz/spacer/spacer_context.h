@@ -186,8 +186,9 @@ namespace spacer {
       
         void init_sig();
         void ensure_level(unsigned level);
-        bool add_property1(expr * lemma, unsigned lvl);  // add property 'p' to state at level lvl.
-        void add_child_property(pred_transformer& child, expr* lemma, unsigned lvl); 
+        void add_lemma_core (expr *lemma, unsigned lvl);
+        void add_lemma_from_child (pred_transformer &child, expr *lemma, unsigned lvl);
+      
         void mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result);
 
         // Initialization
@@ -258,7 +259,8 @@ namespace spacer {
 
         bool propagate_to_next_level(unsigned level);
         void propagate_to_infinity(unsigned level);
-        void add_property(expr * lemma, unsigned lvl);  // add property 'p' to state at level.
+        /// \brief  Add a lemma to the current context and all users
+        void add_lemma (expr * lemma, unsigned lvl);
         expr* get_reach_case_var (unsigned idx) const;
       bool has_reach_facts () const { return !m_reach_facts.empty () ;}
       
