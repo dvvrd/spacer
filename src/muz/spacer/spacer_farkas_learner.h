@@ -67,7 +67,7 @@ class farkas_learner {
    
     void get_asserted(proof* p, expr_set const& bs, ast_mark& b_closed, obj_hashtable<expr>& lemma_set, expr_ref_vector& lemmas);
 
-    bool is_pure_expr(func_decl_set const& symbs, expr* e) const;
+    bool is_pure_expr(func_decl_set const& symbs, expr* e, ast_manager& m) const;
 
     static void test();
 

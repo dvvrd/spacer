@@ -435,10 +435,14 @@ namespace spacer {
     // every uninterpreted symbol is in symbs
     class is_pure_expr_proc {
         func_decl_set const& m_symbs;
+        array_util           m_au;
     public:
         struct non_pure {};
 
-        is_pure_expr_proc(func_decl_set const& s):m_symbs(s) {}
+        is_pure_expr_proc(func_decl_set const& s, ast_manager& m):
+            m_symbs(s),
+            m_au (m)
+        {}
 
         void operator()(app* a) {
             if (a->get_family_id() == null_family_id) {
@@ -446,13 +450,17 @@ namespace spacer {
                     throw non_pure();
                 }
             }
+            else if (a->get_family_id () == m_au.get_family_id () &&
+                     a->is_app_of (a->get_family_id (), OP_ARRAY_EXT_SKOLEM)) {
+                throw non_pure();
+            }
         }
         void operator()(var*) {}
         void operator()(quantifier*) {}
     };
 
-    bool farkas_learner::is_pure_expr(func_decl_set const& symbs, expr* e) const {
-        is_pure_expr_proc proc(symbs);
+    bool farkas_learner::is_pure_expr(func_decl_set const& symbs, expr* e, ast_manager& m) const {
+        is_pure_expr_proc proc(symbs, m);
         try {
             for_each_expr(proc, e);
         }
@@ -613,7 +621,7 @@ namespace spacer {
                     app* arg = to_app(p->get_arg(i));
                     if (IS_B_PURE(arg)) {
                         expr* fact = m.get_fact(arg);
-                        if (is_pure_expr(Bsymbs, fact)) {
+                        if (is_pure_expr(Bsymbs, fact, m)) {
                             TRACE("farkas_learner", 
                                   tout << "Add: " << mk_pp(m.get_fact(arg), m) << "\n";
                                   tout << mk_pp(arg, m) << "\n";
@@ -646,7 +654,7 @@ namespace spacer {
                 break;
             }
             case PR_DEF_AXIOM: {
-                if (!is_pure_expr(Bsymbs, m.get_fact(p))) {
+                if (!is_pure_expr(Bsymbs, m.get_fact(p), m)) {
                     a_depend.mark(p, true);
                 }
                 break;
