@@ -1070,7 +1070,78 @@ namespace spacer {
     obj_map<expr, unsigned>::iterator it  = other.m_prop2level.begin();
     obj_map<expr, unsigned>::iterator end = other.m_prop2level.end();        
     for (; it != end; ++it) add_lemma (it->m_key, it->m_value);
+  }
+  
+  bool pred_transformer::frames::add_lemma (expr * lemma, unsigned level)
+  {
+    for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
+      if (m_lemmas [i].get () == lemma)
+      {
+        if (m_lemmas [i].level () >= level) return false;
+        m_lemmas [i].set_level (level);
+        m_sorted = false;
+        m_pt.add_lemma_core (lemma, level);
+        return true;
+      }
     
+    frames::lemma lem (m_pt.get_ast_manager (), lemma, level);
+    m_lemmas.push_back (lem);
+    m_sorted = false;
+    m_pt.add_lemma_core (m_lemmas.back ().get (), m_lemmas.back ().level ());
+    return true;
+  }
+  
+  void pred_transformer::frames::propagate_to_infinity (unsigned level)
+  {
+    for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
+      if (m_lemmas[i].level () >= level && !is_infty_level (m_lemmas [i].level ())) 
+      {
+        m_lemmas [i].set_level (infty_level ());
+        m_pt.add_lemma_core (m_lemmas [i].get (), infty_level ());
+        m_sorted = false;
+      }
+  }
+  
+  void pred_transformer::frames::sort ()
+  {
+    if (m_sorted) return;
+    
+    m_sorted = true;
+    std::sort (m_lemmas.begin (), m_lemmas.end (), lemmas_lt_proc());
+  }
+  
+  bool pred_transformer::frames::propagate_to_next_level (unsigned level)
+  {
+    sort ();
+    bool all = true;
+    
+    
+    if (m_lemmas.empty ()) return all;
+    
+    unsigned tgt_level = next_level (level);
+    m_pt.ensure_level (tgt_level);
+    
+    for (unsigned i = 0, sz = m_lemmas.size (); i < sz && m_lemmas [i].level () <= level;)
+    {
+      if (m_lemmas [i].level () < level) continue;
+      
+      unsigned solver_level;
+      expr * curr = m_lemmas [i].get ();
+      if (m_pt.is_invariant (tgt_level, curr, false, solver_level))
+      {
+        m_lemmas [i].set_level (solver_level);
+        // percolate the lemma up to its new place
+        while (i+1 < m_lemmas.size () && m_lemmas[i+1].level () < solver_level)
+          swap (m_lemmas [i], m_lemmas[i+1]);
+      }
+      else 
+      {
+        all = false;
+        ++i;
+      }
+    }
+    
+    return all;
   }
 
     // ----------------

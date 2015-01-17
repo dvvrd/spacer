@@ -145,6 +145,94 @@ namespace spacer {
         
       };
       
+      class frames
+      {
+        class lemma
+        {
+          ast_manager &m;
+          expr_ref m_fml;
+          unsigned m_lvl;
+          
+        public:
+          lemma (ast_manager &manager, expr * fml, unsigned lvl) : 
+            m(manager), m_fml (fml, m), m_lvl(lvl) {}
+          
+          lemma (const lemma &other) 
+            : m(other.m), m_fml (other.m_fml), m_lvl (other.m_lvl) {}
+          
+          lemma& operator= (lemma other) 
+          {swap (*this, other); return *this;}
+          
+          
+          expr * get () const {return m_fml.get ();}
+          unsigned level () const {return m_lvl;}
+          void set_level (unsigned lvl) { m_lvl = lvl;}
+          
+          friend void swap (lemma &a, lemma &b)
+          {
+            using std::swap;
+            SASSERT (&a.m == &b.m);
+            swap (a.m_fml, b.m_fml);
+            swap (a.m_lvl, b.m_lvl);
+          }
+        };
+        
+        struct lemmas_lt_proc : 
+          public std::binary_function<const lemma&, const lemma &, bool>
+        {
+          bool operator() (const lemma &a, const lemma &b)
+          {
+            return (a.level () < b.level ()) || 
+              (a.level () == b.level () && 
+               ast_lt_proc() (a.get (), b.get ()));
+          }
+        };
+
+        pred_transformer &m_pt;
+        vector<lemma> m_lemmas;
+        unsigned m_size;
+        bool m_sorted;
+        
+        
+        
+        void sort ();
+        
+      public:
+        frames (pred_transformer &pt) : m_pt (pt), m_size(0), m_sorted (true) {}
+        void simplify_formulas () {UNREACHABLE ();}
+        
+        pred_transformer& pt () {return m_pt;}
+        
+        
+        void get_frame_lemmas (unsigned level, expr_ref_vector &out)
+        {
+          for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
+            if (m_lemmas[i].level () == level) out.push_back (m_lemmas[i].get ());
+        }
+        void get_frame_geq_lemmas (unsigned level, expr_ref_vector &out)
+        {
+          for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
+            if (m_lemmas [i].level () >= level) out.push_back (m_lemmas[i].get ());
+        }
+        
+        
+        unsigned size () const {return m_size;}
+        unsigned lemma_size () const {return m_lemmas.size ();}
+        void add_frame () {m_size++;}
+        void inherit_frames (frames &other)
+        {
+          for (unsigned i = 0, sz = other.m_lemmas.size (); i < sz; ++i)
+            add_lemma (other.m_lemmas [i].get (), other.m_lemmas [i].level ());
+          m_sorted = false;
+        }
+        
+        bool add_lemma (expr * lemma, unsigned level);
+        void propagate_to_infinity (unsigned level);
+        bool propagate_to_next_level (unsigned level);
+        
+        
+      };
+      
         
 
         typedef obj_map<datalog::rule const, expr*> rule2expr;
