@@ -14,7 +14,7 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--inline', 
                     help='Enable inlining', 
-                    action='store_true', default=False)
+                    action='store_true', default=True)
     p.add_argument ('--validate', help='Enable validation',
                     action='store_true', default=False)
     p.add_argument ('--trace', help='Trace levels to enable (spacer, pdr, dl,'
