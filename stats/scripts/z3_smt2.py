@@ -29,7 +29,7 @@ def parseArgs (argv):
                     action='store_true', default=True)
     p.add_argument ('--eager-reach-check', dest='eager_reach_check',
                     help='eagerly use reachability facts for every local query',
-                    action='store_true', default=False)
+                    action='store_true', default=True)
     p.add_argument ('--validate-theory-core', dest='validate_theory_core',
                     help='validate every theory core',
                     action='store_true', default=False)
