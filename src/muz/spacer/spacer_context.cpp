@@ -1074,10 +1074,21 @@ namespace spacer {
   
   bool pred_transformer::frames::add_lemma (expr * lemma, unsigned level)
   {
+    TRACE ("spacer", tout << "add-lemma: " << pp_level (level) << " " 
+           << m_pt.head ()->get_name () << " " 
+           << mk_pp (lemma, m_pt.get_ast_manager ()) << "\n";);
+    
     for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
       if (m_lemmas [i].get () == lemma)
       {
-        if (m_lemmas [i].level () >= level) return false;
+        if (m_lemmas [i].level () >= level) 
+        {
+          TRACE ("spacer", tout << "Already at a higher level: " 
+                 << pp_level (m_lemmas [i].level ()) << "\n";);
+          
+          return false;
+        }
+        
         m_lemmas [i].set_level (level);
         m_sorted = false;
         m_pt.add_lemma_core (lemma, level);
@@ -1123,16 +1134,21 @@ namespace spacer {
     
     for (unsigned i = 0, sz = m_lemmas.size (); i < sz && m_lemmas [i].level () <= level;)
     {
-      if (m_lemmas [i].level () < level) continue;
+      if (m_lemmas [i].level () < level) 
+      {++i; continue;}
+      
       
       unsigned solver_level;
       expr * curr = m_lemmas [i].get ();
       if (m_pt.is_invariant (tgt_level, curr, false, solver_level))
       {
         m_lemmas [i].set_level (solver_level);
+        m_pt.add_lemma_core (m_lemmas [i].get (), solver_level);
+        
         // percolate the lemma up to its new place
         while (i+1 < m_lemmas.size () && m_lemmas[i+1].level () < solver_level)
           swap (m_lemmas [i], m_lemmas[i+1]);
+        
       }
       else 
       {
