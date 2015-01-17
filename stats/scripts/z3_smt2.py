@@ -26,7 +26,7 @@ def parseArgs (argv):
     p.add_argument ('--verbose', help='Z3 verbosity', default=0)
     p.add_argument ('--use-utvpi', dest='use_utvpi', help='use utvpi/diff-logic '
                                                           'solvers, if applicable',
-                    action='store_true', default=False)
+                    action='store_true', default=True)
     p.add_argument ('--eager-reach-check', dest='eager_reach_check',
                     help='eagerly use reachability facts for every local query',
                     action='store_true', default=False)
