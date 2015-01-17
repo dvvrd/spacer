@@ -199,7 +199,7 @@ namespace spacer {
         
       public:
         frames (pred_transformer &pt) : m_pt (pt), m_size(0), m_sorted (true) {}
-        void simplify_formulas () {UNREACHABLE ();}
+        void simplify_formulas ();
         
         pred_transformer& pt () {return m_pt;}
         

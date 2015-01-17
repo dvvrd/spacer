@@ -1161,6 +1161,44 @@ namespace spacer {
     return all;
   }
 
+  void pred_transformer::frames::simplify_formulas ()
+  {
+    ast_manager &m = m_pt.get_ast_manager ();
+    sort ();
+    
+    tactic_ref simplifier = mk_unit_subsumption_tactic (m);
+    vector<lemma> old_lemmas (m_lemmas);
+    unsigned lemmas_size = old_lemmas.size ();
+    m_lemmas.reset ();
+    
+    goal_ref g (alloc (goal, m, false, false, false));
+    
+    unsigned j = 0;
+    for (unsigned i = 0; i <= m_size; ++i)
+    {
+      g->reset_all ();
+      unsigned level = i < m_size ? i : infty_level ();
+      
+      model_converter_ref mc;
+      proof_converter_ref pc;
+      expr_dependency_ref core(m);
+      goal_ref_buffer result;
+      
+      for (; j < lemmas_size && old_lemmas [j].level () <= level; ++j)
+        if (old_lemmas [j].level () == level) g->assert_expr (old_lemmas [j].get ());
+      
+      if (g->size () <= 0) continue;
+      
+      (*simplifier) (g, result, mc, pc, core);
+      SASSERT (result.size () == 1);
+      goal *r = result [0];
+      
+      for (unsigned k = 0; k < r->size (); ++k) 
+        m_lemmas.push_back (lemma (m, r->form (k), level));
+      m_sorted = false;
+    }
+  }
+  
     // ----------------
     // derivation
 
