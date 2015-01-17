@@ -1090,8 +1090,9 @@ namespace spacer {
         }
         
         m_lemmas [i].set_level (level);
-        m_sorted = false;
         m_pt.add_lemma_core (lemma, level);
+        for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas [j+1], m_lemmas[j]); ++j)
+          swap (m_lemmas [j], m_lemmas [j+1]);
         return true;
       }
     
@@ -1118,7 +1119,7 @@ namespace spacer {
     if (m_sorted) return;
     
     m_sorted = true;
-    std::sort (m_lemmas.begin (), m_lemmas.end (), lemmas_lt_proc());
+    std::sort (m_lemmas.begin (), m_lemmas.end (), m_lt);
   }
   
   bool pred_transformer::frames::propagate_to_next_level (unsigned level)
@@ -1146,8 +1147,8 @@ namespace spacer {
         m_pt.add_lemma_core (m_lemmas [i].get (), solver_level);
         
         // percolate the lemma up to its new place
-        while (i+1 < m_lemmas.size () && m_lemmas[i+1].level () < solver_level)
-          swap (m_lemmas [i], m_lemmas[i+1]);
+        for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas[j+1], m_lemmas[j]); ++j)
+          swap (m_lemmas [j], m_lemmas[j+1]);
         
       }
       else 

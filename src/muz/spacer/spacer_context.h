@@ -191,9 +191,9 @@ namespace spacer {
         pred_transformer &m_pt;
         vector<lemma> m_lemmas;
         unsigned m_size;
+        
         bool m_sorted;
-        
-        
+        lemmas_lt_proc m_lt;
         
         void sort ();
         
