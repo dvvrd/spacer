@@ -2288,7 +2288,8 @@ namespace spacer {
         }
         
         for (unsigned i = 0; i < cores.size(); ++i) {
-          expr_ref_vector const& core = cores[i].first;
+          expr_ref_vector& core = cores[i].first;
+          std::sort (core.c_ptr (), core.c_ptr () + core.size (), ast_lt_proc ());
           uses_level = cores[i].second;
           expr_ref lemma (m_pm.mk_not_and(core), m);
           TRACE("spacer", tout << "invariant state: " 
