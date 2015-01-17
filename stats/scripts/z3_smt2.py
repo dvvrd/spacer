@@ -54,6 +54,9 @@ def parseArgs (argv):
     p.add_argument ('--use-heavy-mev', dest='use_heavy_mev',
                     help='use heavy model evaluation routines for arrays',
                     action='store_true', default=False)
+    p.add_argument ('--smt2lib', dest='smt2lib',
+                    help='input smt2 file is in smt2lib format (and not datalog)'
+                    action='store_true', default=False)
 
     return p.parse_args (argv)
 
@@ -169,8 +172,12 @@ def main (argv):
         res = 'unknown'
     print 'Result:', res
 
-    if res == 'sat': stat ('Result', 'SAFE')
-    elif res == 'unsat': stat ('Result', 'CEX')
+    if res == 'sat':
+        if args.smt2lib: stat ('Result', 'SAFE')
+        else: stat ('Result', 'CEX')
+    elif res == 'unsat':
+        if args.smt2lib: stat ('Result', 'CEX')
+        else: stat ('Result', 'SAFE')
     
 if __name__ == '__main__':
     try:
