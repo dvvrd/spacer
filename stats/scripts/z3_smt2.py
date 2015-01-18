@@ -55,7 +55,7 @@ def parseArgs (argv):
                     help='use heavy model evaluation routines for arrays',
                     action='store_true', default=False)
     p.add_argument ('--smt2lib', dest='smt2lib',
-                    help='input smt2 file is in smt2lib format (and not datalog)'
+                    help='input smt2 file is in smt2lib format (and not datalog)',
                     action='store_true', default=False)
 
     return p.parse_args (argv)
