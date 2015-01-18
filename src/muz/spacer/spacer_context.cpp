@@ -257,7 +257,19 @@ namespace spacer {
                 if (is_concrete) break;
             }
         }
-        SASSERT (r);
+        
+        // true because of reach fact
+        if (!r) 
+        {
+          // check that reach-facts are enabled. 
+          SASSERT (has_reach_facts ());
+          SASSERT (model.eval 
+                   (to_app (m_reach_case_vars.get (0))->get_decl (), vl) && 
+                   m.is_true (vl));
+          is_concrete = true;
+        }
+        
+        
         return r;
     }
 
@@ -891,7 +903,7 @@ namespace spacer {
             m_tag2rule.insert(pred, rule);
             m_rule2tag.insert(rule, pred.get());            
             
-            if (is_init[0])
+            if (is_init [0])
             {
               transitions.push_back(pred);
               transitions.push_back (m.mk_not (m_reach_case_vars.back ()));
@@ -2155,9 +2167,12 @@ namespace spacer {
         // must-reachable
         if (is_concrete) 
         {
-          // -- update must summary
-          reach_fact* rf = mk_reach_fact (n, mev, *r);
-          n.pt ().add_reach_fact (*rf);
+          if (r && r->get_uninterpreted_tail_size () > 0)
+          {
+            // -- update must summary
+            reach_fact* rf = mk_reach_fact (n, mev, *r);
+            n.pt ().add_reach_fact (*rf);
+          }
           
           IF_VERBOSE(1, verbose_stream () << " T "
                      << std::fixed << std::setprecision(2) 
