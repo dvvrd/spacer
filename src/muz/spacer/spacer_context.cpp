@@ -139,14 +139,23 @@ namespace spacer {
     if (!has_reach_facts ()) return false;
     
     // put the solver in level0 only
-    prop_solver::scoped_delta_level _sl (m_solver, 0);
+    prop_solver::scoped_level _sl (m_solver, infty_level ());
     m_solver.set_model (model);
     m_solver.set_core (NULL);
     
+    expr_ref_vector v(m);
+    if (!m.is_false (m_initial_state))
+    {
+      v.push_back (m_initial_state);
+      qe::flatten_and (v);
+    }
+    v.push_back (m.mk_not (m_reach_case_vars.back ()));
+    
     expr_ref bg(m);
+    bg = pm.mk_and (v);
+    
     expr_ref_vector hard(m), soft(m);
     hard.push_back (state);
-    bg = m.mk_not (m_reach_case_vars.back ());
     lbool res = m_solver.check_assumptions_and_formula (hard, soft, bg);
     m_solver.set_model (NULL);
     return res == l_true;
