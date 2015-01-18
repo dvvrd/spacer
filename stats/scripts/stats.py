@@ -3,8 +3,9 @@
 import resource
 
 def _systemtime ():
-  ru = resource.getrusage (resource.RUSAGE_SELF)
-  return ru.ru_utime
+  ru_self = resource.getrusage (resource.RUSAGE_SELF)
+  ru_ch = resource.getrusage (resource.RUSAGE_CHILDREN)
+  return ru_self.ru_utime + ru_ch.ru_utime
 
 class Stopwatch:
   """ A stop watch """
