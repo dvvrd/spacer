@@ -3183,12 +3183,6 @@ namespace spacer {
               }
               break;
             }
-            
-            if (all_propagated && lvl == max_prop_lvl) {
-                m_inductive_lvl = lvl;
-                throw inductive_exception();
-            }
-            else if (all_propagated && lvl > max_prop_lvl) break;
         }
         if (m_params.simplify_formulas_post()) {            
             simplify_formulas();
