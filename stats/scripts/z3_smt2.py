@@ -163,11 +163,10 @@ def main (argv):
         popen = subprocess.Popen(z3_args.split (), stdout=subprocess.PIPE)
         popen.wait()
         res = popen.stdout.read()
-    res = res[:-1] # strip off the newline
-    if res.startswith ('sat'):
-        res = 'sat'
-    elif res.startswith ('unsat'):
+    if 'unsat' in res:
         res = 'unsat'
+    elif 'sat' in res:
+        res = 'sat'
     else:
         res = 'unknown'
     print 'Result:', res
