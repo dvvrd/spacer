@@ -1315,32 +1315,63 @@ namespace spacer {
     model_ref model;
     
     ast_manager &m = get_ast_manager ();
+    manager &pm = get_manager ();
+    
     expr_ref_vector summaries (m);
     
     for (unsigned i = m_active + 1; i < m_premises.size (); ++i)
       summaries.push_back (m_premises [i].get_summary ());
     
     // -- orient transition relation towards m_active premise
-    expr_ref v(m);
-    get_manager ().formula_o2n (m_trans, v, m_premises[m_active].get_oidx (), false);
-    summaries.push_back (v);
+    expr_ref active_trans (m);
+    pm.formula_o2n (m_trans, active_trans, 
+                                m_premises[m_active].get_oidx (), false);
+    summaries.push_back (active_trans);
     
     /// must be true, otherwise no suitable must summary found
-    VERIFY (pt.is_must_reachable (get_manager ().mk_and (summaries), &model));
+    VERIFY (pt.is_must_reachable (pm.mk_and (summaries), &model));
     
     model_evaluator mev (m, model);
+    
     // find must summary used
+    expr_ref v(m);
     pt.get_used_reach_fact (mev, v);
     
     // get an implicant of the summary
     expr_ref_vector u(m), lits (m);
     u.push_back (v);
     compute_implicant_literals (mev, u, lits);
-    v = get_manager ().mk_and (lits);
+    v = pm.mk_and (lits);
+    
+    /** HACK: needs a rewrite 
+     * compute post over the new must summary this must be done here
+     * because the must summary is currently described over new
+     * variables. However, we store it over old-variables, but we do
+     * not update the model. So we must get rid of all of the
+     * new-variables at this point.
+     */
+    {
+      expr_ref_vector summaries (m);
+      app_ref_vector vars (m);
+      summaries.push_back (v);
+      summaries.push_back (active_trans);
+      m_trans = pm.mk_and (summaries);
+      
+      // map auxiliary variables
+      app_ref_vector &ovars = m_premises[m_active].get_ovars ();
+      unsigned oidx = m_premises [m_active].get_oidx ();
+      for (unsigned i = 0, sz = ovars.size (); i < sz; ++i)
+        vars.push_back (m.mk_const (pm.o2n (ovars.get (i)->get_decl (), oidx)));
+      
+      if (!vars.empty ()) qe_project (m, vars, m_trans, mev.get_model (), true);
+    }
+    
     
     expr_ref s(m);
-    get_manager ().formula_n2o (v, s, m_premises[m_active].get_oidx ());
+    pm.formula_n2o (v, s, m_premises[m_active].get_oidx ());
     m_premises[m_active].set_summary (s, true);
+    
+    m_active++;
     
     return create_next_child (mev);
   }
