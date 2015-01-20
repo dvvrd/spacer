@@ -69,7 +69,8 @@ void small_object_allocator::reset() {
 #define MASK ((1 << PTR_ALIGNMENT) - 1)
 
 void small_object_allocator::deallocate(size_t size, void * p) {
-#if defined(Z3DEBUG) && !defined(_WINDOWS)
+  //#if defined(Z3DEBUG) && !defined(_WINDOWS)
+#if defined (Z3DEBUG) && defined (VALGRIND)
     // Valgrind friendly
     memory::deallocate(p);
     return;
@@ -91,7 +92,8 @@ void small_object_allocator::deallocate(size_t size, void * p) {
 }
 
 void * small_object_allocator::allocate(size_t size) {
-#if defined(Z3DEBUG) && !defined(_WINDOWS)
+  //#if defined(Z3DEBUG) && !defined(_WINDOWS)
+#if defined (Z3DEBUG) && defined (VALGRIND)
     // Valgrind friendly
     return memory::allocate(size);
 #endif
