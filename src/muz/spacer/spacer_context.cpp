@@ -600,7 +600,8 @@ namespace spacer {
   expr_ref pred_transformer::get_origin_summary (model_evaluator &mev, 
                                                  unsigned level, 
                                                  unsigned oidx,
-                                                 bool must)
+                                                 bool must,
+                                                 const ptr_vector<app> **aux_vars)
   {
     expr_ref_vector summary (m);
     expr_ref v(m);
@@ -611,6 +612,7 @@ namespace spacer {
     {
       reach_fact *f = get_used_origin_reach_fact (mev, oidx);
       summary.push_back (f->get ());
+      *aux_vars = &f->aux_vars ();
     }
     
     SASSERT (!summary.empty ());
@@ -1125,7 +1127,8 @@ namespace spacer {
         m_trans (trans, m_parent.get_ast_manager ()) {} 
   
   derivation::premise::premise (pred_transformer &pt, unsigned oidx, 
-                                     expr *summary, bool must) : 
+                                expr *summary, bool must, 
+                                const ptr_vector<app> &aux_vars) : 
     m_pt (pt), m_oidx (oidx), 
     m_summary (summary, pt.get_ast_manager ()), m_must (must),
     m_ovars (pt.get_ast_manager ())
@@ -1137,6 +1140,8 @@ namespace spacer {
     unsigned sig_sz = m_pt.head ()->get_arity ();
     for (unsigned i = 0; i < sig_sz; ++i)
       m_ovars.push_back (m.mk_const (sm.o2o (pt.sig (i), 0, m_oidx)));
+    for (unsigned i = 0, sz = aux_vars.size (); i < sz; ++i)
+      m_ovars.push_back (m.mk_const (sm.n2o (aux_vars.get (i)->get_decl (), m_oidx)));
   }
   
   derivation::premise::premise (const derivation::premise &p) :
@@ -1147,8 +1152,9 @@ namespace spacer {
   void derivation::add_premise (pred_transformer &pt, 
                                 unsigned oidx,
                                 expr* summary,
-                                bool must)
-  {m_premises.push_back (premise (pt, oidx, summary, must));}
+                                bool must,
+                                const ptr_vector<app> &aux_vars)
+  {m_premises.push_back (premise (pt, oidx, summary, must, aux_vars));}
   
 
 
@@ -2449,15 +2455,26 @@ namespace spacer {
         // }
         
         
+        const ptr_vector<app> tmp;
+        
         /// create a derivation and populate it with premises
         derivation *deriv = alloc (derivation, n, r, phi1);
         for (unsigned i = 0; i < preds.size (); ++i)
         {
+          const ptr_vector<app> *aux = NULL;
+          
           pred_transformer &pt = get_pred_transformer (preds [i]);
-          deriv->add_premise (pt, i, 
-                              pt.get_origin_summary (mev, prev_level (n.level ()),
-                                                     i, reach_pred_used [i]),
-                              reach_pred_used [i]);
+          expr_ref summary(m);
+          summary = pt.get_origin_summary (mev, prev_level (n.level ()), i, 
+                                           reach_pred_used [i], &aux);
+          if (reach_pred_used [i])
+          {
+            SASSERT (aux);
+            deriv->add_premise (pt, i, summary, true, *aux);
+          }
+          else
+            deriv->add_premise (pt, i, summary, false, tmp);
+          
         }
         n.set_derivation (deriv);
 
