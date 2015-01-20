@@ -321,6 +321,10 @@ namespace spacer {
           << " " << head ()->get_name () 
           << " " << mk_pp (lemma, m) << "\n";);
     
+    TRACE("core_array_eq", tout << "add_lemma_core: " << pp_level (lvl)
+          << " " << head ()->get_name () 
+          << " " << mk_pp (lemma, m) << "\n";);
+    
     if (is_infty_level (lvl)) m_solver.add_formula (lemma);
     else 
     {
@@ -672,6 +676,11 @@ namespace spacer {
             lits.append(core);
             uses_level = m_solver.uses_level();
         }
+        TRACE ("core_array_eq", 
+               tout << "check_inductive: " 
+               << "states: " << mk_pp (states, m) 
+               << " is: " << res << "\n"
+               << "with transition: " << mk_pp (m_transition, m) << "\n";);
         return res == l_false;
     }
 
@@ -1811,6 +1820,8 @@ namespace spacer {
             m_core_generalizers.push_back(alloc(core_arith_inductive_generalizer, *this));
         }
         
+        m_core_generalizers.push_back (alloc (core_array_eq_generalizer, *this));
+        
     }
 
     void context::get_level_property(unsigned lvl, expr_ref_vector& res, vector<relation_info>& rs) const {
@@ -2235,6 +2246,12 @@ namespace spacer {
       if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
 
       TRACE ("spacer", 
+             tout << "expand-node: " << n.pt().head()->get_name() 
+             << " level: " << n.level() 
+             << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
+             << mk_pp(n.post(), m) << "\n";);
+      
+      TRACE ("core_array_eq", 
              tout << "expand-node: " << n.pt().head()->get_name() 
              << " level: " << n.level() 
              << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"

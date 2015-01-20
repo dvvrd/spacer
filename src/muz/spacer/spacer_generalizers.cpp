@@ -632,6 +632,8 @@ namespace spacer {
   void core_array_eq_generalizer::operator() 
     (model_node &n, expr_ref_vector& core, unsigned &uses_level)
   {
+    TRACE ("core_array_eq", tout << "Looking for equalities\n";);
+    
     // -- find array constants
     ast_manager &m = m_ctx.get_ast_manager ();
     manager &pm = m_ctx.get_manager ();
@@ -641,6 +643,10 @@ namespace spacer {
     func_decl_set symb;
     collect_array_proc cap (m, symb);
     for_each_expr (cap, v);
+    
+    TRACE ("core_array_eq", 
+           tout << "found " << symb.size () << " array variables in: \n"
+           << mk_pp (v, m) << "\n";);
     
     // too few constants
     if (symb.size () <= 1) return;
@@ -653,17 +659,24 @@ namespace spacer {
     
     // -- for every pair of variables, try an equality
     typedef func_decl_set::iterator iterator;
-    for (iterator it = symb.begin (), end = symb.end ();
-         it != end;)
+    ptr_vector<func_decl> vsymbs;
+    for (iterator it = symb.begin (), end = symb.end (); 
+         it != end; ++it)
+      vsymbs.push_back (*it);
+    
+    for (unsigned i = 0, sz = vsymbs.size (); i < sz; ++i)
     {
-      ++it;
-      for (iterator jt = it; jt != end; ++jt)
+      for (unsigned j = i + 1; j < sz; ++j)
       {
-        v = m.mk_eq (m.mk_const (*it), m.mk_const (*jt));
+        v = m.mk_eq (m.mk_const (vsymbs.get (i)), m.mk_const (vsymbs.get (j)));
         solver.push ();
         solver.assert_expr (v);
         lbool res = solver.check ();
         solver.pop (1);
+        
+        TRACE ("core_array_eq", 
+               tout << "Checking: " << mk_pp (v, m) << ": " << res << "\n";);
+
         if (res == l_false) 
         {
           TRACE ("core_array_eq", 
@@ -672,6 +685,22 @@ namespace spacer {
           expr_ref_vector lits(m);
           lits.push_back (m.mk_not (v));
     
+          /**
+             HACK: if the first 3 arguments of pt are boolean, assume
+             they correspond to SeaHorn encoding and condition the equality on them.
+           */
+          pred_transformer &pt = n.pt ();
+          if (pt.sig_size () >= 3 &&
+              m.is_bool (pt.sig (0)->get_range ()) &&
+              m.is_bool (pt.sig (1)->get_range ()) &&
+              m.is_bool (pt.sig (2)->get_range ()))
+          {
+            lits.push_back (m.mk_const (pm.o2n(pt.sig (0), 0)));
+            lits.push_back (m.mk_not (m.mk_const (pm.o2n(pt.sig (1), 0))));
+            lits.push_back (m.mk_not (m.mk_const (pm.o2n(pt.sig (2), 0))));
+          }
+          
+          
           // -- check if it is consistent with the transition relation
           unsigned uses_level1;
           if (n.pt ().check_inductive (n.level (), lits, uses_level1))
