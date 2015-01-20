@@ -89,5 +89,16 @@ namespace spacer {
         virtual ~core_induction_generalizer() {}
         virtual void operator()(model_node& n, expr_ref_vector& core, unsigned& uses_level);
     };
+  
+  class core_array_eq_generalizer : public core_generalizer 
+  {
+  public:
+    core_array_eq_generalizer (context &ctx) : core_generalizer (ctx) {} 
+    virtual ~core_array_eq_generalizer () {}
+    virtual void operator() (model_node& n, expr_ref_vector& core, unsigned &uses_level);
+    
+  };
+  
+    
 };
 #endif

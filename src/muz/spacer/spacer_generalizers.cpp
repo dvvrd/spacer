@@ -603,4 +603,92 @@ namespace spacer {
             uses_level = n.level ();
         }
     }
+  
+  namespace
+  {
+    class collect_array_proc 
+    {
+      array_util m_au;
+      func_decl_set &m_symbs;
+      sort *m_sort;
+    public:
+      collect_array_proc (ast_manager &m, func_decl_set& s) : 
+        m_au (m), m_symbs (s), m_sort(NULL) {}
+      
+      void operator() (app* a)
+      {
+        if (a->get_family_id () == null_family_id && m_au.is_array (a))
+        {
+          if (m_sort && m_sort != get_sort (a)) return;
+          if (!m_sort) m_sort = get_sort (a);
+          m_symbs.insert (a->get_decl ());
+        }
+      }
+      void operator() (var*) {}
+      void operator() (quantifier*) {}
+    };
+  }
+  
+  void core_array_eq_generalizer::operator() 
+    (model_node &n, expr_ref_vector& core, unsigned &uses_level)
+  {
+    // -- find array constants
+    ast_manager &m = m_ctx.get_ast_manager ();
+    manager &pm = m_ctx.get_manager ();
+    
+    expr_ref v(m);
+    v = pm.mk_and (core);
+    func_decl_set symb;
+    collect_array_proc cap (m, symb);
+    for_each_expr (cap, v);
+    
+    // too few constants
+    if (symb.size () <= 1) return;
+    // too many constants, skip this
+    if (symb.size () >= 8) return;
+    
+    
+    smt::kernel solver (m, m_ctx.get_fparams (), m_ctx.get_params ().p);
+    solver.assert_expr (v);
+    
+    // -- for every pair of variables, try an equality
+    typedef func_decl_set::iterator iterator;
+    for (iterator it = symb.begin (), end = symb.end ();
+         it != end;)
+    {
+      ++it;
+      for (iterator jt = it; jt != end; ++jt)
+      {
+        v = m.mk_eq (m.mk_const (*it), m.mk_const (*jt));
+        solver.push ();
+        solver.assert_expr (v);
+        lbool res = solver.check ();
+        solver.pop (1);
+        if (res == l_false) 
+        {
+          TRACE ("core_array_eq", 
+                 tout << "Found stronger equality: " << mk_pp (v, m) << "\n";);
+    
+          expr_ref_vector lits(m);
+          lits.push_back (m.mk_not (v));
+    
+          // -- check if it is consistent with the transition relation
+          unsigned uses_level1;
+          if (n.pt ().check_inductive (n.level (), lits, uses_level1))
+          {
+            TRACE ("core_array_eq", tout << "Inductive!\n";);
+            core.reset ();
+            core.append (lits);
+            uses_level = uses_level1;
+            return;
+          }
+          else
+          { TRACE ("core_array_eq", tout << "Not-Inductive!\n";);}
+        }
+      }
+    }
+  }
+  
+    
+  
 };
