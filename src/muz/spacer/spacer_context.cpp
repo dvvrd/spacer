@@ -1268,8 +1268,8 @@ namespace spacer {
     
     if (!vars.empty ()) 
     {
-      qe_project (m, vars, m_trans, mev.get_model ());
-      qe::reduce_array_selects (*mev.get_model (), m_trans);
+      qe_project (m, vars, m_trans, mev.get_model (), true);
+      //qe::reduce_array_selects (*mev.get_model (), m_trans);
     }
     
         
@@ -1290,8 +1290,8 @@ namespace spacer {
     summaries.reset ();
     if (!vars.empty ()) 
     {
-      qe_project (m, vars, post, mev.get_model ());
-      qe::reduce_array_selects (*mev.get_model (), post);
+      qe_project (m, vars, post, mev.get_model (), true);
+      //qe::reduce_array_selects (*mev.get_model (), post);
     }
     
     get_manager ().formula_o2n (post.get (), post, m_premises [m_active].get_oidx ());
