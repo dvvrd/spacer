@@ -64,39 +64,37 @@ namespace qe {
         svector<bool>    m_eq;
         scoped_ptr<contains_app> m_var;
 
-        struct cant_project {};
-
-        void is_linear(rational const& mul, expr* t, rational& c, expr_ref_vector& ts) {
+        bool is_linear(rational const& mul, expr* t, rational& c, expr_ref_vector& ts) {
             expr* t1, *t2;
             rational mul1;
+            bool res = true;
             if (t == m_var->x()) {
                 c += mul;
             }
             else if (a.is_mul(t, t1, t2) && a.is_numeral(t1, mul1)) {
-                is_linear(mul* mul1, t2, c, ts);
+                res = is_linear(mul* mul1, t2, c, ts);
             }
             else if (a.is_mul(t, t1, t2) && a.is_numeral(t2, mul1)) {
-                is_linear(mul* mul1, t1, c, ts);
+                res = is_linear(mul* mul1, t1, c, ts);
             }
             else if (a.is_add(t)) {
                 app* ap = to_app(t);
-                for (unsigned i = 0; i < ap->get_num_args(); ++i) {
-                    is_linear(mul, ap->get_arg(i), c, ts);
+                for (unsigned i = 0; res && i < ap->get_num_args(); ++i) {
+                    res = is_linear(mul, ap->get_arg(i), c, ts);
                 }
             }
             else if (a.is_sub(t, t1, t2)) {
-                is_linear(mul,  t1, c, ts);
-                is_linear(-mul, t2, c, ts);
+                res = is_linear(mul,  t1, c, ts) && is_linear(-mul, t2, c, ts);
             }
             else if (a.is_uminus(t, t1)) {
-                is_linear(-mul, t1, c, ts);
+                res = is_linear(-mul, t1, c, ts);
             }
             else if (a.is_numeral(t, mul1)) {
                 ts.push_back(a.mk_numeral(mul*mul1, m.get_sort(t)));
             }
             else if ((*m_var)(t)) {
                 IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(t, m) << "\n";);
-                throw cant_project();
+                res = false;
             }
             else if (mul.is_one()) {
                 ts.push_back(t);
@@ -104,13 +102,12 @@ namespace qe {
             else {
                 ts.push_back(a.mk_mul(a.mk_numeral(mul, m.get_sort(t)), t));
             }
+            return res;
         }
 
         // either an equality (cx + t = 0) or an inequality (cx + t <= 0) or a divisibility literal (d | cx + t)
         bool is_linear(expr* lit, rational& c, expr_ref& t, rational& d, bool& is_strict, bool& is_eq, bool& is_diseq) {
-            if (!(*m_var)(lit)) {
-                return false;
-            }
+            SASSERT ((*m_var)(lit));
             expr* e1, *e2;
             c.reset();
             sort* s;
@@ -122,14 +119,14 @@ namespace qe {
             }
             SASSERT(!m.is_not(lit));
             if (a.is_le(lit, e1, e2) || a.is_ge(lit, e2, e1)) {
-                is_linear( mul, e1, c, ts);
-                is_linear(-mul, e2, c, ts);
+                if (!is_linear( mul, e1, c, ts) || !is_linear(-mul, e2, c, ts))
+                    return false;
                 s = m.get_sort(e1);
                 is_strict = is_not;
             }
             else if (a.is_lt(lit, e1, e2) || a.is_gt(lit, e2, e1)) {
-                is_linear( mul, e1, c, ts);
-                is_linear(-mul, e2, c, ts);
+                if (!is_linear( mul, e1, c, ts) || !is_linear(-mul, e2, c, ts))
+                    return false;
                 s = m.get_sort(e1);
                 is_strict = !is_not;
             }
@@ -142,23 +139,23 @@ namespace qe {
                     // divsibility constraint: t % num == 0 <=> num | t
                     if (num_val.is_zero ()) {
                         IF_VERBOSE(1, verbose_stream() << "div by zero" << mk_pp(lit, m) << "\n";);
-                        throw cant_project();
+                        return false;
                     }
                     d = num_val;
-                    is_linear (mul, t, c, ts);
+                    if (!is_linear (mul, t, c, ts)) return false;
                 } else if (a.is_mod (e2, t, num) && a.is_numeral (num, num_val, is_int) && is_int &&
                         a.is_numeral (e1, z) && z.is_zero ()) {
                     // divsibility constraint: 0 == t % num <=> num | t
                     if (num_val.is_zero ()) {
                         IF_VERBOSE(1, verbose_stream() << "div by zero" << mk_pp(lit, m) << "\n";);
-                        throw cant_project();
+                        return false;
                     }
                     d = num_val;
-                    is_linear (mul, t, c, ts);
+                    if (!is_linear (mul, t, c, ts)) return false;
                 } else {
                     // equality or disequality
-                    is_linear( mul, e1, c, ts);
-                    is_linear(-mul, e2, c, ts);
+                    if (!is_linear( mul, e1, c, ts) || !is_linear(-mul, e2, c, ts))
+                        return false;
                     if (is_not) is_diseq = true;
                     else is_eq = true;
                 }
@@ -166,7 +163,7 @@ namespace qe {
             }
             else {
                 IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(lit, m) << "\n";);
-                throw cant_project();
+                return false;
             }
 
             if (ts.empty()) {
@@ -179,7 +176,7 @@ namespace qe {
             return true;
         }
 
-        void project(model& mdl, expr_ref_vector& lits) {
+        bool project(model& mdl, expr_ref_vector& lits) {
             unsigned num_pos = 0;
             unsigned num_neg = 0;
             bool use_eq = false;
@@ -198,6 +195,10 @@ namespace qe {
                 bool is_strict = false;
                 bool is_eq = false;
                 bool is_diseq = false;
+                if (!(*m_var)(lits.get (i))) {
+                    new_lits.push_back(lits.get (i));
+                    continue;
+                }
                 if (is_linear(lits.get (i), c, t, d, is_strict, is_eq, is_diseq)) {
                     if (c.is_zero()) {
                         m_rw(lits.get (i), t);
@@ -243,9 +244,7 @@ namespace qe {
                         }                    
                     }
                 }
-                else {
-                    new_lits.push_back(lits.get (i));
-                }
+                else return false;
             }
             if (use_eq) {
                 TRACE ("qe",
@@ -274,7 +273,7 @@ namespace qe {
             lits.reset();
             lits.append(new_lits);
             if (use_eq || num_pos == 0 || num_neg == 0) {
-                return;
+                return true;
             }
             bool use_pos = num_pos < num_neg;
             unsigned max_t = find_max(mdl, use_pos);
@@ -295,9 +294,10 @@ namespace qe {
                           );
                 }
             }
+            return true;
         }
 
-        void project(model& mdl, app_ref_vector const& lits, expr_map& map, app_ref& div_lit) {
+        bool project(model& mdl, app_ref_vector const& lits, expr_map& map, app_ref& div_lit) {
             unsigned num_pos = 0; // number of positive literals true in the model
             unsigned num_neg = 0; // number of negative literals true in the model
 
@@ -318,6 +318,7 @@ namespace qe {
                 bool is_strict = false;
                 bool is_eq = false;
                 bool is_diseq = false;
+                if (!(*m_var)(lits.get (i))) continue;
                 if (is_linear(lits.get (i), c, t, d, is_strict, is_eq, is_diseq)) {
                     TRACE ("qe",
                             tout << "Literal: " << mk_pp (lits.get (i), m) << "\n";
@@ -392,6 +393,7 @@ namespace qe {
                             tout << "d: " << d << "\n";
                           );
                 }
+                else return false;
             }
 
             rational lcm_coeffs (1), lcm_divs (1);
@@ -464,7 +466,7 @@ namespace qe {
                     }
                 }
 
-                return;
+                return true;
             }
 
             expr_ref new_lit (m);
@@ -519,7 +521,7 @@ namespace qe {
                             tout << "New literal: " << mk_pp (new_lit, m) << "\n";
                           );
                 }
-                return;
+                return true;
             }
 
             bool use_pos = num_pos < num_neg; // pick a side; both are sound
@@ -617,6 +619,7 @@ namespace qe {
                                        z);
                 }
             }
+            return true;
         }
 
         unsigned find_max(model& mdl, bool do_pos) {
@@ -1003,28 +1006,32 @@ namespace qe {
         arith_project_util(ast_manager& m): 
             m(m), a(m), m_rw(m), m_lits (m), m_terms (m) {}
 
+        // OLD AND UNUSED INTERFACE
         expr_ref operator()(model& mdl, app_ref_vector& vars, expr_ref_vector const& lits) {
             app_ref_vector new_vars(m);
             expr_ref_vector result(lits);
             for (unsigned i = 0; i < vars.size(); ++i) {
                 app* v = vars.get (i);
                 m_var = alloc(contains_app, m, v);
-                try {
-                    if (a.is_int (v)) {
-                        IF_VERBOSE(2, verbose_stream() << "can't project int vars:" << mk_pp(v, m) << "\n";);
-                        throw cant_project ();
-                    }
-                    project(mdl, result);
-                    TRACE("qe", tout << "projected: " << mk_pp(v, m) << "\n";
-                          for (unsigned i = 0; i < result.size(); ++i) {
-                              tout << mk_pp(result.get (i), m) << "\n";
-                          });
-                }
-                catch (cant_project) {
-                    IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
+                bool fail = a.is_int (v) || !project (mdl, result);
+                if (fail) new_vars.push_back (v);
 
-                    new_vars.push_back(v);
-                }
+                IF_VERBOSE(2,
+                        if (fail) {
+                            verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";
+                        }
+                );
+                TRACE("qe",
+                        if (!fail) {
+                            tout << "projected: " << mk_pp(v, m) << "\n";
+                            for (unsigned i = 0; i < result.size(); ++i) {
+                                tout << mk_pp(result.get (i), m) << "\n";
+                            }
+                        }
+                        else {
+                            tout << "can't project: " << mk_pp (v, m) << "\n";
+                        }
+                     );
             }
             vars.reset();
             vars.append(new_vars);
@@ -1066,21 +1073,20 @@ namespace qe {
                         tout << "projecting variable: " << mk_pp (v, m) << "\n";
                       );
                 m_var = alloc(contains_app, m, v);
-                try {
-                    map.reset ();
-                    lits.reset ();
-                    if (a.is_int (v)) {
-                        // factor out mod terms using div terms
-                        expr_map mod_map (m);
-                        mod2div (fml, mod_map);
-                        TRACE ("qe",
-                                tout << "after mod2div:" << "\n";
-                                tout << mk_pp (fml, m) << "\n";
-                              );
-                    }
-                    collect_lits (fml, lits);
-                    app_ref div_lit (m);
-                    project (mdl, lits, map, div_lit);
+                map.reset ();
+                lits.reset ();
+                if (a.is_int (v)) {
+                    // factor out mod terms using div terms
+                    expr_map mod_map (m);
+                    mod2div (fml, mod_map);
+                    TRACE ("qe",
+                            tout << "after mod2div:" << "\n";
+                            tout << mk_pp (fml, m) << "\n";
+                          );
+                }
+                collect_lits (fml, lits);
+                app_ref div_lit (m);
+                if (project (mdl, lits, map, div_lit)) {
                     substitute (fml, lits, map);
                     if (div_lit) {
                         fml = m.mk_and (fml, div_lit);
@@ -1089,16 +1095,8 @@ namespace qe {
                             tout << "projected: " << mk_pp(v, m) << " "
                                  << mk_pp(fml, m) << "\n";
                          );
-                    /**
-                     * DEBUG_CODE(
-                     *     expr_ref bval (m);
-                     *     // model evaluation doesn't always work for array
-                     *     // variables
-                     *     SASSERT (mdl.eval (fml, bval, true) && m.is_true (bval));
-                     * );
-                     */
                 }
-                catch (cant_project) {
+                else {
                     IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
                     new_vars.push_back(v);
                 }
@@ -1123,8 +1121,6 @@ namespace qe {
         expr_ref_vector             m_idx_lits_v;
         app_ref_vector              m_aux_vars;
         model_evaluator_array_util  m_mev;
-
-        struct cant_project {};
 
         void reset_v () {
             m_v = 0;
@@ -1455,8 +1451,9 @@ namespace qe {
          *
          * compute substitution term and aux lits
          */
-        void project (expr_ref const& fml) {
+        bool project (expr_ref const& fml) {
             expr_ref_vector eqs (m);
+            ptr_vector<app> true_eqs; // subset of eqs; eqs ensures references
 
             find_arr_eqs (fml, eqs);
             TRACE ("qe",
@@ -1466,18 +1463,17 @@ namespace qe {
                     }
                   );
 
-            // find subst term
-            // TODO: better ordering of eqs?
-            for (unsigned i = 0; !m_subst_term_v && i < eqs.size (); i++) {
+            // evaluate eqs in M
+            for (unsigned i = 0; i < eqs.size (); i++) {
                 TRACE ("qe",
                         tout << "array equality:\n";
                         tout << mk_pp (eqs.get (i), m) << "\n";
                       );
 
-                expr* curr_eq = eqs.get (i);
+                expr* eq = eqs.get (i);
 
-                // evaluate curr_eq in M
-                app* a = to_app (curr_eq);
+                // evaluate eq in M
+                app* a = to_app (eq);
                 expr_ref val (m);
                 m_mev.eval_array_eq (*M, a, a->get_arg (0), a->get_arg (1), val);
                 if (!val) {
@@ -1491,14 +1487,75 @@ namespace qe {
                       );
 
                 if (m.is_false (val)) {
-                    m_false_sub_v.insert (curr_eq, m.mk_false ());
+                    m_false_sub_v.insert (eq, m.mk_false ());
                 }
                 else {
-                    m_true_sub_v.insert (curr_eq, m.mk_true ());
-                    // try to find subst term
-                    find_subst_term (to_app (curr_eq));
+                    true_eqs.push_back (to_app (eq));
                 }
             }
+
+            // compute nesting depths of stores on m_v in true_eqs, as follows:
+            // 0 if m_v appears on both sides of equality
+            // 1 if equality is (m_v=t)
+            // 2 if equality is (store(m_v,i,v)=t)
+            // ...
+            unsigned num_true_eqs = true_eqs.size ();
+            vector<unsigned> nds (num_true_eqs);
+            for (unsigned i = 0; i < num_true_eqs; i++) {
+                app* eq = true_eqs.get (i);
+                expr* lhs = eq->get_arg (0);
+                expr* rhs = eq->get_arg (1);
+                bool lhs_has_v = (lhs == m_v || m_has_stores_v.is_marked (lhs));
+                bool rhs_has_v = (rhs == m_v || m_has_stores_v.is_marked (rhs));
+                app* store = 0;
+
+                SASSERT (lhs_has_v || rhs_has_v);
+
+                if (!lhs_has_v) {
+                    store = to_app (rhs);
+                }
+                else if (!rhs_has_v) {
+                    store = to_app (lhs);
+                }
+                // else v appears on both sides -- trivial equality
+                // put it in the beginning to simplify it away
+
+                unsigned nd = 0; // nesting depth
+                if (store) {
+                    for (nd = 1; m_arr_u.is_store (store); nd++, store = to_app (store->get_arg (0)));
+                    SASSERT (store == m_v);
+                }
+                nds.push_back (nd);
+            }
+
+            // sort true_eqs according to nesting depth
+            // use insertion sort
+            for (unsigned i = 1; i < num_true_eqs; i++) {
+                app* eq = true_eqs.get (i);
+                unsigned nd = nds.get (i);
+                unsigned j = i;
+                for (; nds.get (j-1) > nd && j > 0; j--) {
+                    true_eqs.set (j, true_eqs.get (j-1));
+                    nds.set (j, nds.get (j-1));
+                }
+                if (j < i) {
+                    true_eqs.set (j, eq);
+                    nds.set (j, nd);
+                    TRACE ("qe",
+                            tout << "changing eq order!\n";
+                          );
+                }
+            }
+
+            // search for subst term
+            for (unsigned i = 0; !m_subst_term_v && i < num_true_eqs; i++) {
+                app* eq = true_eqs.get (i);
+                m_true_sub_v.insert (eq, m.mk_true ());
+                // try to find subst term
+                find_subst_term (eq);
+            }
+
+            return true;
         }
 
         void mk_result (expr_ref& fml) {
@@ -1554,8 +1611,7 @@ namespace qe {
                 TRACE ("qe",
                         tout << "projecting equalities on variable: " << mk_pp (m_v, m) << "\n";
                       );
-                try {
-                    project (fml);
+                if (project (fml)) {
                     mk_result (fml);
                     if (!m_subst_term_v) {
                         rem_arr_vars.push_back (m_v);
@@ -1565,7 +1621,7 @@ namespace qe {
                             tout << mk_pp (fml, m) << "\n";
                           );
                 }
-                catch (cant_project) {
+                else {
                     IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(m_v, m) << "\n";);
                     rem_arr_vars.push_back(m_v);
                 }
@@ -1589,8 +1645,6 @@ namespace qe {
         ast_mark                    m_arr_test;
         ast_mark                    m_has_stores;
         bool                        m_reduce_all_selects;
-
-        struct cant_project {};
 
         void reset () {
             m_cache.reset ();
@@ -1628,11 +1682,14 @@ namespace qe {
             }
         }
 
-        expr* reduce (expr *e) {
-            if (!is_app (e)) return e;
+        bool reduce (expr_ref& e) {
+            if (!is_app (e)) return true;
 
             expr *r = 0;
-            if (m_cache.find (e, r)) return r;
+            if (m_cache.find (e, r)) {
+                e = r;
+                return true;
+            }
 
             ptr_vector<app> todo;
             todo.push_back (to_app (e));
@@ -1681,7 +1738,8 @@ namespace qe {
             }
 
             SASSERT (r);
-            return r;
+            e = r;
+            return true;
         }
 
         expr* reduce_core (app *a) {
@@ -1755,11 +1813,10 @@ namespace qe {
 
             // assume all arr_vars are of array sort
             // and assume no store equalities on arr_vars
-            try {
-              fml = reduce (fml.get ());
-              mk_result (fml);
+            if (reduce (fml)) {
+                mk_result (fml);
             }
-            catch (cant_project) {
+            else {
                 IF_VERBOSE(2, verbose_stream() << "can't project arrays:" << "\n";);
             }
         }
@@ -1781,8 +1838,6 @@ namespace qe {
         model_evaluator_array_util  m_mev;
         expr_safe_replace           m_sub;
         ast_mark                    m_arr_test;
-
-        struct cant_project {};
 
         void reset () {
             m_sel_terms.reset ();
@@ -1933,7 +1988,7 @@ namespace qe {
          * project selects
          * populates idx lits and obtains substitution for sel terms
          */
-        void project (expr_ref& fml) {
+        bool project (expr_ref& fml) {
             // collect sel terms -- populate the map m_sel_terms
             collect_selects (fml);
 
@@ -1953,6 +2008,8 @@ namespace qe {
                         tout << mk_pp (m_idx_lits.get (i), m) << "\n";
                     }
                   );
+
+            return true;
         }
 
     public:
@@ -1986,13 +2043,12 @@ namespace qe {
 
             // assume all arr_vars are of array sort
             // and they only appear in select terms
-            try {
-                project (fml);
+            if (project (fml)) {
                 mk_result (fml);
                 aux_vars.append (m_sel_consts);
                 arr_vars.reset ();
             }
-            catch (cant_project) {
+            else {
                 IF_VERBOSE(2, verbose_stream() << "can't project arrays:" << "\n";);
             }
 
@@ -2005,387 +2061,6 @@ namespace qe {
             m_sel_terms.reset ();
         }
     };
-
-//    class array_project_selects_util {
-//        ast_manager&                m;
-//        array_util                  m_arr_u;
-//        arith_util                  m_ari_u;
-//        obj_map<expr, expr*>        m_elim_stores_cache;
-//        // representative indices for eliminating selects
-//        expr_ref_vector             m_idx_reprs;
-//        expr_ref_vector             m_idx_vals;
-//        app_ref_vector              m_sel_consts;
-//        expr_ref_vector             m_pinned;   // to ensure a reference
-//        expr_ref_vector             m_idx_lits;
-//        model_ref                   M;
-//        model_evaluator_array_util  m_mev;
-//        th_rewriter                 m_rw;
-//        expr_safe_replace           m_sub;
-//        ast_mark                    m_arr_test;
-//        ast_mark                    m_has_stores;
-//        bool                        m_project_all_stores;
-//
-//        struct cant_project {};
-//
-//        void reset () {
-//            m_elim_stores_cache.reset ();
-//            m_idx_reprs.reset ();
-//            m_idx_vals.reset ();
-//            m_sel_consts.reset ();
-//            m_pinned.reset ();
-//            m_idx_lits.reset ();
-//            M = 0;
-//            m_sub.reset ();
-//            m_arr_test.reset ();
-//            m_has_stores.reset ();
-//        }
-//
-//        bool is_equals (expr *e1, expr *e2) {
-//            if (e1 == e2) return true;
-//            expr_ref val1 (m), val2 (m);
-//            m_mev.eval (*M, e1, val1);
-//            m_mev.eval (*M, e2, val2);
-//            return (val1 == val2);
-//        }
-//
-//        void add_idx_cond (expr_ref& cond) {
-//            m_rw (cond);
-//            if (!m.is_true (cond)) m_idx_lits.push_back (cond);
-//        }
-//
-//        bool has_stores (expr* e) {
-//            if (m_project_all_stores) return true;
-//            return m_has_stores.is_marked (e);
-//        }
-//
-//        void mark_stores (app* a, bool args_have_stores) {
-//            if (m_project_all_stores) return;
-//            if (args_have_stores ||
-//                    (m_arr_u.is_store (a) && m_arr_test.is_marked (a->get_arg (0)))) {
-//                m_has_stores.mark (a, true);
-//            }
-//        }
-//
-//        expr* sel_after_stores (expr *e) {
-//            if (!is_app (e)) return e;
-//
-//            expr *r = 0;
-//            if (m_elim_stores_cache.find (e, r)) return r;
-//
-//            ptr_vector<app> todo;
-//            todo.push_back (to_app (e));
-//
-//            while (!todo.empty ()) {
-//                app *a = todo.back ();
-//                unsigned sz = todo.size ();
-//                expr_ref_vector args (m);
-//                bool dirty = false;
-//                bool args_have_stores = false;
-//
-//                for (unsigned i = 0; i < a->get_num_args (); ++i) {
-//                    expr *arg = a->get_arg (i);
-//                    expr *narg = 0;
-//
-//                    if (!is_app (arg)) args.push_back (arg);
-//                    else if (m_elim_stores_cache.find (arg, narg)) { 
-//                        args.push_back (narg);
-//                        dirty |= (arg != narg);
-//                        if (!args_have_stores && has_stores (narg)) {
-//                            args_have_stores = true;
-//                        }
-//                    }
-//                    else {
-//                        todo.push_back (to_app (arg));
-//                    }
-//                }
-//
-//                if (todo.size () > sz) continue;
-//                todo.pop_back ();
-//
-//                if (dirty) {
-//                    r = m.mk_app (a->get_decl (), args.size (), args.c_ptr ());
-//                    m_pinned.push_back (r);
-//                }
-//                else r = a;
-//
-//                if (m_arr_u.is_select (r) && has_stores (to_app (r)->get_arg (0))) {
-//                    r = sel_after_stores_core (to_app(r));
-//                }
-//                else {
-//                    mark_stores (to_app (r), args_have_stores);
-//                }
-//
-//                m_elim_stores_cache.insert (a, r);
-//            }
-//
-//            SASSERT (r);
-//            return r;
-//        }
-//
-//        expr* sel_after_stores_core (app *a) {
-//            if (!m_arr_u.is_store (a->get_arg (0))) return a;
-//
-//            SASSERT (a->get_num_args () == 2 && "Multi-dimensional arrays are not supported");
-//            expr* array = a->get_arg (0);
-//            expr* j = a->get_arg (1);
-//
-//            while (m_arr_u.is_store (array)) {
-//                a = to_app (array);
-//                expr* idx = a->get_arg (1);
-//                expr_ref cond (m);
-//
-//                if (is_equals (idx, j)) {
-//                    cond = m.mk_eq (idx, j);
-//                    add_idx_cond (cond);
-//                    return a->get_arg (2);
-//                }
-//                else {
-//                    cond = m.mk_not (m.mk_eq (idx, j));
-//                    add_idx_cond (cond);
-//                    array = a->get_arg (0);
-//                }
-//            }
-//
-//            expr* args[2] = {array, j};
-//            expr* r = m_arr_u.mk_select (2, args);
-//            m_pinned.push_back (r);
-//            return r;
-//        }
-//
-//        /**
-//         * collect sel terms on array vars as given by m_arr_test
-//         */
-//        void collect_selects (expr* fml, obj_map<app, ptr_vector<app>*>& sel_terms) {
-//            if (!is_app (fml)) return;
-//            ast_mark done;
-//            ptr_vector<app> todo;
-//            todo.push_back (to_app (fml));
-//            while (!todo.empty ()) {
-//                app* a = todo.back ();
-//                if (done.is_marked (a)) {
-//                    todo.pop_back ();
-//                    continue;
-//                }
-//                unsigned num_args = a->get_num_args ();
-//                bool all_done = true;
-//                for (unsigned i = 0; i < num_args; i++) {
-//                    expr* arg = a->get_arg (i);
-//                    if (!done.is_marked (arg) && is_app (arg)) {
-//                        todo.push_back (to_app (arg));
-//                        all_done = false;
-//                    }
-//                }
-//                if (!all_done) continue;
-//                todo.pop_back ();
-//                if (m_arr_u.is_select (a)) {
-//                    expr* arr = a->get_arg (0);
-//                    if (m_arr_test.is_marked (arr)) {
-//                        ptr_vector<app>* lst = sel_terms.find (to_app (arr));;
-//                        lst->push_back (a);
-//                    }
-//                }
-//                done.mark (a, true);
-//            }
-//        }
-//
-//        /**
-//         * model based ackermannization for sel terms of some array
-//         *
-//         * update sub with val consts for sel terms
-//         */
-//        void ackermann (ptr_vector<app> const& sel_terms) {
-//            if (sel_terms.empty ()) return;
-//
-//            expr* v = sel_terms.get (0)->get_arg (0); // array variable
-//            sort* v_sort = m.get_sort (v);
-//            sort* val_sort = get_array_range (v_sort);
-//            sort* idx_sort = get_array_domain (v_sort, 0);
-//
-//            unsigned start = m_idx_reprs.size (); // append at the end
-//
-//            for (unsigned i = 0; i < sel_terms.size (); i++) {
-//                app* a = sel_terms.get (i);
-//                expr* idx = a->get_arg (1);
-//                expr_ref val (m);
-//                m_mev.eval (*M, idx, val);
-//
-//                bool is_new = true;
-//                for (unsigned j = start; j < m_idx_vals.size (); j++) {
-//                    if (m_idx_vals.get (j) == val) {
-//                        // idx belongs to the jth equivalence class;
-//                        // substitute sel term with ith sel const
-//                        expr* c = m_sel_consts.get (j);
-//                        m_sub.insert (a, c);
-//                        // add equality (idx == repr)
-//                        expr* repr = m_idx_reprs.get (j);
-//                        m_idx_lits.push_back (m.mk_eq (idx, repr));
-//
-//                        is_new = false;
-//                        break;
-//                    }
-//                }
-//                if (is_new) {
-//                    // new repr, val, and sel const
-//                    m_idx_reprs.push_back (idx);
-//                    m_idx_vals.push_back (val);
-//                    app_ref c (m.mk_fresh_const ("sel", val_sort), m);
-//                    m_sel_consts.push_back (c);
-//                    // substitute sel term with new const
-//                    m_sub.insert (a, c);
-//                    // extend M to include c
-//                    m_mev.eval (*M, a, val);
-//                    M->register_decl (c->get_decl (), val);
-//                }
-//            }
-//
-//            // sort reprs by their value and add a chain of strict inequalities
-//
-//            unsigned num_reprs = m_idx_reprs.size () - start;
-//            if (num_reprs == 0) return;
-//
-//            SASSERT ((m_ari_u.is_real (idx_sort) || m_ari_u.is_int (idx_sort))
-//                        && "Unsupported index sort: neither real nor int");
-//
-//            // using insertion sort
-//            unsigned end = start + num_reprs;
-//            for (unsigned i = start+1; i < end; i++) {
-//                expr* repr = m_idx_reprs.get (i);
-//                expr* val = m_idx_vals.get (i);
-//                unsigned j = i;
-//                for (; j > start; j--) {
-//                    rational j_val, jm1_val;
-//                    VERIFY (m_ari_u.is_numeral (val, j_val));
-//                    VERIFY (m_ari_u.is_numeral (m_idx_vals.get (j-1), jm1_val));
-//                    if (j_val >= jm1_val) break;
-//                    m_idx_reprs[j] = m_idx_reprs.get (j-1);
-//                    m_idx_vals[j] = m_idx_vals.get (j-1);
-//                }
-//                m_idx_reprs[j] = repr;
-//                m_idx_vals[j] = val;
-//            }
-//
-//            for (unsigned i = start; i < end-1; i++) {
-//                m_idx_lits.push_back (m_ari_u.mk_lt (m_idx_reprs.get (i),
-//                                                     m_idx_reprs.get (i+1)));
-//            }
-//        }
-//
-//        /**
-//         * project selects
-//         * populates idx lits and obtains substitution for sel terms
-//         */
-//        void project (app_ref_vector& vars, expr_ref& fml) {
-//            if (!m_project_all_stores && vars.empty ()) return;
-//            typedef obj_map<app, ptr_vector<app>*> sel_map;
-//
-//            // 1. proj sel after stores
-//            fml = sel_after_stores (fml);
-//
-//            TRACE ("qe",
-//                    tout << "after projecting sel after stores:\n";
-//                    tout << mk_pp (fml, m) << "\n";
-//                    for (unsigned i = 0; i < m_idx_lits.size (); i++) {
-//                        tout << mk_pp (m_idx_lits.get (i), m) << "\n";
-//                    }
-//                  );
-//
-//            if (vars.empty ()) return;
-//
-//            // 2. proj selects over vars
-//
-//            // empty map from array var to sel terms over it
-//            sel_map sel_terms;
-//            for (unsigned i = 0; i < vars.size (); i++) {
-//                ptr_vector<app>* lst = alloc (ptr_vector<app>);
-//                sel_terms.insert (vars.get (i), lst);
-//            }
-//
-//            // collect sel terms -- populate the map
-//            collect_selects (fml, sel_terms);
-//            for (unsigned i = 0; i < m_idx_lits.size (); i++) {
-//                collect_selects (m_idx_lits.get (i), sel_terms);
-//            }
-//
-//            // model based ackermannization
-//            sel_map::iterator begin = sel_terms.begin (),
-//                              end = sel_terms.end ();
-//            for (sel_map::iterator it = begin; it != end; it++) {
-//                TRACE ("qe",
-//                        tout << "ackermann for var: " << mk_pp (it->m_key, m) << "\n";
-//                      );
-//                ackermann (*(it->m_value));
-//            }
-//
-//            TRACE ("qe",
-//                    tout << "idx lits after ackermannization:\n";
-//                    for (unsigned i = 0; i < m_idx_lits.size (); i++) {
-//                        tout << mk_pp (m_idx_lits.get (i), m) << "\n";
-//                    }
-//                  );
-//
-//            // dealloc
-//            for (sel_map::iterator it = begin; it != end; it++) {
-//                dealloc (it->m_value);
-//            }
-//        }
-//
-//        void mk_result (expr_ref& fml) {
-//            // conjoin aux lits
-//            expr_ref_vector lits (m);
-//            lits.append (m_idx_lits);
-//            lits.push_back (fml);
-//            fml = m.mk_and (lits.size (), lits.c_ptr ());
-//
-//            // substitute for sel terms
-//            m_sub (fml);
-//
-//            TRACE ("qe",
-//                    tout << "after projection of selects:\n";
-//                    tout << mk_pp (fml, m) << "\n";
-//                  );
-//        }
-//
-//    public:
-//
-//        array_project_selects_util (ast_manager& m):
-//            m (m),
-//            m_arr_u (m),
-//            m_ari_u (m),
-//            m_idx_reprs (m),
-//            m_idx_vals (m),
-//            m_sel_consts (m),
-//            m_pinned (m),
-//            m_idx_lits (m),
-//            m_mev (m),
-//            m_rw (m),
-//            m_sub (m),
-//            m_project_all_stores (false)
-//        {}
-//
-//        void operator () (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool project_all_stores = false) {
-//            reset ();
-//            M = &mdl;
-//            m_project_all_stores = project_all_stores;
-//
-//            // mark vars to eliminate
-//            for (unsigned i = 0; i < arr_vars.size (); i++) {
-//                m_arr_test.mark (arr_vars.get (i), true);
-//            }
-//
-//            // assume all arr_vars are of array sort
-//            // and assume no store equalities on arr_vars
-//            try {
-//                project (arr_vars, fml);
-//                mk_result (fml);
-//                aux_vars.append (m_sel_consts);
-//                arr_vars.reset ();
-//            }
-//            catch (cant_project) {
-//                IF_VERBOSE(1, verbose_stream() << "can't project arrays:" << "\n";);
-//            }
-//        }
-//    };
-
 
     expr_ref arith_project(model& mdl, app_ref_vector& vars, expr_ref_vector const& lits) {
         ast_manager& m = vars.get_manager();
@@ -2437,7 +2112,7 @@ namespace qe {
         ap (mdl, arr_vars, fml, aux_vars);
     }
 
-    void array_project (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars) {
+    void array_project (model& mdl, app_ref_vector& arr_vars, expr_ref& fml, app_ref_vector& aux_vars, bool reduce_all_selects) {
         // 1. project array equalities
         array_project_eqs (mdl, arr_vars, fml, aux_vars);
         TRACE ("qe",
@@ -2454,7 +2129,12 @@ namespace qe {
               );
 
         // 2. reduce selects
-        reduce_array_selects (mdl, arr_vars, fml);
+        if (reduce_all_selects) {
+            reduce_array_selects (mdl, fml);
+        }
+        else {
+            reduce_array_selects (mdl, arr_vars, fml);
+        }
         TRACE ("qe",
                 ast_manager& m = fml.get_manager ();
                 tout << "Reduced selects:\n" << mk_pp (fml, m) << "\n";

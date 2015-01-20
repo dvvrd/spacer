@@ -14,7 +14,7 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--inline', 
                     help='Enable inlining', 
-                    action='store_true', default=False)
+                    action='store_true', default=True)
     p.add_argument ('--validate', help='Enable validation',
                     action='store_true', default=False)
     p.add_argument ('--trace', help='Trace levels to enable (spacer, pdr, dl,'
@@ -26,10 +26,10 @@ def parseArgs (argv):
     p.add_argument ('--verbose', help='Z3 verbosity', default=0)
     p.add_argument ('--use-utvpi', dest='use_utvpi', help='use utvpi/diff-logic '
                                                           'solvers, if applicable',
-                    action='store_true', default=False)
+                    action='store_true', default=True)
     p.add_argument ('--eager-reach-check', dest='eager_reach_check',
                     help='eagerly use reachability facts for every local query',
-                    action='store_true', default=False)
+                    action='store_true', default=True)
     p.add_argument ('--validate-theory-core', dest='validate_theory_core',
                     help='validate every theory core',
                     action='store_true', default=False)
@@ -53,6 +53,9 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--use-heavy-mev', dest='use_heavy_mev',
                     help='use heavy model evaluation routines for arrays',
+                    action='store_true', default=False)
+    p.add_argument ('--smt2lib', dest='smt2lib',
+                    help='input smt2 file is in smt2lib format (and not datalog)',
                     action='store_true', default=False)
 
     return p.parse_args (argv)
@@ -126,7 +129,7 @@ def main (argv):
         z3_args += ' fixedpoint.validate_theory_core=true'
 
     if args.print_stats:
-        z3_args += ' -st'
+        z3_args += ' fixedpoint.print_statistics=true'
 
     if args.dfs:
         z3_args += ' fixedpoint.bfs_model_search=false'
@@ -169,8 +172,12 @@ def main (argv):
         res = 'unknown'
     print 'Result:', res
 
-    if res == 'sat': stat ('Result', 'SAFE')
-    elif res == 'unsat': stat ('Result', 'CEX')
+    if res == 'sat':
+        if args.smt2lib: stat ('Result', 'SAFE')
+        else: stat ('Result', 'CEX')
+    elif res == 'unsat':
+        if args.smt2lib: stat ('Result', 'CEX')
+        else: stat ('Result', 'SAFE')
     
 if __name__ == '__main__':
     try:

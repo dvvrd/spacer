@@ -2508,8 +2508,8 @@ namespace spacer {
         vars.append(aux_vars.size(), aux_vars.c_ptr());
 
         expr_ref phi1 = m_pm.mk_and (Phi);
-        qe_project (m, vars, phi1, mev.get_model ());
-        qe::reduce_array_selects (*mev.get_model (), phi1);
+        qe_project (m, vars, phi1, mev.get_model (), true);
+        //qe::reduce_array_selects (*mev.get_model (), phi1);
         SASSERT (vars.empty ());
 
         TRACE ("spacer",

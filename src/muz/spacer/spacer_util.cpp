@@ -641,7 +641,7 @@ namespace spacer {
         }
     }
 
-  void model_evaluator::eval_terms (expr * formula)
+  void model_evaluator::eval_terms (expr * formula, bool model_completion)
   {
     ptr_vector<expr> todo;
     todo.push_back (formula);
@@ -667,14 +667,14 @@ namespace spacer {
       else
       {
         expr_ref v(m);
-        m_model->eval (e, v);
+        m_model->eval (e, v, model_completion);
         assign_value (e, v);
       }
       SASSERT (!is_unknown (e));
     }
   }
   
-  expr_ref model_evaluator::eval_heavy (expr* fml) 
+  expr_ref model_evaluator::eval_heavy (expr* fml, bool model_completion) 
   {
     SASSERT (m_model);
     
@@ -713,9 +713,9 @@ namespace spacer {
   }
 
   
-  expr_ref model_evaluator::eval(expr* e) {
+  expr_ref model_evaluator::eval(expr* e, bool model_completion) {
     expr_ref result(m);
-    VERIFY(m_model->eval(e, result, true));
+    VERIFY(m_model->eval(e, result, model_completion));
     if (m_array.is_array(e)) {
       vector<expr_ref_vector> stores;
       expr_ref_vector args(m);
@@ -1176,7 +1176,8 @@ namespace spacer {
      * eliminate simple equalities using qe_lite
      * then, MBP for Booleans (substitute), reals (based on LW), ints (based on Cooper), and arrays
      */
-    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, const model_ref& M) {
+    void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, 
+                     const model_ref& M, bool reduce_all_selects) {
         th_rewriter rw (m);
         TRACE ("spacer",
                 tout << "Before projection:\n";
@@ -1250,7 +1251,7 @@ namespace spacer {
             // project arrays
             {
                 scoped_no_proof _sp (m);
-                qe::array_project (*M.get (), array_vars, fml, vars);
+                qe::array_project (*M.get (), array_vars, fml, vars, reduce_all_selects);
                 SASSERT (array_vars.empty ());
             }
 

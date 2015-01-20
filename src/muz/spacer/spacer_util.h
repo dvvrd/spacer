@@ -130,7 +130,7 @@ namespace spacer {
       
     /// evaluates all sub-formulas and terms of the input in the current model.
     /// Caches the result
-    void eval_fmls(ptr_vector<expr> const & formulas);
+    void eval_fmls(ptr_vector<expr> const & formulas, bool model_completion = false);
 
     bool extract_array_func_interp(expr* a, vector<expr_ref_vector>& stores, 
                                    expr_ref& else_case);
@@ -156,25 +156,25 @@ namespace spacer {
     }
     
     /// compute values of all the terms in all the formulas in the input
-    void eval_terms (const expr_ref_vector &v)
+    void eval_terms (const expr_ref_vector &v, bool complete=false)
     {
       // for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
-      //   eval_terms (formulas.get (i));
+      //   eval_terms (formulas.get (i), complete);
       for (unsigned i = v.size (); i > 0; --i)
         eval_terms (v.get (i-1));
     }
     
     /// compute values of all the terms in all the formulas in the input
-    void eval_terms (const ptr_vector<expr> &v)
+    void eval_terms (const ptr_vector<expr> &v, bool complete=false)
     {
       // for (unsigned i = 0, sz = f.size (); i < sz; ++i)
-      //   eval_terms (f[i]);
+      //   eval_terms (f[i], complete);
       for (unsigned i = v.size (); i > 0; --i)
-        eval_terms (v[i]);
+        eval_terms (v[i], complete);
     }
     
     /// compute values of all the terms in the given formula
-    void eval_terms (expr * formula);
+    void eval_terms (expr * formula, bool complete = false);
     
     bool is_unknown(expr* x) const { return !m1.is_marked(x) && !m2.is_marked(x); }
     bool is_x(expr* x)  const { return !m1.is_marked(x) && m2.is_marked(x); }
@@ -188,9 +188,9 @@ namespace spacer {
     /// evaluates a function declaration
     expr_ref eval(func_decl* d);
     /// evaluates an expression
-    expr_ref eval(expr* e);
+    expr_ref eval(expr* e, bool complete=true);
     /// evaluates an expression by evaluating all of its sub-terms
-    expr_ref eval_heavy (expr* fml);
+    expr_ref eval_heavy (expr* fml, bool complete=true);
 
     /**
        \brief Extracts an implicant of the conjunction of the formulas 
@@ -231,7 +231,7 @@ namespace spacer {
      * 4. for any remaining arith variables, substitute using M
      */
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, 
-                     const model_ref& M);
+                     const model_ref& M, bool reduce_all_selects=false);
 
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
 
