@@ -1820,7 +1820,8 @@ namespace spacer {
             m_core_generalizers.push_back(alloc(core_arith_inductive_generalizer, *this));
         }
         
-        m_core_generalizers.push_back (alloc (core_array_eq_generalizer, *this));
+        if (m_params.use_array_eq_generalizer ()) 
+          m_core_generalizers.push_back (alloc (core_array_eq_generalizer, *this));
         
     }
 
