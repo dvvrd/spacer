@@ -2597,7 +2597,8 @@ namespace spacer {
         SASSERT (ch);
         
         // Optionally disable derivation optimization
-        // n.reset_derivation ();
+        if (get_params ().flexible_trace ())
+          n.reset_derivation ();
         
         m_search.push (*ch);
         m_stats.m_num_queries++;
