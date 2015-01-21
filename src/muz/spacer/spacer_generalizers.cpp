@@ -654,9 +654,6 @@ namespace spacer {
     if (symb.size () >= 8) return;
     
     
-    smt::kernel solver (m, m_ctx.get_fparams (), m_ctx.get_params ().p);
-    solver.assert_expr (v);
-    
     // -- for every pair of variables, try an equality
     typedef func_decl_set::iterator iterator;
     ptr_vector<func_decl> vsymbs;
@@ -664,60 +661,69 @@ namespace spacer {
          it != end; ++it)
       vsymbs.push_back (*it);
     
+    expr_ref_vector eqs (m);
+    
     for (unsigned i = 0, sz = vsymbs.size (); i < sz; ++i)
-    {
       for (unsigned j = i + 1; j < sz; ++j)
+        eqs.push_back (m.mk_eq (m.mk_const (vsymbs.get (i)), m.mk_const (vsymbs.get (j))));
+    
+    smt::kernel solver (m, m_ctx.get_fparams (), m_ctx.get_params ().p);
+    expr_ref_vector lits (m);
+    for (unsigned i = 0, core_sz = core.size (); i < core_sz; ++i)
+    {
+      SASSERT (lits.size () == i);
+      solver.push ();
+      solver.assert_expr (core.get (i));
+      for (unsigned j = 0, eqs_sz = eqs.size (); j < eqs_sz; ++j)
       {
-        v = m.mk_eq (m.mk_const (vsymbs.get (i)), m.mk_const (vsymbs.get (j)));
         solver.push ();
-        solver.assert_expr (v);
+        solver.assert_expr (eqs.get (j));
         lbool res = solver.check ();
         solver.pop (1);
         
-        TRACE ("core_array_eq", 
-               tout << "Checking: " << mk_pp (v, m) << ": " << res << "\n";);
-
-        if (res == l_false) 
-        {
+        if (res == l_false)
+        {  
           TRACE ("core_array_eq", 
-                 tout << "Found stronger equality: " << mk_pp (v, m) << "\n";);
-    
-          expr_ref_vector lits(m);
-          lits.push_back (m.mk_not (v));
-    
-          /**
-             HACK: if the first 3 arguments of pt are boolean, assume
-             they correspond to SeaHorn encoding and condition the equality on them.
-           */
-          pred_transformer &pt = n.pt ();
-          if (pt.sig_size () >= 3 &&
-              m.is_bool (pt.sig (0)->get_range ()) &&
-              m.is_bool (pt.sig (1)->get_range ()) &&
-              m.is_bool (pt.sig (2)->get_range ()))
-          {
-            lits.push_back (m.mk_const (pm.o2n(pt.sig (0), 0)));
-            lits.push_back (m.mk_not (m.mk_const (pm.o2n(pt.sig (1), 0))));
-            lits.push_back (m.mk_not (m.mk_const (pm.o2n(pt.sig (2), 0))));
-          }
-          
-          
-          // -- check if it is consistent with the transition relation
-          unsigned uses_level1;
-          if (n.pt ().check_inductive (n.level (), lits, uses_level1))
-          {
-            TRACE ("core_array_eq", tout << "Inductive!\n";);
-            core.reset ();
-            core.append (lits);
-            uses_level = uses_level1;
-            return;
-          }
-          else
-          { TRACE ("core_array_eq", tout << "Not-Inductive!\n";);}
+                 tout << "strengthened " << mk_pp (core.get (i), m)
+                 << " with " << mk_pp (m.mk_not (eqs.get (j)), m) << "\n";);
+          lits.push_back (m.mk_not (eqs.get (j)));
+          break;
         }
       }
+      solver.pop (1);
+      if (lits.size () == i) lits.push_back (core.get (i));
     }
-  }
-  
     
-  
+    /**
+       HACK: if the first 3 arguments of pt are boolean, assume
+       they correspond to SeaHorn encoding and condition the equality on them.
+    */
+    // pred_transformer &pt = n.pt ();
+    // if (pt.sig_size () >= 3 &&
+    //     m.is_bool (pt.sig (0)->get_range ()) &&
+    //     m.is_bool (pt.sig (1)->get_range ()) &&
+    //     m.is_bool (pt.sig (2)->get_range ()))
+    // {
+    //   lits.push_back (m.mk_const (pm.o2n(pt.sig (0), 0)));
+    //   lits.push_back (m.mk_not (m.mk_const (pm.o2n(pt.sig (1), 0))));
+    //   lits.push_back (m.mk_not (m.mk_const (pm.o2n(pt.sig (2), 0))));
+    // }
+          
+    TRACE ("core_array_eq", tout << "new possible core " 
+           << mk_pp (pm.mk_and (lits), m) << "\n";);
+    
+          
+    // -- check if it is consistent with the transition relation
+    unsigned uses_level1;
+    if (n.pt ().check_inductive (n.level (), lits, uses_level1))
+    {
+      TRACE ("core_array_eq", tout << "Inductive!\n";);
+      core.reset ();
+      core.append (lits);
+      uses_level = uses_level1;
+      return;
+    }
+    else
+    { TRACE ("core_array_eq", tout << "Not-Inductive!\n";);}
+  }
 };
