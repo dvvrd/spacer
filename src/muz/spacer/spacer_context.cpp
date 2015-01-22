@@ -2607,7 +2607,7 @@ namespace spacer {
         kid->set_derivation (deriv);
         
         // Optionally disable derivation optimization
-        //kid.reset_derivation ();
+        if (!get_params ().use_derivations ()) kid->reset_derivation ();
         
         m_search.push (*kid);
         m_stats.m_num_queries++;
