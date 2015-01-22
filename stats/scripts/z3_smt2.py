@@ -14,7 +14,7 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--inline', 
                     help='Enable inlining', 
-                    action='store_true', default=True)
+                    action='store_true', default=False)
     p.add_argument ('--validate', help='Enable validation',
                     action='store_true', default=False)
     p.add_argument ('--trace', help='Trace levels to enable (spacer, pdr, dl,'
@@ -24,12 +24,11 @@ def parseArgs (argv):
                     default=False)
     p.add_argument ('--engine', help='Datalog Engine (pdr/spacer)', default='spacer')
     p.add_argument ('--verbose', help='Z3 verbosity', default=0)
-    p.add_argument ('--use-utvpi', dest='use_utvpi', help='use utvpi/diff-logic '
-                                                          'solvers, if applicable',
-                    action='store_true', default=True)
-    p.add_argument ('--eager-reach-check', dest='eager_reach_check',
-                    help='eagerly use reachability facts for every local query',
-                    action='store_true', default=True)
+    p.add_argument ('--no-utvpi', dest='no_utvpi', help='do not check for utvpi/diff-logic',
+                    action='store_true', default=False)
+    p.add_argument ('--lazy-reach-check', dest='lazy_reach_check',
+                    help='use reachability facts lazily',
+                    action='store_true', default=False)
     p.add_argument ('--validate-theory-core', dest='validate_theory_core',
                     help='validate every theory core',
                     action='store_true', default=False)
@@ -56,6 +55,9 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--smt2lib', dest='smt2lib',
                     help='input smt2 file is in smt2lib format (and not datalog)',
+                    action='store_true', default=False)
+    p.add_argument ('--flexible-trace', dest='flexible_trace',
+                    help='enable generation of long cexes',
                     action='store_true', default=False)
 
     return p.parse_args (argv)
@@ -102,8 +104,6 @@ def main (argv):
 
     if (args.validate):
         z3_args += ' fixedpoint.validate_result=true'
-    else:
-        z3_args += ' fixedpoint.validate_result=false'
 
     if (args.answer):
         z3_args += ' fixedpoint.print_answer=true'
@@ -111,18 +111,10 @@ def main (argv):
     z3_args += ' fixedpoint.engine='
     z3_args += args.engine
 
-
-    z3_args += ' fixedpoint.use_farkas=true'
-    z3_args += ' fixedpoint.generate_proof_trace=false'
-
-    if args.use_utvpi:
-        z3_args += ' fixedpoint.use_utvpi=true'
-    else:
+    if args.no_utvpi:
         z3_args += ' fixedpoint.use_utvpi=false'
 
-    if args.eager_reach_check:
-        z3_args += ' fixedpoint.eager_reach_check=true'
-    else:
+    if args.lazy_reach_check:
         z3_args += ' fixedpoint.eager_reach_check=false'
 
     if args.validate_theory_core:
@@ -146,6 +138,9 @@ def main (argv):
     if args.use_heavy_mev:
         z3_args += ' fixedpoint.use_heavy_mev=true'
 
+    if args.flexible_trace:
+        z3_args += ' fixedpoint.flexible_trace=true'
+
     z3_args += ' ' + args.file
 
 
@@ -163,11 +158,10 @@ def main (argv):
         popen = subprocess.Popen(z3_args.split (), stdout=subprocess.PIPE)
         popen.wait()
         res = popen.stdout.read()
-    res = res[:-1] # strip off the newline
-    if res.startswith ('sat'):
-        res = 'sat'
-    elif res.startswith ('unsat'):
+    if 'unsat' in res:
         res = 'unsat'
+    elif 'sat' in res:
+        res = 'sat'
     else:
         res = 'unknown'
     print 'Result:', res
