@@ -48,7 +48,12 @@ namespace datalog {
 
         uint_set ut_vars; // vars used in uninterpreted part of the tail
         uint_set tail_vars = m_rm.collect_tail_vars (&r);
+        UNREACHABLE ();
+       /** XXX get_var_sorts() is no longer defined 
         ptr_vector<sort> tail_var_sorts (m_rm.get_var_sorts ());
+        */
+        ptr_vector<sort> tail_var_sorts;
+        
 
         for (unsigned i = 0; i < utsz; ++i) {
             expr *t = r.get_tail (i);
@@ -69,7 +74,11 @@ namespace datalog {
         // head vars
         expr_ref head (r.get_head(), m);
         uint_set head_vars = m_rm.collect_vars (head);
-        unsigned num_head_vars = m_rm.get_var_sorts ().size ();
+        UNREACHABLE();
+        /** XXX get_var_sorts() is no longer defined 
+            unsigned num_head_vars = m_rm.get_var_sorts ().size (); */
+        unsigned num_head_vars = 0;
+        
 
         // num_tail_vars and num_vars
         unsigned num_tail_vars = tail_var_sorts.size ();
@@ -126,7 +135,7 @@ namespace datalog {
         if (m_simplifier.transform_rule(new_rules.last(), new_rule)) {
             if (r.get_proof()) {
                 scoped_proof _sc(m);
-                r.to_formula(fml1);
+                m_rm.to_formula(r, fml1);
                 p = m.mk_rewrite(fml1, fml2);
                 p = m.mk_modus_ponens(r.get_proof(), p);
                 new_rule->set_proof(m, p);                
