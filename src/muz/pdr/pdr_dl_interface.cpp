@@ -204,7 +204,7 @@ lbool dl_interface::query_from_lvl (expr * query, unsigned lvl) {
 
     apply_default_transformation(m_ctx);
 
-    if (m_ctx.get_params().slice()) {
+    if (m_ctx.get_params().xform_slice()) {
         datalog::rule_transformer transformer(m_ctx);
         datalog::mk_slice* slice = alloc(datalog::mk_slice, m_ctx);
         transformer.register_plugin(slice);
@@ -221,12 +221,12 @@ lbool dl_interface::query_from_lvl (expr * query, unsigned lvl) {
         }
     }
 
-    if (m_ctx.get_params().unfold_rules() > 0) {
-        unsigned num_unfolds = m_ctx.get_params().unfold_rules();
+    if (m_ctx.get_params().xform_unfold_rules() > 0) {
+        unsigned num_unfolds = m_ctx.get_params().xform_unfold_rules();
         datalog::rule_transformer transf1(m_ctx), transf2(m_ctx);        
         transf1.register_plugin(alloc(datalog::mk_coalesce, m_ctx));
         transf2.register_plugin(alloc(datalog::mk_unfold, m_ctx));
-        if (m_ctx.get_params().coalesce_rules()) {
+        if (m_ctx.get_params().xform_coalesce_rules()) {
             m_ctx.transform_rules(transf1);
         }
         while (num_unfolds > 0) {

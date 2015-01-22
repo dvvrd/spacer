@@ -634,15 +634,15 @@ namespace pdr {
 
     void replace_vars_by_consts (expr* fml, expr_ref& result, expr_ref_vector& consts, ast_manager& m) {
         // get free vars
-        ptr_vector<sort> vars;
-        get_free_vars (fml, vars);
+        expr_free_vars vars;
+        vars (fml);
 
         // mk substitution of vars by consts
         consts.reset ();
         unsigned num_vars = vars.size ();
         expr_safe_replace sub (m);
         for (unsigned i = 0; i < num_vars; i++) {
-            sort* s = vars.get (i);
+            sort* s = vars[i];
             if (!s) continue;
             // mk var
             var_ref v (m.mk_var (i, s), m);
@@ -738,6 +738,7 @@ expr* apply_accessor(ast_manager &m,
             tout << mk_pp(conjs[i].get(), m) << "\n";
           });
   }
+}
 
 template class rewriter_tpl<pdr::arith_normalizer_cfg>;
 

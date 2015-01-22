@@ -305,8 +305,8 @@ namespace datalog {
     bool context::magic() const { return m_params->xform_magic(); }
     bool context::quantify_arrays() const { return m_params->xform_quantify_arrays(); }
     bool context::instantiate_quantifiers() const { return m_params->xform_instantiate_quantifiers(); }
-    bool context::array_blast() const { return m_params->array_blast(); }
-    bool context::array_blast_full() const { return m_params->array_blast_full(); }
+    bool context::array_blast() const { return m_params->xform_array_blast(); }
+    bool context::array_blast_full() const { return m_params->xform_array_blast_full(); }
 
 
     void context::register_finite_sort(sort * s, sort_kind k) {
@@ -962,7 +962,7 @@ namespace datalog {
         expr_ref fml (m);
         rule_ref_vector::iterator it = rv.begin (), end = rv.end ();
         for (; it != end; it++) {
-            (*it)->to_formula (fml);
+            m_rule_manager.to_formula (**it, fml);
             rules.push_back (fml);
             names.push_back ((*it)->name ());
         }

@@ -11,6 +11,8 @@
 #include "qe_lite.h"
 #include "spacer_util.h"
 
+#include "expr_map.h"
+
 extern "C" 
 {
   Z3_ast Z3_API Z3_qe_model_project (Z3_context c, 

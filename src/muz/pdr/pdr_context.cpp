@@ -81,7 +81,7 @@ namespace pdr {
     pred_transformer::pred_transformer(context& ctx, manager& pm, func_decl* head): 
         pm(pm), m(pm.get_manager()),
         ctx(ctx), m_head(head, m), 
-        m_sig(m), m_solver(pm, ctx.get_params().pdr_try_minimize_core(), head->get_name()),
+        m_sig(m), m_solver(pm, ctx.get_params().pdr_try_minimize_core(), head->get_name(), ctx.get_params ().validate_theory_core ()),
         m_invariants(m), m_transition(m), m_initial_state(m), 
         m_reachable(pm, (datalog::PDR_CACHE_MODE)ctx.get_params().pdr_cache_mode()) {}
 
@@ -2012,7 +2012,7 @@ namespace pdr {
               );
 
         // mk ground instances of predicates
-        model_evaluator mev (m);
+        model_implicant mev (m);
         unsigned num_uninterp = uninterp.size ();
         for (unsigned i = 0; i < num_uninterp; i++) {
             app* a = to_app (uninterp.get (i));
