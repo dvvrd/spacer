@@ -34,6 +34,7 @@ Revision History:
 #include "expr_safe_replace.h"
 #include "model_evaluator.h"
 #include "qe_lite.h"
+#include "model_evaluator_array.h"
 
 namespace qe {
 
