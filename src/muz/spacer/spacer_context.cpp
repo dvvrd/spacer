@@ -2193,6 +2193,7 @@ namespace spacer {
                         << "(" << n->level () << ", " << n->depth () << ")"
                         << " " << n << "\n";);
             m_search.pop ();
+            if (m_search.is_root (*n)) return true;
             SASSERT (m_search.top ());
           }
           
@@ -2207,6 +2208,7 @@ namespace spacer {
             m_search.pop ();
             last_reachable = node;
             last_reachable->close ();
+            if (m_search.is_root (*node)) return true;
             break;
           case l_false:
             SASSERT (m_search.top () == node.get ());
