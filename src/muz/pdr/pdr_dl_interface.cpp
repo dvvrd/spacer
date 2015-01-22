@@ -80,7 +80,7 @@ void dl_interface::check_reset() {
 lbool dl_interface::query(expr * query) {
     //we restore the initial state in the datalog context
     m_ctx.ensure_opened();
-    TRACE("pdr",
+    TRACE("pdr_rules",
           tout << "rules:\n";
           m_ctx.display_rules(tout);
           );
@@ -168,7 +168,7 @@ lbool dl_interface::query(expr * query) {
         return l_false;
     }
         
-    TRACE("pdr",
+    TRACE("pdr_rules",
           tout << "rules:\n";
           m_ctx.display_rules(tout);
           );
