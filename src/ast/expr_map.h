@@ -53,6 +53,10 @@ public:
     void flush();
     iterator begin () const { return m_expr2expr.begin (); }
     iterator end () const {return m_expr2expr.end (); }
+    void set_store_proofs(bool f) { 
+        if (m_store_proofs != f) flush();
+        m_store_proofs = f; 
+    }
 };
 
 #endif

@@ -4,7 +4,7 @@ class Z3Exception(Exception):
     def __init__(self, value):
         self.value = value
     def __str__(self):
-        return repr(self.value)
+        return str(self.value)
 
 class ContextObj(ctypes.c_void_p):
   def __init__(self, context): self._as_parameter_ = context
@@ -78,6 +78,10 @@ class FixedpointObj(ctypes.c_void_p):
   def __init__(self, fixedpoint): self._as_parameter_ = fixedpoint
   def from_param(obj): return obj
 
+class OptimizeObj(ctypes.c_void_p):
+  def __init__(self, optimize): self._as_parameter_ = optimize
+  def from_param(obj): return obj
+
 class ModelObj(ctypes.c_void_p):
   def __init__(self, model): self._as_parameter_ = model
   def from_param(obj): return obj
@@ -109,3 +113,4 @@ class FuncEntryObj(ctypes.c_void_p):
 class RCFNumObj(ctypes.c_void_p):
   def __init__(self, e): self._as_parameter_ = e
   def from_param(obj): return obj
+

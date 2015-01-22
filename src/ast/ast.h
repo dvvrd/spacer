@@ -1006,7 +1006,7 @@ enum basic_sort_kind {
 };
 
 enum basic_op_kind {
-    OP_TRUE, OP_FALSE, OP_EQ, OP_DISTINCT, OP_ITE, OP_AND, OP_OR, OP_IFF, OP_XOR, OP_NOT, OP_IMPLIES, OP_OEQ, LAST_BASIC_OP,
+    OP_TRUE, OP_FALSE, OP_EQ, OP_DISTINCT, OP_ITE, OP_AND, OP_OR, OP_IFF, OP_XOR, OP_NOT, OP_IMPLIES, OP_OEQ, OP_INTERP, LAST_BASIC_OP,
 
     PR_UNDEF, PR_TRUE, PR_ASSERTED, PR_GOAL, PR_MODUS_PONENS, PR_REFLEXIVITY, PR_SYMMETRY, PR_TRANSITIVITY, PR_TRANSITIVITY_STAR, PR_MONOTONICITY, PR_QUANT_INTRO,
     PR_DISTRIBUTIVITY, PR_AND_ELIM, PR_NOT_OR_ELIM, PR_REWRITE, PR_REWRITE_STAR, PR_PULL_QUANT, 
@@ -1028,6 +1028,7 @@ protected:
     func_decl * m_iff_decl;
     func_decl * m_xor_decl;
     func_decl * m_not_decl;
+    func_decl * m_interp_decl;
     func_decl * m_implies_decl;
     ptr_vector<func_decl> m_eq_decls;  // cached eqs
     ptr_vector<func_decl> m_ite_decls; // cached ites
@@ -1099,6 +1100,7 @@ protected:
     virtual void set_manager(ast_manager * m, family_id id);
     func_decl * mk_eq_decl_core(char const * name, decl_kind k, sort * s, ptr_vector<func_decl> & cache);
     func_decl * mk_ite_decl(sort * s);
+    sort* join(sort* s1, sort* s2);
 public:
     basic_decl_plugin();
     
@@ -1377,7 +1379,7 @@ enum proof_gen_mode {
 // -----------------------------------
 
 class ast_manager {
-protected:
+    friend class basic_decl_plugin;
 protected:
     struct config {
         typedef ast_manager              value_manager;
@@ -1416,6 +1418,8 @@ protected:
 
 public:
     typedef expr_dependency_array_manager::ref expr_dependency_array;
+
+    void show_id_gen();
 
 protected:
     small_object_allocator    m_alloc;
@@ -2000,6 +2004,8 @@ public:
     app * mk_distinct_expanded(unsigned num_args, expr * const * args);
     app * mk_true() const { return m_true; }
     app * mk_false() const { return m_false; }
+    app * mk_interp(expr * arg) { return mk_app(m_basic_family_id, OP_INTERP, arg); }
+
 
     func_decl* mk_and_decl() { 
         sort* domain[2] = { m_bool_sort, m_bool_sort };

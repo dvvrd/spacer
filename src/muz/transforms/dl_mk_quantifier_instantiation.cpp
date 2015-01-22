@@ -199,7 +199,7 @@ namespace datalog {
         expr_ref fml(m), cnst(m);
         var_ref var(m);
         ptr_vector<sort> sorts;
-        r.get_vars(sorts);
+        r.get_vars(m, sorts);
         m_uf.reset();
         m_terms.reset();
         m_var2cnst.reset();
@@ -207,9 +207,6 @@ namespace datalog {
         fml = m.mk_and(conjs.size(), conjs.c_ptr());
 
         for (unsigned i = 0; i < sorts.size(); ++i) {
-            if (!sorts[i]) {
-                sorts[i] = m.mk_bool_sort();
-            }
             var = m.mk_var(i, sorts[i]);
             cnst = m.mk_fresh_const("C", sorts[i]);
             m_var2cnst.insert(var, cnst);
@@ -241,7 +238,7 @@ namespace datalog {
             proof* p1 = r.get_proof();
             for (unsigned i = 0; i < added_rules.get_num_rules(); ++i) {
                 rule* r2 = added_rules.get_rule(i);
-                r2->to_formula(fml);
+                rm.to_formula(*r2, fml);
                 pr = m.mk_modus_ponens(m.mk_def_axiom(m.mk_implies(m.get_fact(p1), fml)), p1);
                 r2->set_proof(m, pr);
             }
@@ -255,9 +252,10 @@ namespace datalog {
         }
         bool has_quantifiers = false;
         unsigned sz = source.get_num_rules();
+        rule_manager& rm = m_ctx.get_rule_manager();
         for (unsigned i = 0; !has_quantifiers && i < sz; ++i) {
             rule& r = *source.get_rule(i);
-            has_quantifiers = has_quantifiers || r.has_quantifiers();   
+            has_quantifiers = has_quantifiers || rm.has_quantifiers(r);   
             if (r.has_negation()) {
                 return 0;
             }

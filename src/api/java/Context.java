@@ -1,8 +1,19 @@
 /**
- * This file was automatically generated from Context.cs 
- * w/ further modifications by:
- * @author Christoph M. Wintersteiger (cwinter)
- **/
+Copyright (c) 2012-2014 Microsoft Corporation
+   
+Module Name:
+
+    Context.java
+
+Abstract:
+
+Author:
+
+    @author Christoph Wintersteiger (cwinter) 2012-03-15
+
+Notes:
+    
+**/
 
 package com.microsoft.z3;
 
@@ -363,6 +374,23 @@ public class Context extends IDisposable
 
         return mkDatatypeSorts(MkSymbols(names), c);
     }
+
+    /**
+     * Update a datatype field at expression t with value v.
+     * The function performs a record update at t. The field
+     * that is passed in as argument is updated with value v,
+     * the remainig fields of t are unchanged.	
+     **/
+    public Expr MkUpdateField(FuncDecl field, Expr t, Expr v) 
+            throws Z3Exception
+    {
+	return Expr.create
+	    (this, 
+	     Native.datatypeUpdateField
+	     (nCtx(), field.getNativeObject(),
+	      t.getNativeObject(), v.getNativeObject()));		
+    }
+
 
     /**
      * Creates a new function declaration.
@@ -2904,25 +2932,11 @@ public class Context extends IDisposable
      * configuration parameters can be obtained using the Z3 executable:
      * <code>z3.exe -ini?</code> Only a few configuration parameters are mutable
      * once the context is created. An exception is thrown when trying to modify
-     * an immutable parameter. </remarks> <seealso cref="GetParamValue"/>
+     * an immutable parameter. </remarks> 
      **/
     public void updateParamValue(String id, String value) throws Z3Exception
     {
         Native.updateParamValue(nCtx(), id, value);
-    }
-
-    /**
-     * Get a configuration parameter. <remarks> Returns null if the parameter
-     * value does not exist. </remarks> <seealso cref="UpdateParamValue"/>
-     **/
-    public String getParamValue(String id) throws Z3Exception
-    {
-        Native.StringPtr res = new Native.StringPtr();
-        boolean r = Native.getParamValue(nCtx(), id, res);
-        if (!r)
-            return null;
-        else
-            return res.value;
     }
 
     long m_ctx = 0;

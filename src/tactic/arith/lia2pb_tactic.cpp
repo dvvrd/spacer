@@ -71,6 +71,7 @@ class lia2pb_tactic : public tactic {
             if (m_bm.has_lower(n, l, s) &&
                 m_bm.has_upper(n, u, s) &&  
                 l.is_zero() &&
+                !u.is_neg() && 
                 u.get_num_bits() <= m_max_bits) {
                 
                 return true;
@@ -292,9 +293,12 @@ class lia2pb_tactic : public tactic {
                 m_rw(curr, new_curr, new_pr);
                 if (m_produce_unsat_cores) {
                     dep = m.mk_join(m_rw.get_used_dependencies(), g->dep(idx));
-                    m_rw.reset_used_dependencies();
+                    m_rw.reset_used_dependencies();                    
                 }
-                g->update(idx, new_curr, 0, dep);
+                if (m.proofs_enabled()) {
+                    new_pr  = m.mk_modus_ponens(g->pr(idx), new_pr);
+                }
+                g->update(idx, new_curr, new_pr, dep);
             }
             g->inc_depth();
             result.push_back(g.get());
@@ -344,18 +348,12 @@ public:
     }
     
     virtual void cleanup() {
-        ast_manager & m = m_imp->m;
-        imp * d = m_imp;
+        imp * d = alloc(imp, m_imp->m, m_params);
         #pragma omp critical (tactic_cancel)
         {
-            d = m_imp;
+            std::swap(d, m_imp);
         }
         dealloc(d);
-        d = alloc(imp, m, m_params);
-        #pragma omp critical (tactic_cancel) 
-        {
-            m_imp = d;
-        }
     }
 
 protected:

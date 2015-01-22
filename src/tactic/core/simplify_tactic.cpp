@@ -31,6 +31,9 @@ struct simplify_tactic::imp {
         m_num_steps(0) {
     }
 
+    ~imp() {
+    }
+
     ast_manager & m() const { return m_manager; }
 
     void set_cancel(bool f) {
@@ -115,17 +118,12 @@ void simplify_tactic::set_cancel(bool f) {
 
 void simplify_tactic::cleanup() {
     ast_manager & m = m_imp->m();
-    imp * d = m_imp;
+    imp * d = alloc(imp, m, m_params);
     #pragma omp critical (tactic_cancel)
     {
-        m_imp = 0;
+        std::swap(d, m_imp);
     }
     dealloc(d);
-    d = alloc(imp, m, m_params);
-    #pragma omp critical (tactic_cancel)
-    {
-        m_imp = d;
-    }
 }
 
 unsigned simplify_tactic::get_num_steps() const {

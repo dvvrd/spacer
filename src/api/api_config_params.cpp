@@ -37,9 +37,7 @@ extern "C" {
         catch (z3_exception & ex) {
             // The error handler is only available for contexts
             // Just throw a warning.
-            std::ostringstream buffer;
-            buffer << "Error setting " << param_id << ", " << ex.msg();
-            warning_msg(buffer.str().c_str());
+            warning_msg(ex.msg());
         }
     }
 
@@ -64,9 +62,7 @@ extern "C" {
         catch (z3_exception & ex) {
             // The error handler is only available for contexts
             // Just throw a warning.
-            std::ostringstream buffer;
-            buffer << "Error setting " << param_id << ": " << ex.msg();
-            warning_msg(buffer.str().c_str());
+            warning_msg(ex.msg());
             return Z3_FALSE;
         }
     }
@@ -92,9 +88,7 @@ extern "C" {
         catch (z3_exception & ex) {
             // The error handler is only available for contexts
             // Just throw a warning.
-            std::ostringstream buffer;
-            buffer << "Error setting " << param_id << ": " << ex.msg();
-            warning_msg(buffer.str().c_str());
+            warning_msg(ex.msg());
         }
     }
 
@@ -104,12 +98,6 @@ extern "C" {
         RESET_ERROR_CODE();
         mk_c(c)->params().set(param_id, param_value);
         Z3_CATCH;
-    }
-
-    Z3_bool Z3_API Z3_get_param_value(Z3_context c, Z3_string param_id, Z3_string* param_value) {
-        LOG_Z3_get_param_value(c, param_id, param_value);
-        // TODO
-        return Z3_FALSE;
     }
 
 };

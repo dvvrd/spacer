@@ -68,7 +68,10 @@ namespace sat {
         m_restart_factor  = p.restart_factor();
         
         m_random_freq     = p.random_freq();
-
+        m_random_seed     = p.random_seed();
+        if (m_random_seed == 0) 
+            m_random_seed = _p.get_uint("random_seed", 0);
+        
         m_burst_search    = p.burst_search();
         
         m_max_conflicts   = p.max_conflicts();
@@ -104,6 +107,10 @@ namespace sat {
             m_gc_increment    = p.gc_increment();
         }
         m_minimize_lemmas = p.minimize_lemmas();
+        m_minimize_core   = p.minimize_core();
+        m_minimize_core_partial   = p.minimize_core_partial();
+        m_optimize_model  = p.optimize_model();
+        m_bcd             = p.bcd();
         m_dyn_sub_res     = p.dyn_sub_res();
     }
 

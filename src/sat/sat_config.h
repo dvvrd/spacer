@@ -53,6 +53,7 @@ namespace sat {
         unsigned           m_restart_initial;
         double             m_restart_factor; // for geometric case
         double             m_random_freq;
+        unsigned           m_random_seed;
         unsigned           m_burst_search;
         unsigned           m_max_conflicts;
 
@@ -68,6 +69,11 @@ namespace sat {
 
         bool               m_minimize_lemmas;
         bool               m_dyn_sub_res;
+        bool               m_minimize_core;
+        bool               m_minimize_core_partial;
+        bool               m_optimize_model;
+        bool               m_bcd;
+
 
         symbol             m_always_true;
         symbol             m_always_false;

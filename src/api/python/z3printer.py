@@ -386,7 +386,7 @@ def seq3(args, lp='(', rp=')'):
     else:
         return group(indent(len(lp), compose(to_format(lp), seq(args), to_format(rp))))
 
-class StopPPException:
+class StopPPException(Exception):
     def __str__(self):
         return 'pp-interrupted'
 
@@ -841,6 +841,8 @@ class Formatter:
         elif isinstance(a, z3.Solver):
             return self.pp_seq(a.assertions(), 0, [])
         elif isinstance(a, z3.Fixedpoint):
+            return a.sexpr()
+        elif isinstance(a, z3.Optimize):
             return a.sexpr()
         elif isinstance(a, z3.ApplyResult):
             return self.pp_seq_seq(a, 0, [])

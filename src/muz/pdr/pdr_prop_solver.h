@@ -31,7 +31,6 @@ Revision History:
 #include "pdr_manager.h"
 #include "pdr_smt_context_manager.h"
 
-struct fixedpoint_params;
 
 namespace pdr {
     class prop_solver {
@@ -80,7 +79,7 @@ namespace pdr {
         
         
     public:
-        prop_solver(pdr::manager& pm, fixedpoint_params const& p, symbol const& name, bool validate_theory_core);
+        prop_solver(pdr::manager& pm, bool try_minimize_core, symbol const& name, bool validate_theory_core);
         
         /** return true is s is a symbol introduced by prop_solver */
         bool is_aux_symbol(func_decl * s) const { 

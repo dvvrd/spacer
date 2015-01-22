@@ -39,9 +39,10 @@ Revision History:
 #include"model2expr.h"
 #include"smt_params.h"
 #include"dl_rule_transformer.h"
-#include"expr_abstract.h"
 #include"expr_functors.h"
 #include"dl_engine_base.h"
+#include"bind_variables.h"
+#include"rule_properties.h"
 
 struct fixedpoint_params;
 
@@ -53,6 +54,7 @@ namespace datalog {
         MEMOUT,
         INPUT_ERROR,
         APPROX,
+	BOUNDED,
         CANCELED
     };
 
@@ -141,19 +143,6 @@ namespace datalog {
             SK_UINT64,
             SK_SYMBOL
         };
-
-    private:
-        class sort_domain;
-        class symbol_sort_domain;
-        class uint64_sort_domain;
-        class restore_rules;
-        class contains_pred;
-
-        typedef hashtable<symbol, symbol_hash_proc, symbol_eq_proc> symbol_set;
-        typedef map<symbol, func_decl*, symbol_hash_proc, symbol_eq_proc> sym2decl;
-        typedef obj_map<const func_decl, svector<symbol> > pred2syms;
-        typedef obj_map<const sort, sort_domain*> sort_domain_map;
-
         class contains_pred : public i_expr_pred {
             context const& ctx;
         public:
@@ -166,33 +155,47 @@ namespace datalog {
         };
 
 
+    private:
+        class sort_domain;
+        class symbol_sort_domain;
+        class uint64_sort_domain;
+        class restore_rules;
+
+        typedef hashtable<symbol, symbol_hash_proc, symbol_eq_proc> symbol_set;
+        typedef map<symbol, func_decl*, symbol_hash_proc, symbol_eq_proc> sym2decl;
+        typedef obj_map<const func_decl, svector<symbol> > pred2syms;
+        typedef obj_map<const sort, sort_domain*> sort_domain_map;
+
+
         ast_manager &      m;
         register_engine_base& m_register_engine;
         smt_params &       m_fparams;
         params_ref         m_params_ref;
         fixedpoint_params*  m_params;
+        bool               m_generate_proof_trace;      // cached configuration parameter
+        bool               m_unbound_compressor;        // cached configuration parameter
+        symbol             m_default_relation;          // cached configuration parameter
         dl_decl_util       m_decl_util;
         th_rewriter        m_rewriter;
         var_subst          m_var_subst;
         rule_manager       m_rule_manager;
-        unused_vars_eliminator m_elim_unused_vars;
-        expr_abstractor        m_abstractor;
         contains_pred      m_contains_p;
-        check_pred         m_check_pred;
+        rule_properties    m_rule_properties;
         rule_transformer   m_transf;
         trail_stack<context> m_trail;
         ast_ref_vector     m_pinned;
-        app_ref_vector     m_vars;
-        svector<symbol>    m_names;
+        bind_variables     m_bind_variables;
         sort_domain_map    m_sorts;
         func_decl_set      m_preds;
         sym2decl           m_preds_by_name;
         pred2syms          m_argument_var_names;
         rule_set           m_rule_set;
         rule_set           m_transformed_rule_set;
+        expr_free_vars     m_free_vars;
         unsigned           m_rule_fmls_head;
         expr_ref_vector    m_rule_fmls;
         svector<symbol>    m_rule_names;
+        vector<unsigned>   m_rule_bounds;
         expr_ref_vector    m_background;
         model_converter_ref m_mc;
         proof_converter_ref m_pc;
@@ -248,27 +251,32 @@ namespace datalog {
         bool fix_unbound_vars() const;
         symbol default_table() const;
         symbol default_relation() const;
-        symbol default_table_checker() const;
+        void set_default_relation(symbol const& s);
+        symbol default_table_checker() const;        
+        symbol check_relation() const;
         bool default_table_checked() const;
         bool dbg_fpr_nonempty_relation_signature() const;
         unsigned dl_profile_milliseconds_threshold() const;
         bool all_or_nothing_deltas() const;
         bool compile_with_widening() const;
         bool unbound_compressor() const;
+        void set_unbound_compressor(bool f);
         bool similarity_compressor() const;
+        symbol print_aig() const;
+        symbol tab_selection() const;
         unsigned similarity_compressor_threshold() const;
         unsigned soft_timeout() const;
         unsigned initial_restart_timeout() const;
         bool generate_explanations() const;
         bool explanations_on_relation_level() const;
         bool magic_sets_for_queries() const;
-        bool eager_emptiness_checking() const;
-        bool bit_blast() const;
         bool karr() const;
         bool scale() const;
         bool magic() const;
         bool quantify_arrays() const;
         bool instantiate_quantifiers() const;
+        bool xform_bit_blast() const;        
+        bool xform_slice() const;
         bool array_blast() const;
         bool array_blast_full() const;
 
@@ -281,7 +289,13 @@ namespace datalog {
 
         void register_variable(func_decl* var);
 
-        expr_ref bind_variables(expr* fml, bool is_forall);
+        /*
+          Replace constants that have been registered as 
+          variables by de-Bruijn indices and corresponding
+          universal (if is_forall is true) or existential 
+          quantifier.
+         */
+        expr_ref bind_vars(expr* fml, bool is_forall);
 
         /**
            Register datalog relation.
@@ -301,6 +315,8 @@ namespace datalog {
            \brief Retrieve predicates
         */
         func_decl_set const& get_predicates() const { return m_preds; }
+	ast_ref_vector const &get_pinned() const {return m_pinned; }
+
         bool is_predicate(func_decl* pred) const { return m_preds.contains(pred); }
         bool is_predicate(expr * e) const { return is_app(e) && is_predicate(to_app(e)->get_decl()); }
 
@@ -359,7 +375,8 @@ namespace datalog {
 
         rule_set & get_rules() { flush_add_rules(); return m_rule_set; }
 
-        void get_rules_as_formulas(expr_ref_vector& fmls, svector<symbol>& names);
+        void get_rules_as_formulas(expr_ref_vector& fmls, expr_ref_vector& qs, svector<symbol>& names);
+        void get_raw_rule_formulas(expr_ref_vector& fmls, svector<symbol>& names, vector<unsigned> &bounds);
 
         void add_fact(app * head);
         void add_fact(func_decl * pred, const relation_fact & fact);
@@ -376,7 +393,7 @@ namespace datalog {
         /**
            Method exposed from API for adding rules.
         */
-        void add_rule(expr* rl, symbol const& name);
+        void add_rule(expr* rl, symbol const& name, unsigned bound = UINT_MAX);
         
 
         /**
@@ -412,7 +429,7 @@ namespace datalog {
         /**
           \brief Check if rule is well-formed according to engine.
         */
-        void check_rule(rule_ref& r);
+        void check_rules(rule_set& r);
 
         /**
            \brief Return true if facts to \c pred can be added using the \c add_table_fact() function.
@@ -459,7 +476,7 @@ namespace datalog {
 
         void display(std::ostream & out) const;
 
-        void display_smt2(unsigned num_queries, expr* const* queries, std::ostream& out);
+        void display_smt2(unsigned num_queries, expr* const* qs, std::ostream& out);
 
         void display_profile(std::ostream& out) const;
 
@@ -497,14 +514,16 @@ namespace datalog {
         /**
            \brief retrieve model from inductive invariant that shows query is unsat.
            
-           \pre engine == 'pdr' or 'spacer' - this option is only supported for PDR and SPACER modes.
+           \pre engine == 'pdr' || engine == 'duality' - this option is only supported
+           for PDR mode and Duality mode.
          */
         model_ref get_model();
 
         /**
            \brief retrieve proof from derivation of the query.
            
-           \pre engine == 'pdr' or 'spacer' - this option is only supported for PDR and SPACER modes.
+           \pre engine == 'pdr'  || engine == 'duality'- this option is only supported
+	   for PDR mode and Duality mode.
          */
         proof_ref get_proof();
 
@@ -570,11 +589,6 @@ namespace datalog {
         void flush_add_rules();
 
         void ensure_engine();
-
-        void check_quantifier_free(rule_ref& r);        
-        void check_uninterpreted_free(rule_ref& r);
-        void check_existential_tail(rule_ref& r);
-        void check_positive_predicates(rule_ref& r);
 
         // auxilary functions for SMT2 pretty-printer.
         void declare_vars(expr_ref_vector& rules, mk_fresh_name& mk_fresh, std::ostream& out);

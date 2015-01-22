@@ -104,11 +104,16 @@ public:
     }
 
     bool is_int32() const {
-        if (is_small()) return true; 
+        if (is_small() && is_int()) return true; 
         // we don't assume that if it is small, then it is int32.
         if (!is_int64()) return false;
         int64 v = get_int64();
         return INT_MIN <= v && v <= INT_MAX;
+    }
+
+    int get_int32() const {
+        SASSERT(is_int32());
+        return (int)get_int64();
     }
 
     double get_double() const { return m().get_double(m_val); }
@@ -331,22 +336,13 @@ public:
         return target;
     }
 
-    friend inline rational gcd(rational const & r1, rational const & r2) {
-        rational result;
-        m().gcd(r1.m_val, r2.m_val, result.m_val);
-        return result;
-    }
+    friend inline rational gcd(rational const & r1, rational const & r2);
 
     //
     // extended Euclid:
     // r1*a + r2*b = gcd
     //
-    friend inline rational gcd(rational const & r1, rational const & r2, rational & a, rational & b) {
-        rational result;
-        m().gcd(r1.m_val, r2.m_val, a.m_val, b.m_val, result.m_val);
-        return result;
-    }
-
+    friend inline rational gcd(rational const & r1, rational const & r2, rational & a, rational & b);
 
     friend inline rational lcm(rational const & r1, rational const & r2) {
         rational result;
@@ -378,11 +374,7 @@ public:
         return result;
     }
 
-    friend inline rational abs(rational const & r) {
-        rational result(r);
-        m().abs(result.m_val);
-        return result;
-    }
+    friend inline rational abs(rational const & r);
 
     rational to_rational() const { return *this; }
 
@@ -445,6 +437,25 @@ inline rational operator/(rational const & r1, rational const & r2) {
 inline rational power(rational const & r, unsigned p) {
     return r.expt(p);
 }
+
+inline rational abs(rational const & r) {
+  rational result(r);
+  rational::m().abs(result.m_val);
+  return result;
+}
+
+inline rational gcd(rational const & r1, rational const & r2) {
+  rational result;
+  rational::m().gcd(r1.m_val, r2.m_val, result.m_val);
+  return result;
+}
+
+inline rational gcd(rational const & r1, rational const & r2, rational & a, rational & b) {
+  rational result;
+  rational::m().gcd(r1.m_val, r2.m_val, a.m_val, b.m_val, result.m_val);
+  return result;
+}
+
 
 #endif /* _RATIONAL_H_ */
 

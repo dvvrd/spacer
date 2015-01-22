@@ -1,8 +1,19 @@
 /**
- * This file was automatically generated from Fixedpoint.cs 
- * w/ further modifications by:
- * @author Christoph M. Wintersteiger (cwinter)
- **/
+Copyright (c) 2012-2014 Microsoft Corporation
+   
+Module Name:
+
+    Fixedpoint.java
+
+Abstract:
+
+Author:
+
+    @author Christoph Wintersteiger (cwinter) 2012-03-15
+
+Notes:
+    
+**/ 
 
 package com.microsoft.z3;
 
@@ -307,6 +318,18 @@ public class Fixedpoint extends Z3Object
             res[i] = new BoolExpr(getContext(), v.get(i).getNativeObject());
         return res;
     }
+
+    /**
+     * Fixedpoint statistics.
+     * 
+     * @throws Z3Exception
+     **/
+    public Statistics getStatistics() throws Z3Exception
+    {
+        return new Statistics(getContext(), Native.fixedpointGetStatistics(
+                getContext().nCtx(), getNativeObject()));
+    }
+
 
     Fixedpoint(Context ctx, long obj) throws Z3Exception
     {

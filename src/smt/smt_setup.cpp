@@ -22,7 +22,6 @@ Revision History:
 #include"theory_arith.h"
 #include"theory_dense_diff_logic.h"
 #include"theory_diff_logic.h"
-#include"theory_horn_ineq.h"
 #include"theory_utvpi.h"
 #include"theory_array.h"
 #include"theory_array_full.h"
@@ -31,6 +30,7 @@ Revision History:
 #include"theory_dummy.h"
 #include"theory_dl.h"
 #include"theory_seq_empty.h"
+#include"theory_pb.h"
 
 namespace smt {
 
@@ -301,7 +301,7 @@ namespace smt {
     }
 
     void setup::setup_QF_IDL() {
-        TRACE("setup", tout << "setup_QF_IDL(st)\n";);
+        TRACE("setup", tout << "setup_QF_IDL()\n";);
         m_params.m_relevancy_lvl       = 0;
         m_params.m_arith_expand_eqs    = true;
         m_params.m_arith_reflect       = false;
@@ -355,6 +355,10 @@ namespace smt {
                 m_context.register_plugin(alloc(smt::theory_dense_si, m_manager, m_params));
             else
                 m_context.register_plugin(alloc(smt::theory_dense_i, m_manager, m_params));
+
+        }
+        else if (!m_params.m_arith_auto_config_simplex && !is_dense(st)) {
+            m_context.register_plugin(alloc(smt::theory_idl, m_manager, m_params));            
         }
         else {
             // if (st.m_arith_k_sum < rational(INT_MAX / 8)) {
@@ -374,6 +378,7 @@ namespace smt {
         m_params.m_arith_reflect    = false;
         m_params.m_nnf_cnf          = false;
         m_params.m_arith_eq_bounds  = true;
+        m_params.m_arith_expand_eqs = true;
         m_params.m_phase_selection  = PS_ALWAYS_FALSE;
         m_params.m_restart_strategy = RS_GEOMETRIC;
         m_params.m_restart_factor   = 1.5;
@@ -406,6 +411,15 @@ namespace smt {
                 return;
             }
         }
+#if 0
+        switch (m_params.m_arith_mode) {
+        case AS_DIFF_LOGIC:
+        case AS_DENSE_DIFF_LOGIC:
+        case AS_UTVPI:
+            setup_arith();
+            return;
+        }
+#endif
         m_params.m_arith_eq_bounds  = true;
         m_params.m_phase_selection  = PS_ALWAYS_FALSE;
         m_params.m_restart_strategy = RS_GEOMETRIC;
@@ -415,7 +429,7 @@ namespace smt {
             m_context.register_plugin(alloc(smt::theory_mi_arith, m_manager, m_params));
         }
         // else if (st.m_arith_k_sum < rational(INT_MAX / 8))
-        //    m_context.register_plugin(alloc(smt::theory_si_arith, m_manager, m_params));
+        //   m_context.register_plugin(alloc(smt::theory_dense_si, m_manager, m_params));
         else
             m_context.register_plugin(alloc(smt::theory_i_arith, m_manager, m_params));
     }
@@ -689,7 +703,12 @@ namespace smt {
     }
 
     void setup::setup_mi_arith() {
-        m_context.register_plugin(alloc(smt::theory_mi_arith, m_manager, m_params));
+        if (m_params.m_arith_mode == AS_OPTINF) {
+            m_context.register_plugin(alloc(smt::theory_inf_arith, m_manager, m_params));            
+        }
+        else {
+            m_context.register_plugin(alloc(smt::theory_mi_arith, m_manager, m_params));
+        }
     }
 
     void setup::setup_arith() {
@@ -698,6 +717,7 @@ namespace smt {
             m_context.register_plugin(alloc(smt::theory_dummy, m_manager.mk_family_id("arith"), "no arithmetic"));
             break;
         case AS_DIFF_LOGIC:
+            m_params.m_arith_expand_eqs  = true;
             if (m_params.m_arith_fixnum) {
                 if (m_params.m_arith_int_only)
                     m_context.register_plugin(alloc(smt::theory_fidl, m_manager, m_params));
@@ -712,6 +732,7 @@ namespace smt {
             }
             break;
         case AS_DENSE_DIFF_LOGIC:
+            m_params.m_arith_expand_eqs  = true;
             if (m_params.m_arith_fixnum) {
                 if (m_params.m_arith_int_only)
                     m_context.register_plugin(alloc(smt::theory_dense_si, m_manager, m_params));
@@ -725,17 +746,15 @@ namespace smt {
                     m_context.register_plugin(alloc(smt::theory_dense_mi, m_manager, m_params));
             }
             break;
-        case AS_HORN:
-            if (m_params.m_arith_int_only)
-                m_context.register_plugin(alloc(smt::theory_ihi, m_manager));
-            else
-                m_context.register_plugin(alloc(smt::theory_rhi, m_manager));          
-            break;
         case AS_UTVPI:
+            m_params.m_arith_expand_eqs  = true;
             if (m_params.m_arith_int_only)
                 m_context.register_plugin(alloc(smt::theory_iutvpi, m_manager));
             else
                 m_context.register_plugin(alloc(smt::theory_rutvpi, m_manager));          
+            break;
+        case AS_OPTINF:
+            m_context.register_plugin(alloc(smt::theory_inf_arith, m_manager, m_params));            
             break;
         default:
             if (m_params.m_arith_int_only)
@@ -787,6 +806,10 @@ namespace smt {
         m_context.register_plugin(alloc(theory_seq_empty, m_manager));
     }
 
+    void setup::setup_card() {
+        m_context.register_plugin(alloc(theory_pb, m_manager, m_params));
+    }
+
     void setup::setup_unknown() {
         setup_arith();
         setup_arrays();
@@ -794,6 +817,7 @@ namespace smt {
         setup_datatypes();
         setup_dl();
         setup_seq();
+        setup_card();
     }
 
     void setup::setup_unknown(static_features & st) {

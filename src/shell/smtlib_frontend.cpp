@@ -26,9 +26,11 @@ Revision History:
 #include"smt2parser.h"
 #include"dl_cmds.h"
 #include"dbg_cmds.h"
+#include"opt_cmds.h"
 #include"polynomial_cmds.h"
 #include"subpaving_cmds.h"
 #include"smt_strategic_solver.h"
+#include"smt_solver.h"
 
 extern bool g_display_statistics;
 extern void display_config();
@@ -105,11 +107,13 @@ unsigned read_smtlib2_commands(char const * file_name) {
     cmd_context ctx;
 
     ctx.set_solver_factory(mk_smt_strategic_solver_factory());
+    ctx.set_interpolating_solver_factory(mk_smt_solver_factory());
 
     install_dl_cmds(ctx);
     install_dbg_cmds(ctx);
     install_polynomial_cmds(ctx);
     install_subpaving_cmds(ctx);
+    install_opt_cmds(ctx);
 
     g_cmd_context = &ctx;
     signal(SIGINT, on_ctrl_c);

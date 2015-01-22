@@ -302,11 +302,11 @@ namespace Microsoft.Z3
         }
 
         /// <summary>
-        /// Create a new finite domain sort.
-	/// <param name="name">The name used to identify the sort</param>
-	/// <param size="size">The size of the sort</param>
-	/// <returns>The result is a sort</returns>
+        /// Create a new finite domain sort.	    
+	    /// <returns>The result is a sort</returns>
         /// </summary>
+        /// <param name="name">The name used to identify the sort</param>
+        /// <param name="size">The size of the sort</param>
         public FiniteDomainSort MkFiniteDomainSort(Symbol name, ulong size)
         {
             Contract.Requires(name != null);
@@ -317,13 +317,13 @@ namespace Microsoft.Z3
         }
 
         /// <summary>
-        /// Create a new finite domain sort.
-	/// <param name="name">The name used to identify the sort</param>
-	/// <param size="size">The size of the sort</param>
-	/// <returns>The result is a sort</returns>
-	/// Elements of the sort are created using <seealso cref="MkNumeral"/>, 
-	/// and the elements range from 0 to <tt>size-1</tt>.
+        /// Create a new finite domain sort.	    
+	    /// <returns>The result is a sort</returns>
+	    /// Elements of the sort are created using <seealso cref="MkNumeral(ulong, Sort)"/>, 
+	    /// and the elements range from 0 to <tt>size-1</tt>.
         /// </summary>
+        /// <param name="name">The name used to identify the sort</param>
+        /// <param name="size">The size of the sort</param>
         public FiniteDomainSort MkFiniteDomainSort(string name, ulong size)
         {
             Contract.Ensures(Contract.Result<FiniteDomainSort>() != null);
@@ -448,6 +448,19 @@ namespace Microsoft.Z3
 
             return MkDatatypeSorts(MkSymbols(names), c);
         }
+
+        /// <summary>
+        /// Update a datatype field at expression t with value v.
+	/// The function performs a record update at t. The field
+	/// that is passed in as argument is updated with value v,
+	/// the remainig fields of t are unchanged.	
+        /// </summary>
+	public Expr MkUpdateField(FuncDecl field, Expr t, Expr v) 
+	{
+	    return Expr.Create(this, Native.Z3_datatype_update_field(
+	                                  nCtx, field.NativeObject,
+                                          t.NativeObject, v.NativeObject));		
+	}
 
         #endregion
         #endregion
@@ -916,6 +929,8 @@ namespace Microsoft.Z3
             CheckContextMatch(t);
             return new BoolExpr(this, Native.Z3_mk_or(nCtx, (uint)t.Length, AST.ArrayToNative(t)));
         }
+
+
         #endregion
 
         #region Arithmetic
@@ -2249,6 +2264,36 @@ namespace Microsoft.Z3
         }
         #endregion
 
+        #region Pseudo-Boolean constraints
+
+        /// <summary>
+        /// Create an at-most-k constraint.
+        /// </summary>
+        public BoolExpr MkAtMost(BoolExpr[] args, uint k) 
+        {
+           Contract.Requires(args != null);
+           Contract.Requires(Contract.Result<BoolExpr[]>() != null);
+           CheckContextMatch(args);
+           return new BoolExpr(this, Native.Z3_mk_atmost(nCtx, (uint) args.Length, 
+                                                          AST.ArrayToNative(args), k));
+        }
+
+        /// <summary>
+        /// Create a pseudo-Boolean less-or-equal constraint.
+        /// </summary>
+        public BoolExpr MkPBLe(int[] coeffs, BoolExpr[] args, int k) 
+        {
+           Contract.Requires(args != null);
+           Contract.Requires(coeffs != null);
+           Contract.Requires(args.Length == coeffs.Length);
+           Contract.Requires(Contract.Result<BoolExpr[]>() != null);
+           CheckContextMatch(args);
+           return new BoolExpr(this, Native.Z3_mk_pble(nCtx, (uint) args.Length, 
+                                                          AST.ArrayToNative(args), 
+                                                          coeffs, k));
+        }
+        #endregion
+
         #region Numerals
 
         #region General Numerals
@@ -3436,6 +3481,18 @@ namespace Microsoft.Z3
         }
         #endregion
 
+        #region Optimization
+        /// <summary>
+        /// Create an Optimization context.
+        /// </summary>
+        public Optimize MkOptimize()
+        {
+            Contract.Ensures(Contract.Result<Optimize>() != null);
+
+            return new Optimize(this);
+        }
+        #endregion
+
 
         #region Miscellaneous
         /// <summary>
@@ -3521,30 +3578,13 @@ namespace Microsoft.Z3
         /// </summary>
         /// <remarks>
         /// The list of all configuration parameters can be obtained using the Z3 executable:
-        /// <c>z3.exe -ini?</c>
+        /// <c>z3.exe -p</c>
         /// Only a few configuration parameters are mutable once the context is created.
         /// An exception is thrown when trying to modify an immutable parameter.
         /// </remarks>
-        /// <seealso cref="GetParamValue"/>
         public void UpdateParamValue(string id, string value)
         {
             Native.Z3_update_param_value(nCtx, id, value);
-        }
-
-        /// <summary>
-        /// Get a configuration parameter.
-        /// </summary>
-        /// <remarks>
-        /// Returns null if the parameter value does not exist.
-        /// </remarks>
-        /// <seealso cref="UpdateParamValue"/>
-        public string GetParamValue(string id)
-        {
-            IntPtr res = IntPtr.Zero;
-            if (Native.Z3_get_param_value(nCtx, id, out res) == 0)
-                return null;
-            else
-                return Marshal.PtrToStringAnsi(res);
         }
 
         #endregion
@@ -3609,6 +3649,7 @@ namespace Microsoft.Z3
             Contract.Invariant(m_Statistics_DRQ != null);
             Contract.Invariant(m_Tactic_DRQ != null);
             Contract.Invariant(m_Fixedpoint_DRQ != null);
+            Contract.Invariant(m_Optimize_DRQ != null);
         }
 
         readonly private AST.DecRefQueue m_AST_DRQ = new AST.DecRefQueue();
@@ -3626,6 +3667,7 @@ namespace Microsoft.Z3
         readonly private Statistics.DecRefQueue m_Statistics_DRQ = new Statistics.DecRefQueue();
         readonly private Tactic.DecRefQueue m_Tactic_DRQ = new Tactic.DecRefQueue();
         readonly private Fixedpoint.DecRefQueue m_Fixedpoint_DRQ = new Fixedpoint.DecRefQueue();
+        readonly private Optimize.DecRefQueue m_Optimize_DRQ = new Optimize.DecRefQueue();
 
         internal AST.DecRefQueue AST_DRQ { get { Contract.Ensures(Contract.Result<AST.DecRefQueue>() != null); return m_AST_DRQ; } }
         internal ASTMap.DecRefQueue ASTMap_DRQ { get { Contract.Ensures(Contract.Result<ASTMap.DecRefQueue>() != null); return m_ASTMap_DRQ; } }
@@ -3642,9 +3684,10 @@ namespace Microsoft.Z3
         internal Statistics.DecRefQueue Statistics_DRQ { get { Contract.Ensures(Contract.Result<Statistics.DecRefQueue>() != null); return m_Statistics_DRQ; } }
         internal Tactic.DecRefQueue Tactic_DRQ { get { Contract.Ensures(Contract.Result<Tactic.DecRefQueue>() != null); return m_Tactic_DRQ; } }
         internal Fixedpoint.DecRefQueue Fixedpoint_DRQ { get { Contract.Ensures(Contract.Result<Fixedpoint.DecRefQueue>() != null); return m_Fixedpoint_DRQ; } }
+        internal Optimize.DecRefQueue Optimize_DRQ { get { Contract.Ensures(Contract.Result<Optimize.DecRefQueue>() != null); return m_Optimize_DRQ; } }
 
 
-        internal uint refCount = 0;
+        internal long refCount = 0;
 
         /// <summary>
         /// Finalizer.
@@ -3685,6 +3728,7 @@ namespace Microsoft.Z3
             Statistics_DRQ.Clear(this);
             Tactic_DRQ.Clear(this);
             Fixedpoint_DRQ.Clear(this);
+            Optimize_DRQ.Clear(this);
 
             m_boolSort = null;
             m_intSort = null;

@@ -25,6 +25,8 @@ Revision History:
 #include "filter_model_converter.h"
 #include "dl_mk_interp_tail_simplifier.h"
 #include "fixedpoint_params.hpp"
+#include "scoped_proof.h"
+#include "model_v2_pp.h"
 
 namespace datalog {
 
@@ -66,11 +68,17 @@ namespace datalog {
                 func_decl* p = m_new_funcs[i].get();
                 func_decl* q = m_old_funcs[i].get();
                 func_interp* f = model->get_func_interp(p);
+                if (!f) continue;
                 expr_ref body(m);                
                 unsigned arity_p = p->get_arity();
                 unsigned arity_q = q->get_arity();
+                TRACE("dl",
+                      model_v2_pp(tout, *model);
+                      tout << mk_pp(p, m) << "\n";
+                      tout << mk_pp(q, m) << "\n";);
                 SASSERT(0 < arity_p);
-                model->register_decl(p, f);
+                SASSERT(f);
+                model->register_decl(p, f->copy());
                 func_interp* g = alloc(func_interp, m, arity_q);
 
                 if (f) {
@@ -87,11 +95,12 @@ namespace datalog {
                 for (unsigned j = 0; j < arity_q; ++j) {
                     sort* s = q->get_domain(j);
                     arg = m.mk_var(j, s);
+                    expr* t = arg;
                     if (m_bv.is_bv_sort(s)) {
-                        expr* args[1] = { arg };
                         unsigned sz = m_bv.get_bv_size(s);
                         for (unsigned k = 0; k < sz; ++k) {
-                            proj = m.mk_app(m_bv.get_family_id(), OP_BIT2BOOL, 1, args);
+                            parameter p(k);
+                            proj = m.mk_app(m_bv.get_family_id(), OP_BIT2BOOL, 1, &p, 1, &t);
                             sub.insert(m.mk_var(idx++, m.mk_bool_sort()), proj); 
                         }
                     }
@@ -216,7 +225,6 @@ namespace datalog {
         mk_interp_tail_simplifier m_simplifier;
         bit_blaster_rewriter m_blaster;
         expand_mkbv          m_rewriter;
-        
 
         bool blast(rule *r, expr_ref& fml) {
             proof_ref pr(m);
@@ -226,7 +234,7 @@ namespace datalog {
             if (!m_simplifier.transform_rule(r, r2)) {
                 r2 = r;
             }
-            r2->to_formula(fml1);
+            m_context.get_rule_manager().to_formula(*r2.get(), fml1);
             m_blaster(fml1, fml2, pr);
             m_rewriter(fml2, fml3);
             TRACE("dl", tout << mk_pp(fml, m) << " -> " << mk_pp(fml2, m) << " -> " << mk_pp(fml3, m) << "\n";);
@@ -254,7 +262,7 @@ namespace datalog {
         
         rule_set * operator()(rule_set const & source) {
             // TODO pc
-            if (!m_context.bit_blast()) {
+            if (!m_context.xform_bit_blast()) {
                 return 0;
             }
             rule_manager& rm = m_context.get_rule_manager();
@@ -265,10 +273,11 @@ namespace datalog {
             m_rewriter.m_cfg.set_dst(result);
             for (unsigned i = 0; !m_context.canceled() && i < sz; ++i) {
                 rule * r = source.get_rule(i);
-                r->to_formula(fml);
+                rm.to_formula(*r, fml);
                 if (blast(r, fml)) {
                     proof_ref pr(m);
-                    if (m_context.generate_proof_trace()) {
+                    if (r->get_proof()) {
+                        scoped_proof _sc(m);
                         pr = m.mk_asserted(fml); // loses original proof of r.
                     }
                     // TODO add logic for pc:

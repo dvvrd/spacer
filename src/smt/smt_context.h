@@ -54,7 +54,11 @@ Revision History:
 // the case that each context only references a few expressions.
 // Using a map instead of a vector for the literals can compress space 
 // consumption.
+#ifdef SPARSE_MAP
+#define USE_BOOL_VAR_VECTOR 0
+#else
 #define USE_BOOL_VAR_VECTOR 1
+#endif
 
 namespace smt {
 
@@ -69,9 +73,10 @@ namespace smt {
         std::string last_failure_as_string() const;
         void set_progress_callback(progress_callback *callback);
 
+
     protected:
         ast_manager &               m_manager;
-        smt_params &          m_fparams;
+        smt_params &                m_fparams;
         params_ref                  m_params;
         setup                       m_setup;
         volatile bool               m_cancel_flag;
@@ -106,7 +111,7 @@ namespace smt {
         // -----------------------------------
         enode *                     m_true_enode;
         enode *                     m_false_enode;
-        ptr_vector<enode>           m_app2enode;    // app -> enode
+        app2enode_t                 m_app2enode;    // app -> enode
         ptr_vector<enode>           m_enodes;
         plugin_manager<theory>      m_theories;     // mapping from theory_id -> theory
         ptr_vector<theory>          m_theory_set;   // set of theories for fast traversal
@@ -201,9 +206,9 @@ namespace smt {
         // Unsat core extraction
         //
         // -----------------------------------
-        typedef u_map<expr *>  bool_var2assumption;
-        bool_var_vector             m_assumptions;
-        bool_var2assumption         m_bool_var2assumption; // maps an expression associated with a literal to the original assumption
+        typedef u_map<expr *>  literal2assumption;
+        literal_vector             m_assumptions;
+        literal2assumption         m_literal2assumption; // maps an expression associated with a literal to the original assumption
         expr_ref_vector             m_unsat_core;
 
         // -----------------------------------
@@ -330,6 +335,10 @@ namespace smt {
 
         lbool get_assignment(bool_var v) const {
             return get_assignment(literal(v));
+        }
+
+        literal_vector const & assigned_literals() const { 
+            return m_assigned_literals; 
         }
 
         lbool get_assignment(expr * n) const;
@@ -1385,6 +1394,8 @@ namespace smt {
         }
         
         void get_model(model_ref & m) const;
+
+        bool update_model(bool refinalize);
 
         void get_proto_model(proto_model_ref & m) const;
         

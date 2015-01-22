@@ -62,7 +62,7 @@ namespace datalog {
         rule_ref r(const_cast<rule*>(&rl), rm);
         ptr_vector<sort> sorts;
         expr_ref_vector revsub(m), conjs(m);
-        rl.get_vars(sorts);
+        rl.get_vars(m, sorts);
         revsub.resize(sorts.size());  
         svector<bool> valid(sorts.size(), true);
         for (unsigned i = 0; i < sub.size(); ++i) {
@@ -117,8 +117,8 @@ namespace datalog {
         rule_ref res(rm);
         bool_rewriter bwr(m);
         svector<bool> is_neg;
-        tgt->get_vars(sorts1);
-        src.get_vars(sorts2);
+        tgt->get_vars(m, sorts1);
+        src.get_vars(m, sorts2);
 
         mk_pred(head, src.get_head(), tgt->get_head()); 
         for (unsigned i = 0; i < src.get_uninterpreted_tail_size(); ++i) {
@@ -134,9 +134,9 @@ namespace datalog {
         is_neg.push_back(false);
         res = rm.mk(head, tail.size(), tail.c_ptr(), is_neg.c_ptr(), tgt->name());
         if (m_ctx.generate_proof_trace()) {
-            src.to_formula(fml1);
-            tgt->to_formula(fml2);
-            res->to_formula(fml);
+            rm.to_formula(src, fml1);
+            rm.to_formula(*tgt.get(),fml2);
+            rm.to_formula(*res.get(),fml);
 #if 0
             sort* ps = m.mk_proof_sort();
             sort* domain[3] = { ps, ps, m.mk_bool_sort() };
