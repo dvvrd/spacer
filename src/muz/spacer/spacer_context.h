@@ -416,8 +416,8 @@ namespace spacer {
     bool                    m_open;     
     /// whether to use farkas generalizer to construct a lemma blocking this node
     bool                    m_use_farkas;
-    /// optional derivation corresponding to non-linear uninterpreted
-    /// part of some rule of pt
+    
+    /// derivation representing the position of this node in the parent's rule
     scoped_ptr<derivation>   m_derivation;
     
     ptr_vector<model_node>  m_kids;
@@ -439,6 +439,8 @@ namespace spacer {
     bool has_derivation () const {return (bool)m_derivation;}
     derivation &get_derivation() const {return *m_derivation.get ();}
     void reset_derivation () {set_derivation (NULL);}
+    /// detaches derivation from the node without deallocating
+    derivation* detach_derivation () {return m_derivation.detach ();}
     
     model_node* parent () const { return m_parent.get (); }
     

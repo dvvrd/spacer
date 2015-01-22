@@ -1337,8 +1337,9 @@ namespace spacer {
                                 m_premises[m_active].get_oidx (), false);
     summaries.push_back (active_trans);
     
-    /// must be true, otherwise no suitable must summary found
-    VERIFY (pt.is_must_reachable (pm.mk_and (summaries), &model));
+    // if not true, bail out, the must summary of m_active is not strong enough
+    // this is possible if m_post was weakened for some reason
+    if (!pt.is_must_reachable (pm.mk_and (summaries), &model)) return NULL;
     
     model_evaluator mev (m, model);
     
@@ -2231,19 +2232,6 @@ namespace spacer {
     {
       SASSERT(n.is_open());
       
-      if (n.has_derivation ())
-      {
-        model_node *kid = n.get_derivation ().create_next_child ();
-        if (kid) 
-        { 
-          m_search.push (*kid);
-          return l_undef;
-        }
-        else n.reset_derivation ();
-      }
-      
-      
-      
       if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
 
       TRACE ("spacer", 
@@ -2304,13 +2292,35 @@ namespace spacer {
           reach_fact* rf = mk_reach_fact (n, mev, *r);
           n.pt ().add_reach_fact (*rf);
           
-          IF_VERBOSE(1, verbose_stream () << " T "
+          // if n has a derivation, create a new child and report l_undef
+          // otherwise if n has no derivation or no new children, report l_true
+          model_node *next = NULL;
+          if (n.has_derivation ())
+          {
+            next = n.get_derivation ().create_next_child ();
+            if (next) 
+            { 
+              // move derivation over to the next obligation
+              next->set_derivation (n.detach_derivation ());
+              
+              // remove the current node from the queue if it is at the top
+              if (m_search.top () == &n) m_search.pop ();
+              
+              m_search.push (*next);
+            }
+          }
+          
+          // -- close n, it is reachable
+          // -- don't worry about remove n from the obligation queue
+          n.close ();
+          
+          IF_VERBOSE(1, verbose_stream () << (next ? " X " : " T ")
                      << std::fixed << std::setprecision(2) 
                      << watch.get_seconds () << "\n";);
-          return l_true;
+          return next ? l_undef : l_true;
         }
         
-        //otherwise pick the first OA and create a sub-goal
+        // create a child of n
         create_children (n, *r, mev, reach_pred_used);
         IF_VERBOSE(1, verbose_stream () << " U "
                    << std::fixed << std::setprecision(2) 
@@ -2336,6 +2346,7 @@ namespace spacer {
           cores.append (new_cores);
         }
         
+        // -- convert cores into lemmas
         for (unsigned i = 0; i < cores.size(); ++i) {
           expr_ref_vector& core = cores[i].first;
           std::sort (core.c_ptr (), core.c_ptr () + core.size (), ast_lt_proc ());
@@ -2347,9 +2358,6 @@ namespace spacer {
           n.pt().add_lemma (lemma, uses_level);
         }
         CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
-        
-        // -- force the parent to recompute reachability status
-        if (n.parent ()) n.parent ()->reset_derivation ();
         
         // Optionally check reachability of lemmas
         if (get_params ().use_lemma_as_cti ())
@@ -2590,17 +2598,16 @@ namespace spacer {
                                                      i, reach_pred_used [i]),
                               reach_pred_used [i]);
         }
-        n.set_derivation (deriv);
-
+        
         // create post for the first child and add to queue
-        model_node* ch = deriv->create_first_child (mev);
-        SASSERT (ch);
+        model_node* kid = deriv->create_first_child (mev);
+        SASSERT (kid);
+        kid->set_derivation (deriv);
         
         // Optionally disable derivation optimization
-        if (get_params ().flexible_trace ())
-          n.reset_derivation ();
+        //kid.reset_derivation ();
         
-        m_search.push (*ch);
+        m_search.push (*kid);
         m_stats.m_num_queries++;
     }
 

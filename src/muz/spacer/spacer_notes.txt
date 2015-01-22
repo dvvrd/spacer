@@ -166,3 +166,25 @@ discharge_obligation (model_node obl)
 }
 
 
+=============================================================
+
+a node keeps a derivation object
+
+if a node is sat, a new node is constructed and inherits the derivation object
+if a node is sat and the derivation is done, this is reported to the parent
+
+expand_node(n):
+  process node ignoring derivation
+  if sat:
+      if concrete:
+         if has derivation and has next child
+            close current node and push new node
+            return l_undef
+         else
+             return l_true
+      else
+         create_child (creates a new node and optionally sets derivation)
+  else if unsat
+      generate lemmas
+      derivation remains unchanged to be used at a higher level
+      return
