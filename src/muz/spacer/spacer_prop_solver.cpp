@@ -115,7 +115,7 @@ namespace spacer {
             rational r;
             unsigned bv_size;
 
-            TRACE("spacer", 
+            TRACE("expand_literals", 
                   tout << "begin expand\n";
                   for (unsigned i = 0; i < conjs.size(); ++i) {
                       tout << mk_pp(conjs[i].get(), m) << "\n";
@@ -164,7 +164,7 @@ namespace spacer {
                     }
                 }
             }
-            TRACE("spacer", 
+            TRACE("expand_literals", 
                   tout << "end expand\n";
                   for (unsigned i = 0; i < conjs.size(); ++i) {
                       tout << mk_pp(conjs[i].get(), m) << "\n";

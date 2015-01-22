@@ -111,7 +111,7 @@ namespace spacer {
         else 
         {
             IF_VERBOSE(3, verbose_stream() << "Not evaluated " << mk_pp(e, m) << "\n";);
-            TRACE("spacer", tout << "Variable is not tracked: " << mk_pp(e, m) << "\n";);
+            TRACE("spacer_verbose", tout << "Variable is not tracked: " << mk_pp(e, m) << "\n";);
             set_x(e);
         }
     }
