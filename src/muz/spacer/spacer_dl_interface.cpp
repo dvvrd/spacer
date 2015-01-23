@@ -160,7 +160,7 @@ lbool dl_interface::query(expr * query) {
     
     if (m_spacer_rules.get_rules().empty()) {
         m_context->set_unsat();
-        IF_VERBOSE(1, model_smt2_pp(verbose_stream(), m, *m_context->get_model(),0););
+        IF_VERBOSE(2, model_smt2_pp(verbose_stream(), m, *m_context->get_model(),0););
         return l_false;
     }
         
