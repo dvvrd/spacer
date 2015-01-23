@@ -2421,7 +2421,14 @@ namespace spacer {
     if (m_params.pdr_simplify_formulas_pre()) {
       simplify_formulas();
     }
+    IF_VERBOSE (1, verbose_stream () << "Propagating: " << std::flush;);
+    
     for (unsigned lvl = min_prop_lvl; lvl <= full_prop_lvl; lvl++) {
+      IF_VERBOSE (1, 
+                  if (lvl > max_prop_lvl && lvl == max_prop_lvl + 1)
+                    verbose_stream () << " ! ";
+                  verbose_stream () << lvl << " " << std::flush;);
+
       checkpoint();
       CTRACE ("spacer", lvl > max_prop_lvl && lvl == max_prop_lvl + 1, 
               tout << "In full propagation\n";);
@@ -2445,6 +2452,7 @@ namespace spacer {
         if (lvl <= max_prop_lvl)
         {
           m_inductive_lvl = lvl;
+          IF_VERBOSE(1, verbose_stream () << "\n";);
           return true;
         }
         break;
@@ -2459,6 +2467,8 @@ namespace spacer {
     if (m_params.pdr_simplify_formulas_post()) {            
       simplify_formulas();
     }
+    
+    IF_VERBOSE(1, verbose_stream () << "\n";);
     return false;
   }
 
