@@ -691,7 +691,7 @@ namespace spacer {
         proof_converter_ref  m_pc;
         
         // Functions used by search.
-        bool solve_core (unsigned from_lvl = 0);
+        lbool solve_core (unsigned from_lvl = 0);
         bool check_reachability ();        
         bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
                        unsigned full_prop_lvl);

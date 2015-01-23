@@ -1858,12 +1858,8 @@ namespace spacer {
   lbool context::solve(unsigned from_lvl) {
     m_last_result = l_undef;
     try {
-      if (solve_core (from_lvl))
-      {        
-        //IF_VERBOSE(1, verbose_stream() << "\n"; m_search.display(verbose_stream()););  
-        m_last_result = l_true;
-      }
-      else 
+      m_last_result = solve_core (from_lvl);
+      if (m_last_result == l_false)
       {
         simplify_formulas();
         m_last_result = l_false;
@@ -2135,10 +2131,10 @@ namespace spacer {
     }
 
     ///this is where everything starts
-    bool context::solve_core (unsigned from_lvl) 
+    lbool context::solve_core (unsigned from_lvl) 
     {
       //if there is no query predicate, abort
-      if (!m_rels.find(m_query_pred, m_query)) return false;
+      if (!m_rels.find(m_query_pred, m_query)) return l_false;
 
       unsigned lvl = from_lvl;
       
@@ -2146,14 +2142,17 @@ namespace spacer {
       root->set_post (m.mk_true ());
       m_search.set_root (*root);
       
-      while (true) {
+      unsigned max_level = get_params ().pdr_max_level ();
+      
+      for (unsigned i = 0; i < max_level; ++i) {
         checkpoint();
         m_expanded_lvl = lvl;
         m_stats.m_max_query_lvl = lvl;
 
-        if (check_reachability()) return true;
+        if (check_reachability()) return l_true;
             
-        if (lvl > 0 && propagate(m_expanded_lvl, lvl, UINT_MAX)) return false;
+        if (lvl > 0 && !get_params ().pdr_skip_propagate ())
+          if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
             
         m_search.inc_level ();
         lvl = m_search.max_level ();
@@ -2166,6 +2165,7 @@ namespace spacer {
                   };
                   );
       }
+      return l_undef;
     }
 
 

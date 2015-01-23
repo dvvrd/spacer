@@ -154,6 +154,8 @@ def_module_params('fixedpoint',
                           ('use_derivations', BOOL, True, 'SPACER: using derivation mechanism to cache intermediate results for non-linear rules'),	
                           ('xform.array_blast', BOOL, False, "try to eliminate local array terms using Ackermannization -- some array terms may remain"), 
 	                  ('xform.array_blast_full', BOOL, False, "eliminate all local array variables by QE"),
+                          ('pdr.skip_propagate', BOOL, False, "Skip propagate/pushing phase. Turns PDR into a BMC that returns either reachable or unknown"),
+                          ('pdr.max_level', UINT, UINT_MAX, "Maximum level to explore"),
                           ))
 
 
