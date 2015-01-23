@@ -1065,9 +1065,9 @@ namespace spacer {
       
     if (m_levels.empty ()) return;
       
-    for (unsigned i = m_levels.size () - 1; i >= level; --i)
+    for (unsigned i = m_levels.size (); i > level; --i)
     {
-      expr_ref_vector &lemmas = m_levels [i];
+      expr_ref_vector &lemmas = m_levels [i-1];
       for (unsigned j = 0; j < lemmas.size (); ++j)
         add_lemma (lemmas.get (j), infty_level ());
       lemmas.reset();
