@@ -330,7 +330,7 @@ namespace spacer {
 
         bool is_must_reachable (expr* state, model_ref* model = 0);
         /// \brief Returns reachability fact active in the given model
-        void get_used_reach_fact (model_evaluator& mev, expr_ref& reach_fact);
+        reach_fact *get_used_reach_fact (model_evaluator& mev);
         /// \brief Returns reachability fact active in the origin of the given model
         reach_fact* get_used_origin_reach_fact (model_evaluator &mev, unsigned oidx);
         expr_ref get_origin_summary (model_evaluator &mev, 

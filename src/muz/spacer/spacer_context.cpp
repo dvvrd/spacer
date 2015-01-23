@@ -147,19 +147,18 @@ namespace spacer {
     return res;
   }
   
-  void pred_transformer::get_used_reach_fact (model_evaluator& mev, expr_ref& reach_fact) {
+  reach_fact* pred_transformer::get_used_reach_fact (model_evaluator& mev) {
     expr_ref v (m);
     
-    reach_fact = NULL;
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
       v = mev.eval (m_reach_case_vars.get (i));
       if (m.is_false (v)) {
-        reach_fact = m_reach_facts[i]->get ();
-        break;
+        return m_reach_facts.get (i);
       }
     }
     
-    SASSERT (reach_fact);
+    UNREACHABLE ();
+    return NULL;
   }
   
   reach_fact *pred_transformer::get_used_origin_reach_fact (model_evaluator& mev, 
@@ -1346,14 +1345,20 @@ namespace spacer {
     model_evaluator mev (m, model);
     
     // find must summary used
-    expr_ref v(m);
-    pt.get_used_reach_fact (mev, v);
+    
+    reach_fact *rf = pt.get_used_reach_fact (mev);
     
     // get an implicant of the summary
     expr_ref_vector u(m), lits (m);
-    u.push_back (v);
+    u.push_back (rf->get ());
     compute_implicant_literals (mev, u, lits);
+    expr_ref v(m);
     v = pm.mk_and (lits);
+    
+    expr_ref s(m);
+    pm.formula_n2o (v, s, m_premises[m_active].get_oidx ());
+    m_premises[m_active].set_summary (s, true);
+
     
     /** HACK: needs a rewrite 
      * compute post over the new must summary this must be done here
@@ -1363,7 +1368,7 @@ namespace spacer {
      * new-variables at this point.
      */
     {
-      expr_ref_vector summaries (m);
+      summaries.reset ();
       app_ref_vector vars (m);
       summaries.push_back (v);
       summaries.push_back (active_trans);
@@ -1379,9 +1384,6 @@ namespace spacer {
     }
     
     
-    expr_ref s(m);
-    pm.formula_n2o (v, s, m_premises[m_active].get_oidx ());
-    m_premises[m_active].set_summary (s, true);
     
     m_active++;
     
