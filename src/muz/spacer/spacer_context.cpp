@@ -692,8 +692,6 @@ namespace spacer {
       
         if (m_levels.empty ()) return;
 
-        SASSERT (level < m_levels.size ());
-
         for (unsigned i = m_levels.size (); i > level; --i)
         {
           expr_ref_vector &lemmas = m_levels [i-1];
