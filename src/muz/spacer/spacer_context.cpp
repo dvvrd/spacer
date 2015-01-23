@@ -77,8 +77,9 @@ namespace spacer {
 
     std::ostream& pred_transformer::display(std::ostream& out) const {
         if (!rules().empty()) out << "rules\n";
+        datalog::rule_manager& rm = ctx.get_datalog_context().get_rule_manager();
         for (unsigned i = 0; i < rules().size(); ++i) {
-            rules()[i]->display_smt2(m, out) << "\n";
+            rm.display_smt2(*rules()[i], out) << "\n";
         }        
         out << "transition\n" << mk_pp(transition(), m) << "\n";
         return out;
@@ -185,12 +186,13 @@ namespace spacer {
                                                      unsigned& num_reuse_reach) {
         typedef obj_map<expr, datalog::rule const*> tag2rule;
         TRACE ("spacer_verbose",
+                datalog::rule_manager& rm = ctx.get_datalog_context().get_rule_manager();
                 tag2rule::iterator it = m_tag2rule.begin();
                 tag2rule::iterator end = m_tag2rule.end();
                 for (; it != end; ++it) {
                     expr* pred = it->m_key;
                     tout << mk_pp(pred, m) << ":\n";
-                    if (it->m_value) it->m_value->display_smt2(m, tout) << "\n";                  
+                    if (it->m_value) rm.display_smt2 (*(it->m_value), tout) << "\n";
                 }
               );
 
@@ -855,14 +857,14 @@ namespace spacer {
     // create constants for free variables in tail.
   void pred_transformer::ground_free_vars(expr* e, app_ref_vector& vars, 
                                           ptr_vector<app>& aux_vars, bool is_init) {
-        ptr_vector<sort> sorts;
-        get_free_vars(e, sorts);
-        while (vars.size() < sorts.size()) {
+        expr_free_vars fv;
+        fv(e);
+        while (vars.size() < fv.size()) {
             vars.push_back(0);
         }
-        for (unsigned i = 0; i < sorts.size(); ++i) {
-            if (sorts[i] && !vars[i].get()) {
-                vars[i] = m.mk_fresh_const("aux", sorts[i]);
+        for (unsigned i = 0; i < fv.size(); ++i) {
+            if (fv[i] && !vars[i].get()) {
+                vars[i] = m.mk_fresh_const("aux", fv[i]);
                 if (is_init)
                   vars [i] = m.mk_const (pm.get_n_pred (vars.get (i)->get_decl ()));
                 aux_vars.push_back(vars[i].get());
@@ -1439,7 +1441,7 @@ namespace spacer {
           m_params(params),
           m(m),
           m_context(0),
-          m_pm(m_fparams, params.max_num_contexts(), m),
+          m_pm(m_fparams, params.pdr_max_num_contexts(), m),
           m_query_pred(m),
           m_query(0),
           m_search(),
@@ -1673,7 +1675,7 @@ namespace spacer {
     };
 
     bool context::validate() {
-        if (!m_params.validate_result()) return true;
+        if (!m_params.pdr_validate_result()) return true;
         
         std::stringstream msg;
 
@@ -1735,7 +1737,12 @@ namespace spacer {
                                       << "\n";);
                 for (unsigned i = 0; i < rules.size(); ++i) {
                     datalog::rule& r = *rules[i];
-                    TRACE ("spacer", r.display_smt2(m, tout) << "\n";);
+                    
+                    TRACE ("spacer", 
+                           get_datalog_context ().
+                           get_rule_manager ().
+                           display_smt2(r, tout) << "\n";);
+                    
                     model->eval(r.get_head(), tmp);
                     expr_ref_vector fmls(m);
                     fmls.push_back(m.mk_not(tmp));
@@ -1749,18 +1756,17 @@ namespace spacer {
                         fmls.push_back(r.get_tail(j));
                     }
                     tmp = m.mk_and(fmls.size(), fmls.c_ptr()); 
-                    ptr_vector<sort> sorts;
                     svector<symbol> names;
-                    get_free_vars(tmp, sorts);
-                    for (unsigned i = 0; i < sorts.size(); ++i) {
-                        if (!sorts[i]) {
-                            sorts[i] = m.mk_bool_sort();
-                        }
-                        names.push_back(symbol(i));
+                    expr_free_vars fv;
+                    fv (tmp);
+                    fv.set_default_sort (m.mk_bool_sort ());
+                    
+                    for (unsigned i = 0; i < fv.size(); ++i) {
+                      names.push_back(symbol(fv.size () - i - 1));
                     }
-                    sorts.reverse();
-                    if (!sorts.empty()) {
-                        tmp = m.mk_exists(sorts.size(), sorts.c_ptr(), names.c_ptr(), tmp);
+                    if (!fv.empty()) {
+                        fv.reverse ();
+                        tmp = m.mk_exists(fv.size(), fv.c_ptr(), names.c_ptr(), tmp);
                     }
                     smt::kernel solver(m, get_fparams());
                     solver.assert_expr(tmp);
@@ -1790,17 +1796,17 @@ namespace spacer {
     void context::init_core_generalizers(datalog::rule_set& rules) {
         reset_core_generalizers();
         classifier_proc classify(m, rules);
-        bool use_mc = m_params.use_multicore_generalizer();
+        bool use_mc = m_params.pdr_use_multicore_generalizer();
         if (use_mc) {
             m_core_generalizers.push_back(alloc(core_multi_generalizer, *this, 0));
         }
-        if (m_params.use_farkas() && !classify.is_bool()) {
+        if (m_params.pdr_farkas() && !classify.is_bool()) {
             m.toggle_proof_mode(PGM_FINE);
             m_fparams.m_arith_bound_prop = BP_NONE;
             m_fparams.m_arith_auto_config_simplex = true;
             m_fparams.m_arith_propagate_eqs = false;
             m_fparams.m_arith_eager_eq_axioms = false;
-            if (m_params.use_utvpi()) {
+            if (m_params.pdr_utvpi()) {
                 if (classify.is_dl()) {
                     m_fparams.m_arith_mode = AS_DIFF_LOGIC;
                     m_fparams.m_arith_expand_eqs = true;
@@ -1811,13 +1817,13 @@ namespace spacer {
                 }
             }
         }
-        if (!use_mc && m_params.use_inductive_generalizer()) {
+        if (!use_mc && m_params.pdr_use_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_bool_inductive_generalizer, *this, 0));
         }
-        if (m_params.inductive_reachability_check()) {
+        if (m_params.pdr_inductive_reachability_check()) {
             m_core_generalizers.push_back(alloc(core_induction_generalizer, *this));
         }
-        if (m_params.use_arith_inductive_generalizer()) {
+        if (m_params.pdr_use_arith_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_arith_inductive_generalizer, *this));
         }
         
@@ -2215,7 +2221,7 @@ namespace spacer {
             m_search.pop ();
             
             node->inc_level ();
-            if (get_params ().flexible_trace ())
+            if (get_params ().pdr_flexible_trace ())
               m_search.push (*node);
             if (m_search.is_root (*node)) return false;
             break;
@@ -2406,7 +2412,7 @@ namespace spacer {
     
     if (full_prop_lvl < max_prop_lvl) full_prop_lvl = max_prop_lvl;
     
-    if (m_params.simplify_formulas_pre()) {
+    if (m_params.pdr_simplify_formulas_pre()) {
       simplify_formulas();
     }
     for (unsigned lvl = min_prop_lvl; lvl <= full_prop_lvl; lvl++) {
@@ -2444,7 +2450,7 @@ namespace spacer {
       }
       else if (all_propagated && lvl > max_prop_lvl) break;
     }
-    if (m_params.simplify_formulas_post()) {            
+    if (m_params.pdr_simplify_formulas_post()) {            
       simplify_formulas();
     }
     return false;
