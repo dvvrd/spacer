@@ -1431,7 +1431,9 @@ namespace spacer {
               SASSERT(v);
               // no-op                    
             }
-            else if (m.is_bool(args[0])) {
+            else if (m.is_bool(args[0]) && 
+                     (!is_uninterp_const (args [0]) ||
+                      !is_uninterp_const (args [1]))) {
               m_todo.append(sz, args);
             }
             else {
