@@ -982,7 +982,7 @@ namespace spacer {
   {
     get_frame_lemmas (infty_level(), out);
     for (unsigned i = lvl, sz = m_levels.size (); i < sz; ++i)
-      get_frame_lemmas (lvl, out);
+      get_frame_lemmas (i, out);
   }
   
   bool pred_transformer::legacy_frames::propagate_to_next_level(unsigned src_level) 
