@@ -111,8 +111,9 @@ public:
         expr* n1, *n2;
         while (is_forall(n)) n = to_quantifier(n)->get_expr();
         if (m.is_implies(n, n1, n2) && is_predicate(n2)) {
-            app* a1 = to_app(n1);
-            if (m.is_and(a1)) {
+            if (is_var (n1)) return true;
+            app* a1 = to_app (n1);
+            if (a1 && m.is_and(a1)) {
                 for (unsigned i = 0; i < a1->get_num_args(); ++i) {
                     if (!is_predicate(a1->get_arg(i)) && 
                         contains_predicate(a1->get_arg(i))) {                    
