@@ -47,6 +47,7 @@ Notes:
 #include "qe_project.h"
 
 #include "timeit.h"
+#include "luby.h"
 
 namespace spacer {
     
@@ -2184,6 +2185,12 @@ namespace spacer {
         model_node_ref last_reachable;
         
         if (get_params().reset_obligation_queue ()) m_search.reset ();
+        
+        unsigned initial_size = m_search.size ();
+        unsigned restart_initial = 10;
+        unsigned threshold = restart_initial;
+        unsigned luby_idx = 1;
+        
         while (m_search.top ())
         {
           checkpoint ();
@@ -2216,6 +2223,19 @@ namespace spacer {
           }
           
           SASSERT (m_search.top ());
+          
+          if (false && m_search.size () - initial_size > threshold)
+          {
+            luby_idx++;
+            threshold = static_cast<unsigned>(get_luby(luby_idx)) * restart_initial;
+            IF_VERBOSE (1, verbose_stream () 
+                        << "(restarting :obligations " << m_search.size () 
+                        << " :restart_threshold " << threshold
+                        << ")\n";);
+            m_search.reset ();
+            initial_size = m_search.size ();
+          }
+          
           
           node = m_search.top ();
           SASSERT (node->level () <= m_search.max_level ());
