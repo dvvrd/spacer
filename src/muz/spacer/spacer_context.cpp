@@ -318,11 +318,11 @@ namespace spacer {
   /// \brief adds a lemma to the solver and to child solvers
   void pred_transformer::add_lemma_core (expr * lemma, unsigned lvl)
   {
-    TRACE("spacer", tout << "add_lemma_core: " << pp_level (lvl)
+    TRACE("spacer", tout << "add-lemma-core: " << pp_level (lvl)
           << " " << head ()->get_name () 
           << " " << mk_pp (lemma, m) << "\n";);
     
-    TRACE("core_array_eq", tout << "add_lemma_core: " << pp_level (lvl)
+    TRACE("core_array_eq", tout << "add-lemma-core: " << pp_level (lvl)
           << " " << head ()->get_name () 
           << " " << mk_pp (lemma, m) << "\n";);
     
