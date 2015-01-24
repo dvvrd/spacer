@@ -385,6 +385,10 @@ namespace spacer {
              << (is_init ? "INIT " : "")
              << mk_pp(fact.get (), m) << "\n";);
       SASSERT (!is_init);
+      
+      // -- avoid duplicates
+      for (unsigned i = 0, sz = m_reach_facts.size (); i < sz; ++i)
+        if (m_reach_facts[i]->get () == fact.get ()) return;
 
       m_reach_facts.push_back (&fact);
 
