@@ -640,20 +640,16 @@ namespace spacer {
         return l_undef;
     }
 
-    bool pred_transformer::is_invariant(unsigned level, expr* states, bool inductive, unsigned& solver_level, expr_ref_vector* core) {
-        expr_ref_vector conj(m);
-        expr_ref tmp(m);
+    bool pred_transformer::is_invariant(unsigned level, expr* states,
+                                        unsigned& solver_level, expr_ref_vector* core) {
+      expr_ref_vector conj(m), aux(m);
         
         conj.push_back(m.mk_not(states));
 
-        if (inductive) {
-            mk_assumptions(head(), states, conj);
-        }
-        tmp = pm.mk_and(conj);
         prop_solver::scoped_level _sl(m_solver, level);
         m_solver.set_core(core);
         m_solver.set_model(0);
-        lbool r = m_solver.check_conjunction_as_assumptions(tmp);
+        lbool r = m_solver.check_assumptions (conj, aux);
         if (r == l_false) {
             solver_level = m_solver.uses_level ();
             CTRACE ("spacer", level < m_solver.uses_level (), 
@@ -668,15 +664,14 @@ namespace spacer {
                                            unsigned& uses_level) {
         manager& pm = get_manager();
         expr_ref_vector conj(m), core(m);
-        expr_ref fml(m), states(m);
+        expr_ref states(m);
         states = m.mk_not(pm.mk_and(lits));
         mk_assumptions(head(), states, conj);
-        fml = pm.mk_and(conj);
         prop_solver::scoped_level _sl(m_solver, level);
         prop_solver::scoped_subset_core _sc (m_solver, true);
         m_solver.set_core(&core);
         expr_ref_vector aux (m);
-        lbool res = m_solver.check_assumptions_and_formula(lits, aux, fml);
+        lbool res = m_solver.check_assumptions (lits, aux, conj.size (), conj.c_ptr ());
         if (res == l_false) {
             lits.reset();
             lits.append(core);
@@ -1013,8 +1008,7 @@ namespace spacer {
         src[i] = src.back();
         src.pop_back();
       }
-      else if (m_pt.is_invariant(tgt_level, curr, false, solver_level)) {
-              
+      else if (m_pt.is_invariant(tgt_level, curr, solver_level)) {
         add_lemma (curr, solver_level);
         TRACE("spacer", tout << "is invariant: "<< pp_level(solver_level) << " " << mk_pp(curr, m) << "\n";);              
         src[i] = src.back();
@@ -1156,7 +1150,7 @@ namespace spacer {
       
       unsigned solver_level;
       expr * curr = m_lemmas [i].get ();
-      if (m_pt.is_invariant (tgt_level, curr, false, solver_level))
+      if (m_pt.is_invariant (tgt_level, curr, solver_level))
       {
         m_lemmas [i].set_level (solver_level);
         m_pt.add_lemma_core (m_lemmas [i].get (), solver_level);

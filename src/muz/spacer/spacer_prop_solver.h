@@ -138,26 +138,12 @@ namespace spacer {
         void add_level_formula(expr * form, unsigned level);
                 
         /**
-         * Return true iff conjunction of atoms is consistent with the current state of 
-         * the solver.
-         *
-         * If the conjunction of atoms is inconsistent with the solver state and core is non-zero,
-         * core will contain an unsatisfiable core of atoms.
-         *
-         * If the conjunction of atoms is consistent with the solver state and o_model is non-zero,
-         * o_model will contain the "o" literals true in the assignment.
+         * check assumptions with a background formula
          */
-        lbool check_assumptions(const expr_ref_vector & hard_atoms, expr_ref_vector& soft_atoms);
-        
-        lbool check_conjunction_as_assumptions(expr * conj);
-        
-        /**
-         * Like check_assumptions, except it also asserts an extra formula
-         */
-        lbool check_assumptions_and_formula(
-            const expr_ref_vector & hard_atoms, 
-            expr_ref_vector & soft_atoms, 
-            expr * form);
+        lbool check_assumptions (const expr_ref_vector & hard_atoms, 
+                                 expr_ref_vector & soft_atoms, 
+                                 unsigned num_bg = 0,
+                                 expr * const *bg = NULL);
         
         void collect_statistics(statistics& st) const;
 

@@ -579,22 +579,14 @@ namespace spacer {
         }
     }
 
-    lbool prop_solver::check_assumptions(const expr_ref_vector & hard_atoms, expr_ref_vector& soft_atoms) {
-        return check_assumptions_and_formula(hard_atoms, soft_atoms, m.mk_true());
-    }
-
-    lbool prop_solver::check_conjunction_as_assumptions(expr * conj) {
-        expr_ref_vector hard_asmp(m), soft_asmp (m);
-        hard_asmp.push_back(conj);
-        return check_assumptions(hard_asmp, soft_asmp);
-    }
-
-    lbool prop_solver::check_assumptions_and_formula(const expr_ref_vector & hard_atoms, expr_ref_vector& soft_atoms, expr * form) 
+    lbool prop_solver::check_assumptions (const expr_ref_vector & hard_atoms,
+                                          expr_ref_vector& soft_atoms,
+                                          unsigned num_bg, expr * const * bg) 
     {
         spacer::smt_context::scoped _scoped(*m_ctx);
         safe_assumptions safe(*this, hard_atoms, soft_atoms);
-        m_ctx->assert_expr(form);    
-        CTRACE("spacer", !m.is_true(form), tout << "check with formula: " << mk_pp(form, m) << "\n";);
+        for (unsigned i = 0; i < num_bg; ++i) m_ctx->assert_expr (bg [i]);
+        
         lbool res = check_safe_assumptions(safe, safe.hard_atoms(), safe.soft_atoms());
 
         //
