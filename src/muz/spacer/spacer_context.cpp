@@ -607,7 +607,8 @@ namespace spacer {
         // check local reachability;
         // result is either sat (with some reach assumps) or
         // unsat (even with no reach assumps)
-        lbool is_sat = m_solver.check_assumptions (post, reach_assumps);
+        expr *bg = m_extend_lit.get ();
+        lbool is_sat = m_solver.check_assumptions (post, reach_assumps, 1, &bg);
 
         TRACE ("spacer",
                 if (!reach_assumps.empty ()) {
@@ -655,7 +656,8 @@ namespace spacer {
         prop_solver::scoped_level _sl(m_solver, level);
         m_solver.set_core(core);
         m_solver.set_model(0);
-        lbool r = m_solver.check_assumptions (conj, aux);
+        expr * bg = m_extend_lit.get ();
+        lbool r = m_solver.check_assumptions (conj, aux, 1, &bg);
         if (r == l_false) {
             solver_level = m_solver.uses_level ();
             CTRACE ("spacer", level < m_solver.uses_level (), 
@@ -677,6 +679,7 @@ namespace spacer {
         prop_solver::scoped_subset_core _sc (m_solver, true);
         m_solver.set_core(&core);
         expr_ref_vector aux (m);
+        conj.push_back (m_extend_lit);
         lbool res = m_solver.check_assumptions (lits, aux, conj.size (), conj.c_ptr ());
         if (res == l_false) {
             lits.reset();
@@ -758,9 +761,6 @@ namespace spacer {
             transitions.push_back (m.mk_or (pred, m_extend_lit->get_arg (0)));
             if (!is_init [0]) init_conds.push_back (m.mk_not (pred));
             
-            // -- temporary hack
-            transitions.push_back (m_extend_lit);
-            
             transition = pm.mk_and(transitions);
             break;
         default:
@@ -778,9 +778,6 @@ namespace spacer {
                 }
             }
             transitions.push_back(m.mk_or(disj.size(), disj.c_ptr()));
-
-            transitions.push_back (m_extend_lit);
-            
             transition = pm.mk_and(transitions);
             break;                 
         }
