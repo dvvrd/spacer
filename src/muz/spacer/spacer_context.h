@@ -258,6 +258,7 @@ namespace spacer {
         rule2apps                    m_rule2vars;       // map rule to auxiliary variables
         expr_ref                     m_transition;      // transition relation.
         expr_ref                     m_initial_state;   // initial state.
+        app_ref                      m_extend_lit;      // literal to extend initial state
         bool                         m_all_init;        // true if the pt has no uninterpreted body in any rule
         //reachable_cache              m_reachable; 
         ptr_vector<func_decl>        m_predicates;

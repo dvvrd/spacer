@@ -60,10 +60,16 @@ namespace spacer {
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name(), ctx.get_params ().validate_theory_core ()),
         m_reach_ctx (pm.mk_fresh ()),
         m_frames (*this), 
-        m_reach_facts (), m_transition(m), m_initial_state(m), 
+        m_reach_facts (), m_transition(m), m_initial_state(m), m_extend_lit (m),
         m_all_init (false),
         m_reach_case_vars (m)
-    { init_sig (); }
+    {
+      init_sig ();
+      app_ref v(m);
+      v = m.mk_fresh_const (m_head->get_name ().str ().c_str (),
+                            m.mk_bool_sort ());
+      m_extend_lit = m.mk_not (m.mk_const (pm.get_n_pred (v->get_decl ())));
+    }
 
     pred_transformer::~pred_transformer() {
         rule2inst::iterator it2 = m_rule2inst.begin(), end2 = m_rule2inst.end();
@@ -748,14 +754,17 @@ namespace spacer {
             rule = tr_rules[0];
             m_tag2rule.insert(pred, rule);
             m_rule2tag.insert(rule, pred.get());            
-            transitions.push_back(pred);
+            transitions [0] = m.mk_implies (pred, transitions.get (0));
+            transitions.push_back (m.mk_or (pred, m_extend_lit->get_arg (0)));
+            if (!is_init [0]) init_conds.push_back (m.mk_not (pred));
+            
+            // -- temporary hack
+            transitions.push_back (m_extend_lit);
+            
             transition = pm.mk_and(transitions);
-            // mk init condition
-            if (!is_init[0]) {
-                init_conds.push_back (m.mk_not (pred));
-            }
             break;
         default:
+            disj.push_back (m_extend_lit->get_arg (0));
             for (unsigned i = 0; i < transitions.size(); ++i) {
                 pred = m.mk_fresh_const(head()->get_name().str().c_str(), m.mk_bool_sort());
                 rule = tr_rules[i];
@@ -769,6 +778,9 @@ namespace spacer {
                 }
             }
             transitions.push_back(m.mk_or(disj.size(), disj.c_ptr()));
+
+            transitions.push_back (m_extend_lit);
+            
             transition = pm.mk_and(transitions);
             break;                 
         }
