@@ -393,6 +393,9 @@ namespace spacer {
 
         prop_solver& get_solver() { return m_solver; }
 
+      /// \brief Adds a given expression to the set of initial rules
+      app* extend_initial (expr *e);
+      
     };
 
   typedef ref<model_node> model_node_ref;

@@ -1216,6 +1216,25 @@ namespace spacer {
       m_sorted = false;
     }
   }
+
+
+  app* pred_transformer::extend_initial (expr *e)
+  {
+    // create fresh extend literal
+    app_ref v(m);
+    v = m.mk_fresh_const (m_head->get_name ().str ().c_str (),
+                          m.mk_bool_sort ());
+    v = m.mk_const (pm.get_n_pred (v->get_decl ()));
+    
+    // -- extend the initial condition
+    m_solver.add_formula (m.mk_or (m_extend_lit, e, v));
+
+    // -- remember the new extend literal
+    m_extend_lit = m.mk_not (v);
+
+    return m_extend_lit;
+  }
+  
   
     // ----------------
     // derivation
