@@ -540,6 +540,21 @@ namespace spacer {
   
       
 
+  /// \brief Returns true if the obligation is already blocked by current lemmas
+  bool pred_transformer::is_blocked (model_node &n, unsigned &uses_level)
+  {
+    ensure_level (n.level ());
+    prop_solver::scoped_level _sl (m_solver, n.level ());
+    m_solver.set_core (NULL);
+    m_solver.set_model (NULL);
+
+    expr_ref_vector post(m), aux(m);
+    post.push_back (n.post ());
+    lbool res = m_solver.check_assumptions (post, aux);
+    if (res == l_false) uses_level = m_solver.uses_level ();
+    return res == l_false;
+  }
+  
   lbool pred_transformer::is_reachable(model_node& n, expr_ref_vector* core, 
                                        model_ref* model, unsigned& uses_level, 
                                          bool& is_concrete, datalog::rule const*& r, 
@@ -2338,8 +2353,9 @@ namespace spacer {
       vector<bool> reach_pred_used; 
       unsigned num_reuse_reach = 0;
 
-      switch (expand_state(n, cube, model, uses_level, is_concrete, r, 
-                           reach_pred_used, num_reuse_reach)) 
+      lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
+                               reach_pred_used, num_reuse_reach);
+      switch (res) 
       {
         //reachable but don't know if this is purely using UA
       case l_true: {

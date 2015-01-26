@@ -396,6 +396,9 @@ namespace spacer {
       /// \brief Adds a given expression to the set of initial rules
       app* extend_initial (expr *e);
       
+      /// \brief Returns true if the obligation is already blocked by current lemmas
+      bool is_blocked (model_node &n, unsigned &uses_level);
+      
     };
 
   typedef ref<model_node> model_node_ref;
