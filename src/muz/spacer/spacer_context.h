@@ -335,7 +335,8 @@ namespace spacer {
         /// \brief Returns reachability fact active in the origin of the given model
         reach_fact* get_used_origin_reach_fact (model_evaluator &mev, unsigned oidx);
         expr_ref get_origin_summary (model_evaluator &mev, 
-                                     unsigned level, unsigned oidx, bool must);
+                                     unsigned level, unsigned oidx, bool must,
+                                     const ptr_vector<app> **aux);
 
         void remove_predecessors(expr_ref_vector& literals);
         void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
@@ -542,7 +543,7 @@ namespace spacer {
    */
   class derivation {
     /// a single premise of a derivation
-    struct premise
+    class premise
     {
       pred_transformer &m_pt;
       /// origin order in the rule
@@ -553,7 +554,9 @@ namespace spacer {
       bool m_must;
       app_ref_vector m_ovars;
       
-      premise (pred_transformer &pt, unsigned oidx, expr *summary, bool must);
+    public:
+      premise (pred_transformer &pt, unsigned oidx, expr *summary, bool must,
+               const ptr_vector<app> *aux_vars = NULL);
       premise (const premise &p);
       
       bool is_must () {return m_must;}
@@ -590,7 +593,7 @@ namespace spacer {
   public:
     derivation (model_node& parent, datalog::rule const& rule, expr *trans);
     void add_premise (pred_transformer &pt, unsigned oidx, 
-                      expr * summary, bool must);
+                      expr * summary, bool must, const ptr_vector<app> *aux_vars = NULL);
     
     /// creates the first child. Must be called after all the premises
     /// are added. The model must be valid for the premises

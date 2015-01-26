@@ -488,17 +488,23 @@ namespace spacer {
   expr_ref pred_transformer::get_origin_summary (model_evaluator &mev, 
                                                  unsigned level, 
                                                  unsigned oidx,
-                                                 bool must)
+                                                 bool must,
+                                                 const ptr_vector<app> **aux)
   {
     expr_ref_vector summary (m);
     expr_ref v(m);
     
     if (!must) // use may summary
+    {
       summary.push_back (get_formulas (level, false));
+      // -- no auxiliary variables in lemmas
+      *aux = NULL;
+    }
     else // find must summary to use
     {
       reach_fact *f = get_used_origin_reach_fact (mev, oidx);
       summary.push_back (f->get ());
+      *aux = &f->aux_vars ();
     }
     
     SASSERT (!summary.empty ());
@@ -1263,7 +1269,8 @@ namespace spacer {
         m_trans (trans, m_parent.get_ast_manager ()) {} 
   
   derivation::premise::premise (pred_transformer &pt, unsigned oidx, 
-                                     expr *summary, bool must) : 
+                                expr *summary, bool must,
+                                const ptr_vector<app> *aux_vars) : 
     m_pt (pt), m_oidx (oidx), 
     m_summary (summary, pt.get_ast_manager ()), m_must (must),
     m_ovars (pt.get_ast_manager ())
@@ -1275,6 +1282,10 @@ namespace spacer {
     unsigned sig_sz = m_pt.head ()->get_arity ();
     for (unsigned i = 0; i < sig_sz; ++i)
       m_ovars.push_back (m.mk_const (sm.o2o (pt.sig (i), 0, m_oidx)));
+    
+    if (aux_vars)
+      for (unsigned i = 0, sz = aux_vars->size (); i < sz; ++i)
+        m_ovars.push_back (m.mk_const (sm.n2o (aux_vars->get (i)->get_decl (), m_oidx)));
   }
   
   derivation::premise::premise (const derivation::premise &p) :
@@ -1285,8 +1296,9 @@ namespace spacer {
   void derivation::add_premise (pred_transformer &pt, 
                                 unsigned oidx,
                                 expr* summary,
-                                bool must)
-  {m_premises.push_back (premise (pt, oidx, summary, must));}
+                                bool must,
+                                const ptr_vector<app> *aux_vars)
+  {m_premises.push_back (premise (pt, oidx, summary, must, aux_vars));}
   
 
 
@@ -1377,7 +1389,7 @@ namespace spacer {
     // -- orient transition relation towards m_active premise
     expr_ref active_trans (m);
     pm.formula_o2n (m_trans, active_trans, 
-                                m_premises[m_active].get_oidx (), false);
+                    m_premises[m_active].get_oidx (), false);
     summaries.push_back (active_trans);
     
     // if not true, bail out, the must summary of m_active is not strong enough
@@ -2692,10 +2704,12 @@ namespace spacer {
         for (unsigned i = 0; i < preds.size (); ++i)
         {
           pred_transformer &pt = get_pred_transformer (preds [i]);
-          deriv->add_premise (pt, i, 
-                              pt.get_origin_summary (mev, prev_level (n.level ()),
-                                                     i, reach_pred_used [i]),
-                              reach_pred_used [i]);
+          
+          const ptr_vector<app> *aux = NULL;
+          expr_ref sum(m);
+          sum = pt.get_origin_summary (mev, prev_level (n.level ()),
+                                       i, reach_pred_used [i], &aux);
+          deriv->add_premise (pt, i, sum, reach_pred_used [i], aux);
         }
         
         // create post for the first child and add to queue
