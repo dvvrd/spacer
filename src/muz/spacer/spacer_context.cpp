@@ -2353,8 +2353,16 @@ namespace spacer {
       vector<bool> reach_pred_used; 
       unsigned num_reuse_reach = 0;
 
+      
+      if (get_params ().pdr_flexible_trace () && n.pt ().is_blocked (n, uses_level))
+      {
+        // if (!m_search.is_root (n)) n.close ();
+        IF_VERBOSE (1, verbose_stream () << "ALREADY BLOCKED: " << &n << "\n";);
+        return l_false;
+      }
+      
       lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
-                               reach_pred_used, num_reuse_reach);
+                         reach_pred_used, num_reuse_reach);
       switch (res) 
       {
         //reachable but don't know if this is purely using UA
