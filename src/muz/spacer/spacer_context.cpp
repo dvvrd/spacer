@@ -391,7 +391,6 @@ namespace spacer {
              tout << "add_reach_fact: " << head()->get_name() << " " 
              << (is_init ? "INIT " : "")
              << mk_pp(fact.get (), m) << "\n";);
-      SASSERT (!is_init);
       
       // -- avoid duplicates
       for (unsigned i = 0, sz = m_reach_facts.size (); i < sz; ++i)
@@ -755,6 +754,23 @@ namespace spacer {
         //m_reachable.add_init(to_app(m_initial_state));
         
 
+    }
+  
+    void pred_transformer::init_reach_facts ()
+    {
+      expr_ref_vector v(m);
+      reach_fact *fact;
+
+      rule2expr::iterator it = m_rule2tag.begin (), end = m_rule2tag.end ();
+      for (; it != end; ++it)
+      {
+        const datalog::rule* r = it->m_key;
+        if (r->get_uninterpreted_tail_size () == 0)
+        {
+          fact = alloc (reach_fact, m, m_rule2transition.find (r), get_aux_vars (*r));
+          add_reach_fact (*fact, true);
+        }
+      }
     }
   
     void pred_transformer::init_rules(decl2rel const& pts, expr_ref& init, expr_ref& transition) {
@@ -1577,6 +1593,11 @@ namespace spacer {
             rel.initialize(rels);
             TRACE("spacer", rel.display(tout); );
         }
+        
+        // initialize reach facts
+        it = rels.begin (), end = rels.end ();
+        for (; it != end; ++it)
+          it->m_value->init_reach_facts ();        
     }
 
     void context::update_rules(datalog::rule_set& rules) {
@@ -2390,8 +2411,11 @@ namespace spacer {
         if (is_concrete) 
         {
           // -- update must summary
-          reach_fact* rf = mk_reach_fact (n, mev, *r);
-          n.pt ().add_reach_fact (*rf);
+          if (r && r->get_uninterpreted_tail_size () > 0)
+          {
+            reach_fact* rf = mk_reach_fact (n, mev, *r);
+            n.pt ().add_reach_fact (*rf);
+          }
           
           // if n has a derivation, create a new child and report l_undef
           // otherwise if n has no derivation or no new children, report l_true
