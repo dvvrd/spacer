@@ -134,10 +134,9 @@ namespace spacer {
         
         m_reach_ctx->push ();
         m_reach_ctx->assert_expr (state);
-        expr_ref_vector assumps (m);
-        assumps.push_back (m.mk_not (m_reach_case_vars.back ()));
-        // XXX why use check-with-assumptions here?
-        lbool res = m_reach_ctx->check (assumps);
+        m_reach_ctx->assert_expr (m.mk_not (m_reach_case_vars.back ()));
+        expr_ref_vector assumptions (m);
+        lbool res = m_reach_ctx->check (assumptions);
         if (model) m_reach_ctx->get_model (*model);
         m_reach_ctx->pop ();
         return (res == l_true);
