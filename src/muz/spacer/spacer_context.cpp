@@ -910,8 +910,7 @@ namespace spacer {
         for (unsigned i = 0; i < fv.size(); ++i) {
             if (fv[i] && !vars[i].get()) {
                 vars[i] = m.mk_fresh_const("aux", fv[i]);
-                if (is_init)
-                  vars [i] = m.mk_const (pm.get_n_pred (vars.get (i)->get_decl ()));
+                vars [i] = m.mk_const (pm.get_n_pred (vars.get (i)->get_decl ()));
                 aux_vars.push_back(vars[i].get());
             }
         }
