@@ -565,12 +565,10 @@ namespace spacer {
       unsigned get_oidx () {return m_oidx;}
       pred_transformer &pt () {return m_pt;} 
       
-      void set_summary (expr * summary, bool must)
-      {
-        m_summary = summary;
-        m_must = must;
-      }
-      
+      /// \brief Updated the summary. 
+      /// The new summary is over n-variables. 
+      void set_summary (expr * summary, bool must, 
+                        const ptr_vector<app> *aux_vars = NULL);
     };
     
       

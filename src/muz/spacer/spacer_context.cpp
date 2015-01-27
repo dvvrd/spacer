@@ -1305,6 +1305,28 @@ namespace spacer {
     m_pt (p.m_pt), m_oidx (p.m_oidx), m_summary (p.m_summary), m_must (p.m_must),
     m_ovars (p.m_ovars) {}
   
+  /// \brief Updated the summary. 
+  /// The new summary is over n-variables. 
+  void derivation::premise::set_summary (expr * summary, bool must, 
+                                         const ptr_vector<app> *aux_vars)
+  {
+    ast_manager &m = m_pt.get_ast_manager ();
+    manager &sm = m_pt.get_manager ();
+    unsigned sig_sz = m_pt.head ()->get_arity ();
+    
+    m_must = must;
+    sm.formula_n2o (summary, m_summary, m_oidx);
+    
+    m_ovars.reset ();
+    for (unsigned i = 0; i < sig_sz; ++i)
+      m_ovars.push_back (m.mk_const (sm.o2o (m_pt.sig (i), 0, m_oidx)));
+    
+    if (aux_vars)
+      for (unsigned i = 0, sz = aux_vars->size (); i < sz; ++i)
+        m_ovars.push_back (m.mk_const (sm.n2o (aux_vars->get (i)->get_decl (), 
+                                               m_oidx)));
+  }
+  
   
   void derivation::add_premise (pred_transformer &pt, 
                                 unsigned oidx,
@@ -1422,9 +1444,8 @@ namespace spacer {
     expr_ref v(m);
     v = pm.mk_and (lits);
     
-    expr_ref s(m);
-    pm.formula_n2o (v, s, m_premises[m_active].get_oidx ());
-    m_premises[m_active].set_summary (s, true);
+    // XXX The summary is not used by anyone after this point
+    m_premises[m_active].set_summary (v, true, &(rf->aux_vars ()));
 
     
     /** HACK: needs a rewrite 
@@ -1435,17 +1456,18 @@ namespace spacer {
      * new-variables at this point.
      */
     {
-      summaries.reset ();
+      pred_transformer &pt = m_premises[m_active].pt ();
       app_ref_vector vars (m);
+      
+      summaries.reset ();
       summaries.push_back (v);
       summaries.push_back (active_trans);
       m_trans = pm.mk_and (summaries);
       
-      // map auxiliary variables
-      app_ref_vector &ovars = m_premises[m_active].get_ovars ();
-      unsigned oidx = m_premises [m_active].get_oidx ();
-      for (unsigned i = 0, sz = ovars.size (); i < sz; ++i)
-        vars.push_back (m.mk_const (pm.o2n (ovars.get (i)->get_decl (), oidx)));
+      // variables to eliminate
+      vars.append (rf->aux_vars ().size (), rf->aux_vars ().c_ptr ());
+      for (unsigned i = 0, sz = pt.head ()->get_arity (); i < sz; ++i)
+        vars.push_back (m.mk_const (pm.o2n (pt.sig (i), 0)));
       
       if (!vars.empty ()) qe_project (m, vars, m_trans, mev.get_model (), true);
     }
@@ -2730,6 +2752,8 @@ namespace spacer {
           
           const ptr_vector<app> *aux = NULL;
           expr_ref sum(m);
+          // XXX This is a bit confusing. The summary is returned over
+          // XXX o-variables. But it is simpler if it is returned over n-variables instead.
           sum = pt.get_origin_summary (mev, prev_level (n.level ()),
                                        i, reach_pred_used [i], &aux);
           deriv->add_premise (pt, i, sum, reach_pred_used [i], aux);
