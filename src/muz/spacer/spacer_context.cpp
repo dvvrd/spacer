@@ -393,8 +393,7 @@ namespace spacer {
              << mk_pp(fact.get (), m) << "\n";);
       
       // -- avoid duplicates
-      for (unsigned i = 0, sz = m_reach_facts.size (); i < sz; ++i)
-        if (m_reach_facts[i]->get () == fact.get ()) return;
+      if (get_reach_fact (fact.get ())) return;
 
       m_reach_facts.push_back (&fact);
 
@@ -2615,7 +2614,8 @@ namespace spacer {
         }
         // collect aux vars to eliminate
         ptr_vector<app>& aux_vars = pt.get_aux_vars (r);
-        vars.append (aux_vars.size (), aux_vars.c_ptr ());
+        bool elim_aux = get_params ().spacer_elim_aux ();
+        if (elim_aux) vars.append (aux_vars.size (), aux_vars.c_ptr ());
 
         res = m_pm.mk_and (path_cons);
 
@@ -2642,7 +2642,8 @@ namespace spacer {
         SASSERT (vars.empty ());
 
         m_stats.m_num_reach_queries++;
-        reach_fact *f = alloc(reach_fact, m, res);
+        ptr_vector<app> empty;
+        reach_fact *f = alloc(reach_fact, m, res, elim_aux ? empty : aux_vars);
         f->set_rule (r);
         for (unsigned i = 0, sz = child_reach_facts.size (); i < sz; ++i)
           f->add_justification (*child_reach_facts [i]);

@@ -156,6 +156,7 @@ def_module_params('fixedpoint',
 	                  ('xform.array_blast_full', BOOL, False, "eliminate all local array variables by QE"),
                           ('pdr.skip_propagate', BOOL, False, "Skip propagate/pushing phase. Turns PDR into a BMC that returns either reachable or unknown"),
                           ('pdr.max_level', UINT, UINT_MAX, "Maximum level to explore"),
+                          ('spacer.elim_aux', BOOL, True, "Eliminate auxiliary variables in reachability facts"),
                           ))
 
 
