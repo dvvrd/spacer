@@ -60,7 +60,8 @@ namespace spacer {
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name(), ctx.get_params ().validate_theory_core ()),
         m_reach_ctx (pm.mk_fresh ()),
         m_frames (*this), 
-        m_reach_facts (), m_transition(m), m_initial_state(m), m_extend_lit (m),
+        m_reach_facts (), m_rf_init_sz (0),
+        m_transition(m), m_initial_state(m), m_extend_lit (m),
         m_all_init (false),
         m_reach_case_vars (m)
     {
@@ -394,7 +395,13 @@ namespace spacer {
       // -- avoid duplicates
       if (get_reach_fact (fact.get ())) return;
 
+      // all initial facts are grouped together
+      SASSERT (!fact.is_init () || m_reach_facts.empty () ||
+               m_reach_facts.back ()->is_init ());
+      
       m_reach_facts.push_back (&fact);
+      if (fact.is_init ()) m_rf_init_sz++;
+      
 
       // update m_reach_ctx
       expr_ref last_var (m);

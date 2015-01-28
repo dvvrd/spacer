@@ -255,6 +255,8 @@ namespace spacer {
         legacy_frames                m_frames;
       
         reach_fact_ref_vector        m_reach_facts; // reach facts
+        /// Number of initial reachability facts
+        unsigned                     m_rf_init_sz;
         obj_map<expr, datalog::rule const*> m_tag2rule; // map tag predicate to rule. 
         rule2expr                    m_rule2tag;        // map rule to predicate tag.
         rule2inst                    m_rule2inst;       // map rules to instantiations of indices
