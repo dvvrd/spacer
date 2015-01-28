@@ -384,11 +384,11 @@ namespace spacer {
     {return m_reach_case_vars.get (idx);}
 
 
-  void pred_transformer::add_reach_fact (reach_fact &fact, bool is_init) 
+  void pred_transformer::add_reach_fact (reach_fact &fact) 
     {
       TRACE ("spacer",
              tout << "add_reach_fact: " << head()->get_name() << " " 
-             << (is_init ? "INIT " : "")
+             << (fact.is_init () ? "INIT " : "")
              << mk_pp(fact.get (), m) << "\n";);
       
       // -- avoid duplicates
@@ -765,8 +765,9 @@ namespace spacer {
         const datalog::rule* r = it->m_key;
         if (r->get_uninterpreted_tail_size () == 0)
         {
-          fact = alloc (reach_fact, m, m_rule2transition.find (r), get_aux_vars (*r));
-          add_reach_fact (*fact, true);
+          fact = alloc (reach_fact, m, m_rule2transition.find (r),
+                        get_aux_vars (*r), true);
+          add_reach_fact (*fact);
         }
       }
     }

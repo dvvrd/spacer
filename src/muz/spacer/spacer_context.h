@@ -62,14 +62,18 @@ namespace spacer {
     
     const datalog::rule *m_rule;
     reach_fact_ref_vector m_justification;
+
+    bool m_init;
     
   public:  
-    reach_fact (ast_manager &m, expr* fact, const ptr_vector<app> &aux_vars) : 
-      m_ref_count (0), m_fact (fact, m), m_aux_vars (aux_vars), m_rule(NULL) {}
-    reach_fact (ast_manager &m, expr* fact) :
-      m_ref_count (0), m_fact (fact, m), m_aux_vars (), m_rule(NULL) {}
+    reach_fact (ast_manager &m, expr* fact, const ptr_vector<app> &aux_vars,
+                bool init = false) : 
+      m_ref_count (0), m_fact (fact, m), m_aux_vars (aux_vars),
+      m_rule(NULL), m_init (init) {}
+    reach_fact (ast_manager &m, expr* fact, bool init = false) :
+      m_ref_count (0), m_fact (fact, m), m_rule(NULL), m_init (init) {}
     
-    
+    bool is_init () {return m_init;}
     void set_rule (const datalog::rule &r) {m_rule = &r;}
     const datalog::rule* get_rule () {return m_rule;}
     
@@ -356,7 +360,7 @@ namespace spacer {
       
         /// initialize reachability facts using initial rules
         void init_reach_facts ();
-        void add_reach_fact (reach_fact &fact, bool is_init = false);  // add reachability fact
+        void add_reach_fact (reach_fact &fact);  // add reachability fact
         expr* get_last_reach_fact () const { return m_reach_facts.back ()->get (); }
         expr* get_last_reach_case_var () const;
       
