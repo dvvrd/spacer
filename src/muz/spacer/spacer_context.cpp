@@ -154,10 +154,12 @@ namespace spacer {
     return res;
   }
   
-  reach_fact* pred_transformer::get_used_reach_fact (model_evaluator& mev) {
+  reach_fact* pred_transformer::get_used_reach_fact (model_evaluator& mev,
+                                                     bool all) {
     expr_ref v (m);
     
-    for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
+    for (unsigned i = all ? 0 : m_rf_init_sz, sz = m_reach_case_vars.size ();
+         i < sz; i++) {
       v = mev.eval (m_reach_case_vars.get (i));
       if (m.is_false (v)) {
         return m_reach_facts.get (i);
@@ -1443,7 +1445,7 @@ namespace spacer {
     
     // find must summary used
     
-    reach_fact *rf = pt.get_used_reach_fact (mev);
+    reach_fact *rf = pt.get_used_reach_fact (mev, true);
     
     // get an implicant of the summary
     expr_ref_vector u(m), lits (m);
