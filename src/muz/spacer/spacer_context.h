@@ -355,7 +355,7 @@ namespace spacer {
         /// initialize reachability facts using initial rules
         void init_reach_facts ();
         void add_reach_fact (reach_fact &fact, bool is_init = false);  // add reachability fact
-        expr* get_last_reach_fact () const { return m_reach_facts.back ()->get (); }
+        reach_fact* get_last_reach_fact () const { return m_reach_facts.back (); }
         expr* get_last_reach_case_var () const;
       
 
@@ -670,6 +670,7 @@ namespace spacer {
             unsigned m_num_reuse_reach;
             unsigned m_max_query_lvl;
             unsigned m_max_depth;
+            unsigned m_cex_depth;
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
         };
@@ -730,6 +731,8 @@ namespace spacer {
         void reset_core_generalizers();
 
         bool validate();
+
+        unsigned get_cex_depth ();
 
     public:       
         
