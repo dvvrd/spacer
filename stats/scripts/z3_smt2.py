@@ -8,7 +8,7 @@ profiles = {
     ## skip propagation but drive the search as deep as possible
     'bmc': ['--skip-propagate', '--use-heavy-mev', 
             '--flexible-trace', '--keep-obligations', 
-            '--no-elim-aux' ], 
+            '--no-elim-aux'], 
     ## default mode. Eventually this will be the best option to start with
     'def': ['--use-heavy-mev', '--keep-obligations',
             '--flexible-trace', '--no-elim-aux'],
@@ -217,6 +217,7 @@ def main (argv):
 
     if args.no_z3: return
 
+    stat ('File', args.file)
     with stats.timer ('Query'):
         popen = subprocess.Popen(z3_args.split (), stdout=subprocess.PIPE)
         popen.wait()
