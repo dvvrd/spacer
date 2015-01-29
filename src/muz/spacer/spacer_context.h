@@ -696,7 +696,7 @@ namespace spacer {
     decl2rel             m_rels;         // Map from relation predicate to fp-operator.       
     func_decl_ref        m_query_pred;
     pred_transformer*    m_query;
-    mutable model_search m_search;
+    mutable model_search m_search;  //-- the priority queue used in check_reachability()
     lbool                m_last_result;
     unsigned             m_inductive_lvl;
     unsigned             m_expanded_lvl;

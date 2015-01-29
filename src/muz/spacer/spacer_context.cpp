@@ -1032,6 +1032,7 @@ namespace spacer {
       get_frame_lemmas (i, out);
   }
   
+  //-- push relatively inductive lemmas from src_lvel to src_level+1
   bool pred_transformer::legacy_frames::propagate_to_next_level(unsigned src_level) 
   {
       
@@ -2293,6 +2294,7 @@ namespace spacer {
         checkpoint ();
         model_node_ref node;
           
+        //-- process the top element of the queue
         while (last_reachable)
           {
             node = last_reachable;
