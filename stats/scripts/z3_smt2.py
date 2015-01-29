@@ -82,6 +82,9 @@ def parseArgs (argv):
     p.add_argument ('--no-elim-aux', dest='elim_aux', 
                     help='do not eliminate auxiliaries in reachability facts', 
                     action='store_false', default=True)
+    p.add_argument ('--no-z3', dest='no_z3',
+                    help='stop before running z3', default=False,
+                    action='store_true')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -207,6 +210,8 @@ def main (argv):
         stats.put ('Trace', args.trace)
 
     print z3_args
+
+    if args.no_z3: return
 
     with stats.timer ('Query'):
         popen = subprocess.Popen(z3_args.split (), stdout=subprocess.PIPE)
