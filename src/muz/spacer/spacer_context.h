@@ -301,7 +301,7 @@ namespace spacer {
       
         reach_fact *get_reach_fact (expr *v)
         {
-          for (unsigned i = 1, sz = m_reach_facts.size (); i < sz; ++i)
+          for (unsigned i = 0, sz = m_reach_facts.size (); i < sz; ++i)
             if (v == m_reach_facts [i]->get ()) return m_reach_facts[i];
           return NULL;
         }
