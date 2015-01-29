@@ -4,6 +4,21 @@ import sys
 import stats
 import subprocess
 
+profiles = {
+    ## skip propagation but drive the search as deep as possible
+    'bmc': ['--skip-propagate', '--use-heavy-mev', 
+            '--flexible-trace', '--keep-obligations', 
+            '--no-elim-aux' ], 
+    ## default mode. Eventually this will be the best option to start with
+    'def': ['--use-heavy-mev', '--keep-obligations',
+            '--flexible-trace', '--no-elim-aux'],
+    ## inspired by IC3: there is a priority queue, but it is reset
+    ## between propagations
+    'ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux'],
+    ## inspired by gpdr: no priority queue. 
+    'gpdr': ['--use-heavy-mev', '--no-elim-aux']
+}
+
 def parseArgs (argv):
     import argparse as a
     p = a.ArgumentParser (description='Z3 Datalog Frontend')
@@ -64,8 +79,28 @@ def parseArgs (argv):
     p.add_argument ('--max-lvl', dest='max_lvl',
                     help='max query level', type=int,
                     action='store', default=-1)
+    p.add_argument ('--no-elim-aux', dest='elim_aux', 
+                    help='do not eliminate auxiliaries in reachability facts', 
+                    action='store_false', default=True)
 
-    return p.parse_args (argv)
+    # HACK: profiles as a way to provide multiple options at once
+    global profiles
+    nargv = []
+    in_p = False
+    for s in argv:
+        if in_p:
+            if s not in profiles:
+                break
+            nargv.extend (profiles[s])
+            in_p = False
+        elif s == '-p': 
+            in_p = True
+        else: nargv.append (s)
+        
+    if in_p: 
+        print 'WARNING: missing profile'
+        sys.exit (1)
+    return p.parse_args (nargv)
 
 def stat (key, val): stats.put (key, val)
 
@@ -155,6 +190,11 @@ def main (argv):
     if int(args.max_lvl) >= 0:
         z3_args += ' fixedpoint.pdr.max_level={}'.format (args.max_lvl)
 
+    if args.elim_aux:
+        z3_args += ' fixedpoint.spacer.elim_aux=true' 
+    else:
+        z3_args += ' fixedpoint.spacer.elim_aux=false'
+        
     z3_args += ' ' + args.file
 
 
