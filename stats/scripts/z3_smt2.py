@@ -122,10 +122,7 @@ def which(program):
             return exe_file
     return None
 
-def main (argv):
-    args = parseArgs (argv[1:])
-    stat ('Result', 'UNKNOWN')
-
+def compute_z3_args (args):
     z3_args = which ('z3')
 
     if z3_args is None:
@@ -209,6 +206,13 @@ def main (argv):
         print 
         stats.put ('Trace', args.trace)
 
+    return z3_args
+
+def main (argv):
+    args = parseArgs (argv[1:])
+    stat ('Result', 'UNKNOWN')
+
+    z3_args = compute_z3_args (args)
     print z3_args
 
     if args.no_z3: return
