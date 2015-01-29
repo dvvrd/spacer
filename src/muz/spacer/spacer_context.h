@@ -35,20 +35,20 @@ Revision History:
 
 
 namespace datalog {
-    class rule_set;
-    class context;
+  class rule_set;
+  class context;
 };
 
 namespace spacer {
 
-    class pred_transformer;
-    class model_node;
-    class derivation;
-    class model_search;
-    class context;
+  class pred_transformer;
+  class model_node;
+  class derivation;
+  class model_search;
+  class context;
 
-    typedef obj_map<datalog::rule const, app_ref_vector*> rule2inst;
-    typedef obj_map<func_decl, pred_transformer*> decl2rel;
+  typedef obj_map<datalog::rule const, app_ref_vector*> rule2inst;
+  typedef obj_map<func_decl, pred_transformer*> decl2rel;
 
   class reach_fact;
   typedef sref_vector<reach_fact> reach_fact_ref_vector;
@@ -68,10 +68,10 @@ namespace spacer {
   public:  
     reach_fact (ast_manager &m, expr* fact, const ptr_vector<app> &aux_vars,
                 bool init = false) : 
-      m_ref_count (0), m_fact (fact, m), m_aux_vars (aux_vars),
+    m_ref_count (0), m_fact (fact, m), m_aux_vars (aux_vars),
       m_rule(NULL), m_init (init) {}
     reach_fact (ast_manager &m, expr* fact, bool init = false) :
-      m_ref_count (0), m_fact (fact, m), m_rule(NULL), m_init (init) {}
+    m_ref_count (0), m_fact (fact, m), m_rule(NULL), m_init (init) {}
     
     bool is_init () {return m_init;}
     void set_rule (const datalog::rule &r) {m_rule = &r;}
@@ -94,95 +94,95 @@ namespace spacer {
   
   
     
-    // 
-    // Predicate transformer state.
-    // A predicate transformer corresponds to the 
-    // set of rules that have the same head predicates.
-    // 
+  // 
+  // Predicate transformer state.
+  // A predicate transformer corresponds to the 
+  // set of rules that have the same head predicates.
+  // 
     
-    class pred_transformer {
+  class pred_transformer {
 
-        struct stats {
-            unsigned m_num_propagations;
-            stats() { reset(); }
-            void reset() { memset(this, 0, sizeof(*this)); }
-        };
+    struct stats {
+      unsigned m_num_propagations;
+      stats() { reset(); }
+      void reset() { memset(this, 0, sizeof(*this)); }
+    };
 
-      /// manager of the lemmas in all the frames
-      class legacy_frames
+    /// manager of the lemmas in all the frames
+    class legacy_frames
+    {
+      pred_transformer &m_pt;
+        
+      /// level formulas
+      vector<expr_ref_vector>      m_levels;  
+      /// map property to level where it occurs.
+      obj_map<expr, unsigned>      m_prop2level;      
+      /// properties that are invariant.
+      expr_ref_vector              m_invariants;      
+        
+      void simplify_formulas (tactic& tac, expr_ref_vector& v);
+        
+    public:
+      legacy_frames (pred_transformer &pt) : 
+      m_pt(pt), m_invariants (m_pt.get_ast_manager ()) {}
+      pred_transformer& pt () const {return m_pt;}
+      bool add_lemma (expr * lemma, unsigned level);
+      void get_frame_lemmas (unsigned level, expr_ref_vector &out)
       {
-        pred_transformer &m_pt;
+        if (is_infty_level (level)) out.append (m_invariants);
+        else if (level < m_levels.size ()) out.append (m_levels [level]);
+      }
         
-        /// level formulas
-        vector<expr_ref_vector>      m_levels;  
-        /// map property to level where it occurs.
-        obj_map<expr, unsigned>      m_prop2level;      
-        /// properties that are invariant.
-        expr_ref_vector              m_invariants;      
+      void get_frame_geq_lemmas (unsigned level, expr_ref_vector &out);
+      void add_frame () {m_levels.push_back (expr_ref_vector (m_pt.get_ast_manager ()));}
         
-        void simplify_formulas (tactic& tac, expr_ref_vector& v);
-        
-      public:
-        legacy_frames (pred_transformer &pt) : 
-          m_pt(pt), m_invariants (m_pt.get_ast_manager ()) {}
-        pred_transformer& pt () const {return m_pt;}
-        bool add_lemma (expr * lemma, unsigned level);
-        void get_frame_lemmas (unsigned level, expr_ref_vector &out)
-        {
-          if (is_infty_level (level)) out.append (m_invariants);
-          else if (level < m_levels.size ()) out.append (m_levels [level]);
-        }
-        
-        void get_frame_geq_lemmas (unsigned level, expr_ref_vector &out);
-        void add_frame () {m_levels.push_back (expr_ref_vector (m_pt.get_ast_manager ()));}
-        
-        unsigned size () const {return m_levels.size ();}
-        unsigned lemma_size () const {return m_prop2level.size ();}
+      unsigned size () const {return m_levels.size ();}
+      unsigned lemma_size () const {return m_prop2level.size ();}
         
         
-        void propagate_to_infinity (unsigned level);
-        bool propagate_to_next_level (unsigned level);
+      void propagate_to_infinity (unsigned level);
+      bool propagate_to_next_level (unsigned level);
         
-        void simplify_formulas ();
+      void simplify_formulas ();
         
-        void inherit_frames (legacy_frames& other);
+      void inherit_frames (legacy_frames& other);
         
-      };
+    };
       
-      class frames
+    class frames
+    {
+      class lemma
       {
-        class lemma
-        {
-          ast_manager &m;
-          expr_ref m_fml;
-          unsigned m_lvl;
+        ast_manager &m;
+        expr_ref m_fml;
+        unsigned m_lvl;
           
-        public:
-          lemma (ast_manager &manager, expr * fml, unsigned lvl) : 
-            m(manager), m_fml (fml, m), m_lvl(lvl) {}
+      public:
+        lemma (ast_manager &manager, expr * fml, unsigned lvl) : 
+        m(manager), m_fml (fml, m), m_lvl(lvl) {}
           
-          lemma (const lemma &other) 
-            : m(other.m), m_fml (other.m_fml), m_lvl (other.m_lvl) {}
+        lemma (const lemma &other) 
+          : m(other.m), m_fml (other.m_fml), m_lvl (other.m_lvl) {}
           
-          lemma& operator= (lemma other) 
+        lemma& operator= (lemma other) 
           {swap (*this, other); return *this;}
           
           
-          expr * get () const {return m_fml.get ();}
-          unsigned level () const {return m_lvl;}
-          void set_level (unsigned lvl) { m_lvl = lvl;}
+        expr * get () const {return m_fml.get ();}
+        unsigned level () const {return m_lvl;}
+        void set_level (unsigned lvl) { m_lvl = lvl;}
           
-          friend void swap (lemma &a, lemma &b)
-          {
-            using std::swap;
-            SASSERT (&a.m == &b.m);
-            swap (a.m_fml, b.m_fml);
-            swap (a.m_lvl, b.m_lvl);
-          }
-        };
+        friend void swap (lemma &a, lemma &b)
+        {
+          using std::swap;
+          SASSERT (&a.m == &b.m);
+          swap (a.m_fml, b.m_fml);
+          swap (a.m_lvl, b.m_lvl);
+        }
+      };
         
-        struct lemmas_lt_proc : 
-          public std::binary_function<const lemma&, const lemma &, bool>
+      struct lemmas_lt_proc : 
+        public std::binary_function<const lemma&, const lemma &, bool>
         {
           bool operator() (const lemma &a, const lemma &b)
           {
@@ -192,221 +192,221 @@ namespace spacer {
           }
         };
 
-        pred_transformer &m_pt;
-        vector<lemma> m_lemmas;
-        unsigned m_size;
+      pred_transformer &m_pt;
+      vector<lemma> m_lemmas;
+      unsigned m_size;
         
-        bool m_sorted;
-        lemmas_lt_proc m_lt;
+      bool m_sorted;
+      lemmas_lt_proc m_lt;
         
-        void sort ();
+      void sort ();
         
-      public:
-        frames (pred_transformer &pt) : m_pt (pt), m_size(0), m_sorted (true) {}
-        void simplify_formulas ();
-        
-        pred_transformer& pt () {return m_pt;}
-        
-        
-        void get_frame_lemmas (unsigned level, expr_ref_vector &out)
-        {
-          for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
-            if (m_lemmas[i].level () == level) out.push_back (m_lemmas[i].get ());
-        }
-        void get_frame_geq_lemmas (unsigned level, expr_ref_vector &out)
-        {
-          for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
-            if (m_lemmas [i].level () >= level) out.push_back (m_lemmas[i].get ());
-        }
-        
-        
-        unsigned size () const {return m_size;}
-        unsigned lemma_size () const {return m_lemmas.size ();}
-        void add_frame () {m_size++;}
-        void inherit_frames (frames &other)
-        {
-          for (unsigned i = 0, sz = other.m_lemmas.size (); i < sz; ++i)
-            add_lemma (other.m_lemmas [i].get (), other.m_lemmas [i].level ());
-          m_sorted = false;
-        }
-        
-        bool add_lemma (expr * lemma, unsigned level);
-        void propagate_to_infinity (unsigned level);
-        bool propagate_to_next_level (unsigned level);
-        
-        
-      };
-      
-        
-
-        typedef obj_map<datalog::rule const, expr*> rule2expr;
-        typedef obj_map<datalog::rule const, ptr_vector<app> > rule2apps;
-
-        manager&                     pm;        // spacer-manager
-        ast_manager&                 m;         // manager
-        context&                     ctx;
-        
-        func_decl_ref                m_head;    // predicate 
-        func_decl_ref_vector         m_sig;     // signature
-        ptr_vector<pred_transformer> m_use;     // places where 'this' is referenced.
-        ptr_vector<datalog::rule>    m_rules;   // rules used to derive transformer
-        prop_solver                  m_solver;  // solver context
-        scoped_ptr<smt_context>      m_reach_ctx; // context for reachability facts
-        legacy_frames                m_frames;
-      
-        reach_fact_ref_vector        m_reach_facts; // reach facts
-        /// Number of initial reachability facts
-        unsigned                     m_rf_init_sz;
-        obj_map<expr, datalog::rule const*> m_tag2rule; // map tag predicate to rule. 
-        rule2expr                    m_rule2tag;        // map rule to predicate tag.
-        rule2inst                    m_rule2inst;       // map rules to instantiations of indices
-        rule2expr                    m_rule2transition; // map rules to transition 
-        rule2apps                    m_rule2vars;       // map rule to auxiliary variables
-        expr_ref                     m_transition;      // transition relation.
-        expr_ref                     m_initial_state;   // initial state.
-        app_ref                      m_extend_lit;      // literal to extend initial state
-        bool                         m_all_init;        // true if the pt has no uninterpreted body in any rule
-        //reachable_cache              m_reachable; 
-        ptr_vector<func_decl>        m_predicates;
-        stats                        m_stats;
-      
-        /// Auxiliary variables to represent different disjunctive
-        /// cases of must summaries. Stored over 'n' (a.k.a. new)
-        /// versions of the variables
-        expr_ref_vector              m_reach_case_vars; 
-      
-
-      /// evaluate v in a model
-      expr_ref eval (model_evaluator &mev, expr * v);
-      
-        void init_sig();
-        void ensure_level(unsigned level);
-        void add_lemma_core (expr *lemma, unsigned lvl);
-        void add_lemma_from_child (pred_transformer &child, expr *lemma, unsigned lvl);
-      
-        void mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result);
-
-        // Initialization
-        void init_rules(decl2rel const& pts, expr_ref& init, expr_ref& transition);
-        void init_rule(decl2rel const& pts, datalog::rule const& rule, vector<bool>& is_init,                                      
-                       ptr_vector<datalog::rule const>& rules, expr_ref_vector& transition);
-        void init_atom(decl2rel const& pts, app * atom, app_ref_vector& var_reprs, expr_ref_vector& conj, unsigned tail_idx);
-
-        void simplify_formulas(tactic& tac, expr_ref_vector& fmls);
-
-        // Debugging
-        bool check_filled(app_ref_vector const& v) const;
-        
-        void add_premises(decl2rel const& pts, unsigned lvl, datalog::rule& rule, expr_ref_vector& r);
-
-        expr* mk_fresh_reach_case_var ();
-
     public:
-        pred_transformer(context& ctx, manager& pm, func_decl* head);
-        ~pred_transformer();
-
-      
-        reach_fact *get_reach_fact (expr *v)
-        {
-          for (unsigned i = 1, sz = m_reach_facts.size (); i < sz; ++i)
-            if (v == m_reach_facts [i]->get ()) return m_reach_facts[i];
-          return NULL;
-        }
-      
-        void add_rule(datalog::rule* r) { m_rules.push_back(r); }
-        void add_use(pred_transformer* pt) { if (!m_use.contains(pt)) m_use.insert(pt); }
-        void initialize(decl2rel const& pts);
-
-        func_decl* head() const { return m_head; }
-        ptr_vector<datalog::rule> const& rules() const { return m_rules; }
-        func_decl* sig(unsigned i) const { return m_sig[i]; } // signature 
-        func_decl* const* sig() { return m_sig.c_ptr(); }
-        unsigned  sig_size() const { return m_sig.size(); }
-        expr*  transition() const { return m_transition; }
-        expr*  initial_state() const { return m_initial_state; }
-        expr*  rule2tag(datalog::rule const* r) { return m_rule2tag.find(r); }
-        unsigned get_num_levels() { return m_frames.size (); }
-        expr_ref get_cover_delta(func_decl* p_orig, int level);
-        void     add_cover(unsigned level, expr* property);
-        expr* get_reach ();
-
-        std::ostream& display(std::ostream& strm) const;
-
-        void collect_statistics(statistics& st) const;
-        void reset_statistics();
-
-        bool is_must_reachable (expr* state, model_ref* model = 0);
-        /// \brief Returns reachability fact active in the given model
-        reach_fact *get_used_reach_fact (model_evaluator& mev);
-        /// \brief Returns reachability fact active in the origin of the given model
-        reach_fact* get_used_origin_reach_fact (model_evaluator &mev, unsigned oidx);
-        expr_ref get_origin_summary (model_evaluator &mev, 
-                                     unsigned level, unsigned oidx, bool must,
-                                     const ptr_vector<app> **aux);
-
-        void remove_predecessors(expr_ref_vector& literals);
-        void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
-        void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
-        datalog::rule const* find_rule(model &mev, bool& is_concrete, 
-                                       vector<bool>& reach_pred_used, 
-                                       unsigned& num_reuse_reach);
-        expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
-        ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }
-
-        bool propagate_to_next_level(unsigned level);
-        void propagate_to_infinity(unsigned level);
-        /// \brief  Add a lemma to the current context and all users
-        void add_lemma (expr * lemma, unsigned lvl);
-        expr* get_reach_case_var (unsigned idx) const;
-      bool has_reach_facts () const { return !m_reach_facts.empty () ;}
-      
-        /// initialize reachability facts using initial rules
-        void init_reach_facts ();
-        void add_reach_fact (reach_fact &fact);  // add reachability fact
-        expr* get_last_reach_fact () const { return m_reach_facts.back ()->get (); }
-        expr* get_last_reach_case_var () const;
-      
-
-        lbool is_reachable(model_node& n, expr_ref_vector* core, model_ref *model,
-                           unsigned& uses_level, bool& is_concrete, 
-                           datalog::rule const*& r, 
-                           vector<bool>& reach_pred_used, 
-                           unsigned& num_reuse_reach);
-        bool is_invariant(unsigned level, expr* co_state, 
-                          unsigned& solver_level, expr_ref_vector* core = 0);
-        bool check_inductive(unsigned level, expr_ref_vector& state, 
-                             unsigned& assumes_level);
-
-        expr_ref get_formulas(unsigned level, bool add_axioms);
-
-        void simplify_formulas();
-
-        expr_ref get_propagation_formula(decl2rel const& pts, unsigned level);
-
-        context& get_context () const {return ctx;} 
-        manager& get_manager() const { return pm; }
-        ast_manager& get_ast_manager() const { return m; }
-
-        void add_premises(decl2rel const& pts, unsigned lvl, expr_ref_vector& r);
-
-        void close(expr* e);
-
-        app_ref_vector& get_inst(datalog::rule const* r) { return *m_rule2inst.find(r);}
-
-        void inherit_properties(pred_transformer& other);
-
-      void ground_free_vars(expr* e, app_ref_vector& vars, ptr_vector<app>& aux_vars, 
-                            bool is_init);
-
-        prop_solver& get_solver() { return m_solver; }
-
-      /// \brief Adds a given expression to the set of initial rules
-      app* extend_initial (expr *e);
-      
-      /// \brief Returns true if the obligation is already blocked by current lemmas
-      bool is_blocked (model_node &n, unsigned &uses_level);
-      
+      frames (pred_transformer &pt) : m_pt (pt), m_size(0), m_sorted (true) {}
+      void simplify_formulas ();
+        
+      pred_transformer& pt () {return m_pt;}
+        
+        
+      void get_frame_lemmas (unsigned level, expr_ref_vector &out)
+      {
+        for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
+          if (m_lemmas[i].level () == level) out.push_back (m_lemmas[i].get ());
+      }
+      void get_frame_geq_lemmas (unsigned level, expr_ref_vector &out)
+      {
+        for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
+          if (m_lemmas [i].level () >= level) out.push_back (m_lemmas[i].get ());
+      }
+        
+        
+      unsigned size () const {return m_size;}
+      unsigned lemma_size () const {return m_lemmas.size ();}
+      void add_frame () {m_size++;}
+      void inherit_frames (frames &other)
+      {
+        for (unsigned i = 0, sz = other.m_lemmas.size (); i < sz; ++i)
+          add_lemma (other.m_lemmas [i].get (), other.m_lemmas [i].level ());
+        m_sorted = false;
+      }
+        
+      bool add_lemma (expr * lemma, unsigned level);
+      void propagate_to_infinity (unsigned level);
+      bool propagate_to_next_level (unsigned level);
+        
+        
     };
+      
+        
+
+    typedef obj_map<datalog::rule const, expr*> rule2expr;
+    typedef obj_map<datalog::rule const, ptr_vector<app> > rule2apps;
+
+    manager&                     pm;        // spacer-manager
+    ast_manager&                 m;         // manager
+    context&                     ctx;
+        
+    func_decl_ref                m_head;    // predicate 
+    func_decl_ref_vector         m_sig;     // signature
+    ptr_vector<pred_transformer> m_use;     // places where 'this' is referenced.
+    ptr_vector<datalog::rule>    m_rules;   // rules used to derive transformer
+    prop_solver                  m_solver;  // solver context
+    scoped_ptr<smt_context>      m_reach_ctx; // context for reachability facts
+    legacy_frames                m_frames;
+      
+    reach_fact_ref_vector        m_reach_facts; // reach facts
+    /// Number of initial reachability facts
+    unsigned                     m_rf_init_sz;
+    obj_map<expr, datalog::rule const*> m_tag2rule; // map tag predicate to rule. 
+    rule2expr                    m_rule2tag;        // map rule to predicate tag.
+    rule2inst                    m_rule2inst;       // map rules to instantiations of indices
+    rule2expr                    m_rule2transition; // map rules to transition 
+    rule2apps                    m_rule2vars;       // map rule to auxiliary variables
+    expr_ref                     m_transition;      // transition relation.
+    expr_ref                     m_initial_state;   // initial state.
+    app_ref                      m_extend_lit;      // literal to extend initial state
+    bool                         m_all_init;        // true if the pt has no uninterpreted body in any rule
+    //reachable_cache              m_reachable; 
+    ptr_vector<func_decl>        m_predicates;
+    stats                        m_stats;
+      
+    /// Auxiliary variables to represent different disjunctive
+    /// cases of must summaries. Stored over 'n' (a.k.a. new)
+    /// versions of the variables
+    expr_ref_vector              m_reach_case_vars; 
+      
+
+    /// evaluate v in a model
+    expr_ref eval (model_evaluator &mev, expr * v);
+      
+    void init_sig();
+    void ensure_level(unsigned level);
+    void add_lemma_core (expr *lemma, unsigned lvl);
+    void add_lemma_from_child (pred_transformer &child, expr *lemma, unsigned lvl);
+      
+    void mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result);
+
+    // Initialization
+    void init_rules(decl2rel const& pts, expr_ref& init, expr_ref& transition);
+    void init_rule(decl2rel const& pts, datalog::rule const& rule, vector<bool>& is_init,                                      
+                   ptr_vector<datalog::rule const>& rules, expr_ref_vector& transition);
+    void init_atom(decl2rel const& pts, app * atom, app_ref_vector& var_reprs, expr_ref_vector& conj, unsigned tail_idx);
+
+    void simplify_formulas(tactic& tac, expr_ref_vector& fmls);
+
+    // Debugging
+    bool check_filled(app_ref_vector const& v) const;
+        
+    void add_premises(decl2rel const& pts, unsigned lvl, datalog::rule& rule, expr_ref_vector& r);
+
+    expr* mk_fresh_reach_case_var ();
+
+  public:
+    pred_transformer(context& ctx, manager& pm, func_decl* head);
+    ~pred_transformer();
+
+      
+    reach_fact *get_reach_fact (expr *v)
+    {
+      for (unsigned i = 1, sz = m_reach_facts.size (); i < sz; ++i)
+        if (v == m_reach_facts [i]->get ()) return m_reach_facts[i];
+      return NULL;
+    }
+      
+    void add_rule(datalog::rule* r) { m_rules.push_back(r); }
+    void add_use(pred_transformer* pt) { if (!m_use.contains(pt)) m_use.insert(pt); }
+    void initialize(decl2rel const& pts);
+
+    func_decl* head() const { return m_head; }
+    ptr_vector<datalog::rule> const& rules() const { return m_rules; }
+    func_decl* sig(unsigned i) const { return m_sig[i]; } // signature 
+    func_decl* const* sig() { return m_sig.c_ptr(); }
+    unsigned  sig_size() const { return m_sig.size(); }
+    expr*  transition() const { return m_transition; }
+    expr*  initial_state() const { return m_initial_state; }
+    expr*  rule2tag(datalog::rule const* r) { return m_rule2tag.find(r); }
+    unsigned get_num_levels() { return m_frames.size (); }
+    expr_ref get_cover_delta(func_decl* p_orig, int level);
+    void     add_cover(unsigned level, expr* property);
+    expr* get_reach ();
+
+    std::ostream& display(std::ostream& strm) const;
+
+    void collect_statistics(statistics& st) const;
+    void reset_statistics();
+
+    bool is_must_reachable (expr* state, model_ref* model = 0);
+    /// \brief Returns reachability fact active in the given model
+    reach_fact *get_used_reach_fact (model_evaluator& mev);
+    /// \brief Returns reachability fact active in the origin of the given model
+    reach_fact* get_used_origin_reach_fact (model_evaluator &mev, unsigned oidx);
+    expr_ref get_origin_summary (model_evaluator &mev, 
+                                 unsigned level, unsigned oidx, bool must,
+                                 const ptr_vector<app> **aux);
+
+    void remove_predecessors(expr_ref_vector& literals);
+    void find_predecessors(datalog::rule const& r, ptr_vector<func_decl>& predicates) const;
+    void find_predecessors(vector<std::pair<func_decl*, unsigned> >& predicates) const;
+    datalog::rule const* find_rule(model &mev, bool& is_concrete, 
+                                   vector<bool>& reach_pred_used, 
+                                   unsigned& num_reuse_reach);
+    expr* get_transition(datalog::rule const& r) { return m_rule2transition.find(&r); }
+    ptr_vector<app>& get_aux_vars(datalog::rule const& r) { return m_rule2vars.find(&r); }
+
+    bool propagate_to_next_level(unsigned level);
+    void propagate_to_infinity(unsigned level);
+    /// \brief  Add a lemma to the current context and all users
+    void add_lemma (expr * lemma, unsigned lvl);
+    expr* get_reach_case_var (unsigned idx) const;
+    bool has_reach_facts () const { return !m_reach_facts.empty () ;}
+      
+    /// initialize reachability facts using initial rules
+    void init_reach_facts ();
+    void add_reach_fact (reach_fact &fact);  // add reachability fact
+    expr* get_last_reach_fact () const { return m_reach_facts.back ()->get (); }
+    expr* get_last_reach_case_var () const;
+      
+
+    lbool is_reachable(model_node& n, expr_ref_vector* core, model_ref *model,
+                       unsigned& uses_level, bool& is_concrete, 
+                       datalog::rule const*& r, 
+                       vector<bool>& reach_pred_used, 
+                       unsigned& num_reuse_reach);
+    bool is_invariant(unsigned level, expr* co_state, 
+                      unsigned& solver_level, expr_ref_vector* core = 0);
+    bool check_inductive(unsigned level, expr_ref_vector& state, 
+                         unsigned& assumes_level);
+
+    expr_ref get_formulas(unsigned level, bool add_axioms);
+
+    void simplify_formulas();
+
+    expr_ref get_propagation_formula(decl2rel const& pts, unsigned level);
+
+    context& get_context () const {return ctx;} 
+    manager& get_manager() const { return pm; }
+    ast_manager& get_ast_manager() const { return m; }
+
+    void add_premises(decl2rel const& pts, unsigned lvl, expr_ref_vector& r);
+
+    void close(expr* e);
+
+    app_ref_vector& get_inst(datalog::rule const* r) { return *m_rule2inst.find(r);}
+
+    void inherit_properties(pred_transformer& other);
+
+    void ground_free_vars(expr* e, app_ref_vector& vars, ptr_vector<app>& aux_vars, 
+                          bool is_init);
+
+    prop_solver& get_solver() { return m_solver; }
+
+    /// \brief Adds a given expression to the set of initial rules
+    app* extend_initial (expr *e);
+      
+    /// \brief Returns true if the obligation is already blocked by current lemmas
+    bool is_blocked (model_node &n, unsigned &uses_level);
+      
+  };
 
   typedef ref<model_node> model_node_ref;
   
@@ -438,11 +438,11 @@ namespace spacer {
 
   public:
     model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
-      m_ref_count (0),
+    m_ref_count (0),
       m_parent (parent), m_pt (pt), 
       m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth),
       m_open (true), m_use_farkas (true)
-    {if (m_parent) m_parent->add_child (*this);}
+      {if (m_parent) m_parent->add_child (*this);}
     
     ~model_node() {if (m_parent) m_parent->erase_child (*this);}
     
@@ -510,39 +510,39 @@ namespace spacer {
 
   struct model_node_lt : 
     public std::binary_function<const model_node*, const model_node*, bool>
-  {
-    bool operator() (const model_node *pn1, const model_node *pn2) const
     {
-      SASSERT (pn1);
-      SASSERT (pn2);
-      const model_node& n1 = *pn1; 
-      const model_node& n2 = *pn2;
+      bool operator() (const model_node *pn1, const model_node *pn2) const
+      {
+        SASSERT (pn1);
+        SASSERT (pn2);
+        const model_node& n1 = *pn1; 
+        const model_node& n2 = *pn2;
       
-      if (n1.level () < n2.level ()) return true;
-      if (n1.level () > n2.level ()) return false;
+        if (n1.level () < n2.level ()) return true;
+        if (n1.level () > n2.level ()) return false;
       
-      if (n1.depth () < n2.depth ()) return true;
-      if (n1.depth () > n2.depth ()) return false;
+        if (n1.depth () < n2.depth ()) return true;
+        if (n1.depth () > n2.depth ()) return false;
       
-      return &n1 < &n2;
-    }
-  };
+        return &n1 < &n2;
+      }
+    };
   
   struct model_node_gt : 
     public std::binary_function<const model_node*, const model_node*, bool>
-  {
-    model_node_lt lt;
-    bool operator() (const model_node *n1, const model_node *n2) const
-    {return lt(n2, n1);}
-  };    
+    {
+      model_node_lt lt;
+      bool operator() (const model_node *n1, const model_node *n2) const
+      {return lt(n2, n1);}
+    };    
   
   struct model_node_ref_gt :
     public std::binary_function<const model_node_ref&, const model_ref &, bool>
-  {
-    model_node_gt gt;
-    bool operator() (const model_node_ref &n1, const model_node_ref &n2) const
-    {return gt (n1.get (), n2.get ());} 
-  };
+    {
+      model_node_gt gt;
+      bool operator() (const model_node_ref &n1, const model_node_ref &n2) const
+      {return gt (n1.get (), n2.get ());} 
+    };
     
   
   /**
@@ -622,10 +622,10 @@ namespace spacer {
     unsigned m_min_depth;
     
     std::priority_queue<model_node_ref, std::vector<model_node_ref>, 
-                        model_node_ref_gt>     m_obligations;
+      model_node_ref_gt>     m_obligations;
       
   public:
-    model_search(): m_root(NULL), m_max_level(0), m_min_depth(0) {}
+  model_search(): m_root(NULL), m_max_level(0), m_min_depth(0) {}
     ~model_search();
 
     void reset();
@@ -654,175 +654,175 @@ namespace spacer {
   };
 
 
-    // 'state' is unsatisfiable at 'level' with 'core'. 
-    // Minimize or weaken core.
-    class core_generalizer {
-    protected:
-        context& m_ctx;
-    public:
-        typedef vector<std::pair<expr_ref_vector,unsigned> > cores;
-        core_generalizer(context& ctx): m_ctx(ctx) {}
-        virtual ~core_generalizer() {}
-        virtual void operator()(model_node& n, expr_ref_vector& core, unsigned& uses_level) = 0;
-        virtual void operator()(model_node& n, expr_ref_vector const& core, unsigned uses_level, cores& new_cores) {
-            new_cores.push_back(std::make_pair(core, uses_level));
-            if (!core.empty()) {
-                (*this)(n, new_cores.back().first, new_cores.back().second);
-            }
-        }
-        virtual void collect_statistics(statistics& st) const {}
-        virtual void reset_statistics() {}
+  // 'state' is unsatisfiable at 'level' with 'core'. 
+  // Minimize or weaken core.
+  class core_generalizer {
+  protected:
+    context& m_ctx;
+  public:
+    typedef vector<std::pair<expr_ref_vector,unsigned> > cores;
+  core_generalizer(context& ctx): m_ctx(ctx) {}
+    virtual ~core_generalizer() {}
+    virtual void operator()(model_node& n, expr_ref_vector& core, unsigned& uses_level) = 0;
+    virtual void operator()(model_node& n, expr_ref_vector const& core, unsigned uses_level, cores& new_cores) {
+      new_cores.push_back(std::make_pair(core, uses_level));
+      if (!core.empty()) {
+        (*this)(n, new_cores.back().first, new_cores.back().second);
+      }
+    }
+    virtual void collect_statistics(statistics& st) const {}
+    virtual void reset_statistics() {}
+  };
+
+
+  // AK: need to clean this up!
+  class context {
+
+    struct stats {
+      unsigned m_num_queries;
+      unsigned m_num_reach_queries;
+      unsigned m_num_reuse_reach;
+      unsigned m_max_query_lvl;
+      unsigned m_max_depth;
+      stats() { reset(); }
+      void reset() { memset(this, 0, sizeof(*this)); }
     };
-
-
-    // AK: need to clean this up!
-    class context {
-
-        struct stats {
-            unsigned m_num_queries;
-            unsigned m_num_reach_queries;
-            unsigned m_num_reuse_reach;
-            unsigned m_max_query_lvl;
-            unsigned m_max_depth;
-            stats() { reset(); }
-            void reset() { memset(this, 0, sizeof(*this)); }
-        };
         
-        smt_params&    m_fparams;
-        fixedpoint_params const&    m_params;
-        ast_manager&         m;
-        datalog::context*    m_context;
-        manager              m_pm;  
-        decl2rel             m_rels;         // Map from relation predicate to fp-operator.       
-        func_decl_ref        m_query_pred;
-        pred_transformer*    m_query;
-        mutable model_search m_search;
-        lbool                m_last_result;
-        unsigned             m_inductive_lvl;
-        unsigned             m_expanded_lvl;
-        ptr_vector<core_generalizer>  m_core_generalizers;
-        stats                m_stats;
-        volatile bool        m_cancel;
-        model_converter_ref  m_mc;
-        proof_converter_ref  m_pc;
+    smt_params&    m_fparams;
+    fixedpoint_params const&    m_params;
+    ast_manager&         m;
+    datalog::context*    m_context;
+    manager              m_pm;  
+    decl2rel             m_rels;         // Map from relation predicate to fp-operator.       
+    func_decl_ref        m_query_pred;
+    pred_transformer*    m_query;
+    mutable model_search m_search;
+    lbool                m_last_result;
+    unsigned             m_inductive_lvl;
+    unsigned             m_expanded_lvl;
+    ptr_vector<core_generalizer>  m_core_generalizers;
+    stats                m_stats;
+    volatile bool        m_cancel;
+    model_converter_ref  m_mc;
+    proof_converter_ref  m_pc;
         
-        // Functions used by search.
-        lbool solve_core (unsigned from_lvl = 0);
-        bool check_reachability ();        
-        bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
-                       unsigned full_prop_lvl);
-        lbool expand_node(model_node& n);
-        lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 
-                           unsigned& uses_level, bool& is_concrete, 
-                           datalog::rule const*& r, vector<bool>& reach_pred_used, 
-                           unsigned& num_reuse_reach);
-        reach_fact *mk_reach_fact (model_node& n, model_evaluator &mev, 
-                                   datalog::rule const& r);
-        void create_children(model_node& n, datalog::rule const& r, model_evaluator &model, 
-                             const vector<bool>& reach_pred_used);
-        expr_ref mk_sat_answer() const;
-        expr_ref mk_unsat_answer() const;
+    // Functions used by search.
+    lbool solve_core (unsigned from_lvl = 0);
+    bool check_reachability ();        
+    bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
+                   unsigned full_prop_lvl);
+    lbool expand_node(model_node& n);
+    lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 
+                       unsigned& uses_level, bool& is_concrete, 
+                       datalog::rule const*& r, vector<bool>& reach_pred_used, 
+                       unsigned& num_reuse_reach);
+    reach_fact *mk_reach_fact (model_node& n, model_evaluator &mev, 
+                               datalog::rule const& r);
+    void create_children(model_node& n, datalog::rule const& r, model_evaluator &model, 
+                         const vector<bool>& reach_pred_used);
+    expr_ref mk_sat_answer() const;
+    expr_ref mk_unsat_answer() const;
 
-        // Generate inductive property
-        void get_level_property(unsigned lvl, expr_ref_vector& res, 
-                                vector<relation_info> & rs) const;
+    // Generate inductive property
+    void get_level_property(unsigned lvl, expr_ref_vector& res, 
+                            vector<relation_info> & rs) const;
 
 
-        // Initialization
-        class classifier_proc;
-        void init_core_generalizers(datalog::rule_set& rules);
+    // Initialization
+    class classifier_proc;
+    void init_core_generalizers(datalog::rule_set& rules);
 
-        bool check_invariant(unsigned lvl);
-        bool check_invariant(unsigned lvl, func_decl* fn);
+    bool check_invariant(unsigned lvl);
+    bool check_invariant(unsigned lvl, func_decl* fn);
 
-        void checkpoint();
+    void checkpoint();
 
-        void init_rules(datalog::rule_set& rules, decl2rel& transformers);
+    void init_rules(datalog::rule_set& rules, decl2rel& transformers);
 
-        void simplify_formulas();
+    void simplify_formulas();
 
-        void reset_core_generalizers();
+    void reset_core_generalizers();
 
-        bool validate();
+    bool validate();
 
-    public:       
+  public:       
         
-        /**
-           Initial values of predicates are stored in corresponding relations in dctx.
+    /**
+       Initial values of predicates are stored in corresponding relations in dctx.
            
-           We check whether there is some reachable state of the relation checked_relation.
-        */
-        context(
+       We check whether there is some reachable state of the relation checked_relation.
+    */
+    context(
             smt_params&        fparams,
             fixedpoint_params const&  params,
             ast_manager&       m);
 
-        ~context();
+    ~context();
         
-        smt_params&       get_fparams() const { return m_fparams; }
-        fixedpoint_params const& get_params() const { return m_params; }
-        ast_manager&      get_ast_manager() const { return m; }
-        manager&          get_manager() { return m_pm; }
-        decl2rel const&   get_pred_transformers() const { return m_rels; }
-        pred_transformer& get_pred_transformer(func_decl* p) const 
-        { return *m_rels.find(p); }
-        datalog::context& get_datalog_context() const 
-        { SASSERT(m_context); return *m_context; }
-        expr_ref          get_answer();
-        /**
-         * get bottom-up (from query) sequence of ground predicate instances
-         * (for e.g. P(0,1,0,0,3)) that together form a ground derivation to query
-         */
-        expr_ref          get_ground_sat_answer ();
+    smt_params&       get_fparams() const { return m_fparams; }
+    fixedpoint_params const& get_params() const { return m_params; }
+    ast_manager&      get_ast_manager() const { return m; }
+    manager&          get_manager() { return m_pm; }
+    decl2rel const&   get_pred_transformers() const { return m_rels; }
+    pred_transformer& get_pred_transformer(func_decl* p) const 
+      { return *m_rels.find(p); }
+    datalog::context& get_datalog_context() const 
+      { SASSERT(m_context); return *m_context; }
+    expr_ref          get_answer();
+    /**
+     * get bottom-up (from query) sequence of ground predicate instances
+     * (for e.g. P(0,1,0,0,3)) that together form a ground derivation to query
+     */
+    expr_ref          get_ground_sat_answer ();
 
-        bool              is_dl() const { return m_fparams.m_arith_mode == AS_DIFF_LOGIC; }
-        bool              is_utvpi() const { return m_fparams.m_arith_mode == AS_UTVPI; }
+    bool              is_dl() const { return m_fparams.m_arith_mode == AS_DIFF_LOGIC; }
+    bool              is_utvpi() const { return m_fparams.m_arith_mode == AS_UTVPI; }
 
-        void collect_statistics(statistics& st) const;
-        void reset_statistics();
+    void collect_statistics(statistics& st) const;
+    void reset_statistics();
 
-        std::ostream& display(std::ostream& strm) const;        
+    std::ostream& display(std::ostream& strm) const;        
 
-        void display_certificate(std::ostream& strm) const;
+    void display_certificate(std::ostream& strm) const;
 
-        lbool solve(unsigned from_lvl = 0);
+    lbool solve(unsigned from_lvl = 0);
 
-        lbool solve_from_lvl (unsigned from_lvl);
+    lbool solve_from_lvl (unsigned from_lvl);
 
-        void cancel();
+    void cancel();
 
-        void cleanup();
+    void cleanup();
 
-        void reset();
+    void reset();
 
-        void set_query(func_decl* q) { m_query_pred = q; }
+    void set_query(func_decl* q) { m_query_pred = q; }
 
-        void set_unsat() { m_last_result = l_false; }
+    void set_unsat() { m_last_result = l_false; }
 
-        void set_model_converter(model_converter_ref& mc) { m_mc = mc; }
+    void set_model_converter(model_converter_ref& mc) { m_mc = mc; }
 
-        void get_rules_along_trace (datalog::rule_ref_vector& rules);
+    void get_rules_along_trace (datalog::rule_ref_vector& rules);
 
-        model_converter_ref get_model_converter() { return m_mc; }
+    model_converter_ref get_model_converter() { return m_mc; }
 
-        void set_proof_converter(proof_converter_ref& pc) { m_pc = pc; }
+    void set_proof_converter(proof_converter_ref& pc) { m_pc = pc; }
 
-        void update_rules(datalog::rule_set& rules);
+    void update_rules(datalog::rule_set& rules);
 
-        void set_axioms(expr* axioms) { m_pm.set_background(axioms); }
+    void set_axioms(expr* axioms) { m_pm.set_background(axioms); }
 
-        unsigned get_num_levels(func_decl* p);
+    unsigned get_num_levels(func_decl* p);
 
-        expr_ref get_cover_delta(int level, func_decl* p_orig, func_decl* p);
+    expr_ref get_cover_delta(int level, func_decl* p_orig, func_decl* p);
 
-        void add_cover(int level, func_decl* pred, expr* property);
+    void add_cover(int level, func_decl* pred, expr* property);
 
-        model_ref get_model();
+    model_ref get_model();
 
-        proof_ref get_proof() const;
+    proof_ref get_proof() const;
 
-        model_node& get_root() const { return m_search.get_root(); }
-    };
+    model_node& get_root() const { return m_search.get_root(); }
+  };
 
 };
 
