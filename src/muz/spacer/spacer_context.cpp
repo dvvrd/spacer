@@ -237,7 +237,9 @@ namespace spacer {
                 if (is_concrete) break;
             }
         }
-        SASSERT (r);
+        // SASSERT (r);
+        // reached by a reachability fact
+        if (!r) is_concrete = true;
         return r;
     }
 
@@ -411,7 +413,16 @@ namespace spacer {
       expr_ref fml (m);
       
       if (!m_reach_case_vars.empty ()) last_var = m_reach_case_vars.back ();
-      new_var = mk_fresh_reach_case_var ();
+      if (fact.is_init () || !ctx.get_params ().spacer_reach_as_init ())
+        new_var = mk_fresh_reach_case_var ();
+      else
+      {
+        new_var = extend_initial (fact.get ())->get_arg (0);
+        m_reach_case_vars.push_back (new_var);
+      }
+      
+      SASSERT (m_reach_facts.size () == m_reach_case_vars.size ());
+      
       if (last_var)
         fml = m.mk_or (m.mk_not (last_var), fact.get (), new_var);
       else
