@@ -787,6 +787,7 @@ namespace spacer {
         {
           fact = alloc (reach_fact, m, m_rule2transition.find (r),
                         get_aux_vars (*r), true);
+          fact->set_rule (*r);
           add_reach_fact (*fact);
         }
       }
