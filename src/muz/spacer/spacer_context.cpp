@@ -154,10 +154,12 @@ namespace spacer {
     return res;
   }
   
-  reach_fact* pred_transformer::get_used_reach_fact (model_evaluator& mev) {
+  reach_fact* pred_transformer::get_used_reach_fact (model_evaluator& mev,
+                                                     bool all) {
     expr_ref v (m);
     
-    for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
+    for (unsigned i = all ? 0 : m_rf_init_sz, sz = m_reach_case_vars.size ();
+         i < sz; i++) {
       v = mev.eval (m_reach_case_vars.get (i));
       if (m.is_false (v)) {
         return m_reach_facts.get (i);
@@ -235,7 +237,9 @@ namespace spacer {
         if (is_concrete) break;
       }
     }
-    SASSERT (r);
+        // SASSERT (r);
+        // reached by a reachability fact
+        if (!r) is_concrete = true;
     return r;
   }
 
@@ -409,7 +413,16 @@ namespace spacer {
     expr_ref fml (m);
       
     if (!m_reach_case_vars.empty ()) last_var = m_reach_case_vars.back ();
+      if (fact.is_init () || !ctx.get_params ().spacer_reach_as_init ())
     new_var = mk_fresh_reach_case_var ();
+      else
+      {
+        new_var = extend_initial (fact.get ())->get_arg (0);
+        m_reach_case_vars.push_back (new_var);
+      }
+      
+      SASSERT (m_reach_facts.size () == m_reach_case_vars.size ());
+      
     if (last_var)
       fml = m.mk_or (m.mk_not (last_var), fact.get (), new_var);
     else
@@ -774,6 +787,7 @@ namespace spacer {
           {
             fact = alloc (reach_fact, m, m_rule2transition.find (r),
                           get_aux_vars (*r), true);
+          fact->set_rule (*r);
             add_reach_fact (*fact);
           }
       }
@@ -1444,7 +1458,7 @@ namespace spacer {
     
     // find must summary used
     
-    reach_fact *rf = pt.get_used_reach_fact (mev);
+    reach_fact *rf = pt.get_used_reach_fact (mev, true);
     
     // get an implicant of the summary
     expr_ref_vector u(m), lits (m);
@@ -1991,6 +2005,10 @@ namespace spacer {
     catch (unknown_exception) 
       {}
         
+    if (m_last_result == l_true) {
+        m_stats.m_cex_depth = get_cex_depth ();
+    }
+        
     if (m_params.print_statistics ()) {
       statistics st;
       collect_statistics (st);
@@ -2015,6 +2033,77 @@ namespace spacer {
     }
   }
 
+    unsigned context::get_cex_depth () {
+        if (m_last_result != l_true) {
+          IF_VERBOSE(1, 
+                     verbose_stream () 
+                     << "Trace unavailable when result is false\n";);
+            return 0;
+        }
+
+        // treat the following as queues: read from left to right and insert at right
+        ptr_vector<func_decl> preds;
+        ptr_vector<pred_transformer> pts;
+        reach_fact_ref_vector facts;
+
+        // temporary
+        reach_fact* fact;
+        datalog::rule const* r;
+        pred_transformer* pt;
+
+        // get and discard query rule
+        fact = m_query->get_last_reach_fact ();
+        r = fact->get_rule ();
+
+        unsigned cex_depth = 0;
+
+        // initialize queues
+        // assume that the query is only on a single predicate
+        // (i.e. disallow fancy queries for now)
+        facts.append (fact->get_justifications ());
+        if (facts.size () != 1) 
+        {
+          // XXX AG: Escape if an assertion is about to fail
+          IF_VERBOSE(1, 
+                     verbose_stream () << 
+                     "Warning: counterexample is trivial or non-existent\n";);
+          return cex_depth;
+        }
+        SASSERT (facts.size () == 1);
+        m_query->find_predecessors (*r, preds);
+        SASSERT (preds.size () == 1);
+        pts.push_back (&(get_pred_transformer (preds[0])));
+
+        pts.push_back (NULL); // cex depth marker
+
+        // bfs traversal of the query derivation tree
+        for (unsigned curr = 0; curr < pts.size (); curr++) {
+            // get current pt and fact
+            pt = pts.get (curr);
+            // check for depth marker
+            if (pt == NULL) {
+                ++cex_depth;
+                // insert new marker if there are pts at higher depth
+                if (curr + 1 < pts.size ()) pts.push_back (NULL);
+                continue;
+            }
+            fact = facts.get (curr - cex_depth); // discount the number of markers
+            // get rule justifying the derivation of fact at pt
+            r = fact->get_rule ();
+            TRACE ("spacer",
+                    tout << "next rule: " << r->name ().str () << "\n";
+                  );
+            // add child facts and pts
+            facts.append (fact->get_justifications ());
+            pt->find_predecessors (*r, preds);
+            for (unsigned j = 0; j < preds.size (); j++) {
+                pts.push_back (&(get_pred_transformer (preds[j])));
+            }
+        }
+
+        return cex_depth;
+    }
+
   /**
      \brief retrieve answer.
   */
@@ -2038,7 +2127,7 @@ namespace spacer {
     pred_transformer* pt;
 
     // get and discard query rule
-    fact = m_query->get_reach_fact (m.mk_true ());
+        fact = m_query->get_last_reach_fact ();
     r = fact->get_rule ();
 
     // initialize queues
@@ -2136,7 +2225,7 @@ namespace spacer {
     datalog::rule const* r;
 
     // get and discard query rule
-    reach_fact = m_query->get_reach_fact (m.mk_true ());
+        reach_fact = m_query->get_last_reach_fact ();
     r = reach_fact->get_rule ();
 
     // initialize queues
@@ -2795,6 +2884,7 @@ namespace spacer {
     st.update("SPACER max query lvl", m_stats.m_max_query_lvl);
     st.update("SPACER max depth", m_stats.m_max_depth);
     st.update("SPACER inductive level", m_inductive_lvl);
+        st.update("SPACER cex depth", m_stats.m_cex_depth);
     m_pm.collect_statistics(st);
 
     for (unsigned i = 0; i < m_core_generalizers.size(); ++i) {
@@ -2808,6 +2898,7 @@ namespace spacer {
     verbose_stream () << "BRUNCH_STAT num_reach_reuse " << m_stats.m_num_reuse_reach << "\n";
     verbose_stream () << "BRUNCH_STAT inductive_lvl " << m_inductive_lvl << "\n";
     verbose_stream () << "BRUNCH_STAT max_depth " << m_stats.m_max_depth << "\n";
+        verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_cex_depth << "\n";
   }
 
   void context::reset_statistics() {

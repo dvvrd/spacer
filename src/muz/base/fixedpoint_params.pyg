@@ -157,6 +157,7 @@ def_module_params('fixedpoint',
                           ('pdr.skip_propagate', BOOL, False, "Skip propagate/pushing phase. Turns PDR into a BMC that returns either reachable or unknown"),
                           ('pdr.max_level', UINT, UINT_MAX, "Maximum level to explore"),
                           ('spacer.elim_aux', BOOL, True, "Eliminate auxiliary variables in reachability facts"),
+                          ('spacer.reach_as_init', BOOL, True, "Extend initial rules with computed reachability facts"),
                           ))
 
 

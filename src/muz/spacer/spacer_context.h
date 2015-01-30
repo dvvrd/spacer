@@ -308,7 +308,7 @@ namespace spacer {
       
     reach_fact *get_reach_fact (expr *v)
     {
-      for (unsigned i = 1, sz = m_reach_facts.size (); i < sz; ++i)
+          for (unsigned i = 0, sz = m_reach_facts.size (); i < sz; ++i)
         if (v == m_reach_facts [i]->get ()) return m_reach_facts[i];
       return NULL;
     }
@@ -337,7 +337,8 @@ namespace spacer {
 
     bool is_must_reachable (expr* state, model_ref* model = 0);
     /// \brief Returns reachability fact active in the given model
-    reach_fact *get_used_reach_fact (model_evaluator& mev);
+        /// all determines whether initial reachability facts are included as well
+        reach_fact *get_used_reach_fact (model_evaluator& mev, bool all = true);
     /// \brief Returns reachability fact active in the origin of the given model
     reach_fact* get_used_origin_reach_fact (model_evaluator &mev, unsigned oidx);
     expr_ref get_origin_summary (model_evaluator &mev, 
@@ -363,7 +364,7 @@ namespace spacer {
     /// initialize reachability facts using initial rules
     void init_reach_facts ();
     void add_reach_fact (reach_fact &fact);  // add reachability fact
-    expr* get_last_reach_fact () const { return m_reach_facts.back ()->get (); }
+        reach_fact* get_last_reach_fact () const { return m_reach_facts.back (); }
     expr* get_last_reach_case_var () const;
       
 
@@ -684,6 +685,7 @@ namespace spacer {
       unsigned m_num_reuse_reach;
       unsigned m_max_query_lvl;
       unsigned m_max_depth;
+            unsigned m_cex_depth;
       stats() { reset(); }
       void reset() { memset(this, 0, sizeof(*this)); }
     };
@@ -744,6 +746,8 @@ namespace spacer {
     void reset_core_generalizers();
 
     bool validate();
+
+        unsigned get_cex_depth ();
 
   public:       
         
