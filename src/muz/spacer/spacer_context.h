@@ -709,7 +709,7 @@ namespace spacer {
     proof_converter_ref  m_pc;
         
     // Functions used by search.
-    lbool solve_core (unsigned from_lvl = 0);
+    lbool solve_core (unsigned from_lvl = 0, bool prepare_only = false);
     bool check_reachability ();        
     bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
                    unsigned full_prop_lvl);
@@ -789,7 +789,7 @@ namespace spacer {
 
     void display_certificate(std::ostream& strm) const;
 
-    lbool solve(unsigned from_lvl = 0);
+    lbool solve(unsigned from_lvl = 0, bool prepare_only = false);
 
     lbool solve_from_lvl (unsigned from_lvl);
 

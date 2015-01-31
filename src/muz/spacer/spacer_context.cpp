@@ -1974,10 +1974,16 @@ namespace spacer {
     }        
   }
 
-  lbool context::solve(unsigned from_lvl) {
+  lbool context::solve(unsigned from_lvl, bool prepare_only) {
     m_last_result = l_undef;
     try {
-      m_last_result = solve_core (from_lvl);
+      //-- do main solving
+      m_last_result = solve_core (from_lvl, prepare_only);
+
+      //-- if we were just preparing to solve
+      if(prepare_only) return m_last_result;
+
+      //-- otherwise, do post-processing of result
       if (m_last_result == l_false)
         {
           simplify_formulas();
@@ -2325,10 +2331,13 @@ namespace spacer {
   }
 
   ///this is where everything starts
-  lbool context::solve_core (unsigned from_lvl) 
+  lbool context::solve_core (unsigned from_lvl, bool prepare_only) 
   {
     //if there is no query predicate, abort
     if (!m_rels.find(m_query_pred, m_query)) return l_false;
+
+    //-- if preparing only, we are done
+    if(prepare_only) return l_true;
 
     unsigned lvl = from_lvl;
       

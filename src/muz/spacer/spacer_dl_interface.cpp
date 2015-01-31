@@ -255,7 +255,7 @@ lbool dl_interface::prepare_query(expr * query) {
     return l_false;
   }
         
-  return l_true;
+  return m_context->solve(0, true);
 }
 
 lbool dl_interface::query_from_lvl (expr * query, unsigned lvl) {
