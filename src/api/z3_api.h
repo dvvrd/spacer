@@ -5970,6 +5970,17 @@ END_MLAPI_EXCLUDE
     */
     void Z3_API Z3_fixedpoint_pop(Z3_context c,Z3_fixedpoint d);
 
+    /*****************************************************************/
+    //-- begin API added for PSMC project
+    /*****************************************************************/
+
+    /**
+     * Prepare to solve a SMT2 query but don't do any actual
+     * solving. Return l_true on success and l_false on error. This
+     * function should always be called after loading a SMT2 file via
+     * Z3_fixedpoint_from_file().
+     */
+    Z3_lbool Z3_API Z3_fixedpoint_prepare_query(__in Z3_context c,__in Z3_fixedpoint d, __in Z3_ast query);
 #ifdef Conly
 
     /**

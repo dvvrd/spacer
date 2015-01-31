@@ -881,6 +881,23 @@ namespace datalog {
         return m_engine->query(query);
     }
 
+    //-- prepare to answer a query
+    lbool context::prepare_query(expr* query) {
+        m_mc = mk_skip_model_converter();
+        m_last_status = OK;
+        m_last_answer = 0;
+        m_last_ground_answer = 0;
+        switch (get_engine()) {
+        case SPACER_ENGINE:
+            flush_add_rules();
+            break;
+        default:
+            UNREACHABLE();
+        }
+        ensure_engine();
+        return m_engine->prepare_query(query);
+    }
+
     lbool context::query_from_lvl (expr* query, unsigned lvl) {
         m_mc = mk_skip_model_converter();
         m_last_status = OK;

@@ -509,6 +509,8 @@ namespace datalog {
 
         lbool query(expr* q);
 
+        lbool prepare_query(expr* q);
+
         lbool query_from_lvl (expr* q, unsigned lvl);
 
         /**
