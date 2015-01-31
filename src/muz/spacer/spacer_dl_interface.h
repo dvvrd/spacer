@@ -50,9 +50,19 @@ namespace spacer {
         
     lbool query(expr* query);
 
-    lbool prepare_query(expr* query);
-
     lbool query_from_lvl (expr* query, unsigned lvl);
+
+    /*****************************************************************/
+    //-- begin PSMC stuff
+    /*****************************************************************/
+
+    lbool prepare_query(expr* query);
+    lbool init_root();
+    lbool check_reachability();
+
+    /*****************************************************************/
+    //-- end PSMC stuff
+    /*****************************************************************/
 
     void cancel();
 

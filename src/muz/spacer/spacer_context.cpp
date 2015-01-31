@@ -2024,6 +2024,43 @@ namespace spacer {
     return m_last_result;
   }
 
+  /*******************************************************************/
+  //-- begin methods added for PSMC
+  /*******************************************************************/
+  
+  lbool context::init_root()
+  {
+    IF_VERBOSE(1, verbose_stream () << "init_root() called ...\n";);
+
+    //-- currently assuming that all searches start at level 0.
+    unsigned from_lvl = 0;
+
+    model_node *root = alloc (model_node, 0, *m_query, from_lvl, 0);
+    root->set_post (m.mk_true ());
+    m_search.set_root (*root);
+    return l_true;
+  }
+  
+  //-- do check reachability. return l_false if a CEX was detected,
+  //-- and l_true otherwise.
+  lbool context::check_reachability_psmc()
+  {
+    IF_VERBOSE(1, verbose_stream () << "check_reachability() called ...\n";);
+    checkpoint();
+
+    //-- currently assuming that all searches start at level 0.
+    unsigned lvl = 0;
+    m_expanded_lvl = lvl;
+    m_stats.m_max_query_lvl = lvl;
+
+    if (check_reachability()) return l_false;
+
+    return l_true;
+  }
+  
+  /*******************************************************************/
+  //-- end methods added for PSMC
+  /*******************************************************************/
 
   void context::cancel() {
     m_cancel = true;
@@ -2333,6 +2370,9 @@ namespace spacer {
   ///this is where everything starts
   lbool context::solve_core (unsigned from_lvl, bool prepare_only) 
   {
+    if(prepare_only)
+      IF_VERBOSE(1, verbose_stream () << "prepare_query() called ...\n";);
+
     //if there is no query predicate, abort
     if (!m_rels.find(m_query_pred, m_query)) return l_false;
 

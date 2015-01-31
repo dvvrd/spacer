@@ -49,11 +49,39 @@ namespace datalog {
             throw default_exception(std::string("operation is not supported for ") + m_name);
         }
         virtual lbool query(expr* q) = 0;
-        virtual lbool prepare_query(expr* q) { return l_undef; }
         virtual lbool query(unsigned num_rels, func_decl*const* rels) { return l_undef; }
         virtual lbool query_from_lvl (expr* q, unsigned lvl) {
             throw default_exception(std::string("operation is not supported for ") + m_name);
         }
+        
+        /*************************************************************/
+        //-- begin methods added for PSMC. we did not make them pure
+        //-- virtual since there are many other classes (e.g.,
+        //-- duality) that extend this class and they would not
+        //-- necessarily implement these methods. instead an error
+        //-- message will be printed and l_undef will be returned,
+        //-- which will trigger exception handling up the call chain.
+        /*************************************************************/
+
+        virtual lbool prepare_query(expr* q) { 
+          std::cout << "ERROR: prepare_query not implemented !!\n";
+          return l_undef; 
+        }
+
+        virtual lbool init_root() { 
+          std::cout << "ERROR: init_root not implemented !!\n";
+          return l_undef; 
+        }
+
+        virtual lbool check_reachability() { 
+          std::cout << "ERROR: check_reachability not implemented !!\n";
+          return l_undef; 
+        }
+
+        /*************************************************************/
+        //-- end methods added for PSMC
+        /*************************************************************/
+
 
         virtual void reset_statistics() {}
         virtual void display_profile(std::ostream& out) const {}

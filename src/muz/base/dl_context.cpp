@@ -898,6 +898,30 @@ namespace datalog {
         return m_engine->prepare_query(query);
     }
 
+    //-- initialize priority queue for check_reachability()
+    lbool context::init_root() {
+        switch (get_engine()) {
+        case SPACER_ENGINE:
+            break;
+        default:
+            UNREACHABLE();
+        }
+        ensure_engine();
+        return m_engine->init_root();
+    }
+
+    //-- check_reachability()
+    lbool context::check_reachability() {
+        switch (get_engine()) {
+        case SPACER_ENGINE:
+            break;
+        default:
+            UNREACHABLE();
+        }
+        ensure_engine();
+        return m_engine->check_reachability();
+    }
+
     lbool context::query_from_lvl (expr* query, unsigned lvl) {
         m_mc = mk_skip_model_converter();
         m_last_status = OK;

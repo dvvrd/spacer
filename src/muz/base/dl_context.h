@@ -509,9 +509,21 @@ namespace datalog {
 
         lbool query(expr* q);
 
-        lbool prepare_query(expr* q);
-
         lbool query_from_lvl (expr* q, unsigned lvl);
+
+        /*************************************************************/
+        //-- begin methods added for PSMC
+        /*************************************************************/
+
+        lbool prepare_query(expr* q);
+        lbool init_root();
+        lbool check_reachability();
+
+        /*************************************************************/
+        //-- end methods added for PSMC
+        /*************************************************************/
+
+
 
         /**
            \brief retrieve model from inductive invariant that shows query is unsat.

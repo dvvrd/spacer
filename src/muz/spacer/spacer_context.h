@@ -793,6 +793,17 @@ namespace spacer {
 
     lbool solve_from_lvl (unsigned from_lvl);
 
+    /*****************************************************************/
+    //-- begin methods added for PSMC
+    /*****************************************************************/
+
+    lbool init_root();
+    lbool check_reachability_psmc();
+
+    /*****************************************************************/
+    //-- end methods added for PSMC
+    /*****************************************************************/
+
     void cancel();
 
     void cleanup();

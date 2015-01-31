@@ -5982,6 +5982,20 @@ END_MLAPI_EXCLUDE
      * loading a SMT2 file via Z3_fixedpoint_from_file().
      */
     Z3_lbool Z3_API Z3_fixedpoint_prepare_query(__in Z3_context c,__in Z3_fixedpoint d, __in Z3_ast query);
+
+    /**
+     * Create root node for priority-queue based search. Should be
+     * called after Z3_fixedpoint_solve_prepare(). Return true on
+     * success and false on error.
+     */
+    Z3_lbool Z3_API Z3_fixedpoint_init_root(__in Z3_context c,__in Z3_fixedpoint d);
+
+    /**
+     * Call check_reachability() on backend engine. Should be called
+     * after Z3_fixedpoint_init_root(). Return Z3_FALSE if a CEX was
+     * found, and Z3_TRUE otherwise.
+     */
+    Z3_lbool Z3_API Z3_fixedpoint_check_reachability(__in Z3_context c,__in Z3_fixedpoint d);
 #ifdef Conly
 
     /**
