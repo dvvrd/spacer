@@ -5976,9 +5976,10 @@ END_MLAPI_EXCLUDE
 
     /**
      * Prepare to solve a SMT2 query but don't do any actual
-     * solving. Return l_true on success and l_false on error. This
-     * function should always be called after loading a SMT2 file via
-     * Z3_fixedpoint_from_file().
+     * solving. Return l_true on success and l_false if the problem is
+     * already solved during preparation (e.g., due to
+     * simplifications). This function should always be called after
+     * loading a SMT2 file via Z3_fixedpoint_from_file().
      */
     Z3_lbool Z3_API Z3_fixedpoint_prepare_query(__in Z3_context c,__in Z3_fixedpoint d, __in Z3_ast query);
 #ifdef Conly
