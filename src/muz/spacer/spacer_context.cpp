@@ -2064,9 +2064,9 @@ namespace spacer {
     IF_VERBOSE(1, verbose_stream () << "propagate() called ...\n";);
     checkpoint();
 
-    //-- currently assuming that all searches start at level 0.
-    unsigned lvl = 0;
-    if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
+    unsigned lvl = m_search.max_level ();
+    if (lvl > 0 && !get_params ().pdr_skip_propagate ())
+      if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
 
     return l_true;
   }
