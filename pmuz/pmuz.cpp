@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <iostream>
 extern "C" {
 #include "z3.h"
@@ -24,21 +25,42 @@ int main(int argc, char *argv[])
 
   //-- solve the problem
   Z3_ast query = Z3_ast_vector_get(ctx, queries, 0);
+
+#if 0
+  Z3_lbool res = Z3_fixedpoint_query(ctx, fxpt, query);
+  std::cout << "result = " << res << "\n";
+#else
   Z3_lbool res = Z3_fixedpoint_prepare_query(ctx, fxpt, query);
 
   //-- if problem already solved when preparing
-  if (res == Z3_FALSE)
+  if (res == Z3_L_FALSE) {
+    std::cout << "problem solved by simplification ...\n";
     std::cout << "result = " << res << "\n";
-  else {
-    res = Z3_fixedpoint_init_root(ctx, fxpt);
-    std::cout << "result = " << res << "\n";
-    res = Z3_fixedpoint_check_reachability(ctx, fxpt);
-    std::cout << "result = " << res << "\n";
-    res = Z3_fixedpoint_propagate(ctx, fxpt);
-    std::cout << "result = " << res << "\n";
-    res = Z3_fixedpoint_inc_level(ctx, fxpt);
-    std::cout << "result = " << res << "\n";
+  } else {
+    //-- initialize search
+    assert(Z3_fixedpoint_init_root(ctx, fxpt) == Z3_L_TRUE);
+
+    //-- keep doing strengthen and propagate till solution
+    for(;;) {
+      //-- strengthen
+      res = Z3_fixedpoint_check_reachability(ctx, fxpt);
+      if(res == Z3_L_FALSE) {
+        std::cout << "VERIFICATION FAILED\n";
+        break;
+      }
+
+      //-- propagate
+      res = Z3_fixedpoint_propagate(ctx, fxpt);
+      if(res == Z3_L_FALSE) {
+        std::cout << "VERIFICATION SUCCESSFUL\n";
+        break;
+      }
+
+      //-- add a frame
+      assert(Z3_fixedpoint_inc_level(ctx, fxpt) == Z3_L_TRUE);
+    }
   }
+#endif
 
   //-- cleanup
   Z3_fixedpoint_dec_ref (ctx, fxpt);
