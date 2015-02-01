@@ -751,4 +751,50 @@ extern "C" {
         return of_lbool(r);
         Z3_CATCH_RETURN(Z3_L_UNDEF);
     }
+
+    Z3_lbool Z3_API Z3_fixedpoint_propagate(Z3_context c,Z3_fixedpoint d) {
+        Z3_TRY;
+        //no logging
+        RESET_ERROR_CODE();
+        lbool r = l_undef;
+        cancel_eh<api::fixedpoint_context> eh(*to_fixedpoint_ref(d));
+        unsigned timeout = to_fixedpoint(d)->m_params.get_uint("timeout", mk_c(c)->get_timeout());
+        api::context::set_interruptable si(*(mk_c(c)), eh);        
+        {
+            scoped_timer timer(timeout, &eh);
+            try {
+                r = to_fixedpoint_ref(d)->ctx().propagate();
+            }
+            catch (z3_exception& ex) {
+                mk_c(c)->handle_exception(ex);
+                r = l_undef;
+            }
+            to_fixedpoint_ref(d)->ctx().cleanup();
+        }
+        return of_lbool(r);
+        Z3_CATCH_RETURN(Z3_L_UNDEF);
+    }
+
+    Z3_lbool Z3_API Z3_fixedpoint_inc_level(Z3_context c,Z3_fixedpoint d) {
+        Z3_TRY;
+        //no logging
+        RESET_ERROR_CODE();
+        lbool r = l_undef;
+        cancel_eh<api::fixedpoint_context> eh(*to_fixedpoint_ref(d));
+        unsigned timeout = to_fixedpoint(d)->m_params.get_uint("timeout", mk_c(c)->get_timeout());
+        api::context::set_interruptable si(*(mk_c(c)), eh);        
+        {
+            scoped_timer timer(timeout, &eh);
+            try {
+                r = to_fixedpoint_ref(d)->ctx().inc_level();
+            }
+            catch (z3_exception& ex) {
+                mk_c(c)->handle_exception(ex);
+                r = l_undef;
+            }
+            to_fixedpoint_ref(d)->ctx().cleanup();
+        }
+        return of_lbool(r);
+        Z3_CATCH_RETURN(Z3_L_UNDEF);
+    }
 };

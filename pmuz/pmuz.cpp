@@ -23,8 +23,22 @@ int main(int argc, char *argv[])
   std::cout << "number of queries = " << Z3_ast_vector_size(ctx, queries) << '\n';
 
   //-- solve the problem
-  bool res = Z3_fixedpoint_query(ctx, fxpt, Z3_ast_vector_get(ctx, queries, 0));
-  std::cout << "result = " << res << "\n";
+  Z3_ast query = Z3_ast_vector_get(ctx, queries, 0);
+  Z3_lbool res = Z3_fixedpoint_prepare_query(ctx, fxpt, query);
+
+  //-- if problem already solved when preparing
+  if (res == Z3_FALSE)
+    std::cout << "result = " << res << "\n";
+  else {
+    res = Z3_fixedpoint_init_root(ctx, fxpt);
+    std::cout << "result = " << res << "\n";
+    res = Z3_fixedpoint_check_reachability(ctx, fxpt);
+    std::cout << "result = " << res << "\n";
+    res = Z3_fixedpoint_propagate(ctx, fxpt);
+    std::cout << "result = " << res << "\n";
+    res = Z3_fixedpoint_inc_level(ctx, fxpt);
+    std::cout << "result = " << res << "\n";
+  }
 
   //-- cleanup
   Z3_fixedpoint_dec_ref (ctx, fxpt);

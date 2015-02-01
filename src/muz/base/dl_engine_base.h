@@ -78,6 +78,16 @@ namespace datalog {
           return l_undef; 
         }
 
+        virtual lbool propagate() { 
+          std::cout << "ERROR: propagate not implemented !!\n";
+          return l_undef; 
+        }
+
+        virtual lbool inc_level() { 
+          std::cout << "ERROR: inc_level not implemented !!\n";
+          return l_undef; 
+        }
+
         /*************************************************************/
         //-- end methods added for PSMC
         /*************************************************************/

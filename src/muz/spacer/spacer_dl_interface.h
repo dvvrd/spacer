@@ -59,6 +59,8 @@ namespace spacer {
     lbool prepare_query(expr* query);
     lbool init_root();
     lbool check_reachability();
+    lbool propagate();
+    lbool inc_level();
 
     /*****************************************************************/
     //-- end PSMC stuff

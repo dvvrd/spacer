@@ -2048,12 +2048,39 @@ namespace spacer {
     IF_VERBOSE(1, verbose_stream () << "check_reachability() called ...\n";);
     checkpoint();
 
-    //-- currently assuming that all searches start at level 0.
-    unsigned lvl = 0;
+    unsigned lvl = m_search.max_level ();
     m_expanded_lvl = lvl;
     m_stats.m_max_query_lvl = lvl;
 
     if (check_reachability()) return l_false;
+
+    return l_true;
+  }
+  
+  //-- do propagate. return l_false if a proof was detected, and
+  //-- l_true otherwise.
+  lbool context::propagate_psmc()
+  {
+    IF_VERBOSE(1, verbose_stream () << "propagate() called ...\n";);
+    checkpoint();
+
+    //-- currently assuming that all searches start at level 0.
+    unsigned lvl = 0;
+    if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
+
+    return l_true;
+  }
+  
+  //-- do inc_level. return l_false if an error happened, and l_true
+  //-- otherwise.
+  lbool context::inc_level()
+  {
+    IF_VERBOSE(1, verbose_stream () << "inc_level() called ...\n";);
+    checkpoint();
+
+    m_search.inc_level ();
+    unsigned lvl = m_search.max_level ();
+    m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
 
     return l_true;
   }

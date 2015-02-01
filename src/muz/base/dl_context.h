@@ -518,6 +518,8 @@ namespace datalog {
         lbool prepare_query(expr* q);
         lbool init_root();
         lbool check_reachability();
+        lbool propagate();
+        lbool inc_level();
 
         /*************************************************************/
         //-- end methods added for PSMC

@@ -922,6 +922,30 @@ namespace datalog {
         return m_engine->check_reachability();
     }
 
+    //-- propagate
+    lbool context::propagate() {
+        switch (get_engine()) {
+        case SPACER_ENGINE:
+            break;
+        default:
+            UNREACHABLE();
+        }
+        ensure_engine();
+        return m_engine->propagate();
+    }
+
+    //-- inc_level
+    lbool context::inc_level() {
+        switch (get_engine()) {
+        case SPACER_ENGINE:
+            break;
+        default:
+            UNREACHABLE();
+        }
+        ensure_engine();
+        return m_engine->inc_level();
+    }
+
     lbool context::query_from_lvl (expr* query, unsigned lvl) {
         m_mc = mk_skip_model_converter();
         m_last_status = OK;

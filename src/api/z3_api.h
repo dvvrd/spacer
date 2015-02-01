@@ -5985,8 +5985,8 @@ END_MLAPI_EXCLUDE
 
     /**
      * Create root node for priority-queue based search. Should be
-     * called after Z3_fixedpoint_solve_prepare(). Return true on
-     * success and false on error.
+     * called after Z3_fixedpoint_solve_prepare(). Return Z3_TRUE on
+     * success and Z3_FALSE on error.
      */
     Z3_lbool Z3_API Z3_fixedpoint_init_root(__in Z3_context c,__in Z3_fixedpoint d);
 
@@ -5996,6 +5996,25 @@ END_MLAPI_EXCLUDE
      * found, and Z3_TRUE otherwise.
      */
     Z3_lbool Z3_API Z3_fixedpoint_check_reachability(__in Z3_context c,__in Z3_fixedpoint d);
+
+    /**
+     * Call propagate() on backend engine. Should be called after
+     * Z3_fixedpoint_check_reachability(). Return Z3_FALSE if a proof
+     * was found, and Z3_TRUE otherwise.
+     */
+    Z3_lbool Z3_API Z3_fixedpoint_propagate(__in Z3_context c,__in Z3_fixedpoint d);
+
+    /**
+     * Call inc_level() on backend engine. Should be called after
+     * Z3_fixedpoint_propagate(). Return Z3_TRUE on success and
+     * Z3_FALSE on error.
+     */
+    Z3_lbool Z3_API Z3_fixedpoint_inc_level(__in Z3_context c,__in Z3_fixedpoint d);
+
+    /*****************************************************************/
+    //-- end API added for PSMC project
+    /*****************************************************************/
+
 #ifdef Conly
 
     /**

@@ -363,6 +363,16 @@ lbool dl_interface::check_reachability()
   return m_context->check_reachability_psmc();
 }
 
+lbool dl_interface::propagate() 
+{
+  return m_context->propagate_psmc();
+}
+
+lbool dl_interface::inc_level() 
+{
+  return m_context->inc_level();
+}
+
 /*********************************************************************/
 //-- end PSMC stuff
 /*********************************************************************/

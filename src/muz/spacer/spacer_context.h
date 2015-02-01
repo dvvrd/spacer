@@ -799,6 +799,8 @@ namespace spacer {
 
     lbool init_root();
     lbool check_reachability_psmc();
+    lbool propagate_psmc();
+    lbool inc_level();
 
     /*****************************************************************/
     //-- end methods added for PSMC
