@@ -3,6 +3,8 @@
 #include <string.h>
 #include <iostream>
 #include <string>
+#include <vector>
+#include <boost/lexical_cast.hpp>
 extern "C" {
 #include "z3.h"
 }
