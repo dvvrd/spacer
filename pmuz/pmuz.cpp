@@ -132,21 +132,20 @@ namespace pmuz
         //-- register relations
         for (int k = 0; k < nconjs-1; k++) {
           Z3_ast rule = Z3_get_app_arg(ctx, app, k);
+          //-- non quantified formula
           if(Z3_is_app(ctx, rule)) {
-            Z3_app x = Z3_to_app(ctx, rule);
-            Z3_func_decl fd = Z3_get_app_decl(ctx, x);
-            Z3_fixedpoint_register_relation(ctx, fxpt, fd);
+            Z3_func_decl rule_fd = Z3_get_app_decl(ctx, Z3_to_app(ctx, rule));
+            Z3_fixedpoint_register_relation(ctx, fxpt, rule_fd);
             continue;
           }
+          //-- quantified formulas
           assert(Z3_is_quantifier_forall(ctx, rule));
-          Z3_ast qbody = Z3_get_quantifier_body(ctx, rule);
-          Z3_app x = Z3_to_app(ctx, qbody);
-          assert(Z3_get_app_num_args(ctx,x) == 2);
-          Z3_ast head = Z3_get_app_arg(ctx, x, 1);
+          Z3_app qbody_app = Z3_to_app(ctx, Z3_get_quantifier_body(ctx, rule));
+          assert(Z3_get_app_num_args(ctx,qbody_app) == 2);
+          Z3_ast head = Z3_get_app_arg(ctx, qbody_app, 1);
           assert(Z3_is_app(ctx, head));
-          x = Z3_to_app(ctx, head);
-          Z3_func_decl fd = Z3_get_app_decl(ctx, x);
-          Z3_fixedpoint_register_relation(ctx, fxpt, fd);
+          Z3_func_decl head_fd = Z3_get_app_decl(ctx, Z3_to_app(ctx, head));
+          Z3_fixedpoint_register_relation(ctx, fxpt, head_fd);
         }
 
         //-- all but last assertion becomes rules
