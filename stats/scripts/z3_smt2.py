@@ -3,6 +3,7 @@
 import sys
 import stats
 import subprocess
+import os.path
 
 profiles = {
     ## skip propagation but drive the search as deep as possible
@@ -85,6 +86,10 @@ def parseArgs (argv):
     p.add_argument ('--no-z3', dest='no_z3',
                     help='stop before running z3', default=False,
                     action='store_true')
+    p.add_argument ('--cpu', dest='cpu', type=int,
+                    action='store', help='CPU time limit (seconds)', default=-1)
+    p.add_argument ('--mem', dest='mem', type=int,
+                    action='store', help='MEM limit (MB)', default=-1)   
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -218,8 +223,18 @@ def main (argv):
     if args.no_z3: return
 
     stat ('File', args.file)
+    stat ('base', os.path.basename (args.file))
     with stats.timer ('Query'):
-        popen = subprocess.Popen(z3_args.split (), stdout=subprocess.PIPE)
+        def set_limits ():
+            import resource as r    
+            if args.cpu > 0:
+                r.setrlimit (r.RLIMIT_CPU, [args.cpu, args.cpu])
+            if args.mem > 0:
+                mem_bytes = args.mem * 1024 * 1024
+                r.setrlimit (r.RLIMIT_AS, [mem_bytes, mem_bytes])
+                
+        popen = subprocess.Popen(z3_args.split (), stdout=subprocess.PIPE,
+                                 preexec_fn=set_limits)
         popen.wait()
         res = popen.stdout.read()
     if 'unsat' in res:
@@ -236,6 +251,9 @@ def main (argv):
     elif res == 'unsat':
         if args.smt2lib: stat ('Result', 'CEX')
         else: stat ('Result', 'SAFE')
+
+    # set returncode    
+    stat ('Status', popen.returncode)
     
 if __name__ == '__main__':
     try:
