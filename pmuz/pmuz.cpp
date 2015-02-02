@@ -24,6 +24,14 @@ namespace pmuz
   bool directQuery = false;
 
   /*******************************************************************/
+  //-- error handler
+  /*******************************************************************/
+  void pmuz_error_handler(Z3_context ctx, Z3_error_code ec)
+  {
+    std::cout << Z3_get_error_msg_ex (ctx, ec) << '\n';
+  }
+  
+  /*******************************************************************/
   //-- print usage and exit
   /*******************************************************************/
   void usage(char *cmd)
@@ -31,7 +39,7 @@ namespace pmuz
     std::cout << "Usage : " << cmd << " options\n";
     std::cout << "Options :\n";
     std::cout << "\t-dq             call query directly\n";
-    std::cout << "\t-idl            datalog format input file\n";
+    std::cout << "\t-idl            datalog format input file (default: HORN)\n";
     std::cout << "\tfoo.smt2        input file name\n";
     ::exit(30);
   }
@@ -62,6 +70,145 @@ namespace pmuz
     }
   }
   
+  /*******************************************************************/
+  //the parallel Mu-Z solver
+  /*******************************************************************/
+  class PMuz
+  {
+  private:
+    //-- the Z3 context, fixedpoint object, and query
+    Z3_context ctx;
+    Z3_fixedpoint fxpt;
+    Z3_ast query;
+
+  public:
+    //-- constructor
+    PMuz() : ctx(0), fxpt(0), query(0) {}
+    
+    //-- initialize the solver
+    void init()
+    {
+      //-- set parameters
+      Z3_global_param_set("verbose", "1");
+      Z3_global_param_set("fixedpoint.engine", "spacer");
+
+      //-- create context
+      Z3_config config = Z3_mk_config ();
+      ctx = Z3_mk_context (config);
+      Z3_del_config (config);
+      fxpt = Z3_mk_fixedpoint (ctx);
+      Z3_fixedpoint_inc_ref (ctx, fxpt);
+
+      //-- register error handler
+      Z3_set_error_handler (ctx, pmuz_error_handler);
+    }
+
+    //-- destroy the solver
+    void destroy()
+    {
+      Z3_fixedpoint_dec_ref (ctx, fxpt);
+      Z3_del_context (ctx);
+    }
+
+    //-- create the problem
+    void createProblem()
+    {
+      //-- if using datalog input
+      if(inputDatalog) {
+        Z3_ast_vector queries = Z3_fixedpoint_from_file (ctx, fxpt, inputFile.c_str());
+        std::cout << "number of queries = " << Z3_ast_vector_size(ctx, queries) << '\n';
+        query = Z3_ast_vector_get(ctx, queries, 0);
+      }
+      //-- if using HORN format
+      else {
+        //-- parse file to get list of assertions
+        std::cout << "parsing HORN file " << inputFile << '\n';
+        Z3_ast asserts = Z3_parse_smtlib2_file(ctx, inputFile.c_str(), 0, 0, 0, 0, 0, 0);
+        //-- add rules and query
+        Z3_app app = Z3_to_app(ctx, asserts);
+        int nconjs = Z3_get_app_num_args(ctx, app);
+        std::cout << "number of asserts = " << nconjs << '\n';
+
+        //-- register relations
+        for (int k = 0; k < nconjs-1; k++) {
+          Z3_ast rule = Z3_get_app_arg(ctx, app, k);
+          if(Z3_is_app(ctx, rule)) {
+            Z3_app x = Z3_to_app(ctx, rule);
+            Z3_func_decl fd = Z3_get_app_decl(ctx, x);
+            Z3_fixedpoint_register_relation(ctx, fxpt, fd);
+            continue;
+          }
+          assert(Z3_is_quantifier_forall(ctx, rule));
+          Z3_ast qbody = Z3_get_quantifier_body(ctx, rule);
+          Z3_app x = Z3_to_app(ctx, qbody);
+          assert(Z3_get_app_num_args(ctx,x) == 2);
+          Z3_ast head = Z3_get_app_arg(ctx, x, 1);
+          assert(Z3_is_app(ctx, head));
+          x = Z3_to_app(ctx, head);
+          Z3_func_decl fd = Z3_get_app_decl(ctx, x);
+          Z3_fixedpoint_register_relation(ctx, fxpt, fd);
+        }
+
+        //-- all but last assertion becomes rules
+        for (int k = 0; k < nconjs-1; k++) {
+          std::string rn = std::string("rule_") + boost::lexical_cast<std::string>(k); 
+          Z3_symbol ruleName = Z3_mk_string_symbol(ctx, rn.c_str());
+          Z3_fixedpoint_add_rule(ctx, fxpt, Z3_get_app_arg(ctx, app, k), ruleName);
+        }
+        //-- the last assertion must be of the form !q. and q becomes
+        //-- the query
+        Z3_app qapp = Z3_to_app(ctx, Z3_get_app_arg(ctx, app, nconjs-1));
+        assert(Z3_get_app_num_args(ctx, qapp) == 1);
+        query = Z3_get_app_arg(ctx, qapp, 0);
+      }
+    }
+    
+    //-- solver the problem
+    void solve()
+    {
+      //-- call query directly
+      if(directQuery) {
+        Z3_lbool res = Z3_fixedpoint_query(ctx, fxpt, query);
+        if(res == Z3_L_TRUE) std::cout << "VERIFICATION FAILED\n";
+        else if(res == Z3_L_FALSE) std::cout << "VERIFICATION SUCCESSFUL\n";
+        else std::cout << "VERIFICATION UNDEFINED\n";
+      }
+      //-- use exposed lowel-level IC3 API
+      else {
+        Z3_lbool res = Z3_fixedpoint_prepare_query(ctx, fxpt, query);
+
+        //-- if problem already solved when preparing
+        if (res == Z3_L_FALSE) {
+          std::cout << "problem solved by simplification ...\n";
+          std::cout << "VERIFICATION FAILED\n";
+        } else {
+          //-- initialize search
+          assert(Z3_fixedpoint_init_root(ctx, fxpt) == Z3_L_TRUE);
+
+          //-- keep doing strengthen and propagate till solution
+          for(;;) {
+            //-- strengthen
+            res = Z3_fixedpoint_check_reachability(ctx, fxpt);
+            if(res == Z3_L_FALSE) {
+              std::cout << "VERIFICATION FAILED\n";
+              break;
+            }
+
+            //-- propagate
+            res = Z3_fixedpoint_propagate(ctx, fxpt);
+            if(res == Z3_L_FALSE) {
+              std::cout << "VERIFICATION SUCCESSFUL\n";
+              break;
+            }
+
+            //-- add a frame
+            assert(Z3_fixedpoint_inc_level(ctx, fxpt) == Z3_L_TRUE);
+          }
+        }
+      }
+    }
+  };
+  
 } //namespace pmuz
 
 /*********************************************************************/
@@ -71,67 +218,13 @@ int main(int argc, char *argv[])
 {
   //-- parse options
   pmuz::parseOptions(argc, argv);
-  
-  //-- set parameters
-  Z3_global_param_set("verbose", "1");
-  Z3_global_param_set("fixedpoint.engine", "spacer");
 
-  //-- create context
-  Z3_config config = Z3_mk_config ();
-  Z3_context ctx = Z3_mk_context (config);
-  Z3_del_config (config);
-  Z3_fixedpoint fxpt = Z3_mk_fixedpoint (ctx);
-  Z3_fixedpoint_inc_ref (ctx, fxpt);
-
-  //-- load the problem from file
-  Z3_ast_vector queries = Z3_fixedpoint_from_file (ctx, fxpt, pmuz::inputFile.c_str());
-  std::cout << "number of queries = " << Z3_ast_vector_size(ctx, queries) << '\n';
-
-  //-- solve the problem
-  Z3_ast query = Z3_ast_vector_get(ctx, queries, 0);
-
-  //-- call query directly
-  if(pmuz::directQuery) {
-    Z3_lbool res = Z3_fixedpoint_query(ctx, fxpt, query);
-    std::cout << "result = " << res << "\n";
-  }
-  //-- use exposed lowel-level IC3 API
-  else {
-    Z3_lbool res = Z3_fixedpoint_prepare_query(ctx, fxpt, query);
-
-    //-- if problem already solved when preparing
-    if (res == Z3_L_FALSE) {
-      std::cout << "problem solved by simplification ...\n";
-      std::cout << "result = " << res << "\n";
-    } else {
-      //-- initialize search
-      assert(Z3_fixedpoint_init_root(ctx, fxpt) == Z3_L_TRUE);
-
-      //-- keep doing strengthen and propagate till solution
-      for(;;) {
-        //-- strengthen
-        res = Z3_fixedpoint_check_reachability(ctx, fxpt);
-        if(res == Z3_L_FALSE) {
-          std::cout << "VERIFICATION FAILED\n";
-          break;
-        }
-
-        //-- propagate
-        res = Z3_fixedpoint_propagate(ctx, fxpt);
-        if(res == Z3_L_FALSE) {
-          std::cout << "VERIFICATION SUCCESSFUL\n";
-          break;
-        }
-
-        //-- add a frame
-        assert(Z3_fixedpoint_inc_level(ctx, fxpt) == Z3_L_TRUE);
-      }
-    }
-  }
-
-  //-- cleanup
-  Z3_fixedpoint_dec_ref (ctx, fxpt);
-  Z3_del_context (ctx);
+  //-- solve
+  pmuz::PMuz pmuz;
+  pmuz.init();
+  pmuz.createProblem();
+  pmuz.solve();
+  pmuz.destroy();
 }
 
 /*********************************************************************/
