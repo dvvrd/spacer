@@ -88,6 +88,11 @@ namespace datalog {
           return l_undef; 
         }
 
+        virtual lbool process_result() { 
+          std::cout << "ERROR: process_result not implemented !!\n";
+          return l_undef; 
+        }
+
         /*************************************************************/
         //-- end methods added for PSMC
         /*************************************************************/

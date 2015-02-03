@@ -6011,6 +6011,14 @@ END_MLAPI_EXCLUDE
      */
     Z3_lbool Z3_API Z3_fixedpoint_inc_level(__in Z3_context c,__in Z3_fixedpoint d);
 
+    /**
+     * Do post-processing of result, e.g., print inductive invariant,
+     * collect and print statistics etc. Should be called after the
+     * problem has been solved. Return Z3_TRUE on success and Z3_FALSE
+     * on error.
+     */
+    Z3_lbool Z3_API Z3_fixedpoint_process_result(__in Z3_context c,__in Z3_fixedpoint d);
+
     /*****************************************************************/
     //-- end API added for PSMC project
     /*****************************************************************/

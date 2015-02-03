@@ -934,7 +934,7 @@ namespace datalog {
         return m_engine->propagate();
     }
 
-    //-- inc_level
+    //-- increase search depth
     lbool context::inc_level() {
         switch (get_engine()) {
         case SPACER_ENGINE:
@@ -944,6 +944,18 @@ namespace datalog {
         }
         ensure_engine();
         return m_engine->inc_level();
+    }
+
+    //-- process result
+    lbool context::process_result() {
+        switch (get_engine()) {
+        case SPACER_ENGINE:
+            break;
+        default:
+            UNREACHABLE();
+        }
+        ensure_engine();
+        return m_engine->process_result();
     }
 
     lbool context::query_from_lvl (expr* query, unsigned lvl) {

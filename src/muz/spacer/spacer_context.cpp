@@ -2052,11 +2052,14 @@ namespace spacer {
     m_expanded_lvl = lvl;
     m_stats.m_max_query_lvl = lvl;
 
-    if (check_reachability()) return l_false;
-
+    if (check_reachability()) {
+      m_last_result = l_true;
+      return l_false;
+    }
+    
     return l_true;
   }
-  
+
   //-- do propagate. return l_false if a proof was detected, and
   //-- l_true otherwise.
   lbool context::propagate_psmc()
@@ -2066,8 +2069,10 @@ namespace spacer {
 
     unsigned lvl = m_search.max_level ();
     if (lvl > 0 && !get_params ().pdr_skip_propagate ())
-      if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
-
+      if (propagate(m_expanded_lvl, lvl, UINT_MAX)) {
+        m_last_result = l_false;
+        return l_false;
+      }
     return l_true;
   }
   
@@ -2081,6 +2086,52 @@ namespace spacer {
     m_search.inc_level ();
     unsigned lvl = m_search.max_level ();
     m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
+
+    return l_true;
+  }
+  
+  //-- process the result of solving. return l_false if an error
+  //-- happened, and l_true otherwise.
+  lbool context::process_result()
+  {
+    IF_VERBOSE(1, verbose_stream () << "process_result() called ...\n";);
+    try {
+      if (m_last_result == l_false)
+        {
+          simplify_formulas();
+          m_last_result = l_false;
+          //TRACE("spacer",  display_certificate(tout););      
+          IF_VERBOSE(1, {
+              expr_ref_vector refs(m);
+              vector<relation_info> rs;
+              get_level_property(m_inductive_lvl, refs, rs);    
+              model_converter_ref mc;
+              inductive_property ex(m, mc, rs);
+              verbose_stream() << ex.to_string();
+            });
+            
+          // upgrade invariants that are known to be inductive.
+          // decl2rel::iterator it = m_rels.begin (), end = m_rels.end ();
+          // for (; m_inductive_lvl > 0 && it != end; ++it) {
+          //   if (it->m_value->head() != m_query_pred) {
+          //     it->m_value->propagate_to_infinity (m_inductive_lvl);	
+          //   }
+          // }
+        }            
+      VERIFY (validate ());
+    }
+    catch (unknown_exception) 
+      { return l_false; }
+        
+    if (m_last_result == l_true) {
+        m_stats.m_cex_depth = get_cex_depth ();
+    }
+        
+    if (m_params.print_statistics ()) {
+      statistics st;
+      collect_statistics (st);
+      st.display_smt2 (verbose_stream ());
+    }
 
     return l_true;
   }

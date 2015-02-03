@@ -210,6 +210,7 @@ namespace pmuz
             //-- strengthen
             res = Z3_fixedpoint_check_reachability(ctx, fxpt);
             if(res == Z3_L_FALSE) {
+              Z3_fixedpoint_process_result(ctx, fxpt);
               std::cout << "VERIFICATION FAILED\n";
               break;
             }
@@ -217,6 +218,7 @@ namespace pmuz
             //-- propagate
             res = Z3_fixedpoint_propagate(ctx, fxpt);
             if(res == Z3_L_FALSE) {
+              Z3_fixedpoint_process_result(ctx, fxpt);
               std::cout << "VERIFICATION SUCCESSFUL\n";
               break;
             }

@@ -520,6 +520,7 @@ namespace datalog {
         lbool check_reachability();
         lbool propagate();
         lbool inc_level();
+        lbool process_result();
 
         /*************************************************************/
         //-- end methods added for PSMC

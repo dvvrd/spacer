@@ -373,6 +373,11 @@ lbool dl_interface::inc_level()
   return m_context->inc_level();
 }
 
+lbool dl_interface::process_result() 
+{
+  return m_context->process_result();
+}
+
 /*********************************************************************/
 //-- end PSMC stuff
 /*********************************************************************/
