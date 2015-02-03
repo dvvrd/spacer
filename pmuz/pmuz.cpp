@@ -159,6 +159,8 @@ namespace pmuz
           //-- quantified formulas
           assert(Z3_is_quantifier_forall(ctx, rule));
           Z3_app qbody_app = Z3_to_app(ctx, Z3_get_quantifier_body(ctx, rule));
+          Z3_func_decl qbody_fd = Z3_get_app_decl(ctx, qbody_app);
+          assert(Z3_get_decl_kind(ctx, qbody_fd) == Z3_OP_IMPLIES);
           assert(Z3_get_app_num_args(ctx,qbody_app) == 2);
           Z3_ast head = Z3_get_app_arg(ctx, qbody_app, 1);
           assert(Z3_is_app(ctx, head));
