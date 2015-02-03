@@ -68,3 +68,6 @@ src/api/java/enumerations/*.java
 *.bak
 doc/api
 doc/code
+#Benchmarks and generated files for PSMC
+run/unstable
+test/svcomp13
