@@ -177,6 +177,7 @@ namespace pmuz
         //-- the last assertion must be of the form !q. and q becomes
         //-- the query
         Z3_app qapp = Z3_to_app(ctx, Z3_get_app_arg(ctx, app, nconjs-1));
+        assert(Z3_get_decl_kind(ctx, Z3_get_app_decl(ctx, qapp)) == Z3_OP_NOT);
         assert(Z3_get_app_num_args(ctx, qapp) == 1);
         query = Z3_get_app_arg(ctx, qapp, 0);
       }
