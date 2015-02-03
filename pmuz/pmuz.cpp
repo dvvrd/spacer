@@ -4,7 +4,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <set>
 #include <boost/lexical_cast.hpp>
+#include <boost/foreach.hpp>
 extern "C" {
 #include "z3.h"
 }
@@ -23,6 +25,10 @@ namespace pmuz
   //-- whether to use query directly
   bool directQuery = false;
 
+  //-- options to be passed to Z3
+  typedef std::pair<std::string,std::string> OptVal;
+  std::set<OptVal> z3Opts;
+
   /*******************************************************************/
   //-- error handler
   /*******************************************************************/
@@ -40,6 +46,7 @@ namespace pmuz
     std::cout << "Options :\n";
     std::cout << "\t-dq             call query directly\n";
     std::cout << "\t-idl            datalog format input file (default: HORN)\n";
+    std::cout << "\t-z3:x=y         option x=y to be passed to Z3\n";
     std::cout << "\tfoo.smt2        input file name\n";
     ::exit(30);
   }
@@ -58,7 +65,17 @@ namespace pmuz
     for(int i = 1;i < argc;++i) {
       if(!strcmp(argv[i],"-dq")) directQuery = true;
       else if(!strcmp(argv[i],"-idl")) inputDatalog = true;
-      else if(strstr(argv[i],".smt2") == argv[i] + (strlen(argv[i]) - 5)) {
+      else if(strstr(argv[i],"-z3:") == argv[i]) {
+        std::string optVal(argv[i]+4);
+        size_t pos = optVal.find('=');
+        if(pos == std::string::npos) {
+          std::cerr << "ERROR: illegal Z3 option : " << argv[i] << '\n';
+          usage(argv[0]);
+        }
+        std::string opt = optVal.substr(0,pos);
+        std::string val = optVal.substr(pos+1);
+        z3Opts.insert(OptVal(opt, val));        
+      } else if(strstr(argv[i],".smt2") == argv[i] + (strlen(argv[i]) - 5)) {
         if(!inputFile.empty()) {
           std::cerr << "ERROR: multiple inputs files : " << inputFile << ' ' << argv[i] << '\n';
           usage(argv[0]);
@@ -89,8 +106,9 @@ namespace pmuz
     void init()
     {
       //-- set parameters
-      Z3_global_param_set("verbose", "1");
       Z3_global_param_set("fixedpoint.engine", "spacer");
+      BOOST_FOREACH(const OptVal &ov, z3Opts)
+        Z3_global_param_set(ov.first.c_str(), ov.second.c_str());
 
       //-- create context
       Z3_config config = Z3_mk_config ();
