@@ -214,13 +214,14 @@ def compute_z3_args (args):
     return z3_args
 
 def main (argv):
+    returncode = 1
     args = parseArgs (argv[1:])
     stat ('Result', 'UNKNOWN')
 
     z3_args = compute_z3_args (args)
     print z3_args
 
-    if args.no_z3: return
+    if args.no_z3: return returncode
 
     stat ('File', args.file)
     stat ('base', os.path.basename (args.file))
@@ -235,7 +236,7 @@ def main (argv):
                 
         popen = subprocess.Popen(z3_args.split (), stdout=subprocess.PIPE,
                                  preexec_fn=set_limits)
-        popen.wait()
+        returncode = popen.wait()
         res = popen.stdout.read()
     if 'unsat' in res:
         res = 'unsat'
@@ -253,7 +254,9 @@ def main (argv):
         else: stat ('Result', 'SAFE')
 
     # set returncode    
-    stat ('Status', popen.returncode)
+    stat ('Status', returncode)
+
+    return returncode
     
 if __name__ == '__main__':
     try:
