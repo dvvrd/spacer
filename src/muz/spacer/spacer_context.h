@@ -747,7 +747,7 @@ namespace spacer {
 
     bool validate();
 
-        unsigned get_cex_depth ();
+    unsigned get_cex_depth ();
 
   public:       
         
