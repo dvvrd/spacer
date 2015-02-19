@@ -559,6 +559,46 @@ namespace eq {
                             largest_vinx = std::max(idx, largest_vinx); 
                             m_new_exprs.push_back(t);
                         }
+                        else if (false && !m.is_value (m_map[idx]))
+                        {
+                          // check if the new definition is simpler
+                          expr *old_def = m_map[idx];
+                          
+                          // -- prefer values 
+                          if (m.is_value (t))
+                          {
+	                    for (unsigned k = 0; k < i; ++k)
+			      if (m_pos2var[k] == idx) m_pos2var[k] = -1;
+        		    m_pos2var [i] = idx;
+                            m_map [idx] = t;
+                            m_new_exprs.push_back (t);
+                          }
+                          // -- prefer ground
+                          else if (is_app (t) && to_app (t)->is_ground () &&
+                                   (!is_app (old_def) || 
+                                    !to_app(old_def)->is_ground ()))
+                          {
+	                    for (unsigned k = 0; k < i; ++k)
+			      if (m_pos2var[k] == idx) m_pos2var[k] = -1;
+        		    m_pos2var [i] = idx;
+                            m_map [idx] = t;
+                            m_new_exprs.push_back (t);
+                          }
+                          // -- prefer constants
+                          else if (is_uninterp_const (t) 
+                                   /* && !is_uninterp_const (old_def) */)
+                          {
+	                    for (unsigned k = 0; k < i; ++k)
+			      if (m_pos2var[k] == idx) m_pos2var[k] = -1;
+        		    m_pos2var [i] = idx;
+                            m_map [idx] = t;
+                            m_new_exprs.push_back (t);
+                          }
+                          TRACE ("qe_def", 
+                                 tout << "Replacing definition of VAR " << idx << " from " 
+                                 << mk_pp (old_def, m) << " to " << mk_pp (t, m)
+                                 << " inferred from: " << mk_pp (args [i], m) << "\n";);
+                        }
                     }
                 }
             }
