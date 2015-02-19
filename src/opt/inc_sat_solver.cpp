@@ -56,6 +56,7 @@ class inc_sat_solver : public solver {
     expr_dependency_ref m_dep_core;
     expr_ref_vector     m_soft;
     vector<rational>    m_weights;
+    bool                m_soft_assumptions;
 
 
     typedef obj_map<expr, sat::literal> dep2asm_t;
@@ -69,7 +70,8 @@ public:
         m_map(m),
         m_num_scopes(0), 
         m_dep_core(m),
-        m_soft(m) {
+        m_soft(m),
+        m_soft_assumptions(false) {
         m_params.set_bool("elim_vars", false);
         m_solver.updt_params(m_params);
         params_ref simp2_p = p;
@@ -177,6 +179,7 @@ public:
         m_params = p;
         m_params.set_bool("elim_vars", false);
         m_solver.updt_params(m_params);
+        m_soft_assumptions = m_params.get_bool("soft_assumptions", false);
         m_optimize_model = m_params.get_bool("optimize_model", false);
     }    
     virtual void collect_statistics(statistics & st) const {
@@ -187,11 +190,11 @@ public:
         r.reset();
         r.append(m_core.size(), m_core.c_ptr());
     }
-    virtual void get_model(model_ref & m) {
+    virtual void get_model(model_ref & mdl) {
         if (!m_model.get()) {
             extract_model();
         }
-        m = m_model;
+        mdl = m_model;
     }
     virtual proof * get_proof() {
         UNREACHABLE();
@@ -328,10 +331,10 @@ private:
         }
         sat::literal_vector const& core = m_solver.get_core();
         TRACE("opt",
-              dep2asm_t::iterator it = dep2asm.begin();
-              dep2asm_t::iterator end = dep2asm.end();
-              for (; it != end; ++it) {
-                  tout << mk_pp(it->m_key, m) << " |-> " << sat::literal(it->m_value) << "\n";
+              dep2asm_t::iterator it2 = dep2asm.begin();
+              dep2asm_t::iterator end2 = dep2asm.end();
+              for (; it2 != end2; ++it2) {
+                  tout << mk_pp(it2->m_key, m) << " |-> " << sat::literal(it2->m_value) << "\n";
               }
               tout << "core: ";
               for (unsigned i = 0; i < core.size(); ++i) {
@@ -355,7 +358,7 @@ private:
         dep2asm_t::iterator it = dep2asm.begin(), end = dep2asm.end();
         for (; it != end; ++it) {
             sat::literal lit = it->m_value;
-            if (sat::value_at(lit, ll_m) != l_true) {
+            if (!m_soft_assumptions && sat::value_at(lit, ll_m) != l_true) {
                 IF_VERBOSE(0, verbose_stream() << mk_pp(it->m_key, m) << " does not evaluate to true\n";
                            verbose_stream() << m_asms << "\n";
                            m_solver.display_assignment(verbose_stream());

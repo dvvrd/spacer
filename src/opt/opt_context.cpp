@@ -474,8 +474,7 @@ namespace opt {
             return;
         }
         if (m_maxsat_engine != symbol("maxres") &&
-            m_maxsat_engine != symbol("mus-mss-maxres") &&
-            m_maxsat_engine != symbol("mss-maxres") &&
+            m_maxsat_engine != symbol("pd-maxres") &&
             m_maxsat_engine != symbol("bcd2") &&
             m_maxsat_engine != symbol("sls")) {
             return;
@@ -490,6 +489,13 @@ namespace opt {
         #pragma omp critical (opt_context)
         {
             m_solver = m_sat_solver.get();
+        }
+    }
+
+    void context::set_soft_assumptions() {
+        if (m_sat_solver.get()) {
+            m_params.set_bool("soft_assumptions", true);
+            m_sat_solver->updt_params(m_params);
         }
     }
 
