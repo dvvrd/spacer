@@ -78,6 +78,8 @@ VS_PAR=False
 VS_PAR_NUM=8
 GPROF=False
 GIT_HASH=False
+GASNET_ENABLED=False
+GASNET_ROOT=None
 
 def check_output(cmd):
     return str(subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]).rstrip('\r\n')
@@ -220,6 +222,33 @@ def test_openmp(cc):
     t.add('#include<omp.h>\nint main() { return omp_in_parallel() ? 1 : 0; }\n')
     t.commit()
     return exec_compiler_cmd([cc, CPPFLAGS, 'tstomp.cpp', LDFLAGS, '-fopenmp']) == 0
+
+def get_gastnet_cppflags(gasnetroot):
+    # Note: currently GASNet usage is hardcoded to par-sync build of the UDP conduit
+    cppflags = "-D GASNET_PARSYNC"
+    if gasnetroot is not None:
+        cppflags = "-I%s/include -I %s/include/udp-conduit %s" % (gasnetroot, gasnetroot, cppflags)
+    return cppflags
+
+def get_gasnet_ldflags(gasnetroot):
+    # Note: currently GASNet usage is hardcoded to par-sync build of the UDP conduit
+    ldflags = "-lrt"
+    if gasnetroot:
+        ldflags = "%s/lib/libgasnet-udp-parsync.a %s/lib/libamudp.a %s " % (gasnetroot, gasnetroot, ldflags)
+    else:
+        ldflags = "lgasnet-udp-parsync lamudp %s " % ldflags
+    return ldflags
+
+def test_gasnet(cc,gasnetroot):
+    if is_verbose():
+        print("Testing GASNet...")
+    t = TempFile('tstgasnet.cpp')
+    t.add('#include<gasnet.h>\nint main(int argc, char** argv) { return gasnet_init(&argc, &argv); }\n')
+    t.commit()
+    gasnetcppflags = get_gastnet_cppflags(gasnetroot)
+    gasnetldflags = get_gasnet_ldflags(gasnetroot)
+    return exec_compiler_cmd([cc, gasnetcppflags, 'tstgasnet.cpp', gasnetldflags, '-fopenmp']) == 0
+
 
 def find_jni_h(path):
     for root, dirs, files in os.walk(path):
@@ -446,6 +475,8 @@ def display_help(exit_code):
         print("  --parallel=num                use cl option /MP with 'num' parallel processes")
     print("  -b <sudir>, --build=<subdir>  subdirectory where Z3 will be built (default: build).")
     print("  --githash=hash                include the given hash in the binaries.")
+    print("  --enable-gasnet               Enable GASNet support for distributed Z3")
+    print("  --with-gasnet=<dir>           Enable GASNet and supply path to built GASNet distribution")
     print("  -d, --debug                   compile Z3 in debug mode.")
     print("  -t, --trace                   enable tracing in release mode.")
     if IS_WINDOWS:
@@ -476,12 +507,12 @@ def display_help(exit_code):
 # Parse configuration option for mk_make script
 def parse_options():
     global VERBOSE, DEBUG_MODE, IS_WINDOWS, VS_X64, ONLY_MAKEFILES, SHOW_CPPS, VS_PROJ, TRACE, VS_PAR, VS_PAR_NUM
-    global DOTNET_ENABLED, JAVA_ENABLED, STATIC_LIB, PREFIX, GMP, FOCI2, FOCI2LIB, PYTHON_PACKAGE_DIR, GPROF, GIT_HASH
+    global DOTNET_ENABLED, JAVA_ENABLED, STATIC_LIB, PREFIX, GMP, FOCI2, FOCI2LIB, PYTHON_PACKAGE_DIR, GPROF, GIT_HASH, GASNET_ENABLED, GASNET_ROOT
     try:
         options, remainder = getopt.gnu_getopt(sys.argv[1:],
                                                'b:df:sxhmcvtnp:gj',
                                                ['build=', 'debug', 'silent', 'x64', 'help', 'makefiles', 'showcpp', 'vsproj',
-                                                'trace', 'nodotnet', 'staticlib', 'prefix=', 'gmp', 'foci2=', 'java', 'parallel=', 'gprof',
+                                                'trace', 'nodotnet', 'staticlib', 'prefix=', 'gmp', 'foci2=', 'java', 'parallel=', 'gprof','with-gasnet=','enable-gasnet',
                                                 'githash='])
     except:
         print("ERROR: Invalid command line option")
@@ -535,6 +566,11 @@ def parse_options():
             GPROF = True
         elif opt == '--githash':
             GIT_HASH=arg
+        elif opt == '--enable-gasnet':
+            GASNET_ENABLED = True
+        elif opt == '--with-gasnet':
+            GASNET_ENABLED = True
+            GASNET_ROOT = arg
         else:
             print("ERROR: Invalid command line option '%s'" % opt)
             display_help(1)
@@ -1553,6 +1589,10 @@ def mk_config():
             SLIBEXTRAFLAGS = '%s -fopenmp' % SLIBEXTRAFLAGS
         else:
             CXXFLAGS = '%s -D_NO_OMP_' % CXXFLAGS
+        HAS_GASNET = GASNET_ENABLED and test_gasnet(CXX,GASNET_ROOT)
+        if HAS_GASNET:
+            CXXFLAGS = '%s %s' % (CXXFLAGS, get_gastnet_cppflags(GASNET_ROOT))
+            LDFLAGS  = '%s %s' % (LDFLAGS, get_gasnet_ldflags(GASNET_ROOT))
         if DEBUG_MODE:
             CXXFLAGS     = '%s -g -Wall' % CXXFLAGS
             EXAMP_DEBUG_FLAG = '-g'
@@ -1626,6 +1666,7 @@ def mk_config():
             print('C Compiler  :   %s' % CC)
             print('Arithmetic:     %s' % ARITH)
             print('OpenMP:         %s' % HAS_OMP)
+            print('GASNet:         %s' % HAS_GASNET)
             print('Prefix:         %s' % PREFIX)
             print('64-bit:         %s' % is64())
             if GPROF:
