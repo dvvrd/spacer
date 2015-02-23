@@ -51,6 +51,7 @@ Notes:
 #include "model_implicant.h"
 #include "expr_safe_replace.h"
 #include "model_pp.h"
+#include "z3_gasnet.h"
 
 namespace pdr {
 
@@ -2056,6 +2057,14 @@ namespace pdr {
             lvl++;
             m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
             IF_VERBOSE(1,verbose_stream() << "Entering level "<<lvl << "\n";);
+
+            //wait for all nodes of the job to finish this iteration
+            //this is just a straw-man for distributed capabilities and
+            //will be removed
+            Z3GASNET_CALL(IF_VERBOSE(1,verbose_stream() << "Node " << gasnet_mynode() << " syncronizing at lvl "<<lvl << "\n";););
+            Z3GASNET_CALL(gasnet_barrier_notify(0,0));
+            Z3GASNET_CHECKCALL(gasnet_barrier_wait(0,0));
+            Z3GASNET_CALL(IF_VERBOSE(1,verbose_stream() << "Node " << gasnet_mynode() << " syncronized at lvl "<<lvl << "\n";););
         }
     }
 
