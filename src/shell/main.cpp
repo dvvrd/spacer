@@ -35,6 +35,7 @@ Revision History:
 #include"error_codes.h"
 #include"gparams.h"
 #include"env_params.h"
+#include"z3_gasnet.h"
 
 typedef enum { IN_UNSPECIFIED, IN_SMTLIB, IN_SMTLIB_2, IN_DATALOG, IN_DIMACS, IN_WCNF, IN_OPB, IN_Z3_LOG } input_kind;
 
@@ -288,8 +289,20 @@ char const * get_extension(char const * file_name) {
     }
 }
 
+int foo()
+{
+  return 0;
+}
 int main(int argc, char ** argv) {
     try{
+        // gasnet places itself in front of any applicaiton cmdline handling
+        // it will strip off the arguments it uses inside gasnet_init and 
+        // the returned state of argc, argv can be used as normal by the the app
+        Z3GASNET_CHECKCALL(gasnet_init(&argc, &argv));
+        // gasnet will block here until all nodes of the job are attached
+        Z3GASNET_CHECKCALL(gasnet_attach(
+              NULL, 0,gasnet_getMaxLocalSegmentSize(),0));
+        
         unsigned return_value = 0;
         memory::initialize(0);
         memory::exit_when_out_of_memory(true, "ERROR: out of memory");
@@ -359,15 +372,23 @@ int main(int argc, char ** argv) {
 #ifdef _WINDOWS
         _CrtDumpMemoryLeaks();
 #endif
+
+        Z3GASNET_CALL(gasnet_exit(return_value));
+
         return return_value;
     }
     catch (z3_exception & ex) {
         // unhandled exception
+
         std::cerr << "ERROR: " << ex.msg() << "\n";
-        if (ex.has_error_code())
+        if (ex.has_error_code()) {
+            Z3GASNET_CALL(gasnet_exit(ex.error_code()));
             return ex.error_code();
-        else
+        }
+        else {
+            Z3GASNET_CALL(gasnet_exit(ERR_INTERNAL_FATAL));
             return ERR_INTERNAL_FATAL;
+        }
     }
 }
 

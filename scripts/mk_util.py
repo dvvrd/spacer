@@ -1591,7 +1591,7 @@ def mk_config():
             CXXFLAGS = '%s -D_NO_OMP_' % CXXFLAGS
         HAS_GASNET = GASNET_ENABLED and test_gasnet(CXX,GASNET_ROOT)
         if HAS_GASNET:
-            CXXFLAGS = '%s %s' % (CXXFLAGS, get_gastnet_cppflags(GASNET_ROOT))
+            CXXFLAGS = '%s %s -DZ3GASNET' % (CXXFLAGS, get_gastnet_cppflags(GASNET_ROOT))
             LDFLAGS  = '%s %s' % (LDFLAGS, get_gasnet_ldflags(GASNET_ROOT))
         if DEBUG_MODE:
             CXXFLAGS     = '%s -g -Wall' % CXXFLAGS
