@@ -108,6 +108,7 @@ void invoke_gdb() {
             return;
         default:
             std::cerr << "INVALID COMMAND\n";
+            exit(42);
         }
     }
 }
