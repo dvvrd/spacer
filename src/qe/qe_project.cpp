@@ -95,6 +95,7 @@ namespace qe {
             }
             else if ((*m_var)(t)) {
                 IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(t, m) << "\n";);
+                TRACE ("qe", tout << "Failed to project: " << mk_pp (t, m) << "\n";);
                 res = false;
             }
             else if (mul.is_one()) {
@@ -164,6 +165,7 @@ namespace qe {
             }
             else {
                 IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(lit, m) << "\n";);
+                TRACE ("qe", tout << "Failed to project: " << mk_pp (lit, m) << "\n";);
                 return false;
             }
 
@@ -1030,7 +1032,7 @@ namespace qe {
                             }
                         }
                         else {
-                            tout << "can't project: " << mk_pp (v, m) << "\n";
+                            tout << "Failed to project: " << mk_pp (v, m) << "\n";
                         }
                      );
             }
@@ -1099,6 +1101,7 @@ namespace qe {
                 }
                 else {
                     IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
+                    TRACE ("qe", tout << "Failed to project: " << mk_pp (v, m) << "\n";);
                     new_vars.push_back(v);
                 }
             }
@@ -1624,6 +1627,7 @@ namespace qe {
                 }
                 else {
                     IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(m_v, m) << "\n";);
+                    TRACE ("qe", tout << "Failed to project: " << mk_pp (m_v, m) << "\n";);
                     rem_arr_vars.push_back(m_v);
                 }
             }
@@ -1819,6 +1823,7 @@ namespace qe {
             }
             else {
                 IF_VERBOSE(2, verbose_stream() << "can't project arrays:" << "\n";);
+                TRACE ("qe", tout << "Failed to project arrays\n";);
             }
         }
     };
@@ -2051,6 +2056,7 @@ namespace qe {
             }
             else {
                 IF_VERBOSE(2, verbose_stream() << "can't project arrays:" << "\n";);
+                TRACE ("qe", tout << "Failed to project arrays\n";);
             }
 
             // dealloc
