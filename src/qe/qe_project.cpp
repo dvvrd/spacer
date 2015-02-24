@@ -1617,7 +1617,8 @@ namespace qe {
                       );
                 if (project (fml)) {
                     mk_result (fml);
-                    if (!m_subst_term_v) {
+                    contains_app contains_v (m, m_v);
+                    if (!m_subst_term_v || contains_v (m_subst_term_v)) {
                         rem_arr_vars.push_back (m_v);
                     }
                     TRACE ("qe",
