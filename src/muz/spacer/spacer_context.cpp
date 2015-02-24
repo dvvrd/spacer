@@ -2620,7 +2620,8 @@ namespace spacer {
         TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
         throw unknown_exception();
       }
-      
+      UNREACHABLE();
+      throw unknown_exception();
     }
 
     //
