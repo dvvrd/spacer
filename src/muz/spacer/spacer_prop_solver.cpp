@@ -51,7 +51,6 @@ namespace spacer {
         obj_map<app,expr *> m_proxies2expr;
         obj_map<expr, app*> m_expr2proxies;
         unsigned            m_num_proxies;
-        const char *        m_proxy_name;
 
         app * mk_proxy(expr* literal) {
             app* res;
@@ -62,8 +61,7 @@ namespace spacer {
             SASSERT(s.m_proxies.size() >= m_num_proxies);
             if (m_num_proxies == s.m_proxies.size()) {
                 std::stringstream name;
-                // name << "spacer_proxy_" << s.m_proxies.size();
-                name << m_proxy_name << s.m_proxies.size ();
+                name << "spacer_proxy_" << s.m_proxies.size();
                 res = m.mk_const(symbol(name.str().c_str()), m.mk_bool_sort());
                 s.m_proxies.push_back(res);
                 s.m_aux_symbols.insert(res->get_decl());
@@ -176,10 +174,9 @@ namespace spacer {
     public:
         safe_assumptions(prop_solver& s,
                          expr_ref_vector const& hard_assumptions,
-                         expr_ref_vector& soft_assumptions,
-                         const char * proxy_name = "spacer_proxy_"):
+                         expr_ref_vector& soft_assumptions):
             s(s), m(s.m), m_hard_atoms(hard_assumptions), m_soft_atoms (soft_assumptions),
-            m_assumptions(m), m_num_proxies(0), m_proxy_name (proxy_name) {
+            m_assumptions(m), m_num_proxies(0) {
               mk_safe(m_hard_atoms);
               mk_safe(m_soft_atoms);
         }
@@ -481,7 +478,7 @@ namespace spacer {
         expr_ref_vector atoms (m);
         if (!m_core->empty ()) {
             expr_ref_vector _aux (m);
-            safe_assumptions safe (*this, *m_core, _aux, "validate_proxy_");
+            safe_assumptions safe (*this, *m_core, _aux);
             atoms.append (safe.hard_atoms ());
         }
         if (m_in_level) {
