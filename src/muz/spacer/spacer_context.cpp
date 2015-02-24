@@ -1889,8 +1889,10 @@ namespace spacer {
                     solver.assert_expr(tmp);
                     lbool res = solver.check();
                     if (res != l_false) {
-                        msg << "rule validation failed when checking: " << mk_pp(tmp, m);
+                        msg << "rule validation failed when checking: " 
+                            << mk_pp(tmp, m);
                         IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
+                        throw default_exception(msg.str());
                         return false;
                     }
                 }
