@@ -1956,8 +1956,9 @@ namespace qe {
             // using insertion sort
             unsigned end = start + num_reprs;
             for (unsigned i = start+1; i < end; i++) {
-                expr* repr = m_idx_reprs.get (i);
-                expr* val = m_idx_vals.get (i);
+                expr_ref repr(m), val(m);
+                repr = m_idx_reprs.get (i);
+                val = m_idx_vals.get (i);
                 unsigned j = i;
                 for (; j > start; j--) {
                     rational j_val, jm1_val;
