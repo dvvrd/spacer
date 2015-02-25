@@ -4,6 +4,7 @@ import sys
 import stats
 import subprocess
 import os.path
+import threading
 
 profiles = {
     ## skip propagation but drive the search as deep as possible
@@ -17,7 +18,11 @@ profiles = {
     ## between propagations
     'ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux'],
     ## inspired by gpdr: no priority queue. 
-    'gpdr': ['--use-heavy-mev', '--no-elim-aux']
+    'gpdr': ['--use-heavy-mev', '--no-elim-aux'],
+    ## For testing the launching and parsing harness
+    'testlaunch': ['--use-heavy-mev', '--keep-obligations',
+            '--flexible-trace', '--no-elim-aux','--verbose=1', 
+            '--print-stats','--mem=24000', '--cpu=10' ]
 }
 
 def parseArgs (argv):
@@ -102,6 +107,7 @@ def parseArgs (argv):
         if in_p:
             if s not in profiles:
                 break
+            stat('profile', s)
             nargv.extend (profiles[s])
             in_p = False
         elif s == '-p': 
@@ -216,6 +222,56 @@ def compute_z3_args (args):
 
     return z3_args
 
+
+# inspred from:
+# http://stackoverflow.com/questions/4158502/python-kill-or-terminate-subprocess-when-timeout
+class RunCmd(threading.Thread):
+    def __init__(self, cmd, cpu, mem):
+        threading.Thread.__init__(self)
+        self.cmd = cmd 
+        self.cpu = cpu
+        self.mem = mem
+        self.p = None
+
+    def run(self):
+        def set_limits ():
+            import resource as r    
+            if self.cpu > 0:
+                r.setrlimit (r.RLIMIT_CPU, [self.cpu, self.cpu])
+            if self.mem > 0:
+                mem_bytes = self.mem * 1024 * 1024
+                r.setrlimit (r.RLIMIT_AS, [mem_bytes, mem_bytes])
+                
+#       print "In thread, opening process"
+        self.p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE,
+                                 preexec_fn=set_limits)
+#       print "In thread, waiting for exit"
+        self.p.wait()
+#       print "In thread, z3 has exited"
+
+    def Run(self):
+        print "Launching thread"
+        self.start()
+
+        if self.cpu > 0:
+#           print "Waiting for", self.cpu, 'seconds'
+            self.join(self.cpu+5)
+        else:
+            self.join()
+
+        if self.is_alive():
+            print 'z3 is still alive, terminating'
+            self.p.terminate()      
+            self.join(5)
+
+        if self.is_alive():
+            print 'z3 is still alive after attempt to terminate, sending kill'
+            self.p.kill()
+
+        return self.p.returncode
+
+
+
 def main (argv):
     returncode = 1
     args = parseArgs (argv[1:])
@@ -228,19 +284,11 @@ def main (argv):
 
     stat ('File', args.file)
     stat ('base', os.path.basename (args.file))
-    with stats.timer ('Query'):
-        def set_limits ():
-            import resource as r    
-            if args.cpu > 0:
-                r.setrlimit (r.RLIMIT_CPU, [args.cpu, args.cpu])
-            if args.mem > 0:
-                mem_bytes = args.mem * 1024 * 1024
-                r.setrlimit (r.RLIMIT_AS, [mem_bytes, mem_bytes])
-                
-        popen = subprocess.Popen(z3_args.split (), stdout=subprocess.PIPE,
-                                 preexec_fn=set_limits)
-        returncode = popen.wait()
-        res = popen.stdout.read()
+
+    cmd = RunCmd(z3_args.split(), args.cpu, args.mem)
+    returncode = cmd.Run()
+    res = cmd.p.stdout.read()
+
     if 'unsat' in res:
         res = 'unsat'
     elif 'sat' in res:
