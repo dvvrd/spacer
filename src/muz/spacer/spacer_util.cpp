@@ -1529,6 +1529,11 @@ namespace spacer {
         {
           expr * e = in.get (i);
           SASSERT (m_mev.is_true (e) || m_mev.is_false (e));
+          CTRACE ("div_bug", !m_mev.is_true (e) && !m_mev.is_false (e),
+                  tout << "Unknown (expect to contain div-by-zero): "
+                  << mk_pp (e, m) << "\n";
+                  model_pp (tout, *m_mev.get_model ());
+                  );
           m_todo.push_back (e);
         }
       
