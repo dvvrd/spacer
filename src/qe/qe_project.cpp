@@ -1526,7 +1526,9 @@ namespace qe {
 
                 unsigned nd = 0; // nesting depth
                 if (store) {
-                    for (nd = 1; m_arr_u.is_store (store); nd++, store = to_app (store->get_arg (0)));
+                    for (nd = 1; m_arr_u.is_store (store);
+                         nd++, store = to_app (store->get_arg (0)))
+                      /* empty */ ;
                     SASSERT (store == m_v);
                 }
                 nds.push_back (nd);
