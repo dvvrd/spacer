@@ -45,6 +45,7 @@ Notes:
 #include "proof_utils.h"
 #include "scoped_proof.h"
 #include "qe_project.h"
+#include "blast_term_ite_tactic.h"
 
 #include "timeit.h"
 #include "luby.h"
@@ -886,9 +887,10 @@ namespace spacer {
         expr_ref fml = pm.mk_and(conj);
         th_rewriter rw(m);
         rw(fml);
-        if (ctx.is_dl() || ctx.is_utvpi()) {
-            hoist_non_bool_if(fml);
-        }
+        if (ctx.get_params ().spacer_blast_term_ite () || ctx.is_dl() || ctx.is_utvpi()) {
+          blast_term_ite (fml);
+          rw(fml);
+         }
         TRACE("spacer", tout << mk_pp(fml, m) << "\n";);
         SASSERT(is_ground(fml));
         if (m.is_false(fml)) {
