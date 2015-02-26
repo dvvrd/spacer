@@ -285,8 +285,9 @@ def main (argv):
     stat ('File', args.file)
     stat ('base', os.path.basename (args.file))
 
-    cmd = RunCmd(z3_args.split(), args.cpu, args.mem)
-    returncode = cmd.Run()
+    with stats.timer ('Query'):
+        cmd = RunCmd(z3_args.split(), args.cpu, args.mem)
+        returncode = cmd.Run()
     res = cmd.p.stdout.read()
 
     if 'unsat' in res:
