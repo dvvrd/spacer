@@ -18,11 +18,7 @@ profiles = {
     ## between propagations
     'ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux'],
     ## inspired by gpdr: no priority queue. 
-    'gpdr': ['--use-heavy-mev', '--no-elim-aux'],
-    ## For testing the launching and parsing harness
-    'testlaunch': ['--use-heavy-mev', '--keep-obligations',
-            '--flexible-trace', '--no-elim-aux','--verbose=1', 
-            '--print-stats','--mem=24000', '--cpu=10' ]
+    'gpdr': ['--use-heavy-mev', '--no-elim-aux']
 }
 
 def parseArgs (argv):
@@ -232,6 +228,7 @@ class RunCmd(threading.Thread):
         self.cpu = cpu
         self.mem = mem
         self.p = None
+        self.stdout = None
 
     def run(self):
         def set_limits ():
@@ -242,19 +239,15 @@ class RunCmd(threading.Thread):
                 mem_bytes = self.mem * 1024 * 1024
                 r.setrlimit (r.RLIMIT_AS, [mem_bytes, mem_bytes])
                 
-#       print "In thread, opening process"
-        self.p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE,
-                                 preexec_fn=set_limits)
-#       print "In thread, waiting for exit"
-        self.p.wait()
-#       print "In thread, z3 has exited"
+        self.p = subprocess.Popen(self.cmd, 
+                stdout=subprocess.PIPE,
+                preexec_fn=set_limits)
+        self.stdout, unused = self.p.communicate()
 
     def Run(self):
-        print "Launching thread"
         self.start()
 
         if self.cpu > 0:
-#           print "Waiting for", self.cpu, 'seconds'
             self.join(self.cpu+5)
         else:
             self.join()
@@ -271,9 +264,8 @@ class RunCmd(threading.Thread):
         return self.p.returncode
 
 
-
 def main (argv):
-    returncode = 1
+    returncode = 13
     args = parseArgs (argv[1:])
     stat ('Result', 'UNKNOWN')
 
@@ -285,17 +277,20 @@ def main (argv):
     stat ('File', args.file)
     stat ('base', os.path.basename (args.file))
 
+    cmd = RunCmd(z3_args.split(), args.cpu, args.mem)
     with stats.timer ('Query'):
-        cmd = RunCmd(z3_args.split(), args.cpu, args.mem)
         returncode = cmd.Run()
-    res = cmd.p.stdout.read()
+    res = cmd.stdout
 
-    if 'unsat' in res:
+    if res is None:
+        res = 'unknown'
+    elif 'unsat' in res:
         res = 'unsat'
     elif 'sat' in res:
         res = 'sat'
     else:
         res = 'unknown'
+
     print 'Result:', res
 
     if res == 'sat':
@@ -311,6 +306,7 @@ def main (argv):
     return returncode
     
 if __name__ == '__main__':
+    res = 14
     try:
         res = main (sys.argv)
     finally:
