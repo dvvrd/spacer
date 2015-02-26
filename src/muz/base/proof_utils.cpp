@@ -156,24 +156,12 @@ public:
             SASSERT(m.get_num_parents(p) == 1);
             tmp = m.get_parent(p, 0);
             elim(tmp);
+            get_literals(m.get_fact(p));
             expr_set* hyps = m_hypmap.find(tmp);
             expr_set* new_hyps = 0;
             if (hyps) {
                 new_hyps = alloc(expr_set, *hyps);
             }
-            
-            // Corner case when hypothesis is a single literal of the
-            // form (not (or A B)), and the fact of p is (or A B).
-            // In this case, the fact should be treated as a literal
-            if (hyps && hyps->size () == 1 &&
-                in_hypotheses (m.get_fact (p), hyps))
-            {
-              m_literals.reset ();
-              m_literals.push_back (m.get_fact (p));
-            }
-            else
-              get_literals(m.get_fact(p));
-            
             for (unsigned i = 0; i < m_literals.size(); ++i) {
                 expr* e = m_literals[i];
                 if (!in_hypotheses(e, hyps)) {
