@@ -265,6 +265,10 @@ class RunCmd(threading.Thread):
 
 
 def main (argv):
+    ## add directory containing this file to the PATH
+    os.environ ['PATH'] =  os.path.dirname (os.path.realpath (__file__)) + \
+                           os.pathsep + os.environ['PATH']
+
     returncode = 13
     args = parseArgs (argv[1:])
     stat ('Result', 'UNKNOWN')
