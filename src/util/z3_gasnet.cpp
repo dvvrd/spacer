@@ -50,30 +50,20 @@ distribution.
 
 DM-XXXXXXX
 **********************************************************************/
-#ifndef __Z3_GASNET_H
-#define __Z3_GASNET_H
 #ifdef Z3GASNET
-#pragma GCC system_header //disable some warnings
-#include <gasnet.h>
 
-#define Z3GASNET_CHECKCALL(fncall) \
-  if (int gnrc = (fncall) ) throw default_exception( \
-          std::string(gasnet_ErrorName(gnrc)) + \
-          std::string(": ") + \
-          std::string(gasnet_ErrorDesc(gnrc)))
-
-#define Z3GASNET_CALL(fncall) do {fncall;} while(false)
+#include"z3_gasnet.h"
 
 bool node_works_on_item(
-    const size_t &node_index, const size_t &num_nodes, 
-    const size_t &work_item_index);
-
-#else
-
-#define Z3GASNET_CHECKCALL(fncall)
-#define Z3GASNET_CALL(fncall)
-
-#endif
+    const size_t &node_index, const size_t &num_nodes,
+    const size_t &work_item_index)
+{
+    if (!num_nodes) return false;
+    size_t remainder = work_item_index % num_nodes;
+    return node_index == remainder;
+}
 
 #endif
+
+
 

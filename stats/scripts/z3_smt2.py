@@ -93,6 +93,8 @@ def parseArgs (argv):
                     action='store', help='CPU time limit (seconds)', default=-1)
     p.add_argument ('--mem', dest='mem', type=int,
                     action='store', help='MEM limit (MB)', default=-1)   
+    p.add_argument ('--jobsize', dest='jobsize', type=int,
+                    action='store', help='number of nodes in GASNet job', default=-1)   
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -132,6 +134,9 @@ def which(program):
 
 def compute_z3_args (args):
     z3_args = which ('z3')
+
+    if args.jobsize != -1:
+        z3_args += ' %d' % args.jobsize
 
     if z3_args is None:
         print 'No executable named "z3" found in current directory or PATH'
