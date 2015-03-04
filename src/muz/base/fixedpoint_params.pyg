@@ -158,6 +158,7 @@ def_module_params('fixedpoint',
                           ('pdr.max_level', UINT, UINT_MAX, "Maximum level to explore"),
                           ('spacer.elim_aux', BOOL, True, "Eliminate auxiliary variables in reachability facts"),
                           ('spacer.reach_as_init', BOOL, True, "Extend initial rules with computed reachability facts"),
+                          ('spacer.blast_term_ite', BOOL, True, "Expand non-Boolean ite-terms"),
                           ))
 
 

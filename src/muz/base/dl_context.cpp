@@ -338,6 +338,7 @@ namespace datalog {
         if (!is_predicate(decl)) {
             m_pinned.push_back(decl);
             m_preds.insert(decl);
+            TRACE("dl", tout << mk_pp(decl, m) << "\n";);
             if (named) {
                 m_preds_by_name.insert(decl->get_name(), decl);
             }
@@ -348,6 +349,7 @@ namespace datalog {
         m_preds.reset();
         func_decl_set::iterator it = preds.begin(), end = preds.end();
         for (; it != end; ++it) {
+            TRACE("dl", tout << mk_pp(*it, m) << "\n";);
             m_preds.insert(*it);
         }
     }

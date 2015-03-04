@@ -3236,18 +3236,16 @@ namespace smt {
                 }
                 ptr_vector<theory>::iterator it  = m_theory_set.begin();
                 ptr_vector<theory>::iterator end = m_theory_set.end();
-                for (; it != end; ++it)
+                for (; it != end && !inconsistent(); ++it)
                     (*it)->restart_eh();
                 TRACE("mbqi_bug_detail", tout << "before instantiating quantifiers...\n";); 
-                m_qmanager->restart_eh();                
-
-                if (inconsistent ())
-                {
-                  SASSERT (status == l_undef);
-                  bool res = resolve_conflict ();
-                  SASSERT (!res);
-                  status = l_false;
-                  break;
+                if (!inconsistent()) {
+                    m_qmanager->restart_eh();                
+                }
+                if (inconsistent()) {
+                    VERIFY(!resolve_conflict());
+                    status = l_false;      
+                    break;
                 }
             }
             if (m_fparams.m_simplify_clauses)

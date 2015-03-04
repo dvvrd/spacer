@@ -161,19 +161,17 @@ public:
             if (hyps) {
                 new_hyps = alloc(expr_set, *hyps);
             }
-            
-            // Corner case when hypothesis is a single literal of the
-            // form (not (or A B)), and the fact of p is (or A B).
-            // In this case, the fact should be treated as a literal
-            if (hyps && hyps->size () == 1 &&
-                in_hypotheses (m.get_fact (p), hyps))
-            {
-              m_literals.reset ();
-              m_literals.push_back (m.get_fact (p));
+            expr* fact = m.get_fact(p);
+            // when hypothesis is a single literal of the form 
+            // (or A B), and the fact of p is (or A B).            
+            if (hyps && hyps->size() == 1 && in_hypotheses(fact, hyps)) {
+                m_literals.reset();
+                m_literals.push_back(fact);
             }
-            else
-              get_literals(m.get_fact(p));
-            
+            else {
+                get_literals(fact);
+            }
+
             for (unsigned i = 0; i < m_literals.size(); ++i) {
                 expr* e = m_literals[i];
                 if (!in_hypotheses(e, hyps)) {
