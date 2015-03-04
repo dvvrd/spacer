@@ -52,7 +52,14 @@ DM-XXXXXXX
 **********************************************************************/
 #ifdef Z3GASNET
 
+#include<iostream>
 #include"z3_gasnet.h"
+#include<vector>
+#include<limits.h>
+
+
+namespace z3gasnet
+{
 
 bool node_works_on_item(
     const size_t &node_index, const size_t &num_nodes,
@@ -62,6 +69,52 @@ bool node_works_on_item(
     size_t remainder = work_item_index % num_nodes;
     return node_index == remainder;
 }
+
+bool node_is_master()
+{
+  return !gasnet_mynode();
+}
+
+
+void ping_shorthandler(gasnet_token_t token) {
+  std::cout << "ping handled on node" << gasnet_mynode() << std::endl;
+  Z3GASNET_CHECKCALL(gasnet_AMReplyShort0(token, hidx_pong_shorthandler)); 
+  std::cout << "replied pong on node" << gasnet_mynode() << std::endl;
+} 
+
+int ponghandled = 0;
+void pong_shorthandler(gasnet_token_t token) 
+{
+  std::cout << "pong handled on node " << gasnet_mynode() << std::endl;
+  ponghandled++;
+}
+
+const gasnet_handlerarg_t handlerarg_flag_value = std::numeric_limits<gasnet_handlerarg_t>::min();
+
+const int handler_contextsolve_index = 203;
+const int replyhandler_contextsolve_index = 204;
+
+typedef void (*handler_fn_t)();
+gasnet_handlerentry_t htable[] = {
+  { hidx_ping_shorthandler,  (handler_fn_t)ping_shorthandler  },
+  { hidx_pong_shorthandler,  (handler_fn_t)pong_shorthandler  },
+  { handler_contextsolve_index,  (handler_fn_t)handler_contextsolve  },
+  { replyhandler_contextsolve_index,  (handler_fn_t)replyhandler_contextsolve  } 
+};
+
+gasnet_handlerentry_t *get_handler_table()
+{
+  return htable;
+}
+int get_num_handler_table_entires()
+{
+  return sizeof(htable)/sizeof(gasnet_handlerentry_t);
+}
+
+}
+
+int ponghandeled = 0;
+
 
 #endif
 

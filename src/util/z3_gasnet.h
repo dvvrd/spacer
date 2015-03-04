@@ -54,20 +54,61 @@ DM-XXXXXXX
 #define __Z3_GASNET_H
 #ifdef Z3GASNET
 #pragma GCC system_header //disable some warnings
-#include <gasnet.h>
+#include<gasnet.h>
+#include"lbool.h"
+#include"z3_exception.h"
 
-#define Z3GASNET_CHECKCALL(fncall) \
-  if (int gnrc = (fncall) ) throw default_exception( \
-          std::string(gasnet_ErrorName(gnrc)) + \
-          std::string(": ") + \
-          std::string(gasnet_ErrorDesc(gnrc)))
+#define Z3GASNET_CHECKCALL(fncall) do {                              \
+    int _retval;                                                     \
+    if ((_retval = fncall) != GASNET_OK) {                           \
+      fprintf(stderr, "ERROR calling: %s\n"                          \
+                   " at: %s:%i\n"                                    \
+                   " error: %s (%s)\n",                              \
+              #fncall, __FILE__, __LINE__,                           \
+              gasnet_ErrorName(_retval), gasnet_ErrorDesc(_retval)); \
+      fflush(stderr);                                                \
+      gasnet_exit(_retval);                                          \
+    }                                                                \
+  } while(0)
+
 
 #define Z3GASNET_CALL(fncall) do {fncall;} while(false)
+
+#define Z3GASNET_BARRIER_CONTEXT_READY 1
+#define Z3GASNET_BARRIER_CONTEXT_SOLVED 2
+
+namespace z3gasnet
+{
+
+extern int contextsolved;
 
 bool node_works_on_item(
     const size_t &node_index, const size_t &num_nodes, 
     const size_t &work_item_index);
 
+bool node_is_master();
+
+extern int ponghandled;
+#define hidx_ping_shorthandler 201
+#define hidx_pong_shorthandler 202 
+
+extern const gasnet_handlerarg_t handlerarg_flag_value;
+
+gasnet_handlerentry_t *get_handler_table();
+int get_num_handler_table_entires();
+
+// For pdr_dl_interface.cpp 
+extern const int handler_contextsolve_index;
+void handler_contextsolve(gasnet_token_t token, gasnet_handlerarg_t ans);
+extern gasnet_handlerarg_t contextsolve_answer;
+
+// For pdr_dl_interface.cpp 
+extern const int replyhandler_contextsolve_index;
+void replyhandler_contextsolve(gasnet_token_t token);
+extern int contextsolve_nodes_recieved;
+
+
+} //namesapce z3gasnet
 #else
 
 #define Z3GASNET_CHECKCALL(fncall)
