@@ -60,22 +60,23 @@ namespace spacer {
     expr_ref m_fact;
     ptr_vector<app> m_aux_vars;
     
-    const datalog::rule *m_rule;
+    const datalog::rule &m_rule;
     reach_fact_ref_vector m_justification;
 
     bool m_init;
     
   public:  
-    reach_fact (ast_manager &m, expr* fact, const ptr_vector<app> &aux_vars,
+    reach_fact (ast_manager &m, const datalog::rule &rule,
+                expr* fact, const ptr_vector<app> &aux_vars,
                 bool init = false) : 
     m_ref_count (0), m_fact (fact, m), m_aux_vars (aux_vars),
-      m_rule(NULL), m_init (init) {}
-    reach_fact (ast_manager &m, expr* fact, bool init = false) :
-    m_ref_count (0), m_fact (fact, m), m_rule(NULL), m_init (init) {}
+      m_rule(rule), m_init (init) {}
+    reach_fact (ast_manager &m, const datalog::rule &rule,
+                expr* fact, bool init = false) :
+      m_ref_count (0), m_fact (fact, m), m_rule(rule), m_init (init) {}
     
     bool is_init () {return m_init;}
-    void set_rule (const datalog::rule &r) {m_rule = &r;}
-    const datalog::rule* get_rule () {return m_rule;}
+    const datalog::rule& get_rule () {return m_rule;}
     
     void add_justification (reach_fact &f) {m_justification.push_back (&f);}
     const reach_fact_ref_vector& get_justifications () {return m_justification;}

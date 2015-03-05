@@ -3,6 +3,8 @@
 import sys
 import stats
 import subprocess
+import os.path
+import threading
 
 profiles = {
     ## skip propagation but drive the search as deep as possible
@@ -82,9 +84,16 @@ def parseArgs (argv):
     p.add_argument ('--no-elim-aux', dest='elim_aux', 
                     help='do not eliminate auxiliaries in reachability facts', 
                     action='store_false', default=True)
+    p.add_argument ('--elim-aux', dest='elim_aux',
+                    help='eliminate auxiliaries in reachability facts',
+                    action='store_true')
     p.add_argument ('--no-z3', dest='no_z3',
                     help='stop before running z3', default=False,
                     action='store_true')
+    p.add_argument ('--cpu', dest='cpu', type=int,
+                    action='store', help='CPU time limit (seconds)', default=-1)
+    p.add_argument ('--mem', dest='mem', type=int,
+                    action='store', help='MEM limit (MB)', default=-1)   
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -94,6 +103,7 @@ def parseArgs (argv):
         if in_p:
             if s not in profiles:
                 break
+            stat('profile', s)
             nargv.extend (profiles[s])
             in_p = False
         elif s == '-p': 
@@ -208,26 +218,83 @@ def compute_z3_args (args):
 
     return z3_args
 
+
+# inspred from:
+# http://stackoverflow.com/questions/4158502/python-kill-or-terminate-subprocess-when-timeout
+class RunCmd(threading.Thread):
+    def __init__(self, cmd, cpu, mem):
+        threading.Thread.__init__(self)
+        self.cmd = cmd 
+        self.cpu = cpu
+        self.mem = mem
+        self.p = None
+        self.stdout = None
+
+    def run(self):
+        def set_limits ():
+            import resource as r    
+            if self.cpu > 0:
+                r.setrlimit (r.RLIMIT_CPU, [self.cpu, self.cpu])
+            if self.mem > 0:
+                mem_bytes = self.mem * 1024 * 1024
+                r.setrlimit (r.RLIMIT_AS, [mem_bytes, mem_bytes])
+                
+        self.p = subprocess.Popen(self.cmd, 
+                stdout=subprocess.PIPE,
+                preexec_fn=set_limits)
+        self.stdout, unused = self.p.communicate()
+
+    def Run(self):
+        self.start()
+
+        if self.cpu > 0:
+            self.join(self.cpu+5)
+        else:
+            self.join()
+
+        if self.is_alive():
+            print 'z3 is still alive, terminating'
+            self.p.terminate()      
+            self.join(5)
+
+        if self.is_alive():
+            print 'z3 is still alive after attempt to terminate, sending kill'
+            self.p.kill()
+
+        return self.p.returncode
+
+
 def main (argv):
+    ## add directory containing this file to the PATH
+    os.environ ['PATH'] =  os.path.dirname (os.path.realpath (__file__)) + \
+                           os.pathsep + os.environ['PATH']
+
+    returncode = 13
     args = parseArgs (argv[1:])
     stat ('Result', 'UNKNOWN')
 
     z3_args = compute_z3_args (args)
     print z3_args
 
-    if args.no_z3: return
+    if args.no_z3: return returncode
 
     stat ('File', args.file)
+    stat ('base', os.path.basename (args.file))
+
+    cmd = RunCmd(z3_args.split(), args.cpu, args.mem)
     with stats.timer ('Query'):
-        popen = subprocess.Popen(z3_args.split (), stdout=subprocess.PIPE)
-        popen.wait()
-        res = popen.stdout.read()
-    if 'unsat' in res:
+        returncode = cmd.Run()
+    res = cmd.stdout
+
+    if res is None:
+        res = 'unknown'
+    elif 'unsat' in res:
         res = 'unsat'
     elif 'sat' in res:
         res = 'sat'
     else:
         res = 'unknown'
+
     print 'Result:', res
 
     if res == 'sat':
@@ -236,8 +303,14 @@ def main (argv):
     elif res == 'unsat':
         if args.smt2lib: stat ('Result', 'CEX')
         else: stat ('Result', 'SAFE')
+
+    # set returncode    
+    stat ('Status', returncode)
+
+    return returncode
     
 if __name__ == '__main__':
+    res = 14
     try:
         res = main (sys.argv)
     finally:

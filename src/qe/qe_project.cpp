@@ -95,6 +95,7 @@ namespace qe {
             }
             else if ((*m_var)(t)) {
                 IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(t, m) << "\n";);
+                TRACE ("qe", tout << "Failed to project: " << mk_pp (t, m) << "\n";);
                 res = false;
             }
             else if (mul.is_one()) {
@@ -164,6 +165,7 @@ namespace qe {
             }
             else {
                 IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(lit, m) << "\n";);
+                TRACE ("qe", tout << "Failed to project: " << mk_pp (lit, m) << "\n";);
                 return false;
             }
 
@@ -1030,7 +1032,7 @@ namespace qe {
                             }
                         }
                         else {
-                            tout << "can't project: " << mk_pp (v, m) << "\n";
+                            tout << "Failed to project: " << mk_pp (v, m) << "\n";
                         }
                      );
             }
@@ -1099,6 +1101,7 @@ namespace qe {
                 }
                 else {
                     IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(v, m) << "\n";);
+                    TRACE ("qe", tout << "Failed to project: " << mk_pp (v, m) << "\n";);
                     new_vars.push_back(v);
                 }
             }
@@ -1523,7 +1526,9 @@ namespace qe {
 
                 unsigned nd = 0; // nesting depth
                 if (store) {
-                    for (nd = 1; m_arr_u.is_store (store); nd++, store = to_app (store->get_arg (0)));
+                    for (nd = 1; m_arr_u.is_store (store);
+                         nd++, store = to_app (store->get_arg (0)))
+                      /* empty */ ;
                     SASSERT (store == m_v);
                 }
                 nds.push_back (nd);
@@ -1614,7 +1619,8 @@ namespace qe {
                       );
                 if (project (fml)) {
                     mk_result (fml);
-                    if (!m_subst_term_v) {
+                    contains_app contains_v (m, m_v);
+                    if (!m_subst_term_v || contains_v (m_subst_term_v)) {
                         rem_arr_vars.push_back (m_v);
                     }
                     TRACE ("qe",
@@ -1624,6 +1630,7 @@ namespace qe {
                 }
                 else {
                     IF_VERBOSE(2, verbose_stream() << "can't project:" << mk_pp(m_v, m) << "\n";);
+                    TRACE ("qe", tout << "Failed to project: " << mk_pp (m_v, m) << "\n";);
                     rem_arr_vars.push_back(m_v);
                 }
             }
@@ -1819,6 +1826,7 @@ namespace qe {
             }
             else {
                 IF_VERBOSE(2, verbose_stream() << "can't project arrays:" << "\n";);
+                TRACE ("qe", tout << "Failed to project arrays\n";);
             }
         }
     };
@@ -1948,8 +1956,9 @@ namespace qe {
             // using insertion sort
             unsigned end = start + num_reprs;
             for (unsigned i = start+1; i < end; i++) {
-                expr* repr = m_idx_reprs.get (i);
-                expr* val = m_idx_vals.get (i);
+                expr_ref repr(m), val(m);
+                repr = m_idx_reprs.get (i);
+                val = m_idx_vals.get (i);
                 unsigned j = i;
                 for (; j > start; j--) {
                     rational j_val, jm1_val;
@@ -2051,6 +2060,7 @@ namespace qe {
             }
             else {
                 IF_VERBOSE(2, verbose_stream() << "can't project arrays:" << "\n";);
+                TRACE ("qe", tout << "Failed to project arrays\n";);
             }
 
             // dealloc

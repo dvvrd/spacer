@@ -188,3 +188,44 @@ expand_node(n):
       generate lemmas
       derivation remains unchanged to be used at a higher level
       return
+======================================================================
+1. open disjunction for transition relation
+   - a fresh literal to open the disjunction of the transition relation
+   - expr* expand_init (expr *e) -- add e to initial state and return
+     new disj var
+   - close the disjunction by passing the negation of the literal
+     during various calls
+   - store the literal negated to have access to both positive and
+     negative versions
+   - with this, can do an optional check whether the lemmas alone are
+     strong enough to discharge the counterexample. Easiest is to
+     implement it as a separate pre-check.
+     
+2. auxiliary variables in lemmas and reach-facts. 
+   - store and expect auxiliary variables
+   - quantify them out when necessary
+
+3. initial rules as reach-facts
+   - add initial rules of a predicate to its reach-facts. Propagate them to uses.
+   - this way, the checks at level 0 will include initial rules of
+     immediate predecessors
+======================================================================
+
+reach_fact_ref_vector m_reach_facts
+app_ref_vector m_reach_case_vars
+
+bool is_must_reachable (expr *state, model_ref *model)
+reach_fact* get_used_reach_fact (model_evaluator &mev)
+app* mk_fresh_reach_case_var ()
+expr* get_reach ()
+expr* get_last_reach_case_var ()
+app* get_reach_case_var (unsigned idx)
+
+get_used_origin_reach_fact():
+    
+
+======================================================================
+4. track relationship between an obligation and lemmas. Attempt to
+   generalize an obligation into the exact lemma that worked
+   before. Perhaps pick one lemma with highest level? Implement as
+   core-generalizer. Will require reworking how legacy_frames is implemented.

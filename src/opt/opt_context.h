@@ -34,8 +34,40 @@ namespace opt {
 
     class opt_solver;
 
+    /**
+       \brief base class required by MaxSMT solvers.
+       By implementing a base class, you can invoke the MaxSMT solvers
+       independent of the overall optimization infrastructure.
+       The caller has to supply a solver object that encapsulates 
+       an incremental SAT or SMT solver. The MaxSMT solvers may assume that
+       the solver object should be in a satisfiable state and contain an initial model.
+    */
 
-    class context : public opt_wrapper, public pareto_callback {
+    class maxsat_context {
+    public:        
+        virtual filter_model_converter& fm() = 0;   // converter that removes fresh names introduced by simplification.
+        virtual bool sat_enabled() const = 0;       // is using th SAT solver core enabled?
+        virtual solver& get_solver() = 0;           // retrieve solver object (SAT or SMT solver)
+        virtual ast_manager& get_manager() = 0;      
+        virtual params_ref& params() = 0;
+        virtual void enable_sls(expr_ref_vector const& soft, weights_t& weights) = 0; // stochastic local search 
+        virtual void set_enable_sls(bool f) = 0;    // overwrite whether SLS is enabled.
+        virtual void set_soft_assumptions() = 0;    // configure SAT solver to skip assumptions assigned by unit-propagation  
+        virtual symbol const& maxsat_engine() const = 0; // retrieve maxsat engine configuration parameter.
+        virtual void get_base_model(model_ref& _m) = 0;  // retrieve model from initial satisfiability call.
+        virtual smt::context& smt_context() = 0;    // access SMT context for SMT based MaxSMT solver (wmax requires SMT core)
+    };
+
+    /**
+       \brief main context object for optimization.
+       Hard and soft assertions, and objectives are registered with this context.
+       It handles combinations of objectives.
+    */
+
+    class context : 
+        public opt_wrapper, 
+        public pareto_callback,
+        public maxsat_context {
         struct free_func_visitor;
         typedef map<symbol, maxsmt*, symbol_hash_proc, symbol_eq_proc> map_t;
         typedef map<symbol, unsigned, symbol_hash_proc, symbol_eq_proc> map_id;
@@ -146,9 +178,9 @@ namespace opt {
         virtual void cancel() { set_cancel(true); }
         virtual void set_hard_constraints(ptr_vector<expr> & hard);
         virtual lbool optimize();
-        virtual void get_model(model_ref& m);
-        virtual void set_model(model_ref& m);
-        virtual void fix_model(model_ref& m);
+        virtual void get_model(model_ref& _m);
+        virtual void set_model(model_ref& _m);
+        virtual void fix_model(model_ref& _m);
         virtual void collect_statistics(statistics& stats) const;
         virtual proof* get_proof() { return 0; }
         virtual void get_labels(svector<symbol> & r) {}
@@ -176,16 +208,17 @@ namespace opt {
         virtual expr_ref mk_ge(unsigned i, model_ref& model);
         virtual expr_ref mk_le(unsigned i, model_ref& model);
 
-        smt::context& smt_context() { return m_opt_solver->get_context(); }
-        filter_model_converter& fm() { return m_fm; }
-        bool sat_enabled() const { return 0 != m_sat_solver.get(); }
-        solver& get_solver();
-        ast_manager& get_manager() { return this->m; }
-        params_ref& params() { return m_params; }
-        void enable_sls(expr_ref_vector const& soft, weights_t& weights);
-        void set_enable_sls(bool f) { m_enable_sls = f; }
-        symbol const& maxsat_engine() const { return m_maxsat_engine; }
-        void get_base_model(model_ref& m);
+        virtual smt::context& smt_context() { return m_opt_solver->get_context(); }
+        virtual filter_model_converter& fm() { return m_fm; }
+        virtual bool sat_enabled() const { return 0 != m_sat_solver.get(); }
+        virtual solver& get_solver();
+        virtual ast_manager& get_manager() { return this->m; }
+        virtual params_ref& params() { return m_params; }
+        virtual void enable_sls(expr_ref_vector const& soft, weights_t& weights);
+        virtual void set_enable_sls(bool f) { m_enable_sls = f; }
+        virtual void set_soft_assumptions();
+        virtual symbol const& maxsat_engine() const { return m_maxsat_engine; }
+        virtual void get_base_model(model_ref& _m);
 
 
     private:
@@ -249,7 +282,7 @@ namespace opt {
         // pareto
         void yield();
         expr_ref mk_ge(expr* t, expr* s);
-        void mk_term_val(model_ref& mdl, objective const& obj, expr_ref& term, expr_ref& val);
+        expr_ref mk_cmp(bool is_ge, model_ref& mdl, objective const& obj);
 
     };
 

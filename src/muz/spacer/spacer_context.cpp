@@ -45,6 +45,7 @@ Notes:
 #include "proof_utils.h"
 #include "scoped_proof.h"
 #include "qe_project.h"
+#include "blast_term_ite_tactic.h"
 
 #include "timeit.h"
 #include "luby.h"
@@ -785,9 +786,8 @@ namespace spacer {
         const datalog::rule* r = it->m_key;
         if (r->get_uninterpreted_tail_size () == 0)
           {
-            fact = alloc (reach_fact, m, m_rule2transition.find (r),
+          fact = alloc (reach_fact, m, *r, m_rule2transition.find (r),
                           get_aux_vars (*r), true);
-          fact->set_rule (*r);
             add_reach_fact (*fact);
           }
       }
@@ -887,8 +887,9 @@ namespace spacer {
     expr_ref fml = pm.mk_and(conj);
     th_rewriter rw(m);
     rw(fml);
-    if (ctx.is_dl() || ctx.is_utvpi()) {
-      hoist_non_bool_if(fml);
+        if (ctx.get_params ().spacer_blast_term_ite () || ctx.is_dl() || ctx.is_utvpi()) {
+          blast_term_ite (fml);
+          rw(fml);
     }
     TRACE("spacer", tout << mk_pp(fml, m) << "\n";);
     SASSERT(is_ground(fml));
@@ -1891,8 +1892,10 @@ namespace spacer {
           solver.assert_expr(tmp);
           lbool res = solver.check();
           if (res != l_false) {
-            msg << "rule validation failed when checking: " << mk_pp(tmp, m);
+                        msg << "rule validation failed when checking: " 
+                            << mk_pp(tmp, m);
             IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
+                        throw default_exception(msg.str());
             return false;
           }
         }
@@ -2174,7 +2177,7 @@ namespace spacer {
 
         // get and discard query rule
         fact = m_query->get_last_reach_fact ();
-        r = fact->get_rule ();
+        r = &fact->get_rule ();
 
         unsigned cex_depth = 0;
 
@@ -2210,7 +2213,7 @@ namespace spacer {
             }
             fact = facts.get (curr - cex_depth); // discount the number of markers
             // get rule justifying the derivation of fact at pt
-            r = fact->get_rule ();
+            r = &fact->get_rule ();
             TRACE ("spacer",
                     tout << "next rule: " << r->name ().str () << "\n";
                   );
@@ -2249,7 +2252,7 @@ namespace spacer {
 
     // get and discard query rule
         fact = m_query->get_last_reach_fact ();
-    r = fact->get_rule ();
+        r = &fact->get_rule ();
 
     // initialize queues
     // assume that the query is only on a single predicate
@@ -2274,7 +2277,7 @@ namespace spacer {
       pt = pts.get (curr);
       fact = facts.get (curr);
       // get rule justifying the derivation of fact at pt
-      r = fact->get_rule ();
+            r = &fact->get_rule ();
       rules.push_back (const_cast<datalog::rule *> (r));
       TRACE ("spacer",
              tout << "next rule: " << r->name ().str () << "\n";
@@ -2347,7 +2350,7 @@ namespace spacer {
 
     // get and discard query rule
         reach_fact = m_query->get_last_reach_fact ();
-    r = reach_fact->get_rule ();
+        r = &reach_fact->get_rule ();
 
     // initialize queues
     reach_facts.append (reach_fact->get_justifications ());
@@ -2373,7 +2376,7 @@ namespace spacer {
       ptr_vector<pred_transformer> child_pts;
 
       // get justifying rule and child facts for the derivation of reach_fact at pt
-      r = reach_fact->get_rule ();
+            r = &reach_fact->get_rule ();
       const reach_fact_ref_vector &child_reach_facts = 
         reach_fact->get_justifications ();
       // get child pts
@@ -2748,7 +2751,8 @@ namespace spacer {
         TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
         throw unknown_exception();
       }
-      
+      UNREACHABLE();
+      throw unknown_exception();
   }
 
   //
@@ -2890,8 +2894,7 @@ namespace spacer {
 
     m_stats.m_num_reach_queries++;
     ptr_vector<app> empty;
-    reach_fact *f = alloc(reach_fact, m, res, elim_aux ? empty : aux_vars);
-    f->set_rule (r);
+        reach_fact *f = alloc(reach_fact, m, r, res, elim_aux ? empty : aux_vars);
     for (unsigned i = 0, sz = child_reach_facts.size (); i < sz; ++i)
       f->add_justification (*child_reach_facts [i]);
     return f;
