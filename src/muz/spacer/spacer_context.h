@@ -32,6 +32,8 @@ Revision History:
 #include "spacer_prop_solver.h"
 #include "spacer_reachable_cache.h"
 #include "fixedpoint_params.hpp"
+#include "z3_gasnet.h"
+#include <set>
 
 
 namespace datalog {
@@ -708,9 +710,46 @@ namespace spacer {
         volatile bool        m_cancel;
         model_converter_ref  m_mc;
         proof_converter_ref  m_pc;
+
+#ifdef Z3GASNET
+
+        //the node index and pointer to the context on that node
+        typedef std::pair<gasnet_node_t, uintptr_t> remote_context;
+
+        //a correxponding set of remote context, one for each node
+        typedef std::set<remote_context> remote_contexts;
+        
+        //a map for tracking multiple sets of remote_contexts
+        typedef int pool_id;
+        typedef std::map<pool_id,remote_contexts> context_pool;
+
+        static context_pool m_context_pool;
+
+        static pool_id m_next_pool_index;
+        pool_id m_pool_index;
+
+        // each node will call each other node and pass its context ptr.  this
+        // handler function will recive the remote context ptrs and store them
+        // in the m_context_pool
+        static void set_context_pool_member(gasnet_token_t, void* remote_context_addr,
+            size_t size_of_context_ptr, gasnet_handlerarg_t remote_node_index);
+
+        // this will recieve the index for the set_context_pool_member handler
+        // function after the gasnet handler table is constructed
+        static int m_set_context_pool_member_handler_index;
+
+        // this will check if the pool is full.  As pool is filled in by
+        // message handlers.  If called while message handlers are filling
+        // the pool hold_interrupts should be set to true
+        bool pool_is_full(
+            context::pool_id pool_index, gasnet_node_t nodecnt, bool hold_interrupts);
+     
+
+#endif
         
         // Functions used by search.
         lbool solve_core (unsigned from_lvl = 0);
+        lbool solve_core_iteration (unsigned &lvl);
         bool check_reachability ();        
         bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
                        unsigned full_prop_lvl);

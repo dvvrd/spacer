@@ -880,6 +880,7 @@ namespace datalog {
             UNREACHABLE();
         }
         ensure_engine();
+        TRACE("dhk",tout << "Querying engine\n";);
         return m_engine->query(query);
     }
 

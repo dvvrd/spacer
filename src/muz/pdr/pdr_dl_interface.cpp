@@ -38,6 +38,7 @@ Revision History:
 
 using namespace pdr;
 
+#ifdef Z3GASNET
 namespace z3gasnet
 {
 
@@ -81,6 +82,7 @@ void replyhandler_contextsolve(
 }
 
 }
+#endif
 
 dl_interface::dl_interface(datalog::context& ctx) : 
     engine_base(ctx.get_manager(), "pdr"),

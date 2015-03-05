@@ -1564,6 +1564,22 @@ namespace spacer {
           m_expanded_lvl(0),
           m_cancel(false)
     {
+#ifdef Z3GASNET
+      m_pool_index = m_next_pool_index++;
+      gasnet_node_t nodecnt = gasnet_nodes();
+      gasnet_node_t mynode = gasnet_mynode();
+      uintptr_t thiscontext = (uintptr_t) this;
+
+      for (gasnet_node_t n = 0; n < nodecnt; n++)
+      {
+        Z3GASNET_CHECKCALL(gasnet_AMRequestMedium2(
+              n, m_set_context_pool_member_handler_index,
+              &thiscontext, sizeof(uintptr_t),
+              mynode,m_pool_index));
+      }
+      GASNET_BLOCKUNTIL(pool_is_full(m_pool_index, nodecnt, true));
+
+#endif
     }
 
     context::~context() {
@@ -2326,6 +2342,37 @@ namespace spacer {
         return expr_ref (m.mk_and (cex.size (), cex.c_ptr ()), m);
     }
 
+    lbool context::solve_core_iteration (unsigned &lvl)
+    {
+      m_expanded_lvl = lvl;
+      m_stats.m_max_query_lvl = lvl;
+      TRACE("dhk",tout << "On iteration" << lvl;);
+
+      if (check_reachability()) return l_true;
+          
+      if (lvl > 0 && !get_params ().pdr_skip_propagate ())
+        if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
+          
+      m_search.inc_level ();
+      lvl = m_search.max_level ();
+      m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
+      IF_VERBOSE(1,verbose_stream() << "Entering level "<< lvl << "\n";);
+      IF_VERBOSE(1, 
+                if (m_params.print_statistics ()) {
+                    statistics st;
+                    collect_statistics (st);
+                };
+                );
+      return l_undef;
+    }
+#ifdef Z3GASNET
+    void handler_solve_core_iteration(
+        gasnet_token_t token, void* context_addr, size_t nbytes, gasnet_handlerarg_t ans)
+    {
+
+    }
+#endif
+
     ///this is where everything starts
     lbool context::solve_core (unsigned from_lvl) 
     {
@@ -2340,28 +2387,35 @@ namespace spacer {
       
       unsigned max_level = get_params ().pdr_max_level ();
       
-      for (unsigned i = 0; i < max_level; ++i) {
+      lbool ans = l_undef;
+      for (unsigned i = 0; ans == l_undef && i < max_level; ++i) {
         checkpoint();
-        m_expanded_lvl = lvl;
-        m_stats.m_max_query_lvl = lvl;
+#ifdef Z3GASNET
+        using namespace z3gasnet;
+        if (node_is_master())
+        {
+          ans = solve_core_iteration(lvl);
+        //gasnet_node_t nodecnt = gasnet_nodes();
+        //for (gasnet_node_t node = 1; node < nodecnt; node++)
+        //{
+        //  Z3GASNET_CHECKCALL(gasnet_AMRequestMedium1(
+        //        node,handler_solve_core_iteration_index,
+        //        this,sizeof(context*),(gasnet_handlerarg_t)ans));
+        //}
 
-        if (check_reachability()) return l_true;
-            
-        if (lvl > 0 && !get_params ().pdr_skip_propagate ())
-          if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
-            
-        m_search.inc_level ();
-        lvl = m_search.max_level ();
-        m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
-        IF_VERBOSE(1,verbose_stream() << "Entering level "<< lvl << "\n";);
-        IF_VERBOSE(1, 
-                  if (m_params.print_statistics ()) {
-                      statistics st;
-                      collect_statistics (st);
-                  };
-                  );
+          
+        }
+        else
+        {
+        }
+
+
+#else
+        ans = solve_core_iteration(lvl);
+#endif
+
       }
-      return l_undef;
+      return ans;
     }
 
 
@@ -2976,5 +3030,38 @@ namespace spacer {
         }
     }
 */
+#ifdef Z3GASNET
+  bool context::pool_is_full(context::pool_id pool_index, 
+      gasnet_node_t nodecnt, bool hold_interrupts)
+  {
+    using namespace z3gasnet;
+
+    scoped_interrupt_holder holder(hold_interrupts);
+
+    context_pool::iterator pi = m_context_pool.find(pool_index);
+    if (pi == m_context_pool.end())
+    {
+      return false;
+    }
+    const remote_contexts &rcs(pi->second);
+    SASSERT(rcs.size() <= nodecnt);
+    return rcs.size() == nodecnt;
+  }
+
+  int context::m_set_context_pool_member_handler_index=-1;
+  context::context_pool context::m_context_pool;
+  context::pool_id context::m_next_pool_index = 0;
+
+  struct context_handler_registrar
+  {
+    context_handler_registrar()
+    {
+      //TODO STOPPED HERE
+
+    }
+  }
+  static context_handler_registrar chr;
+
+#endif
 
 }

@@ -348,6 +348,7 @@ int main(int argc, char ** argv) {
             break;
         case IN_SMTLIB_2:
             memory::exit_when_out_of_memory(true, "(error \"out of memory\")");
+            TRACE("dhk",tout <<"Reading commands\n";);
             return_value = read_smtlib2_commands(g_input_file);
             break;
         case IN_DIMACS:

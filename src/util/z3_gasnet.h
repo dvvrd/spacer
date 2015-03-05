@@ -97,6 +97,11 @@ extern const gasnet_handlerarg_t handlerarg_flag_value;
 gasnet_handlerentry_t *get_handler_table();
 int get_num_handler_table_entires();
 
+typedef void (*handler_fn_t)();
+
+// finds the index in the gasnet handler table of a handler function
+int find_handler_index(handler_fn_t *fn);
+
 // For pdr_dl_interface.cpp 
 extern const int handler_contextsolve_index;
 void handler_contextsolve(gasnet_token_t token, gasnet_handlerarg_t ans);
@@ -107,6 +112,28 @@ extern const int replyhandler_contextsolve_index;
 void replyhandler_contextsolve(gasnet_token_t token);
 extern int contextsolve_nodes_recieved;
 
+// For spacer_context.cpp solve_core
+extern const int handler_solve_core_iteration_index;
+void handler_solve_core_iteration(gasnet_token_t token, void* context_addr, size_t nbytes, gasnet_handlerarg_t ans);
+
+
+// Thid function should be called at static initialization time, before 
+// the main function which calls gasnet_attach
+void register_handler(handler_fn_t handler);
+int  find_handler(handler_fn_t handler);
+
+// Will hold interrupts upon construction and resume them again
+// when the object goes out of scope.  Occasionally you may 
+// have client code that optinally wants to hold interrupts, for
+// this situation you can pass false to the constructor and 
+// the object then has no affect
+struct scoped_interrupt_holder
+{
+  scoped_interrupt_holder(const bool &hold);
+  ~scoped_interrupt_holder();
+private:
+  bool m_hold;
+};
 
 } //namesapce z3gasnet
 #else

@@ -78,6 +78,7 @@ void dl_interface::check_reset() {
 
 
 lbool dl_interface::query(expr * query) {
+    TRACE("dhk",tout <<"in Query\n";);
     //we restore the initial state in the datalog context
     m_ctx.ensure_opened();
     m_refs.reset();
@@ -137,6 +138,7 @@ lbool dl_interface::query(expr * query) {
     }
 
     if (m_ctx.get_rules().get_output_predicates().empty()) {
+        TRACE("dhk",tout << "Setting unsat\n";);
         m_context->set_unsat();
         return l_false;
     }
@@ -159,6 +161,7 @@ lbool dl_interface::query(expr * query) {
     m_context->update_rules(m_spacer_rules);
     
     if (m_spacer_rules.get_rules().empty()) {
+        TRACE("dhk",tout << "Empty Rules\n";);
         m_context->set_unsat();
         IF_VERBOSE(2, model_smt2_pp(verbose_stream(), m, *m_context->get_model(),0););
         return l_false;

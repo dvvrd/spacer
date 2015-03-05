@@ -111,10 +111,46 @@ int get_num_handler_table_entires()
   return sizeof(htable)/sizeof(gasnet_handlerentry_t);
 }
 
+int find_handler(handler_fn_t handler)
+{
+  int tablesize = get_num_handler_table_entires();
+  for (int i = 0 i < tablesize; i++)
+  {
+    if (htable[i] == handler)
+    {
+      return i;
+    }
+  }
+  return -1;
 }
+
+void register_handler(handler_fn_t handler)
+{
+  if (find_handler(handler) == -1)
+  {
+    return;
+  }
+  //TODO look for reallocable boost b
+
+}
+
+struct handler_table
+{
+  std::vector<gasnet_handlerentry_t> m_table;
+};
 
 int ponghandeled = 0;
 
+scoped_interrupt_holder::scoped_interrupt_holder(const bool &hold) : m_hold(hold)
+{
+  if (m_hold) gasnet_hold_interrupts();
+}
+scoped_interrupt_holder::~scoped_interrupt_holder()
+{
+  if (m_hold) gasnet_resume_interrupts();
+}
+
+} /// end z3gasnet namespace
 
 #endif
 
