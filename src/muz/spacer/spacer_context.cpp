@@ -46,6 +46,7 @@ Notes:
 #include "scoped_proof.h"
 #include "qe_project.h"
 #include "blast_term_ite_tactic.h"
+#include "z3_gasnet.h"
 
 #include "timeit.h"
 #include "luby.h"
@@ -1570,6 +1571,12 @@ namespace spacer {
       gasnet_node_t mynode = gasnet_mynode();
       uintptr_t thiscontext = (uintptr_t) this;
 
+      TRACE("gas", tout << "Node " << mynode 
+          << " sending out context address\n";);
+      //each node sends to each other node the address
+      //of its context.  For identification it also sends
+      //which index of node it is, and the current pool index
+      //TODO rename "pool" to something better
       for (gasnet_node_t n = 0; n < nodecnt; n++)
       {
         Z3GASNET_CHECKCALL(gasnet_AMRequestMedium2(
@@ -1577,7 +1584,15 @@ namespace spacer {
               &thiscontext, sizeof(uintptr_t),
               mynode,m_pool_index));
       }
+
+      TRACE("gas", tout << "Node " << mynode 
+          << " waiting for all context addresses\n";);
+      //the when the request handler is run for each node in the job
+      //the pool will become full, wait until this happens
       GASNET_BLOCKUNTIL(pool_is_full(m_pool_index, nodecnt, true));
+
+      TRACE("gas", tout << "Node " << mynode 
+          << " recieved all context addresses\n";);
 
 #endif
     }
@@ -3031,6 +3046,23 @@ namespace spacer {
     }
 */
 #ifdef Z3GASNET
+
+  void context::set_context_pool_member(gasnet_token_t token, 
+      void* remote_context_addr, size_t size_of_context_ptr, 
+      gasnet_handlerarg_t remote_node_index, 
+      gasnet_handlerarg_t pool_index)
+  {
+    //handlers run in an implicit "hold interrupt" state and can 
+    //directly access variables shared between regular code and
+    //handler code
+    remote_contexts &rcs = m_context_pool[pool_index];
+    SASSERT(size_of_context_ptr == sizeof(uintptr_t));
+    uintptr_t remote_address = *((uintptr_t*)remote_context_addr);
+    rcs.insert(remote_context(remote_node_index,remote_address));
+  }
+
+
+
   bool context::pool_is_full(context::pool_id pool_index, 
       gasnet_node_t nodecnt, bool hold_interrupts)
   {
@@ -3048,19 +3080,20 @@ namespace spacer {
     return rcs.size() == nodecnt;
   }
 
-  int context::m_set_context_pool_member_handler_index=-1;
+  void context::register_set_context_pool_member_handler()
+  {
+    using namespace z3gasnet;
+    m_set_context_pool_member_handler_index = 
+      register_handler((handler_fn_t)set_context_pool_member);
+
+    Z3GASNET_INIT_VERBOSE(
+        << "context registered set_context_pool_member at index: "
+        << (int) context::m_set_context_pool_member_handler_index << "\n");
+  }
+
+  gasnet_handler_t context::m_set_context_pool_member_handler_index;
   context::context_pool context::m_context_pool;
   context::pool_id context::m_next_pool_index = 0;
-
-  struct context_handler_registrar
-  {
-    context_handler_registrar()
-    {
-      //TODO STOPPED HERE
-
-    }
-  }
-  static context_handler_registrar chr;
 
 #endif
 

@@ -37,6 +37,11 @@ Revision History:
 #include"env_params.h"
 #include"z3_gasnet.h"
 
+#ifdef Z3GASNET
+//Have to include in main  here for access to message handlers
+#include "spacer_context.h"
+#endif
+
 typedef enum { IN_UNSPECIFIED, IN_SMTLIB, IN_SMTLIB_2, IN_DATALOG, IN_DIMACS, IN_WCNF, IN_OPB, IN_Z3_LOG } input_kind;
 
 std::string         g_aux_input_file;
@@ -289,9 +294,13 @@ char const * get_extension(char const * file_name) {
     }
 }
 
+
 int main(int argc, char ** argv) {
 
     try{
+        //Register the messange handlers 
+        Z3GASNET_CALL(spacer::context::register_set_context_pool_member_handler());
+
         // gasnet places itself in front of any applicaiton cmdline handling
         // it will strip off the arguments it uses inside gasnet_init and 
         // the returned state of argc, argv can be used as normal by the the app
@@ -301,6 +310,7 @@ int main(int argc, char ** argv) {
               z3gasnet::get_handler_table(),
               z3gasnet::get_num_handler_table_entires(),
               gasnet_getMaxLocalSegmentSize(),0));
+
 
         unsigned return_value = 0;
         memory::initialize(0);

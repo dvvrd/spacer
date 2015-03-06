@@ -57,6 +57,14 @@ DM-XXXXXXX
 #include<gasnet.h>
 #include"lbool.h"
 #include"z3_exception.h"
+#include<ostream>
+#include<vector>
+
+#define Z3GASNET_INIT_VERBOSE_STREAM_NAME std::cout
+
+#define Z3GASNET_VERBOSE_STREAM( code, stream ) do {stream << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): "  code ; stream.flush();} while (false)
+
+#define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( code, Z3GASNET_INIT_VERBOSE_STREAM_NAME )
 
 #define Z3GASNET_CHECKCALL(fncall) do {                              \
     int _retval;                                                     \
@@ -88,10 +96,6 @@ bool node_works_on_item(
 
 bool node_is_master();
 
-extern int ponghandled;
-#define hidx_ping_shorthandler 201
-#define hidx_pong_shorthandler 202 
-
 extern const gasnet_handlerarg_t handlerarg_flag_value;
 
 gasnet_handlerentry_t *get_handler_table();
@@ -99,8 +103,6 @@ int get_num_handler_table_entires();
 
 typedef void (*handler_fn_t)();
 
-// finds the index in the gasnet handler table of a handler function
-int find_handler_index(handler_fn_t *fn);
 
 // For pdr_dl_interface.cpp 
 extern const int handler_contextsolve_index;
@@ -117,10 +119,20 @@ extern const int handler_solve_core_iteration_index;
 void handler_solve_core_iteration(gasnet_token_t token, void* context_addr, size_t nbytes, gasnet_handlerarg_t ans);
 
 
-// Thid function should be called at static initialization time, before 
+// This function should be called at static initialization time, before 
 // the main function which calls gasnet_attach
-void register_handler(handler_fn_t handler);
-int  find_handler(handler_fn_t handler);
+// It will return the index of the handler
+gasnet_handler_t register_handler(handler_fn_t handler);
+
+// This function will find a handler by its function pointer
+// if it is found its index will be returned.  Valid index values
+// for handlers are from [128..255] acprding to gasnet docs.  If it is not
+// found 0 will be returned, 0 should never be used as a user defined
+// handler value
+gasnet_handler_t  find_handler(handler_fn_t handler);
+
+// for debugging purposes show information of the handler table
+void handlertable_to_stream(std::ostream &strm);
 
 // Will hold interrupts upon construction and resume them again
 // when the object goes out of scope.  Occasionally you may 
@@ -133,6 +145,24 @@ struct scoped_interrupt_holder
   ~scoped_interrupt_holder();
 private:
   bool m_hold;
+};
+
+// holds the static data needed to initialize gasnet
+// gasnet wants us to provide the table of functions
+// to call before gasnet_attach(), while in main.  
+// message handlers are registered by client static
+// initializers called registrar s
+class z3gasnet_context
+{
+public:
+  static std::vector<gasnet_handlerentry_t> &get_handlertable() {
+    return z3gasnet_context::m_handlertable; 
+  }
+
+private:
+  static std::vector<gasnet_handlerentry_t> m_handlertable;
+public:
+  static int m_testval;
 };
 
 } //namesapce z3gasnet

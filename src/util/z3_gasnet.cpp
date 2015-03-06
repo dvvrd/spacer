@@ -76,6 +76,7 @@ bool node_is_master()
 }
 
 
+/*
 void ping_shorthandler(gasnet_token_t token) {
   std::cout << "ping handled on node" << gasnet_mynode() << std::endl;
   Z3GASNET_CHECKCALL(gasnet_AMReplyShort0(token, hidx_pong_shorthandler)); 
@@ -88,56 +89,81 @@ void pong_shorthandler(gasnet_token_t token)
   std::cout << "pong handled on node " << gasnet_mynode() << std::endl;
   ponghandled++;
 }
-
-const gasnet_handlerarg_t handlerarg_flag_value = std::numeric_limits<gasnet_handlerarg_t>::min();
-
-const int handler_contextsolve_index = 203;
-const int replyhandler_contextsolve_index = 204;
+*/
 
 typedef void (*handler_fn_t)();
-gasnet_handlerentry_t htable[] = {
-  { hidx_ping_shorthandler,  (handler_fn_t)ping_shorthandler  },
-  { hidx_pong_shorthandler,  (handler_fn_t)pong_shorthandler  },
-  { handler_contextsolve_index,  (handler_fn_t)handler_contextsolve  },
-  { replyhandler_contextsolve_index,  (handler_fn_t)replyhandler_contextsolve  } 
-};
 
 gasnet_handlerentry_t *get_handler_table()
 {
-  return htable;
+  return &(z3gasnet_context::get_handlertable()[0]);
 }
+
 int get_num_handler_table_entires()
 {
-  return sizeof(htable)/sizeof(gasnet_handlerentry_t);
+  //client handlers are given indexes [128..255]
+  SASSERT(z3gasnet_context::get_handlertable().size() < 255-128);
+  return (int) z3gasnet_context::get_handlertable().size();
 }
 
-int find_handler(handler_fn_t handler)
+gasnet_handler_t find_handler(handler_fn_t handler)
 {
   int tablesize = get_num_handler_table_entires();
-  for (int i = 0 i < tablesize; i++)
+  for (int i = 0; i < tablesize; i++)
   {
-    if (htable[i] == handler)
+    if (z3gasnet_context::get_handlertable()[i].fnptr == handler)
     {
-      return i;
+      return z3gasnet_context::get_handlertable()[i].index;
     }
   }
-  return -1;
+  return 0;
 }
 
-void register_handler(handler_fn_t handler)
+gasnet_handler_t register_handler(handler_fn_t handler)
 {
-  if (find_handler(handler) == -1)
+  Z3GASNET_INIT_VERBOSE(<< "Registering handler: " << (void*)handler 
+      << " in table: " << (void*) &z3gasnet_context::get_handlertable() << "\n";);
+
+  // gasnet documentation states user based indexes from [128..255]
+  gasnet_handler_t foundindex = find_handler(handler);
+  if (foundindex)
   {
-    return;
+    Z3GASNET_INIT_VERBOSE(<< "handler: " << (void*)handler << 
+        " was already registered at index: " << foundindex <<"\n";);
+    return foundindex;
   }
-  //TODO look for reallocable boost b
+  
+  size_t index = 128 + z3gasnet_context::get_handlertable().size();
+  SASSERT(index >=128 and index <=255);
+  
+  Z3GASNET_INIT_VERBOSE( << "adding handler: " << (void*)handler << 
+      " at index: " << index <<"\n";);
+  z3gasnet_context::get_handlertable().resize(z3gasnet_context::get_handlertable().size()+1);
+  gasnet_handlerentry_t &he = z3gasnet_context::get_handlertable().back();
+  //he.index = reinterpret_cast<gasnet_handler_t>(index);
+  he.index = index;
+  he.fnptr = handler;
 
+  Z3GASNET_INIT_VERBOSE( << "added handler entry: { index=" 
+      << (int) z3gasnet_context::get_handlertable().back().index << ", fnptr=" 
+      << (void*) z3gasnet_context::get_handlertable().back().fnptr << " } at position: "
+      << z3gasnet_context::get_handlertable().size() << "\n" ;);
+
+  return he.index;
 }
 
-struct handler_table
+void handlertable_to_stream(std::ostream &strm)
 {
-  std::vector<gasnet_handlerentry_t> m_table;
-};
+  int numentries = get_num_handler_table_entires();
+  
+//Z3GASNET_INIT_VERBOSE( << "table: " << (void*) & z3gasnet_context::get_handlertable() 
+//    << " has " <<  z3gasnet_context::get_handlertable().size() << " entries\n" ;);
+
+  for (int i = 0; i < numentries; i++)
+  {
+    gasnet_handlerentry_t &he = z3gasnet_context::get_handlertable()[i];
+    strm << (int) he.index << "\t:\t" << (void *) he.fnptr <<"\n";
+  }
+}
 
 int ponghandeled = 0;
 
@@ -150,8 +176,12 @@ scoped_interrupt_holder::~scoped_interrupt_holder()
   if (m_hold) gasnet_resume_interrupts();
 }
 
-} /// end z3gasnet namespace
+std::vector<gasnet_handlerentry_t> z3gasnet_context::m_handlertable;
 
+int z3gasnet_context::m_testval = 6;
+
+
+} /// end z3gasnet namespace
 #endif
 
 

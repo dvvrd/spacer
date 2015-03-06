@@ -731,12 +731,19 @@ namespace spacer {
         // each node will call each other node and pass its context ptr.  this
         // handler function will recive the remote context ptrs and store them
         // in the m_context_pool
-        static void set_context_pool_member(gasnet_token_t, void* remote_context_addr,
-            size_t size_of_context_ptr, gasnet_handlerarg_t remote_node_index);
+        static void set_context_pool_member(gasnet_token_t token, 
+            void* remote_context_addr, size_t size_of_context_ptr, 
+            gasnet_handlerarg_t remote_node_index, 
+            gasnet_handlerarg_t pool_index);
+
+    public:
+        // This should be called before asnet_attach, so in main
+        static void register_set_context_pool_member_handler();
+    private:
 
         // this will recieve the index for the set_context_pool_member handler
         // function after the gasnet handler table is constructed
-        static int m_set_context_pool_member_handler_index;
+        static gasnet_handler_t m_set_context_pool_member_handler_index;
 
         // this will check if the pool is full.  As pool is filled in by
         // message handlers.  If called while message handlers are filling
