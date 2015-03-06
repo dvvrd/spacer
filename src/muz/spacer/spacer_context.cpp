@@ -1571,8 +1571,10 @@ namespace spacer {
       gasnet_node_t mynode = gasnet_mynode();
       uintptr_t thiscontext = (uintptr_t) this;
 
-      TRACE("gas", tout << "Node " << mynode 
-          << " sending out context address\n";);
+
+      TRACE( "gas", Z3GASNET_VERBOSE_STREAM ( std::cout, 
+            << " sending out context address\n";););
+
       //each node sends to each other node the address
       //of its context.  For identification it also sends
       //which index of node it is, and the current pool index
@@ -1585,14 +1587,17 @@ namespace spacer {
               mynode,m_pool_index));
       }
 
-      TRACE("gas", tout << "Node " << mynode 
-          << " waiting for all context addresses\n";);
+      TRACE( "gas", Z3GASNET_VERBOSE_STREAM ( std::cout, 
+          << " waiting for all context addresses\n";););
+
       //the when the request handler is run for each node in the job
       //the pool will become full, wait until this happens
       GASNET_BLOCKUNTIL(pool_is_full(m_pool_index, nodecnt, true));
 
-      TRACE("gas", tout << "Node " << mynode 
-          << " recieved all context addresses\n";);
+      TRACE( "gas", Z3GASNET_VERBOSE_STREAM ( std::cout, 
+          << " got all context addresses\n";););
+
+
 
 #endif
     }

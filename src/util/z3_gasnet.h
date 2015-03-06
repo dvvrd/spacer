@@ -62,9 +62,9 @@ DM-XXXXXXX
 
 #define Z3GASNET_INIT_VERBOSE_STREAM_NAME std::cout
 
-#define Z3GASNET_VERBOSE_STREAM( code, stream ) do {stream << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): "  code ; stream.flush();} while (false)
+#define Z3GASNET_VERBOSE_STREAM( stream, code ) do {stream << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): "  code ; stream.flush();} while (false)
 
-#define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( code, Z3GASNET_INIT_VERBOSE_STREAM_NAME )
+#define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( Z3GASNET_INIT_VERBOSE_STREAM_NAME , code )
 
 #define Z3GASNET_CHECKCALL(fncall) do {                              \
     int _retval;                                                     \
@@ -96,7 +96,6 @@ bool node_works_on_item(
 
 bool node_is_master();
 
-extern const gasnet_handlerarg_t handlerarg_flag_value;
 
 gasnet_handlerentry_t *get_handler_table();
 int get_num_handler_table_entires();
