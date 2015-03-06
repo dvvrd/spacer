@@ -34,55 +34,8 @@ Revision History:
 #include "dl_transforms.h"
 #include "scoped_proof.h"
 #include "model_smt2_pp.h"
-#include "z3_gasnet.h"
 
 using namespace pdr;
-
-#ifdef Z3GASNET
-namespace z3gasnet
-{
-
-void dbgmsg(char *msg)
-{
-  std::stringstream ss;
-  ss << "Node " << gasnet_mynode() << ": " << msg << std::endl;
-  std::cout << ss.str();
-}
-
-gasnet_handlerarg_t contextsolve_answer = handlerarg_flag_value;
-
-void handler_contextsolve(
-    gasnet_token_t token, gasnet_handlerarg_t ans) 
-{
-  dbgmsg("handler_contextsolve begin");
-  //This call is executing on a slave node
-  //The master has sent his answer as "ans"
-  contextsolve_answer = ans;
-
-  //Send the reply to the master so he knows we received it
-  Z3GASNET_CHECKCALL(gasnet_AMReplyShort0(
-        token, replyhandler_contextsolve_index)); 
-
-  dbgmsg("handler_contextsolve end");
-}
-
-int contextsolve_nodes_recieved = 0;
-
-void replyhandler_contextsolve(
-    gasnet_token_t token) 
-{
-  dbgmsg("replyhandler_contextsolve begin");
-  //this call is executing on the master node
-  //it is in response to a contextsolve message
-  
-  //master increments how many slaves have replied that
-  //the message was recieved
-  contextsolve_nodes_recieved++;
-  dbgmsg("replyhandler_contextsolve begin");
-}
-
-}
-#endif
 
 dl_interface::dl_interface(datalog::context& ctx) : 
     engine_base(ctx.get_manager(), "pdr"),
@@ -219,62 +172,7 @@ lbool dl_interface::query(expr * query) {
           tout << "rules:\n";
           m_ctx.display_rules(tout);
           );
-#ifdef Z3GASNET
-    using namespace z3gasnet;
-
-    lbool ans;
-
-    Z3GASNET_CALL(gasnet_barrier_notify(Z3GASNET_BARRIER_CONTEXT_READY,0));
-    Z3GASNET_CHECKCALL(gasnet_barrier_wait(Z3GASNET_BARRIER_CONTEXT_READY,0));
-
-    gasnet_node_t numnodes = gasnet_nodes();
-
-    // for now do not worry about the contextsolve message being used more than once
-    if (contextsolve_nodes_recieved != 0 || 
-        contextsolve_answer != handlerarg_flag_value)
-    {
-        throw default_exception("contextsolve message was implemented as non-reentrant");
-    }
-
-    if (node_is_master())
-    {
-        ans = m_context->solve();
-
-        //send out the answer to all other nodes
-        for (gasnet_node_t node = 1; node < numnodes; node++)
-        {
-            gasnet_handlerarg_t haans = (gasnet_handlerarg_t) ans;
-            Z3GASNET_CHECKCALL(gasnet_AMRequestShort1(
-                  node, handler_contextsolve_index, haans));       
-        }
-    }
-
-    
-    if (node_is_master())
-    {
-        //master waits until all slaves have recieved the answer
-        GASNET_BLOCKUNTIL(contextsolve_nodes_recieved == numnodes-1);
-    }
-    else
-    {
-        //slaves wait until the answer is no longer equal to the flag value
-        GASNET_BLOCKUNTIL(contextsolve_answer != handlerarg_flag_value);
-        ans = (lbool) contextsolve_answer;
-    }
-    std::cout << "Returned answer: " << ans << std::endl;
-
-    // reset the global variables used during the message in case they are
-    // needed again
-    contextsolve_answer = handlerarg_flag_value;
-    contextsolve_nodes_recieved = 0;
-
-
-
-
-    return ans;
-
-#else
-#endif
+    return m_context->solve();
 
 }
 
@@ -365,7 +263,6 @@ lbool dl_interface::query_from_lvl (expr * query, unsigned lvl) {
         return l_false;
     }
         
-    std::cout << "Querying from level: " << lvl << std::endl;
     return m_context->solve_from_lvl (lvl);
 
 }
