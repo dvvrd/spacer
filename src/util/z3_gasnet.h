@@ -62,9 +62,12 @@ DM-XXXXXXX
 
 #define Z3GASNET_INIT_VERBOSE_STREAM_NAME std::cout
 
+#define Z3GASNET_TRACE_PREFIX tout << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): " 
+
 #define Z3GASNET_VERBOSE_STREAM( stream, code ) do {stream << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): "  code ; stream.flush();} while (false)
 
 #define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( Z3GASNET_INIT_VERBOSE_STREAM_NAME , code )
+
 
 #define Z3GASNET_CHECKCALL(fncall) do {                              \
     int _retval;                                                     \

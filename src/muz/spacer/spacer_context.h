@@ -736,10 +736,6 @@ namespace spacer {
             gasnet_handlerarg_t remote_node_index, 
             gasnet_handlerarg_t pool_index);
 
-    public:
-        // This should be called before asnet_attach, so in main
-        static void register_set_context_pool_member_handler();
-    private:
 
         // this will recieve the index for the set_context_pool_member handler
         // function after the gasnet handler table is constructed
@@ -751,6 +747,14 @@ namespace spacer {
         bool pool_is_full(
             context::pool_id pool_index, gasnet_node_t nodecnt, bool hold_interrupts);
      
+        // communicate among distributed spacers, collect information for how to
+        // perfrom further commmunicaiton amongst them
+        void init_distributed_context_pool();
+
+    public:
+        // This should be called before asnet_attach, so in main
+        static void register_set_context_pool_member_handler();
+    private:
 
 #endif
         

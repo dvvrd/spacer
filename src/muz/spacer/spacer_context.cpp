@@ -1565,46 +1565,13 @@ namespace spacer {
           m_expanded_lvl(0),
           m_cancel(false)
     {
-#ifdef Z3GASNET
-      m_pool_index = m_next_pool_index++;
-      gasnet_node_t nodecnt = gasnet_nodes();
-      gasnet_node_t mynode = gasnet_mynode();
-      uintptr_t thiscontext = (uintptr_t) this;
-
-
-      TRACE( "gas", Z3GASNET_VERBOSE_STREAM ( std::cout, 
-            << " sending out context address\n";););
-
-      //each node sends to each other node the address
-      //of its context.  For identification it also sends
-      //which index of node it is, and the current pool index
-      //TODO rename "pool" to something better
-      for (gasnet_node_t n = 0; n < nodecnt; n++)
-      {
-        Z3GASNET_CHECKCALL(gasnet_AMRequestMedium2(
-              n, m_set_context_pool_member_handler_index,
-              &thiscontext, sizeof(uintptr_t),
-              mynode,m_pool_index));
-      }
-
-      TRACE( "gas", Z3GASNET_VERBOSE_STREAM ( std::cout, 
-          << " waiting for all context addresses\n";););
-
-      //the when the request handler is run for each node in the job
-      //the pool will become full, wait until this happens
-      GASNET_BLOCKUNTIL(pool_is_full(m_pool_index, nodecnt, true));
-
-      TRACE( "gas", Z3GASNET_VERBOSE_STREAM ( std::cout, 
-          << " got all context addresses\n";););
-
-
-
-#endif
     }
 
     context::~context() {
         reset_core_generalizers();
         reset();
+        //TODO DHK gracefully leave distributed context pool
+
     }
 
     void context::reset() {
@@ -2013,6 +1980,9 @@ namespace spacer {
     }
 
   lbool context::solve(unsigned from_lvl) {
+#ifdef Z3GASNET
+    init_distributed_context_pool();
+#endif
     m_last_result = l_undef;
     try {
       m_last_result = solve_core (from_lvl);
@@ -2362,36 +2332,6 @@ namespace spacer {
         return expr_ref (m.mk_and (cex.size (), cex.c_ptr ()), m);
     }
 
-    lbool context::solve_core_iteration (unsigned &lvl)
-    {
-      m_expanded_lvl = lvl;
-      m_stats.m_max_query_lvl = lvl;
-      TRACE("dhk",tout << "On iteration" << lvl;);
-
-      if (check_reachability()) return l_true;
-          
-      if (lvl > 0 && !get_params ().pdr_skip_propagate ())
-        if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
-          
-      m_search.inc_level ();
-      lvl = m_search.max_level ();
-      m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
-      IF_VERBOSE(1,verbose_stream() << "Entering level "<< lvl << "\n";);
-      IF_VERBOSE(1, 
-                if (m_params.print_statistics ()) {
-                    statistics st;
-                    collect_statistics (st);
-                };
-                );
-      return l_undef;
-    }
-#ifdef Z3GASNET
-    void handler_solve_core_iteration(
-        gasnet_token_t token, void* context_addr, size_t nbytes, gasnet_handlerarg_t ans)
-    {
-
-    }
-#endif
 
     ///this is where everything starts
     lbool context::solve_core (unsigned from_lvl) 
@@ -2407,39 +2347,30 @@ namespace spacer {
       
       unsigned max_level = get_params ().pdr_max_level ();
       
-      lbool ans = l_undef;
-      for (unsigned i = 0; ans == l_undef && i < max_level; ++i) {
+      for (unsigned i = 0; i < max_level; ++i) {
         checkpoint();
-#ifdef Z3GASNET
-        using namespace z3gasnet;
-        if (node_is_master())
-        {
-          ans = solve_core_iteration(lvl);
-        //gasnet_node_t nodecnt = gasnet_nodes();
-        //for (gasnet_node_t node = 1; node < nodecnt; node++)
-        //{
-        //  Z3GASNET_CHECKCALL(gasnet_AMRequestMedium1(
-        //        node,handler_solve_core_iteration_index,
-        //        this,sizeof(context*),(gasnet_handlerarg_t)ans));
-        //}
+        m_expanded_lvl = lvl;
+        m_stats.m_max_query_lvl = lvl;
 
-          
-        }
-        else
-        {
-        }
-
-
-#else
-        ans = solve_core_iteration(lvl);
-#endif
-
+        if (check_reachability()) return l_true;
+            
+        if (lvl > 0 && !get_params ().pdr_skip_propagate ())
+          if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
+            
+        m_search.inc_level ();
+        lvl = m_search.max_level ();
+        m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
+        IF_VERBOSE(1,verbose_stream() << "Entering level "<< lvl << "\n";);
+        IF_VERBOSE(1, 
+                  if (m_params.print_statistics ()) {
+                      statistics st;
+                      collect_statistics (st);
+                  };
+                  );
       }
-      return ans;
+      return l_undef;
     }
 
-
-    //
     bool context::check_reachability () 
     {
       timeit _timer (get_verbosity_level () >= 1, "spacer::context::check_reachability", 
@@ -3051,6 +2982,44 @@ namespace spacer {
     }
 */
 #ifdef Z3GASNET
+    void context::init_distributed_context_pool()
+    {
+      m_pool_index = m_next_pool_index++;
+      gasnet_node_t nodecnt = gasnet_nodes();
+      gasnet_node_t mynode = gasnet_mynode();
+      uintptr_t thiscontext = (uintptr_t) this;
+
+      SASSERT(m_pool_index==0);
+
+
+      TRACE( "gas", Z3GASNET_TRACE_PREFIX  
+            << " sending out context address for pool: " << m_pool_index 
+            << "\n";);
+
+      //each node sends to each other node the address
+      //of its context.  For identification it also sends
+      //which index of node it is, and the current pool index
+      //TODO rename "pool" to something better
+      for (gasnet_node_t n = 0; n < nodecnt; n++)
+      {
+        Z3GASNET_CHECKCALL(gasnet_AMRequestMedium2(
+              n, m_set_context_pool_member_handler_index,
+              &thiscontext, sizeof(uintptr_t),
+              mynode,m_pool_index));
+      }
+
+//    TRACE( "gas", Z3GASNET_TRACE_PREFIX  
+//        << " waiting for all context addresses\n";);
+
+      //the when the request handler is run for each node in the job
+      //the pool will become full, wait until this happens
+      GASNET_BLOCKUNTIL(pool_is_full(m_pool_index, nodecnt, true));
+
+      TRACE( "gas", Z3GASNET_TRACE_PREFIX  
+          << " got all context addresses for pool: " << m_pool_index
+          << "\n";);
+    }
+
 
   void context::set_context_pool_member(gasnet_token_t token, 
       void* remote_context_addr, size_t size_of_context_ptr, 

@@ -16,11 +16,20 @@ Author:
 Revision History:
 
 --*/
+#include<unistd.h>
+#include<sstream>
 #include"trace.h"
 #include"str_hashtable.h"
 
 #ifdef _TRACE
-std::ofstream tout(".z3-trace"); 
+const char *get_trace_file_name()
+{
+  std::stringstream ss;
+  ss << ".z3-trace-" << ::getpid();
+  return ss.str().c_str();
+}
+
+std::ofstream tout(get_trace_file_name()); 
 #endif
 
 bool g_enable_all_trace_tags = false;
@@ -63,6 +72,6 @@ void close_trace() {
 
 void open_trace() {
 #ifdef _TRACE
-    tout.open(".z3-trace");
+    tout.open(get_trace_file_name());
 #endif
 }
