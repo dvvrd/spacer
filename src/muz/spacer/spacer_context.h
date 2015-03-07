@@ -713,11 +713,22 @@ namespace spacer {
 
 #ifdef Z3GASNET
 
-        //the node index and pointer to the context on that node
-        typedef std::pair<gasnet_node_t, uintptr_t> remote_context;
 
         //a correxponding set of remote context, one for each node
-        typedef std::set<remote_context> remote_contexts;
+        //the node index and pointer to the context on that node
+        typedef std::map<gasnet_node_t, uintptr_t> remote_context_ptrs;
+
+        //a correxponding set of shared_string 's, one for each node
+        //the node index and the string from that node
+        typedef std::map<gasnet_node_t, std::string> remote_shared_strings;
+
+        //all of the distributed state which is updated via GASNet 
+        //messages
+        struct remote_contexts
+        {
+          remote_context_ptrs m_context_ptrs;
+          remote_shared_strings m_shared_strings;
+        };
         
         //a map for tracking multiple sets of remote_contexts
         typedef int pool_id;
@@ -725,36 +736,70 @@ namespace spacer {
 
         static context_pool m_context_pool;
 
+        // modifiers (setters) for remote context data
+        static void set_remote_context_ptr( pool_id pool_index, gasnet_node_t node_index, uintptr_t context_ptr);
+
+        static void clear_remote_shared_string( pool_id pool_index);
+        static void set_remote_shared_string( pool_id pool_index, gasnet_node_t node_index, const std::string &shared_string);
+        static bool filled_remote_shared_string( pool_id pool_index, gasnet_node_t num_nodes, bool hold_interrupts);
+
+
         static pool_id m_next_pool_index;
         pool_id m_pool_index;
-
-        // each node will call each other node and pass its context ptr.  this
-        // handler function will recive the remote context ptrs and store them
-        // in the m_context_pool
-        static void set_context_pool_member(gasnet_token_t token, 
-            void* remote_context_addr, size_t size_of_context_ptr, 
-            gasnet_handlerarg_t remote_node_index, 
-            gasnet_handlerarg_t pool_index);
-
-
-        // this will recieve the index for the set_context_pool_member handler
-        // function after the gasnet handler table is constructed
-        static gasnet_handler_t m_set_context_pool_member_handler_index;
 
         // this will check if the pool is full.  As pool is filled in by
         // message handlers.  If called while message handlers are filling
         // the pool hold_interrupts should be set to true
         bool pool_is_full(
             context::pool_id pool_index, gasnet_node_t nodecnt, bool hold_interrupts);
-     
+
         // communicate among distributed spacers, collect information for how to
         // perfrom further commmunicaiton amongst them
         void init_distributed_context_pool();
 
+        
+        //
+        // GASNet Message -- set_context_pool_member
+        //
+
     public:
         // This should be called before asnet_attach, so in main
         static void register_set_context_pool_member_handler();
+
     private:
+        // this will recieve the index for the set_context_pool_member handler
+        // function after the gasnet handler table is constructed
+        static gasnet_handler_t m_set_context_pool_member_handler_index;
+
+        // each node will call each other node and pass its context ptr.  this
+        // handler function will recive the remote context ptrs and store them
+        // in the m_context_pool
+        static void set_context_pool_member_handler(gasnet_token_t token, 
+            void* remote_context_addr, size_t size_of_context_ptr, 
+            gasnet_handlerarg_t remote_node_index, 
+            gasnet_handlerarg_t pool_index);
+
+        //
+        // GASNet Message -- share_string
+        //
+    public:
+        // called before gasnet_attach to register handler in message
+        // handler table
+        static void register_share_string_handler();
+
+        // Share a string with all remote contexts
+        void share_string(const std::string &str);
+
+    private:
+        // see comment on m_set_context_pool_member_handler_index
+        static gasnet_handler_t m_share_string_handler_index;
+        // see comment on set_context_pool_member
+        static void share_string_handler(gasnet_token_t token, 
+            void* buffer, size_t num_bytes, 
+            gasnet_handlerarg_t remote_node_index, 
+            gasnet_handlerarg_t pool_index);
+
+
 
 #endif
         

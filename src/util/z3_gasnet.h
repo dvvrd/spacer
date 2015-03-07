@@ -85,8 +85,10 @@ DM-XXXXXXX
 
 #define Z3GASNET_CALL(fncall) do {fncall;} while(false)
 
-#define Z3GASNET_BARRIER_CONTEXT_READY 1
-#define Z3GASNET_BARRIER_CONTEXT_SOLVED 2
+//TODO DHK - abstrace barrier definitions so generic z3 header doesn't know
+//specifics of how barriers are used, but still ensures they are uniquely numbered
+//and there arn't too many of them
+#define Z3GASNET_BARRIER_LEVEL_SOLVED 1
 
 namespace z3gasnet
 {
