@@ -99,6 +99,9 @@ bool node_works_on_item(
     const size_t &node_index, const size_t &num_nodes, 
     const size_t &work_item_index);
 
+// When z3 is called from the PSMC Mesos Scheduler, the node given
+// an environment variable of PSMC_TASK_ID=1 shall be the master
+// otherwise the gasnet's  node number 0 is master
 bool node_is_master();
 
 

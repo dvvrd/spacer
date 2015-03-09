@@ -72,6 +72,12 @@ bool node_works_on_item(
 
 bool node_is_master()
 {
+  const char *taskid(std::getenv("PSMC_TASK_ID"));
+  if (taskid)
+  {
+    return taskid[0] == '1' and taskid[1] == 0;
+  }
+
   return !gasnet_mynode();
 }
 
