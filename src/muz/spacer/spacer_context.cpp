@@ -2360,6 +2360,24 @@ namespace spacer {
         if (lvl > 0 && !get_params ().pdr_skip_propagate ())
           if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
             
+#ifdef Z3GASNET
+
+
+        obj_map<func_decl, func_decl*>::iterator 
+          it = m_engine_pred2slice->begin(),
+          end = m_engine_pred2slice->end();
+        for(; it !=end; ++it)
+        {
+          func_decl *sliced = it->m_value;
+
+        }
+        //taken from spacer_dl_interface.cp
+        func_decl* pred = pred_orig;
+        m_pred2slice.find(pred_orig, pred);
+        SASSERT(pred);
+
+#endif
+
         m_search.inc_level ();
         lvl = m_search.max_level ();
         m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
@@ -2374,6 +2392,7 @@ namespace spacer {
 #ifdef Z3GASNET
 
         //TODO DHK - Ask if seperate spacers will always have same number of levels
+
         clear_remote_shared_string(m_pool_index);
         gasnet_barrier_notify(Z3GASNET_BARRIER_LEVEL_SOLVED,0);
         Z3GASNET_CHECKCALL(gasnet_barrier_wait(Z3GASNET_BARRIER_LEVEL_SOLVED,0));

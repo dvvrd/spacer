@@ -713,6 +713,14 @@ namespace spacer {
 
 #ifdef Z3GASNET
 
+      public:
+        //this information seemed to be needed to call get_cover_delta
+        //internally, it is passed in from the engine in spacer_dl_interface
+        void set_engine_pred2slice(obj_map<func_decl, func_decl*> *p2s) { m_engine_pred2slice = p2s;}
+      private:
+        //this pointer is owned by the spacer dl_interface engine, do not
+        //delete it
+        obj_map<func_decl, func_decl*> *m_engine_pred2slice;
 
         //a correxponding set of remote context, one for each node
         //the node index and pointer to the context on that node

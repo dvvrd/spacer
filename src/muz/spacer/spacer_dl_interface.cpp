@@ -258,6 +258,10 @@ lbool dl_interface::query_from_lvl (expr * query, unsigned lvl) {
         return l_false;
     }
         
+#ifdef Z3GASNET
+    m_context->set_engine_pred2slice(&m_pred2slice);
+#endif
+
     return m_context->solve (lvl);
 
 }
