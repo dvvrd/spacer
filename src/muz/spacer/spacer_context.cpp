@@ -2373,10 +2373,15 @@ namespace spacer {
 
 #ifdef Z3GASNET
 
-        //TODO DHK - Ask if seperate spacers will always have same number of levels
         clear_remote_shared_string(m_pool_index);
+#ifdef Z3GASNET_PROFILING
+        m_stats.m_msg_wait.start();
+#endif
         gasnet_barrier_notify(Z3GASNET_BARRIER_LEVEL_SOLVED,0);
         Z3GASNET_CHECKCALL(gasnet_barrier_wait(Z3GASNET_BARRIER_LEVEL_SOLVED,0));
+#ifdef Z3GASNET_PROFILING
+        m_stats.m_msg_wait.stop();
+#endif
         std::stringstream ss;
         ss << "Node " << gasnet_mynode() << " is at level " << lvl;
         share_string(ss.str());
@@ -2924,6 +2929,11 @@ namespace spacer {
         st.update("SPACER max depth", m_stats.m_max_depth);
         st.update("SPACER inductive level", m_inductive_lvl);
         st.update("SPACER cex depth", m_stats.m_cex_depth);
+#ifdef Z3GASNET_PROFILING
+        st.update("SPACER num messages", m_stats.m_msg_cnt);
+        st.update("SPACER message bytes", m_stats.m_msg_bytes);
+        st.update("SPACER message wait", m_stats.m_msg_wait.get_seconds());
+#endif
         m_pm.collect_statistics(st);
 
         for (unsigned i = 0; i < m_core_generalizers.size(); ++i) {
@@ -2938,6 +2948,12 @@ namespace spacer {
         verbose_stream () << "BRUNCH_STAT inductive_lvl " << m_inductive_lvl << "\n";
         verbose_stream () << "BRUNCH_STAT max_depth " << m_stats.m_max_depth << "\n";
         verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_cex_depth << "\n";
+#ifdef Z3GASNET_PROFILING
+        verbose_stream () << "BRUNCH_STAT msg_cnt " << m_stats.m_msg_cnt << "\n";
+        verbose_stream () << "BRUNCH_STAT msg_bytes " << m_stats.m_msg_bytes << "\n";
+        verbose_stream () << "BRUNCH_STAT msg_wait " << m_stats.m_msg_wait.get_seconds() << "\n";
+#endif
+
     }
 
     void context::reset_statistics() {
@@ -3084,18 +3100,25 @@ namespace spacer {
       //TODO rename "pool" to something better
       for (gasnet_node_t n = 0; n < nodecnt; n++)
       {
+#ifdef Z3GASNET_PROFILING
+        m_stats.m_msg_cnt++;
+        m_stats.m_msg_bytes+=sizeof(uintptr_t) + 2* sizeof(gasnet_handlerarg_t);
+#endif
         Z3GASNET_CHECKCALL(gasnet_AMRequestMedium2(
               n, m_set_context_pool_member_handler_index,
               &thiscontext, sizeof(uintptr_t),
               mynode,m_pool_index));
       }
 
-//    TRACE( "gas", Z3GASNET_TRACE_PREFIX  
-//        << " waiting for all context addresses\n";);
-
       //the when the request handler is run for each node in the job
       //the pool will become full, wait until this happens
+#ifdef Z3GASNET_PROFILING
+      m_stats.m_msg_wait.start();
+#endif
       GASNET_BLOCKUNTIL(pool_is_full(m_pool_index, nodecnt, true));
+#ifdef Z3GASNET_PROFILING
+      m_stats.m_msg_wait.stop();
+#endif
 
       STRACE( "gas", Z3GASNET_TRACE_PREFIX  
           << " got all context addresses for pool: " << m_pool_index
@@ -3146,14 +3169,24 @@ namespace spacer {
 
       for (gasnet_node_t n = 0; n < nodecnt; n++)
       {
+#ifdef Z3GASNET_PROFILING
+        m_stats.m_msg_cnt++;
+        m_stats.m_msg_bytes+=str.size() + 2*sizeof(gasnet_handlerarg_t);
+#endif
         Z3GASNET_CHECKCALL(gasnet_AMRequestMedium2(
               n, m_share_string_handler_index,
               const_cast<char*>(str.c_str()), str.size(),
               mynode,m_pool_index));
       }
 
+#ifdef Z3GASNET_PROFILING
+      m_stats.m_msg_wait.start();
+#endif
       GASNET_BLOCKUNTIL(
           filled_remote_shared_string(m_pool_index, nodecnt, true));
+#ifdef Z3GASNET_PROFILING
+      m_stats.m_msg_wait.stop();
+#endif
 
       STRACE( "gas", Z3GASNET_TRACE_PREFIX  
           << " got all strings for pool: " << m_pool_index

@@ -66,7 +66,11 @@ DM-XXXXXXX
 
 #define Z3GASNET_VERBOSE_STREAM( stream, code ) do {stream << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): "  code ; stream.flush();} while (false)
 
-#define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( Z3GASNET_INIT_VERBOSE_STREAM_NAME , code )
+// no-op on these messages, they are just used during construction
+#define Z3GASNET_INIT_VERBOSE( code ) 
+// when debugging things that occur before normal z3 tracing and verbose mechanims are initialized, you
+// can uncomment the following
+// #define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( Z3GASNET_INIT_VERBOSE_STREAM_NAME , code )
 
 
 #define Z3GASNET_CHECKCALL(fncall) do {                              \
@@ -89,6 +93,11 @@ DM-XXXXXXX
 //specifics of how barriers are used, but still ensures they are uniquely numbered
 //and there arn't too many of them
 #define Z3GASNET_BARRIER_LEVEL_SOLVED 1
+
+//We adopt trace mode as a sign that we should profile
+#ifdef _TRACE
+#define Z3GASNET_PROFILING
+#endif
 
 namespace z3gasnet
 {

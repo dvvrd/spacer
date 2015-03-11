@@ -33,7 +33,9 @@ Revision History:
 #include "spacer_reachable_cache.h"
 #include "fixedpoint_params.hpp"
 #include "z3_gasnet.h"
-#include <set>
+#ifdef Z3GASNET_PROFILING
+#include "spacer_wall_stopwatch.h"
+#endif
 
 
 namespace datalog {
@@ -689,6 +691,12 @@ namespace spacer {
             unsigned m_max_query_lvl;
             unsigned m_max_depth;
             unsigned m_cex_depth;
+#ifdef Z3GASNET_PROFILING
+            unsigned  m_msg_cnt;
+            unsigned m_msg_bytes;
+            spacer_wall_stopwatch m_msg_wait;
+#endif
+
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
         };
