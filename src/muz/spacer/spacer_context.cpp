@@ -2336,6 +2336,42 @@ namespace spacer {
     }
 
 
+    //call this and it constructs the string
+    void context::send_string()
+    {
+      expr_ref res(m);
+      expr_ref_vector invs(m);
+
+      decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
+      for (; it != end; ++it) {
+        checkpoint();            
+        pred_transformer& r = *it->m_value;
+
+        expr_ref inv = r.get_formulas(infty_level(),false);
+
+        if (m.is_true(inv)) continue;
+
+        // replace local constants by bound variables.
+        expr_ref_vector args(m);
+        for (unsigned i = 0; i < r.sig_size(); ++i) {
+            args.push_back(m.mk_const(m_pm.o2n(r.sig(i), 0)));
+        }
+
+
+        expr_ref pred(m);
+        pred = m.mk_app(r.head (), r.sig_size(), args.c_ptr());
+
+        invs.push_back(m.mk_implies(pred, inv));
+        
+      }
+
+      res = m_pm.mk_and(invs);
+
+      STRACE("gas", Z3GASNET_TRACE_PREFIX 
+          << "shared_string: " << mk_pp(res, m) << "\n" ;);
+
+    }
+
     ///this is where everything starts
     lbool context::solve_core (unsigned from_lvl) 
     {
@@ -2358,7 +2394,16 @@ namespace spacer {
         if (check_reachability()) return l_true;
             
         if (lvl > 0 && !get_params ().pdr_skip_propagate ())
-          if (propagate(m_expanded_lvl, lvl, UINT_MAX)) return l_false;
+        {
+          bool ans = propagate(m_expanded_lvl, lvl, UINT_MAX);
+
+          //DHK broadcast m_invariants
+          send_string();
+
+
+          
+          if (ans) return l_false;
+        }
             
         m_search.inc_level ();
         lvl = m_search.max_level ();
@@ -2558,6 +2603,13 @@ namespace spacer {
 
         return l_false;
       }
+
+      //DHK recieve invariants from others
+//    while(s = queuedstrings.pop()
+//        {
+//        }
+//        ;
+
       
       lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
                          reach_pred_used, num_reuse_reach);

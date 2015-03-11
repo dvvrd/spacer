@@ -123,6 +123,7 @@ namespace spacer {
         /// map property to level where it occurs.
         obj_map<expr, unsigned>      m_prop2level;      
         /// properties that are invariant.
+        //DHK could be shared across all nodes in job
         expr_ref_vector              m_invariants;      
         
         void simplify_formulas (tactic& tac, expr_ref_vector& v);
@@ -720,6 +721,9 @@ namespace spacer {
         proof_converter_ref  m_pc;
 
 #ifdef Z3GASNET
+
+        //DHK rename to get_invariants
+        void send_string();
 
 
         //a correxponding set of remote context, one for each node
