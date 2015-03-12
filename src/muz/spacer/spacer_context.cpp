@@ -2977,4 +2977,51 @@ namespace spacer {
     }
 */
 
+  expr_ref context::get_constraints (unsigned level)
+  {
+    expr_ref res(m);
+    expr_ref_vector constraints(m);
+
+    decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
+    for (; it != end; ++it) {
+      pred_transformer& r = *it->m_value;
+      expr_ref c = r.get_formulas(level, false);
+
+      if (m.is_true(c)) continue;
+
+      // replace local constants by bound variables.
+      expr_ref_vector args(m);
+      for (unsigned i = 0; i < r.sig_size(); ++i) 
+        args.push_back(m.mk_const(m_pm.o2n(r.sig(i), 0)));
+
+      expr_ref pred(m);
+      pred = m.mk_app(r.head (), r.sig_size(), args.c_ptr());
+
+      constraints.push_back(m.mk_implies(pred, c));
+    }
+
+    return m_pm.mk_and(constraints);
+  }
+  
+  void context::add_constraints (unsigned level, expr_ref c)
+  {
+    expr_ref_vector constraints (m);
+    constraints.push_back (c);
+    qe::flatten_and (constraints);
+    
+    for (unsigned i = 0, sz = constraints.size (); i < sz; ++i)
+    {
+      expr *c = constraints.get (i);
+      expr *e1, *e2;
+      if (m.is_implies (c, e1, e2))
+      {
+        SASSERT (is_app (e1));
+        pred_transformer *r = 0;
+        if (m_rels.find (to_app (e1)->get_decl (), r))
+          r->add_lemma (e2, level);
+      }
+    }
+  }
+  
+  
 }
