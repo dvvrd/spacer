@@ -68,10 +68,11 @@ DM-XXXXXXX
 #define Z3GASNET_VERBOSE_STREAM( stream, code ) do {stream << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): "  code ; stream.flush();} while (false)
 
 // no-op on these messages, they are just used during construction
-#define Z3GASNET_INIT_VERBOSE( code ) 
+// #define Z3GASNET_INIT_VERBOSE( code ) 
+
 // when debugging things that occur before normal z3 tracing and verbose mechanims are initialized, you
 // can uncomment the following
-// #define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( Z3GASNET_INIT_VERBOSE_STREAM_NAME , code )
+#define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( Z3GASNET_INIT_VERBOSE_STREAM_NAME , code )
 
 
 #define Z3GASNET_CHECKCALL(fncall) do {                              \
@@ -191,7 +192,7 @@ class msg_rec
     gasnet_node_t m_node_index;
 };
 
-typedef std::queue<msg_rec> msg_queue;
+typedef std::queue<msg_rec*> msg_queue;
 
 
 // holds the static data needed to initialize gasnet
@@ -222,8 +223,10 @@ public:
   // -- static const char * const get_front_msg(size_t &string_size);
 
   //removes the first message in this node's queue, and returns
-  //the number of elements that remain in the queue
-  static size_t pop_front_msg(std::string&  next_message);
+  //false if there were no elements and next_message is unmodified
+  //returns true and sets next_messsage to the message before popping
+  //it from the queue
+  static bool pop_front_msg(std::string& next_message);
 
 
 

@@ -188,17 +188,16 @@ msg_rec::msg_rec(
     const void * const buffer, 
     const size_t &buffer_size, 
     const gasnet_handler_t &sender_node_index) :
-  //m_buffer(memory::allocate(buffer_size)),
-//  m_buffer(memory::allocate(buffer_size)),
+    m_buffer(memory::allocate(buffer_size)),
   m_buffer_size(buffer_size),
   m_node_index(sender_node_index) 
 {
-  //memcpy(m_buffer,buffer,buffer_size);
+  memcpy(m_buffer,buffer,buffer_size);
 }
 
 msg_rec::~msg_rec()
 {
-  //memory::deallocate(m_buffer);
+  memory::deallocate(m_buffer);
 }
 
 void context::register_queue_msg_handler()
@@ -208,7 +207,7 @@ void context::register_queue_msg_handler()
 
   Z3GASNET_INIT_VERBOSE(
       << "queue_msg_handler registered as index: "
-      << (int) m_queue_msg_handler_index)
+      << (int) m_queue_msg_handler_index << "\n";);
 }
 
 void context::queue_msg_handler(gasnet_token_t token,
@@ -216,19 +215,25 @@ void context::queue_msg_handler(gasnet_token_t token,
           gasnet_handlerarg_t sender_node_index)
 {
     STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "handling message from node: " << sender_node_index << "\n" ;);
-  //dhk m_msg_queue.push(alloc(
-  m_msg_queue.push(msg_rec(
-        buffer, buffer_size, sender_node_index));
+        << "handling message of " << buffer_size 
+        << " bytes, from node: " << sender_node_index << "\n" ;);
+
+    //We don't have a use case for sending ourselves messages at this time
+    //but there is no reason we couldn't support this
+    SASSERT(sender_node_index != gasnet_mynode());
+
+    m_msg_queue.push(alloc( msg_rec, 
+          buffer, buffer_size, sender_node_index));
 }
 
 void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
 {
     STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "sending message to node: " << node_index << "\n" ;);
+        << "sending " << msg.size()+1 << " bytes to node: " << node_index 
+        << ", using handler: " << (int) m_queue_msg_handler_index << "\n" ;);
     Z3GASNET_CHECKCALL(gasnet_AMRequestMedium1(
           node_index, m_queue_msg_handler_index,
-          const_cast<char*>(msg.c_str()), msg.size()+1, node_index));
+          const_cast<char*>(msg.c_str()), msg.size()+1, gasnet_mynode() ));
 }
   
 /*
@@ -246,24 +251,37 @@ const char * const context::get_front_msg(size_t &string_size)
 }
 */
   
-size_t context::pop_front_msg(std::string &next_message)
+bool context::pop_front_msg(std::string &next_message)
 {
-  //msg_rec *m = NULL;
+  // Poll GASNet to assure any pending message handlers get called
+  Z3GASNET_CHECKCALL(gasnet_AMPoll());
+
+  msg_rec *m = NULL;
   size_t n;
   {
+    // use the scope lock to access the same data which is accessed
+    // in the context of a message interrupt
     scoped_interrupt_holder interrupt_lock(true);
-    //dhk m = m_msg_queue.front();
-    
-    // -- m_msg_queue.pop();
-    
     n = m_msg_queue.size();
-    STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "msg_q poppeed 1, now has " << n << "\n" ;);
+    if (n)
+    {
+        m = m_msg_queue.front();    
+        m_msg_queue.pop();
+    }
   }
-  //TODO replace with .assign
-  //dhk next_message = std::string((const char *) m->get_buffer());
-  //dhk dealloc(m);
-  return n;
+
+  //TODO replace with .assign, should be more efficient
+  if (m)
+  {
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "dequeued a msg of " << m->get_buffer_size()
+        << " bytes and contains " << n-1 << " more messages\n" ;);
+
+    next_message = std::string((char *) m->get_buffer(),m->get_buffer_size()-1);
+    dealloc(m);
+  }
+
+  return n > 0;
 }
 
 std::vector<gasnet_handlerentry_t> context::m_handlertable;

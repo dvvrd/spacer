@@ -1576,8 +1576,9 @@ namespace spacer {
         reset_core_generalizers();
         reset();
         //TODO DHK gracefully leave distributed context pool
-
+        
     }
+
 
     void context::reset() {
         TRACE("spacer", tout << "\n";);
@@ -2361,14 +2362,21 @@ namespace spacer {
         {
           bool ans = propagate(m_expanded_lvl, lvl, UINT_MAX);
 
-          //DHK broadcast m_invariants
 #ifdef Z3GASNET
+          // generate string of all invariants, and broadcast it to all 
+          // nodes other then this node
+
           get_invariants(m_invariants);
 
           gasnet_node_t mynode = gasnet_mynode();
           gasnet_node_t num_nodes = gasnet_nodes();
-          for (gasnet_node_t n = 0; n < num_nodes && n != mynode; n++)
+          for (gasnet_node_t n = 0; n < num_nodes;  n++)
           {
+            if (n == mynode) continue;
+
+            STRACE("gas", Z3GASNET_TRACE_PREFIX 
+                << "sending invariants to node: " << n  << "\n" ;);
+
             Z3GASNET_PROFILING_CALL(m_stats.m_msg_send.start());
 
             z3gasnet::context::transmit_msg(n,m_invariants.c_str());
@@ -2551,24 +2559,18 @@ namespace spacer {
       std::string remote_node_invariants;
       while (z3gasnet::context::pop_front_msg(remote_node_invariants))
       {
-    //  size_t size;
-    //  const char * const c_str = z3gasnet::context::get_front_msg(size);
-    //  if (!c_str) break;
-    //  remote_node_invariants.assign(c_str,size);
+
+        // TODO Use the invariants which came from the remote node
 
 
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
-            << "recieved invariants: " << remote_node_invariants << "\n" ;);
+            << "recieved invariants with string length " 
+            << remote_node_invariants.size() << "\n" ;);
 
+        break;
       }
       
 #endif
-      //DHK recieve invariants from others
-//    while(s = queuedstrings.pop()
-//        {
-//        }
-//        ;
-
       
       lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
                          reach_pred_used, num_reuse_reach);
