@@ -59,6 +59,7 @@ DM-XXXXXXX
 #include"z3_exception.h"
 #include<ostream>
 #include<vector>
+#include<queue>
 
 #define Z3GASNET_INIT_VERBOSE_STREAM_NAME std::cout
 
@@ -96,7 +97,16 @@ DM-XXXXXXX
 
 //We adopt trace mode as a sign that we should profile
 #ifdef _TRACE
+//the define can be used for larger sections of code only
+//applicable with proiling
 #define Z3GASNET_PROFILING
+#ifdef Z3GASNET_PROFILING
+//this define can be used for  sections of code applicable
+//only when profiling
+#define Z3GASNET_PROFILING_CALL(code) code;
+#else
+#define Z3GASNET_PROFILING_CALL(code)
+#endif
 #endif
 
 namespace z3gasnet
@@ -163,22 +173,68 @@ private:
   bool m_hold;
 };
 
+class msg_rec
+{
+  public:
+    msg_rec(
+        const void * const buffer, 
+        const size_t &buffer_size, 
+        const gasnet_handler_t &sender_node_index);
+    ~msg_rec();
+
+    const void * const get_buffer() const { return m_buffer; }
+    size_t get_buffer_size() const { return m_buffer_size; }
+
+  private:
+    void *m_buffer;
+    size_t m_buffer_size;
+    gasnet_node_t m_node_index;
+};
+
+typedef std::queue<msg_rec> msg_queue;
+
+
 // holds the static data needed to initialize gasnet
 // gasnet wants us to provide the table of functions
 // to call before gasnet_attach(), while in main.  
 // message handlers are registered by client static
 // initializers called registrar s
-class z3gasnet_context
+//
+// holds the global message q
+class context
 {
 public:
   static std::vector<gasnet_handlerentry_t> &get_handlertable() {
-    return z3gasnet_context::m_handlertable; 
+    return context::m_handlertable; 
   }
+  static void register_queue_msg_handler();
+
+  //sends a string message to the node at node_index
+  static void transmit_msg(gasnet_node_t node_index, const std::string &msg);
+  
+  //gets the contents of the first message in this node's
+  //queue interpreted as a string
+  //the returned pointer should NOT be deallocated by the caller.
+  //if the message queue is empty, NULL is returned and string_size is unmodified
+  //otherwise the returned pointer points to a null terminated string 
+  //and string_size is set to the string length, this is the number of charachters 
+  //before (and not including) the null terminator
+  // -- static const char * const get_front_msg(size_t &string_size);
+
+  //removes the first message in this node's queue, and returns
+  //the number of elements that remain in the queue
+  static size_t pop_front_msg(std::string&  next_message);
+
+
 
 private:
+  static void queue_msg_handler(gasnet_token_t token,
+            void* buffer, size_t buffer_size, 
+            gasnet_handlerarg_t sender_node_index);
+
   static std::vector<gasnet_handlerentry_t> m_handlertable;
-public:
-  static int m_testval;
+  static msg_queue m_msg_queue;
+  static gasnet_handler_t m_queue_msg_handler_index;
 };
 
 } //namesapce z3gasnet

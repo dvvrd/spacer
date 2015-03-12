@@ -696,6 +696,7 @@ namespace spacer {
             unsigned  m_msg_cnt;
             unsigned m_msg_bytes;
             spacer_wall_stopwatch m_msg_wait;
+            spacer_wall_stopwatch m_msg_send;
 #endif
 
             stats() { reset(); }
@@ -723,7 +724,8 @@ namespace spacer {
 #ifdef Z3GASNET
 
         //DHK rename to get_invariants
-        void send_string();
+        std::string m_invariants;
+        void get_invariants(std::string &invariants);
 
 
         //a correxponding set of remote context, one for each node

@@ -46,8 +46,10 @@ Notes:
 #include "scoped_proof.h"
 #include "qe_project.h"
 #include "blast_term_ite_tactic.h"
+#ifdef Z3GASNET
 #include "z3_gasnet.h"
-
+#include <sstream>
+#endif
 //TODO DHL - added for debugging
 #include<sstream>
 
@@ -1983,9 +1985,6 @@ namespace spacer {
     }
 
   lbool context::solve(unsigned from_lvl) {
-#ifdef Z3GASNET
-    init_distributed_context_pool();
-#endif
     m_last_result = l_undef;
     try {
       m_last_result = solve_core (from_lvl);
@@ -2336,41 +2335,6 @@ namespace spacer {
     }
 
 
-    //call this and it constructs the string
-    void context::send_string()
-    {
-      expr_ref res(m);
-      expr_ref_vector invs(m);
-
-      decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
-      for (; it != end; ++it) {
-        checkpoint();            
-        pred_transformer& r = *it->m_value;
-
-        expr_ref inv = r.get_formulas(infty_level(),false);
-
-        if (m.is_true(inv)) continue;
-
-        // replace local constants by bound variables.
-        expr_ref_vector args(m);
-        for (unsigned i = 0; i < r.sig_size(); ++i) {
-            args.push_back(m.mk_const(m_pm.o2n(r.sig(i), 0)));
-        }
-
-
-        expr_ref pred(m);
-        pred = m.mk_app(r.head (), r.sig_size(), args.c_ptr());
-
-        invs.push_back(m.mk_implies(pred, inv));
-        
-      }
-
-      res = m_pm.mk_and(invs);
-
-      STRACE("gas", Z3GASNET_TRACE_PREFIX 
-          << "shared_string: " << mk_pp(res, m) << "\n" ;);
-
-    }
 
     ///this is where everything starts
     lbool context::solve_core (unsigned from_lvl) 
@@ -2398,9 +2362,23 @@ namespace spacer {
           bool ans = propagate(m_expanded_lvl, lvl, UINT_MAX);
 
           //DHK broadcast m_invariants
-          send_string();
+#ifdef Z3GASNET
+          get_invariants(m_invariants);
 
+          gasnet_node_t mynode = gasnet_mynode();
+          gasnet_node_t num_nodes = gasnet_nodes();
+          for (gasnet_node_t n = 0; n < num_nodes && n != mynode; n++)
+          {
+            Z3GASNET_PROFILING_CALL(m_stats.m_msg_send.start());
 
+            z3gasnet::context::transmit_msg(n,m_invariants.c_str());
+
+            Z3GASNET_PROFILING_CALL(
+                m_stats.m_msg_send.stop();
+                m_stats.m_msg_bytes += m_invariants.size()+ 1 + 
+                    sizeof(gasnet_handlerarg_t))
+          }
+#endif
           
           if (ans) return l_false;
         }
@@ -2415,41 +2393,6 @@ namespace spacer {
                       collect_statistics (st);
                   };
                   );
-
-#ifdef Z3GASNET
-
-        clear_remote_shared_string(m_pool_index);
-#ifdef Z3GASNET_PROFILING
-        m_stats.m_msg_wait.start();
-#endif
-        gasnet_barrier_notify(Z3GASNET_BARRIER_LEVEL_SOLVED,0);
-        Z3GASNET_CHECKCALL(gasnet_barrier_wait(Z3GASNET_BARRIER_LEVEL_SOLVED,0));
-#ifdef Z3GASNET_PROFILING
-        m_stats.m_msg_wait.stop();
-#endif
-        std::stringstream ss;
-        ss << "Node " << gasnet_mynode() << " is at level " << lvl;
-        share_string(ss.str());
-        remote_shared_strings &rs = m_context_pool[m_pool_index].m_shared_strings;
-        for (gasnet_node_t n = 0; n < gasnet_nodes(); n++)
-        {
-          std::string &s = rs[n];
-
-          STRACE("gas", Z3GASNET_TRACE_PREFIX 
-              << "Node " << n << " shared_string: " << s << "\n" ;);
-
-        }
-
-        if (!z3gasnet::node_is_master())
-        {
-          //Z3GASNET_CHECKCALL(gasnet_AMRequestMedium2(
-          //      n, m_set_context_pool_member_handler_index,
-          //      &thiscontext, sizeof(uintptr_t),
-          //      mynode,m_pool_index));
-        }
-
-#endif
-
       }
       return l_undef;
     }
@@ -2604,6 +2547,22 @@ namespace spacer {
         return l_false;
       }
 
+#ifdef Z3GASNET
+      std::string remote_node_invariants;
+      while (z3gasnet::context::pop_front_msg(remote_node_invariants))
+      {
+    //  size_t size;
+    //  const char * const c_str = z3gasnet::context::get_front_msg(size);
+    //  if (!c_str) break;
+    //  remote_node_invariants.assign(c_str,size);
+
+
+        STRACE("gas", Z3GASNET_TRACE_PREFIX 
+            << "recieved invariants: " << remote_node_invariants << "\n" ;);
+
+      }
+      
+#endif
       //DHK recieve invariants from others
 //    while(s = queuedstrings.pop()
 //        {
@@ -2985,6 +2944,7 @@ namespace spacer {
         st.update("SPACER num messages", m_stats.m_msg_cnt);
         st.update("SPACER message bytes", m_stats.m_msg_bytes);
         st.update("SPACER message wait", m_stats.m_msg_wait.get_seconds());
+        st.update("SPACER message send", m_stats.m_msg_send.get_seconds());
 #endif
         m_pm.collect_statistics(st);
 
@@ -3004,6 +2964,7 @@ namespace spacer {
         verbose_stream () << "BRUNCH_STAT msg_cnt " << m_stats.m_msg_cnt << "\n";
         verbose_stream () << "BRUNCH_STAT msg_bytes " << m_stats.m_msg_bytes << "\n";
         verbose_stream () << "BRUNCH_STAT msg_wait " << m_stats.m_msg_wait.get_seconds() << "\n";
+        verbose_stream () << "BRUNCH_STAT msg_send " << m_stats.m_msg_send.get_seconds() << "\n";
 #endif
 
     }
@@ -3083,6 +3044,49 @@ namespace spacer {
     }
 */
 #ifdef Z3GASNET
+
+    //call this and it constructs the string
+    void context::get_invariants(std::string &invariants)
+    {
+      expr_ref res(m);
+      expr_ref_vector invs(m);
+
+      decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
+      for (; it != end; ++it) {
+        checkpoint();            
+        pred_transformer& r = *it->m_value;
+
+        expr_ref inv = r.get_formulas(infty_level(),false);
+
+        if (m.is_true(inv)) continue;
+
+        // replace local constants by bound variables.
+        expr_ref_vector args(m);
+        for (unsigned i = 0; i < r.sig_size(); ++i) {
+            args.push_back(m.mk_const(m_pm.o2n(r.sig(i), 0)));
+        }
+
+
+        expr_ref pred(m);
+        pred = m.mk_app(r.head (), r.sig_size(), args.c_ptr());
+
+        invs.push_back(m.mk_implies(pred, inv));
+        
+      }
+
+      res = m_pm.mk_and(invs);
+
+      std::stringstream ss;
+      ss << mk_pp(res,m);
+      invariants.assign(ss.str());
+
+//    z3gasnet::context::queue_msg(invstr);
+
+//    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+//        << "shared_string: " << mk_pp(res, m) << "\n" ;);
+
+    }
+
   bool context::pool_is_full(context::pool_id pool_index, 
       gasnet_node_t nodecnt, bool hold_interrupts)
   {

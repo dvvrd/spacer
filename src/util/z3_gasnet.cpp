@@ -56,6 +56,8 @@ DM-XXXXXXX
 #include"z3_gasnet.h"
 #include<vector>
 #include<limits.h>
+#include"memory_manager.h"
+#include"trace.h"
 
 
 namespace z3gasnet
@@ -101,14 +103,14 @@ typedef void (*handler_fn_t)();
 
 gasnet_handlerentry_t *get_handler_table()
 {
-  return &(z3gasnet_context::get_handlertable()[0]);
+  return &(context::get_handlertable()[0]);
 }
 
 int get_num_handler_table_entires()
 {
   //client handlers are given indexes [128..255]
-  SASSERT(z3gasnet_context::get_handlertable().size() < 255-128);
-  return (int) z3gasnet_context::get_handlertable().size();
+  SASSERT(context::get_handlertable().size() < 255-128);
+  return (int) context::get_handlertable().size();
 }
 
 gasnet_handler_t find_handler(handler_fn_t handler)
@@ -116,9 +118,9 @@ gasnet_handler_t find_handler(handler_fn_t handler)
   int tablesize = get_num_handler_table_entires();
   for (int i = 0; i < tablesize; i++)
   {
-    if (z3gasnet_context::get_handlertable()[i].fnptr == handler)
+    if (context::get_handlertable()[i].fnptr == handler)
     {
-      return z3gasnet_context::get_handlertable()[i].index;
+      return context::get_handlertable()[i].index;
     }
   }
   return 0;
@@ -127,7 +129,7 @@ gasnet_handler_t find_handler(handler_fn_t handler)
 gasnet_handler_t register_handler(handler_fn_t handler)
 {
   Z3GASNET_INIT_VERBOSE(<< "Registering handler: " << (void*)handler 
-      << " in table: " << (void*) &z3gasnet_context::get_handlertable() << "\n";);
+      << " in table: " << (void*) &context::get_handlertable() << "\n";);
 
   // gasnet documentation states user based indexes from [128..255]
   gasnet_handler_t foundindex = find_handler(handler);
@@ -138,21 +140,21 @@ gasnet_handler_t register_handler(handler_fn_t handler)
     return foundindex;
   }
   
-  size_t index = 128 + z3gasnet_context::get_handlertable().size();
+  size_t index = 128 + context::get_handlertable().size();
   SASSERT(index >=128 and index <=255);
   
   Z3GASNET_INIT_VERBOSE( << "adding handler: " << (void*)handler << 
       " at index: " << index <<"\n";);
-  z3gasnet_context::get_handlertable().resize(z3gasnet_context::get_handlertable().size()+1);
-  gasnet_handlerentry_t &he = z3gasnet_context::get_handlertable().back();
+  context::get_handlertable().resize(context::get_handlertable().size()+1);
+  gasnet_handlerentry_t &he = context::get_handlertable().back();
   //he.index = reinterpret_cast<gasnet_handler_t>(index);
   he.index = index;
   he.fnptr = handler;
 
   Z3GASNET_INIT_VERBOSE( << "added handler entry: { index=" 
-      << (int) z3gasnet_context::get_handlertable().back().index << ", fnptr=" 
-      << (void*) z3gasnet_context::get_handlertable().back().fnptr << " } at position: "
-      << z3gasnet_context::get_handlertable().size() << "\n" ;);
+      << (int) context::get_handlertable().back().index << ", fnptr=" 
+      << (void*) context::get_handlertable().back().fnptr << " } at position: "
+      << context::get_handlertable().size() << "\n" ;);
 
   return he.index;
 }
@@ -161,12 +163,12 @@ void handlertable_to_stream(std::ostream &strm)
 {
   int numentries = get_num_handler_table_entires();
   
-//Z3GASNET_INIT_VERBOSE( << "table: " << (void*) & z3gasnet_context::get_handlertable() 
-//    << " has " <<  z3gasnet_context::get_handlertable().size() << " entries\n" ;);
+//Z3GASNET_INIT_VERBOSE( << "table: " << (void*) & context::get_handlertable() 
+//    << " has " <<  context::get_handlertable().size() << " entries\n" ;);
 
   for (int i = 0; i < numentries; i++)
   {
-    gasnet_handlerentry_t &he = z3gasnet_context::get_handlertable()[i];
+    gasnet_handlerentry_t &he = context::get_handlertable()[i];
     strm << (int) he.index << "\t:\t" << (void *) he.fnptr <<"\n";
   }
 }
@@ -182,9 +184,91 @@ scoped_interrupt_holder::~scoped_interrupt_holder()
   if (m_hold) gasnet_resume_interrupts();
 }
 
-std::vector<gasnet_handlerentry_t> z3gasnet_context::m_handlertable;
+msg_rec::msg_rec(
+    const void * const buffer, 
+    const size_t &buffer_size, 
+    const gasnet_handler_t &sender_node_index) :
+  //m_buffer(memory::allocate(buffer_size)),
+//  m_buffer(memory::allocate(buffer_size)),
+  m_buffer_size(buffer_size),
+  m_node_index(sender_node_index) 
+{
+  //memcpy(m_buffer,buffer,buffer_size);
+}
 
-int z3gasnet_context::m_testval = 6;
+msg_rec::~msg_rec()
+{
+  //memory::deallocate(m_buffer);
+}
+
+void context::register_queue_msg_handler()
+{
+  m_queue_msg_handler_index = register_handler(
+      (handler_fn_t)queue_msg_handler);
+
+  Z3GASNET_INIT_VERBOSE(
+      << "queue_msg_handler registered as index: "
+      << (int) m_queue_msg_handler_index)
+}
+
+void context::queue_msg_handler(gasnet_token_t token,
+          void* buffer, size_t buffer_size, 
+          gasnet_handlerarg_t sender_node_index)
+{
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "handling message from node: " << sender_node_index << "\n" ;);
+  //dhk m_msg_queue.push(alloc(
+  m_msg_queue.push(msg_rec(
+        buffer, buffer_size, sender_node_index));
+}
+
+void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
+{
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "sending message to node: " << node_index << "\n" ;);
+    Z3GASNET_CHECKCALL(gasnet_AMRequestMedium1(
+          node_index, m_queue_msg_handler_index,
+          const_cast<char*>(msg.c_str()), msg.size()+1, node_index));
+}
+  
+/*
+const char * const context::get_front_msg(size_t &string_size)
+{
+  const msg_rec *m = NULL;
+  {
+    scoped_interrupt_holder interrupt_lock(true);
+    m = m_msg_queue.front();
+  }
+  const void * const vb = m->get_buffer();
+  string_size = m->get_buffer_size();
+
+  return (const char * const) vb;
+}
+*/
+  
+size_t context::pop_front_msg(std::string &next_message)
+{
+  //msg_rec *m = NULL;
+  size_t n;
+  {
+    scoped_interrupt_holder interrupt_lock(true);
+    //dhk m = m_msg_queue.front();
+    
+    // -- m_msg_queue.pop();
+    
+    n = m_msg_queue.size();
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "msg_q poppeed 1, now has " << n << "\n" ;);
+  }
+  //TODO replace with .assign
+  //dhk next_message = std::string((const char *) m->get_buffer());
+  //dhk dealloc(m);
+  return n;
+}
+
+std::vector<gasnet_handlerentry_t> context::m_handlertable;
+msg_queue context::m_msg_queue;
+gasnet_handler_t context::m_queue_msg_handler_index;
 
 
 } /// end z3gasnet namespace

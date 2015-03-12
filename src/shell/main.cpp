@@ -301,6 +301,7 @@ int main(int argc, char ** argv) {
         //Register the messange handlers 
         Z3GASNET_CALL(spacer::context::register_set_context_pool_member_handler());
         Z3GASNET_CALL(spacer::context::register_share_string_handler());
+        Z3GASNET_CALL(z3gasnet::context::register_queue_msg_handler());
 
         // gasnet places itself in front of any applicaiton cmdline handling
         // it will strip off the arguments it uses inside gasnet_init and 
