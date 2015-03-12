@@ -936,6 +936,9 @@ namespace spacer {
         proof_ref get_proof() const;
 
         model_node& get_root() const { return m_search.get_root(); }
+      
+        expr_ref get_constraints (unsigned lvl);
+        void add_constraints (unsigned lvl, expr_ref c);
     };
 
 };
