@@ -3005,6 +3005,8 @@ namespace spacer {
   
   void context::add_constraints (unsigned level, expr_ref c)
   {
+    if (!c.get ()) return;
+    
     expr_ref_vector constraints (m);
     constraints.push_back (c);
     qe::flatten_and (constraints);
