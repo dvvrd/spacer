@@ -3000,12 +3000,14 @@ namespace spacer {
       constraints.push_back(m.mk_implies(pred, c));
     }
 
-    return m_pm.mk_and(constraints);
+    if (constraints.empty ()) return expr_ref (m.mk_true (), m);
+    return m_pm.mk_and (constraints);
   }
   
   void context::add_constraints (unsigned level, expr_ref c)
   {
     if (!c.get ()) return;
+    if (m.is_true (c)) return;
     
     expr_ref_vector constraints (m);
     constraints.push_back (c);
