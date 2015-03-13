@@ -2565,19 +2565,19 @@ namespace spacer {
       // TODO Use the invariants which came from the remote node
       // TODO Optimization - use message bytes directly for unmarshall string
       expr_ref remote_invs = unmarshal(remote_node_invariants, m);
-      if (remote_invs) add_constraints (infty_level(), remote_invs);
+      if (remote_invs)
+      {
+        add_constraints (infty_level(), remote_invs);
+        STRACE("gas", Z3GASNET_TRACE_PREFIX 
+            << "Added invariants from remote node: " << remote_node_invariants <<"\n";);
+      }
       else
       {
-        std::cerr << "Failed to unmarshall: " << remote_node_invariants <<"\n";
-        std::cerr.flush();
-      }
-
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
-            << "recieved invariants with string length " 
-            << remote_node_invariants.size() << "\n" ;);
-
-        break;
+            << "Failed to unmarshall: " << remote_node_invariants <<"\n";);
       }
+
+    }
       
 #endif
       
