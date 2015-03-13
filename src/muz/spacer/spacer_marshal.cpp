@@ -4,16 +4,25 @@
 #include "cmd_context.h"
 #include "smt2parser.h"
 #include "vector.h"
+#include "ast_smt_pp.h"
 #include "ast_pp.h"
 
 namespace spacer
 {
+  std::ostream &marshal (std::ostream &os, expr_ref e, ast_manager &m)
+  {
+    ast_smt_pp pp (m);
+    pp.display_smt2 (os, e);
+    return os;
+  }
+
   std::string marshal (expr_ref e, ast_manager &m)
   {
     std::stringstream ss;
-    ss << "(assert " << mk_pp (e, m) << ")";
+    marshal (ss, e, m);
     return ss.str ();
   }
+  
   
   expr_ref unmarshal (std::istream &is, ast_manager &m)
   {
@@ -23,6 +32,7 @@ namespace spacer
     
     ptr_vector<expr>::const_iterator it  = ctx.begin_assertions();
     ptr_vector<expr>::const_iterator end = ctx.end_assertions();
+    if (it == end) return expr_ref (m.mk_true (), m);
     unsigned size = static_cast<unsigned>(end - it);
     return expr_ref (m.mk_and (size, it), m);
   }
