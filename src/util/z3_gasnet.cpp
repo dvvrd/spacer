@@ -270,13 +270,13 @@ bool context::pop_front_msg(std::string &next_message)
     }
   }
 
-  //TODO replace with .assign, should be more efficient
   if (m)
   {
     STRACE("gas", Z3GASNET_TRACE_PREFIX 
         << "dequeued a msg of " << m->get_buffer_size()
         << " bytes and contains " << n-1 << " more messages\n" ;);
 
+  //TODO Optimization - replace with .assign, should be more efficient
     next_message = std::string((char *) m->get_buffer(),m->get_buffer_size()-1);
     dealloc(m);
   }
