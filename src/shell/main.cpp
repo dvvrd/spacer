@@ -35,12 +35,6 @@ Revision History:
 #include"error_codes.h"
 #include"gparams.h"
 #include"env_params.h"
-#include"z3_gasnet.h"
-
-#ifdef Z3GASNET
-//Have to include in main  here for access to message handlers
-#include "spacer_context.h"
-#endif
 
 typedef enum { IN_UNSPECIFIED, IN_SMTLIB, IN_SMTLIB_2, IN_DATALOG, IN_DIMACS, IN_WCNF, IN_OPB, IN_Z3_LOG } input_kind;
 
@@ -294,26 +288,8 @@ char const * get_extension(char const * file_name) {
     }
 }
 
-
 int main(int argc, char ** argv) {
-
     try{
-        //Register the messange handlers 
-        Z3GASNET_CALL(spacer::context::register_set_context_pool_member_handler());
-        Z3GASNET_CALL(spacer::context::register_share_string_handler());
-        Z3GASNET_CALL(z3gasnet::context::register_queue_msg_handler());
-
-        // gasnet places itself in front of any applicaiton cmdline handling
-        // it will strip off the arguments it uses inside gasnet_init and 
-        // the returned state of argc, argv can be used as normal by the the app
-        Z3GASNET_CHECKCALL(gasnet_init(&argc, &argv));
-        // gasnet will block here until all nodes of the job are attached
-        Z3GASNET_CHECKCALL(gasnet_attach(
-              z3gasnet::get_handler_table(),
-              z3gasnet::get_num_handler_table_entires(),
-              gasnet_getMaxLocalSegmentSize(),0));
-
-
         unsigned return_value = 0;
         memory::initialize(0);
         memory::exit_when_out_of_memory(true, "ERROR: out of memory");
@@ -360,7 +336,6 @@ int main(int argc, char ** argv) {
             break;
         case IN_SMTLIB_2:
             memory::exit_when_out_of_memory(true, "(error \"out of memory\")");
-            TRACE("dhk",tout <<"Reading commands\n";);
             return_value = read_smtlib2_commands(g_input_file);
             break;
         case IN_DIMACS:
@@ -384,23 +359,15 @@ int main(int argc, char ** argv) {
 #ifdef _WINDOWS
         _CrtDumpMemoryLeaks();
 #endif
-
-        Z3GASNET_CALL(gasnet_exit(return_value));
-
         return return_value;
     }
     catch (z3_exception & ex) {
         // unhandled exception
-
         std::cerr << "ERROR: " << ex.msg() << "\n";
-        if (ex.has_error_code()) {
-            Z3GASNET_CALL(gasnet_exit(ex.error_code()));
+        if (ex.has_error_code())
             return ex.error_code();
-        }
-        else {
-            Z3GASNET_CALL(gasnet_exit(ERR_INTERNAL_FATAL));
+        else
             return ERR_INTERNAL_FATAL;
-        }
     }
 }
 
