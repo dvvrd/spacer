@@ -135,7 +135,7 @@ def which(program):
     return None
 
 def compute_z3_args (args):
-    z3_args = which ('z3')
+    z3_args = which ('spacer')
 
     if args.jobsize != -1:
         z3_args += ' %d' % args.jobsize

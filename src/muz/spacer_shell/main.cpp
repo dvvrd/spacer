@@ -298,10 +298,18 @@ char const * get_extension(char const * file_name) {
 int main(int argc, char ** argv) {
 
     try{
+
+
+        unsigned return_value = 0;
+        memory::initialize(0);
+        memory::exit_when_out_of_memory(true, "ERROR: out of memory");
+
+#ifdef Z3GASNET
+
         //Register the messange handlers 
-        Z3GASNET_CALL(spacer::context::register_set_context_pool_member_handler());
-        Z3GASNET_CALL(spacer::context::register_share_string_handler());
-        Z3GASNET_CALL(z3gasnet::context::register_queue_msg_handler());
+        spacer::context::register_set_context_pool_member_handler();    //deprecated
+        spacer::context::register_share_string_handler();               //deprecated
+        z3gasnet::context::register_queue_msg_handler();
 
         // gasnet places itself in front of any applicaiton cmdline handling
         // it will strip off the arguments it uses inside gasnet_init and 
@@ -311,12 +319,10 @@ int main(int argc, char ** argv) {
         Z3GASNET_CHECKCALL(gasnet_attach(
               z3gasnet::get_handler_table(),
               z3gasnet::get_num_handler_table_entires(),
-              gasnet_getMaxLocalSegmentSize(),0));
+              0,0));
 
+#endif
 
-        unsigned return_value = 0;
-        memory::initialize(0);
-        memory::exit_when_out_of_memory(true, "ERROR: out of memory");
         parse_cmd_line_args(argc, argv);
         env_params::updt_params();
 
@@ -360,7 +366,6 @@ int main(int argc, char ** argv) {
             break;
         case IN_SMTLIB_2:
             memory::exit_when_out_of_memory(true, "(error \"out of memory\")");
-            TRACE("dhk",tout <<"Reading commands\n";);
             return_value = read_smtlib2_commands(g_input_file);
             break;
         case IN_DIMACS:

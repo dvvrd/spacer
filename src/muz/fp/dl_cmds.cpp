@@ -239,7 +239,6 @@ public:
             scoped_timer timer(timeout, &eh);
             cmd_context::scoped_watch sw(ctx);
             try {
-                TRACE("dhk",tout << "Making query";);
                 status = dlctx.query(m_target);
             }
             catch (z3_error & ex) {
