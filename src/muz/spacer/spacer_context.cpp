@@ -2566,6 +2566,11 @@ namespace spacer {
       // TODO Optimization - use message bytes directly for unmarshall string
       expr_ref remote_invs = unmarshal(remote_node_invariants, m);
       if (remote_invs) add_constraints (infty_level(), remote_invs);
+      else
+      {
+        std::cerr << "Failed to unmarshall: " << remote_node_invariants <<"\n";
+        std::cerr.flush();
+      }
 
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
             << "recieved invariants with string length " 
