@@ -68,11 +68,11 @@ DM-XXXXXXX
 #define Z3GASNET_VERBOSE_STREAM( stream, code ) do {stream << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): "  code ; stream.flush();} while (false)
 
 // no-op on these messages, they are just used during construction
-// #define Z3GASNET_INIT_VERBOSE( code ) 
+#define Z3GASNET_INIT_VERBOSE( code ) 
 
 // when debugging things that occur before normal z3 tracing and verbose mechanims are initialized, you
 // can uncomment the following
-#define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( Z3GASNET_INIT_VERBOSE_STREAM_NAME , code )
+//#define Z3GASNET_INIT_VERBOSE( code ) Z3GASNET_VERBOSE_STREAM( Z3GASNET_INIT_VERBOSE_STREAM_NAME , code )
 
 
 #define Z3GASNET_CHECKCALL(fncall) do {                              \
@@ -228,6 +228,9 @@ public:
   //it from the queue
   static bool pop_front_msg(std::string& next_message);
 
+  //set the information about the global address space, all of the shared
+  //memory segments on all of the nodes
+  static void set_seginfo_table();
 
 
 private:
@@ -238,6 +241,7 @@ private:
   static std::vector<gasnet_handlerentry_t> m_handlertable;
   static msg_queue m_msg_queue;
   static gasnet_handler_t m_queue_msg_handler_index;
+  static std::vector<gasnet_seginfo_t> m_seginfo_table;
 };
 
 } //namesapce z3gasnet

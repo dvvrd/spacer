@@ -2562,20 +2562,21 @@ namespace spacer {
     while (z3gasnet::context::pop_front_msg(remote_node_invariants))
     {
 
-      // TODO Use the invariants which came from the remote node
-      // TODO Optimization - use message bytes directly for unmarshall string
+      // TODO DHK Optimization - use message bytes directly for unmarshall string
       expr_ref remote_invs = unmarshal(remote_node_invariants, m);
       if (remote_invs)
       {
         add_constraints (infty_level(), remote_invs);
-        STRACE("gas", Z3GASNET_TRACE_PREFIX 
-            << "Added invariants from remote node: " << remote_node_invariants <<"\n";);
+        // STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        //     << "Added invariants from remote node: " << remote_node_invariants <<"\n";);
       }
       else
       {
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
             << "Failed to unmarshall: " << remote_node_invariants <<"\n";);
       }
+      
+      SASSERT(remote_invs);
 
     }
       

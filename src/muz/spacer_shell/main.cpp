@@ -14,6 +14,10 @@ Author:
     Leonardo de Moura (leonardo) 2006-10-10.
     Nikolaj Bjorner   (nbjorner) 
 
+Adopted by:
+    
+    Derrick Karimi 2015-03-13
+
 Revision History:
 
 --*/
@@ -36,6 +40,7 @@ Revision History:
 #include"gparams.h"
 #include"env_params.h"
 #include"z3_gasnet.h"
+#include<vector>
 
 #ifdef Z3GASNET
 //Have to include in main  here for access to message handlers
@@ -50,6 +55,8 @@ bool                g_standard_input      = false;
 input_kind          g_input_kind          = IN_UNSPECIFIED;
 bool                g_display_statistics  = false;
 bool                g_display_istatistics = false;
+std::string         g_profiles;
+char const *        g_profile_names[] = { "def","gpdr","ic3"};
 
 void error(const char * msg) {
     std::cerr << "Error: " << msg << "\n";
@@ -72,8 +79,12 @@ void display_usage() {
 #ifdef Z3GITHASH
     std::cout << " - build hashcode " << STRINGIZE_VALUE_OF(Z3GITHASH);
 #endif
-    std::cout << "]. (C) Copyright 2006-2014 Microsoft Corp.\n";
-    std::cout << "Usage: z3 [options] [-file:]file\n";
+    std::cout << "]. (C) Copyright 2006-2014 Microsoft Corp, (C) Copyright 2015 Software Engineering Institute - Carnegie Mellon University.\n";
+#ifdef Z3GASNET
+    std::cout << "Usage: spacer JOB_SIZE [options] [-file:]file\n";
+#else
+    std::cout << "Usage: spacer [options] [-file:]file\n";
+#endif
     std::cout << "\nInput format:\n";
     std::cout << "  -smt        use parser for SMT input format.\n";
     std::cout << "  -smt2       use parser for SMT 2 input format.\n";
@@ -90,6 +101,11 @@ void display_usage() {
     std::cout << "  -pd         display Z3 global (and module) parameter descriptions.\n";
     std::cout << "  -pm:name    display Z3 module ('name') parameters.\n";
     std::cout << "  -pp:name    display Z3 parameter description, if 'name' is not provided, then all module names are listed.\n";
+#ifdef Z3GASNET
+    std::cout << "  -profile:name0,name1,...    set predefined profiles of Z3 parameters.  If name list is provided its size should be N.  If no profile names are provided, a predefined set of profiles will be used.\n";
+#else
+    std::cout << "  -profile:name   set predefined profiles of Z3 parameters, if name is not provided 'def' will be used.\n";
+#endif
     std::cout << "  --"      << "          all remaining arguments are assumed to be part of the input file name. This option allows Z3 to read files with strange names such as: -foo.smt2.\n";
     std::cout << "\nResources:\n";
     // timeout and memout are now available on Linux and OSX too.
@@ -256,6 +272,9 @@ void parse_cmd_line_args(int argc, char ** argv) {
                     error("option argument (-memory:val) is missing.");
                 gparams::set("memory_max_size", opt_arg);
             }
+            else if (strcmp(opt_name, "profile") == 0) {
+                g_profiles=!opt_arg ? "def" : opt_arg;
+            }
             else {
                 std::cerr << "Error: invalid command line option: " << arg << "\n";
                 std::cerr << "For usage information: z3 -h\n";
@@ -294,6 +313,105 @@ char const * get_extension(char const * file_name) {
     }
 }
 
+void profiles_string_to_vec(
+    std::vector<std::string> &profile_vec,
+    const std::string  &profiles_str)
+{
+  
+  using namespace std;
+
+  profile_vec.clear();
+  size_t end = 0;
+  size_t start = 0;
+  const string delim(",");
+
+  while ( end != string::npos)
+  {
+      end = profiles_str.find( delim, start);
+
+      // If at end, use length=maxLength.  Else use length=end-start.
+      profile_vec.push_back(profiles_str.substr( start,
+                     (end == string::npos) ? string::npos : end - start));
+
+      // If at end, use start=maxSize.  Else use start=end+delimiter.
+      start = (   ( end > (string::npos - delim.size()) )
+                ?  string::npos  :  end + delim.size());
+  }
+}
+
+void set_profile_params(const std::string &profile)
+{
+#ifdef Z3GASNET
+  STRACE("gas", Z3GASNET_TRACE_PREFIX
+      << "profile set to: " << profile << "\n";);
+  STRACE("gas", Z3GASNET_TRACE_PREFIX
+      << "Limits:\n\tgasnet_AMMaxMedium(): " << gasnet_AMMaxMedium() << "\n"
+      << "\tgasnet_AMMaxLongRequest(): " << gasnet_AMMaxLongRequest() << "\n"
+      << "\tgasnet_AMMaxLongReply(): " << gasnet_AMMaxLongReply() << "\n" 
+      ;);
+#endif
+
+  if (profile == "def")
+  {
+    gparams::set("fixedpoint.use_heavy_mev","true");
+    gparams::set("fixedpoint.reset_obligation_queue","false");
+    gparams::set("fixedpoint.pdr.flexible_trace","true");
+    gparams::set("fixedpoint.spacer.elim_aux","false");
+    
+  }
+  else if (profile == "ic3")
+  {
+    gparams::set("fixedpoint.use_heavy_mev","true");
+    gparams::set("fixedpoint.pdr.flexible_trace","true");
+    gparams::set("fixedpoint.spacer.elim_aux","false");
+  }
+  else if (profile == "gpdr")
+  {
+    gparams::set("fixedpoint.use_heavy_mev","true");
+    gparams::set("fixedpoint.spacer.elim_aux","false");
+  }
+  else 
+  {
+    std::cerr << "Unrecognized profile: " << profile << std::endl;
+    throw z3_error(ERR_CMD_LINE);
+  }
+}
+
+void set_profile(std::vector<std::string> profile_vec)
+{
+  SASSERT(profile_vec.size() > 0);
+
+#ifdef Z3GASNET
+
+  //the user should have specified either 1 profile, or exactly 
+  //number of nodes profiles
+  size_t stock_profiles = sizeof(g_profile_names) / sizeof(char const *);
+  if (profile_vec.size() == 1)
+  {
+    SASSERT(profile_vec[0] == "def");
+    profile_vec.clear();
+    for (size_t i = 0; i < stock_profiles; i++)
+      profile_vec.push_back(g_profile_names[i]);
+    SASSERT(profile_vec[0] == "def");
+  }
+  
+  if (profile_vec.size() > gasnet_nodes())
+  {
+    std::cerr << "Either 0, 1 or " << std::min<size_t>(gasnet_nodes(),stock_profiles)
+      << " profiles should be specified\n";
+    throw z3_error(ERR_CMD_LINE);
+  }
+
+  set_profile_params(profile_vec[gasnet_mynode()]);
+
+#else
+
+  set_profile_params(profile_vec[0]);
+
+#endif
+
+}
+
 
 int main(int argc, char ** argv) {
 
@@ -319,11 +437,20 @@ int main(int argc, char ** argv) {
         Z3GASNET_CHECKCALL(gasnet_attach(
               z3gasnet::get_handler_table(),
               z3gasnet::get_num_handler_table_entires(),
-              0,0));
+              gasnet_getMaxLocalSegmentSize(),0));
+
+        z3gasnet::context::set_seginfo_table();
 
 #endif
 
         parse_cmd_line_args(argc, argv);
+        if (g_profiles.size())
+        {
+          std::vector<std::string> profile_vec;
+          profiles_string_to_vec(profile_vec, g_profiles);
+          set_profile(profile_vec);
+        }
+
         env_params::updt_params();
 
         if (g_input_file && g_standard_input) {

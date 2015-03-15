@@ -58,6 +58,7 @@ DM-XXXXXXX
 #include<limits.h>
 #include"memory_manager.h"
 #include"trace.h"
+#include<sstream>
 
 
 namespace z3gasnet
@@ -231,9 +232,26 @@ void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
     STRACE("gas", Z3GASNET_TRACE_PREFIX 
         << "sending " << msg.size()+1 << " bytes to node: " << node_index 
         << ", using handler: " << (int) m_queue_msg_handler_index << "\n" ;);
-    Z3GASNET_CHECKCALL(gasnet_AMRequestMedium1(
-          node_index, m_queue_msg_handler_index,
-          const_cast<char*>(msg.c_str()), msg.size()+1, gasnet_mynode() ));
+
+    if (msg.size() + 1 <= gasnet_AMMaxMedium())
+      Z3GASNET_CHECKCALL(gasnet_AMRequestMedium1(
+            node_index, m_queue_msg_handler_index,
+            const_cast<char*>(msg.c_str()), msg.size()+1, gasnet_mynode() ));
+    else if (msg.size() + 1 <= gasnet_AMMaxLongRequest())
+    {
+      SASSERT(m_seginfo_table.size() > node_index);
+      void *dst = m_seginfo_table[node_index].addr;
+      Z3GASNET_CHECKCALL(gasnet_AMRequestLong1(
+            node_index, m_queue_msg_handler_index,
+            const_cast<char*>(msg.c_str()), msg.size()+1, dst, gasnet_mynode() ));
+    }
+    else
+    {
+      std::stringstream emsg;
+      emsg << "Message is " << msg.size()+1 << " bytes, max size is " << gasnet_AMMaxLongRequest() 
+        << " bytes.";
+      throw default_exception(emsg.str().c_str());
+    }
 }
   
 /*
@@ -284,9 +302,16 @@ bool context::pop_front_msg(std::string &next_message)
   return n > 0;
 }
 
+void context::set_seginfo_table()
+{
+  m_seginfo_table.resize(gasnet_nodes());
+  Z3GASNET_CHECKCALL(gasnet_getSegmentInfo(&m_seginfo_table.front(),gasnet_nodes()));
+}
+
 std::vector<gasnet_handlerentry_t> context::m_handlertable;
 msg_queue context::m_msg_queue;
 gasnet_handler_t context::m_queue_msg_handler_index;
+std::vector<gasnet_seginfo_t> context::m_seginfo_table;
 
 
 } /// end z3gasnet namespace
