@@ -344,10 +344,18 @@ void set_profile_params(const std::string &profile)
 #ifdef Z3GASNET
   STRACE("gas", Z3GASNET_TRACE_PREFIX
       << "profile set to: " << profile << "\n";);
+  size_t ms = std::string().max_size();
+
   STRACE("gas", Z3GASNET_TRACE_PREFIX
-      << "Limits:\n\tgasnet_AMMaxMedium(): " << gasnet_AMMaxMedium() << "\n"
+      << "System Info:\n\tgasnet_AMMaxMedium(): " << gasnet_AMMaxMedium() << "\n"
       << "\tgasnet_AMMaxLongRequest(): " << gasnet_AMMaxLongRequest() << "\n"
       << "\tgasnet_AMMaxLongReply(): " << gasnet_AMMaxLongReply() << "\n" 
+      << "\tgasnet_getMaxLocalSegmentSize(): " << gasnet_getMaxLocalSegmentSize() << "\n" 
+      << "\tsizeof(gasnet_handlerarg_t): " << sizeof(gasnet_handlerarg_t) << "\n" 
+      << "\tsizeof(uintptr_t): " << sizeof(uintptr_t) << "\n" 
+      << "\tsizeof(size_t): " << sizeof(size_t) << "\n" 
+      << "\tsizeof(void*): " << sizeof(void*) << "\n" 
+      << "\tstd::string::max_size(): " << ms << "\n" 
       ;);
 #endif
 
@@ -516,6 +524,11 @@ int main(int argc, char ** argv) {
 #ifdef _WINDOWS
         _CrtDumpMemoryLeaks();
 #endif
+        STRACE("gas", Z3GASNET_TRACE_PREFIX 
+            << "Ready to exit\n";);
+
+        gasnet_barrier_notify(0,0);
+        Z3GASNET_CALL(gasnet_barrier_wait(0,0));
 
         Z3GASNET_CALL(gasnet_exit(return_value));
 

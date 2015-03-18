@@ -59,6 +59,9 @@ DM-XXXXXXX
 #include"memory_manager.h"
 #include"trace.h"
 #include<sstream>
+#if _TRACE
+#include"md5.h"
+#endif
 
 
 namespace z3gasnet
@@ -184,6 +187,15 @@ scoped_interrupt_holder::~scoped_interrupt_holder()
 {
   if (m_hold) gasnet_resume_interrupts();
 }
+scoped_hsl_lock::scoped_hsl_lock(gasnet_hsl_t *lock, const bool &hold) : 
+  m_hold(hold), m_lock(lock)
+{
+  if (m_hold) gasnet_hsl_lock(m_lock);
+}
+scoped_hsl_lock::~scoped_hsl_lock()
+{
+  if (m_hold) gasnet_hsl_unlock(m_lock);
+}
 
 msg_rec::msg_rec(
     const void * const buffer, 
@@ -193,7 +205,7 @@ msg_rec::msg_rec(
   m_buffer_size(buffer_size),
   m_node_index(sender_node_index) 
 {
-  memcpy(m_buffer,buffer,buffer_size);
+  if (buffer) memcpy(m_buffer,buffer,buffer_size);
 }
 
 msg_rec::~msg_rec()
@@ -205,6 +217,12 @@ void context::register_queue_msg_handler()
 {
   m_queue_msg_handler_index = register_handler(
       (handler_fn_t)queue_msg_handler);
+#ifdef _TRACE
+  m_queue_msg_response_handler_index = register_handler(
+      (handler_fn_t)queue_msg_response_handler);
+#endif
+  m_queue_long_msg_handler_index = register_handler(
+      (handler_fn_t)queue_long_msg_handler);
 
   Z3GASNET_INIT_VERBOSE(
       << "queue_msg_handler registered as index: "
@@ -215,23 +233,127 @@ void context::queue_msg_handler(gasnet_token_t token,
           void* buffer, size_t buffer_size, 
           gasnet_handlerarg_t sender_node_index)
 {
-    STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "handling message of " << buffer_size 
-        << " bytes, from node: " << sender_node_index << "\n" ;);
 
     //We don't have a use case for sending ourselves messages at this time
     //but there is no reason we couldn't support this
     SASSERT(sender_node_index != gasnet_mynode());
 
-    m_msg_queue.push(alloc( msg_rec, 
-          buffer, buffer_size, sender_node_index));
+    msg_rec *front = alloc( msg_rec, 
+          buffer, buffer_size, sender_node_index);
+
+    { 
+      scoped_hsl_lock hsl_lock(&m_handler_lock, true);
+      m_msg_queue.push(front);
+    }
+
+#ifdef _TRACE
+    MD5 md5;
+    std::string hash(md5.digestMemory((BYTE *) buffer, (int) buffer_size));
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "receive " << buffer_size
+        << " bytes, from node: " << sender_node_index
+        << ", md5: " << hash << "\n" ;);
+
+    Z3GASNET_CHECKCALL(gasnet_AMReplyMedium0( token,
+          m_queue_msg_response_handler_index, 
+          const_cast<char *>(hash.c_str()), hash.size() + 1));
+#endif
 }
+
+#ifdef _TRACE
+void context::queue_msg_response_handler(gasnet_token_t token,
+          void* buffer, size_t buffer_size, 
+          gasnet_handlerarg_t sender_node_index)
+{
+  std::list<std::string>::iterator i = m_unack_messages.begin();
+  std::list<std::string>::iterator end = m_unack_messages.end();
+  std::string acked_msg((const char *)buffer, buffer_size -1);
+  
+  size_t osize = m_unack_messages.size();
+  SASSERT(osize > 0);
+  bool acked = false;
+  while(i != end)
+  {
+    if (*i == acked_msg)
+    {
+      m_unack_messages.erase(i);
+      acked = true;
+      break;
+    }
+    i++;
+  }
+  
+  STRACE("gas", Z3GASNET_TRACE_PREFIX 
+      << "Acknowledged " << acked << " msg(s) recieved, with " 
+      << m_unack_messages.size() << " msg(s) unacknowleged" << "\n" ;);
+
+  if (!acked)
+  {
+    std::cerr << "Node " << (int) gasnet_mynode() 
+      << ": Unable to recognize response message\n";
+
+  }
+
+}
+#endif
+
+
+uintptr_t context::get_shared_segment_start()
+{
+    return (uintptr_t) m_seginfo_table[gasnet_mynode()].addr ;
+}
+
+size_t context::get_shared_segment_size()
+{
+    return (uintptr_t) m_seginfo_table[gasnet_mynode()].size ;
+}
+
+uintptr_t context::get_shared_segment_end()
+{
+    return get_shared_segment_start() + get_shared_segment_size();
+}
+
+bool context::can_reserve_buffer(size_t size)
+{
+  return m_next_seg_loc + size <= get_shared_segment_end();
+}
+
+uintptr_t context::reserve_buffer(size_t size)
+{
+  if (!can_reserve_buffer(size))
+  {
+    std::cerr << "Rolling shared memory segment buffer\n";
+    m_next_seg_loc = get_shared_segment_start();
+  }
+
+  if (!can_reserve_buffer(size))
+  {
+    throw default_exception("Shared memory segment is not large enough to handle the request");
+  }
+
+  uintptr_t buf = m_next_seg_loc;
+  m_next_seg_loc += size;
+
+  STRACE("gas", Z3GASNET_TRACE_PREFIX 
+      << "reserved buffer: " << buf << ", size: " << size << "\n";);
+
+  return buf;
+}
+
 
 void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
 {
+#ifdef _TRACE
+    MD5 md5;
+    std::string hash(md5.digestMemory((BYTE*) const_cast<char *>(msg.c_str()),msg.size()+1));
+    {
+      scoped_interrupt_holder lock(true);
+      m_unack_messages.push_back(hash);
+    }
     STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "sending " << msg.size()+1 << " bytes to node: " << node_index 
-        << ", using handler: " << (int) m_queue_msg_handler_index << "\n" ;);
+        << "transmit " << msg.size()+1 << " bytes to node: " << node_index 
+        << ", md5: " << hash << "\n" ;);
+#endif
 
     if (msg.size() + 1 <= gasnet_AMMaxMedium())
       Z3GASNET_CHECKCALL(gasnet_AMRequestMedium1(
@@ -239,11 +361,28 @@ void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
             const_cast<char*>(msg.c_str()), msg.size()+1, gasnet_mynode() ));
     else if (msg.size() + 1 <= gasnet_AMMaxLongRequest())
     {
-      SASSERT(m_seginfo_table.size() > node_index);
-      void *dst = m_seginfo_table[node_index].addr;
-      Z3GASNET_CHECKCALL(gasnet_AMRequestLong1(
-            node_index, m_queue_msg_handler_index,
-            const_cast<char*>(msg.c_str()), msg.size()+1, dst, gasnet_mynode() ));
+      uintptr_t mybuffer[2] = {
+        reserve_buffer(msg.size()+1),
+        msg.size()+1};
+
+      //copy message contents to the reserved buffer on the 
+      //shared memory segment
+      memcpy((void*)mybuffer[0],msg.c_str(),msg.size()+1);
+
+      //send the remote node the location where they may write on
+      //the our shared memory segment
+      Z3GASNET_CHECKCALL(gasnet_AMRequestMedium0(
+            node_index, m_queue_long_msg_handler_index,
+            (void*) mybuffer, sizeof(mybuffer) ));
+
+    //uintptr_t remote_addr = receive_node_malloc(msg.size()+1);
+
+    //
+    //SASSERT(m_seginfo_table.size() > node_index);
+    //void *dst = m_seginfo_table[node_index].addr;
+    //Z3GASNET_CHECKCALL(gasnet_AMRequestLong1(
+    //      node_index, m_queue_msg_handler_index,
+    //      const_cast<char*>(msg.c_str()), msg.size()+1, dst, gasnet_mynode() ));
     }
     else
     {
@@ -252,6 +391,7 @@ void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
         << " bytes.";
       throw default_exception(emsg.str().c_str());
     }
+
 }
   
 /*
@@ -279,7 +419,7 @@ bool context::pop_front_msg(std::string &next_message)
   {
     // use the scope lock to access the same data which is accessed
     // in the context of a message interrupt
-    scoped_interrupt_holder interrupt_lock(true);
+    scoped_hsl_lock hsl_lock(&m_handler_lock, true);
     n = m_msg_queue.size();
     if (n)
     {
@@ -292,27 +432,141 @@ bool context::pop_front_msg(std::string &next_message)
   {
     STRACE("gas", Z3GASNET_TRACE_PREFIX 
         << "dequeued a msg of " << m->get_buffer_size()
-        << " bytes and contains " << n-1 << " more messages\n" ;);
+        << " bytes from node: " << m->get_node_index() << " and contains " 
+        << n-1 << " more messages\n" ;);
+    SASSERT(m->get_buffer_size());
+    SASSERT(m->get_buffer());
 
   //TODO Optimization - replace with .assign, should be more efficient
-    next_message = std::string((char *) m->get_buffer(),m->get_buffer_size()-1);
+    next_message.assign((const char *) m->get_buffer(),m->get_buffer_size()-1);
+
     dealloc(m);
   }
 
   return n > 0;
 }
 
+/* dhk
+gasnet_node_t context::get_rcv_node()
+{
+    gasnet_node_t mynode = gasnet_mynode();
+    gasnet_node_t num_nodes = gasnet_nodes();
+    gasnet_node_t receive_node = (mynode + 1) % num_nodes;
+    return receive_node;
+}
+*/
+
 void context::set_seginfo_table()
 {
   m_seginfo_table.resize(gasnet_nodes());
   Z3GASNET_CHECKCALL(gasnet_getSegmentInfo(&m_seginfo_table.front(),gasnet_nodes()));
+
+
+  //dhk
+  // gasnet_seginfo_t &remote_segment = m_seginfo_table[get_rcv_node()];
+//m_rcv_node_free_list.push_back(std::pair<uintptr_t,size_t>(
+//      (uintptr_t) remote_segment.addr, remote_segment.size));
+  m_next_seg_loc = get_shared_segment_start();
+
+}
+  
+/*
+void context::receive_node_free(uintptr_t remote_address, size_t numbytes)
+{
+  m_rcv_node_free_list.push_back(std::pair<uintptr_t, size_t>(
+        remote_address, numbytes));
+}
+
+//dhk
+uintptr_t context::receive_node_malloc(size_t size)
+{
+    free_list::iterator i = m_rcv_node_free_list.begin();
+    free_list::iterator end = m_rcv_node_free_list.end();
+
+    while (i != end)
+    {
+      std::pair<uintptr_t, size_t> &cur(*i);
+
+      if (cur.second >= size)
+      {
+        std::pair<uintptr_t, size_t> allocation(
+            cur.first,
+            size);
+
+        cur.first += size;
+        cur.second -= size;
+
+        SASSERT(cur.second > 0);
+        break;
+      }
+
+      i++;
+    }
+}
+
+
+#ifdef _TRACE
+void free_list_to_stream(std::ostream &stream)
+{
+  free_list::iterator i = m_rcv_node_free_list.begin();
+  free_list::iterator end = m_rcv_node_free_list.end();
+
+  while (i != end)
+  {
+    stream << "[" << i->first << ", " << i->second << "]--";
+    i++;
+  }
+}
+#endif
+*/
+
+void context::queue_long_msg_handler(gasnet_token_t token,
+            void* buffer, size_t buffer_size)
+{
+  SASSERT(buffer_size == sizeof(uintptr_t)*2);
+  uintptr_t *remote_buffer = (uintptr_t*) buffer;
+  uintptr_t remote_addr = remote_buffer[0];
+  uintptr_t size = remote_buffer[1];
+
+  gasnet_node_t srcindex;
+  Z3GASNET_CHECKCALL(gasnet_AMGetMsgSource (token, &srcindex));
+
+  msg_rec *front = alloc( msg_rec , NULL, size, srcindex);
+
+  gasnet_get_bulk(front->m_buffer,srcindex,(void*)remote_addr,size);
+  
+#ifdef _TRACE
+  MD5 md5;
+  std::string hash(md5.digestMemory((BYTE*) front->m_buffer,size));
+
+  STRACE("gas", Z3GASNET_TRACE_PREFIX 
+      << "bulk get " << size
+      << " bytes, from node: " << srcindex
+      << ", md5: " << hash << "\n" ;);
+
+  Z3GASNET_CHECKCALL(gasnet_AMReplyMedium0( token,
+        m_queue_msg_response_handler_index, 
+        const_cast<char *>(hash.c_str()), hash.size() + 1));
+#endif
+
+  { 
+    scoped_hsl_lock hsl_lock(&m_handler_lock, true);
+    m_msg_queue.push(front);
+  }
 }
 
 std::vector<gasnet_handlerentry_t> context::m_handlertable;
 msg_queue context::m_msg_queue;
 gasnet_handler_t context::m_queue_msg_handler_index;
 std::vector<gasnet_seginfo_t> context::m_seginfo_table;
-
+#ifdef _TRACE
+std::list<std::string> context::m_unack_messages;
+gasnet_handler_t context::m_queue_msg_response_handler_index;
+#endif
+//dhk context::free_list context::m_rcv_node_free_list;
+uintptr_t context::m_next_seg_loc;
+gasnet_handler_t context::m_queue_long_msg_handler_index;
+gasnet_hsl_t context::m_handler_lock = GASNET_HSL_INITIALIZER;
 
 } /// end z3gasnet namespace
 #endif

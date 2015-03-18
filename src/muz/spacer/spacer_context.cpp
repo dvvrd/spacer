@@ -50,8 +50,11 @@ Notes:
 #include "z3_gasnet.h"
 #include <sstream>
 #include "spacer_marshal.h"
+#ifdef _TRACE
+#include <algorithm>
 #endif
-//TODO DHL - added for debugging
+#endif
+//TODO DHK - added for debugging
 #include<sstream>
 
 #include "timeit.h"
@@ -2366,27 +2369,39 @@ namespace spacer {
 #ifdef Z3GASNET
         // generate string of all invariants, and broadcast it to all 
         // nodes other then this node
+        //if (gasnet_mynode()==0)
+        {
 
         //TODO optimization on string coppies
         m_invariants = marshal( get_constraints(infty_level()), m);
+      
+        // temporarily for construction, just check we can unmarshal what we marshalled
+        SASSERT( unmarshal( m_invariants, m));
 
         gasnet_node_t mynode = gasnet_mynode();
         gasnet_node_t num_nodes = gasnet_nodes();
+ //     gasnet_node_t receive_node = (mynode + 1) % num_nodes;
         for (gasnet_node_t n = 0; n < num_nodes;  n++)
         {
           if (n == mynode) continue;
 
-          STRACE("gas", Z3GASNET_TRACE_PREFIX 
-              << "sending invariants to node: " << n  << "\n" ;);
 
           Z3GASNET_PROFILING_CALL(m_stats.m_msg_send.start());
 
-          z3gasnet::context::transmit_msg(n,m_invariants.c_str());
+        //std::string &s(m_invariants);
+        //std::replace( s.begin(), s.end(), '\n', '\t');
+        //TODO DHK Optimization, don't reserve multiple buffers when sending
+        //the same message ot multiple nodes
+        z3gasnet::context::transmit_msg(n, m_invariants);
+
+        //STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        //    << "sending invariant to node: " << n  << ": " <<s <<"\n" ;);
 
           Z3GASNET_PROFILING_CALL(
               m_stats.m_msg_send.stop();
               m_stats.m_msg_bytes += m_invariants.size()+ 1 + 
               sizeof(gasnet_handlerarg_t))
+        }
         }
 #endif
 
@@ -2572,11 +2587,13 @@ namespace spacer {
       }
       else
       {
+        std::string &s(remote_node_invariants);
+        std::replace( s.begin(), s.end(), '\n', '\t');
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
             << "Failed to unmarshall: " << remote_node_invariants <<"\n";);
       }
       
-      SASSERT(remote_invs);
+      //SASSERT(remote_invs);
 
     }
       

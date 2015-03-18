@@ -60,6 +60,9 @@ DM-XXXXXXX
 #include<ostream>
 #include<vector>
 #include<queue>
+# ifdef _TRACE
+#include<list>
+#endif
 
 #define Z3GASNET_INIT_VERBOSE_STREAM_NAME std::cout
 
@@ -173,18 +176,33 @@ struct scoped_interrupt_holder
 private:
   bool m_hold;
 };
+struct scoped_hsl_lock
+{
+  scoped_hsl_lock(gasnet_hsl_t *lock, const bool &hold);
+  ~scoped_hsl_lock();
+private:
+  bool m_hold;
+  gasnet_hsl_t *m_lock;
+};
 
 class msg_rec
 {
+  private:
+    msg_rec(const msg_rec &rhs) {} //non copyable
+
   public:
+    friend class context;
+
     msg_rec(
         const void * const buffer, 
         const size_t &buffer_size, 
         const gasnet_handler_t &sender_node_index);
+    //msg_rec();
     ~msg_rec();
 
     const void * const get_buffer() const { return m_buffer; }
     size_t get_buffer_size() const { return m_buffer_size; }
+    gasnet_node_t get_node_index() const { return m_node_index; }
 
   private:
     void *m_buffer;
@@ -232,6 +250,9 @@ public:
   //memory segments on all of the nodes
   static void set_seginfo_table();
 
+  //destroy static data
+  static void destroy();
+
 
 private:
   static void queue_msg_handler(gasnet_token_t token,
@@ -242,6 +263,47 @@ private:
   static msg_queue m_msg_queue;
   static gasnet_handler_t m_queue_msg_handler_index;
   static std::vector<gasnet_seginfo_t> m_seginfo_table;
+#ifdef _TRACE
+  static void queue_msg_response_handler(gasnet_token_t token,
+            void* buffer, size_t buffer_size, 
+            gasnet_handlerarg_t sender_node_index);
+  static std::list<std::string> m_unack_messages;
+  static gasnet_handler_t m_queue_msg_response_handler_index;
+#endif
+
+
+  /*
+//dhk
+  typedef std::list<std::pair<uintptr_t,size_t> > free_list;
+  static free_list m_rcv_node_free_list;
+  
+  //get the next free spot of the local nodes representation of the
+  //shered memory segment on the receiving node
+  static uintptr_t receive_node_malloc(size_t size);
+  //free up a previously reserved spot of the remote segment
+  void receive_node_free(uintptr_t remote_address, size_t numbytes);
+
+  //get the index of the node who receives all instruction from this
+  //local node
+  static gasnet_node_t get_rcv_node();
+  */
+
+#ifdef _TRACE
+  static void free_list_to_stream(std::ostream &stream);
+#endif
+  static uintptr_t m_next_seg_loc;
+
+  static uintptr_t get_shared_segment_start();
+  static uintptr_t get_shared_segment_end();
+  static size_t get_shared_segment_size();
+  static bool can_reserve_buffer(size_t size);
+  static uintptr_t reserve_buffer(size_t size);
+
+  static gasnet_handler_t m_queue_long_msg_handler_index;
+  static void queue_long_msg_handler(gasnet_token_t token,
+            void* buffer, size_t buffer_size);
+  static gasnet_hsl_t m_handler_lock;
+
 };
 
 } //namesapce z3gasnet
