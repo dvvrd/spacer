@@ -527,8 +527,8 @@ int main(int argc, char ** argv) {
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
             << "Ready to exit\n";);
 
-        gasnet_barrier_notify(0,0);
-        Z3GASNET_CALL(gasnet_barrier_wait(0,0));
+        Z3GASNET_CALL(gasnet_barrier_notify(0,0));
+        Z3GASNET_CHECKCALL(gasnet_barrier_wait(0,0));
 
         Z3GASNET_CALL(gasnet_exit(return_value));
 

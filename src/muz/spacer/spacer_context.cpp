@@ -2386,7 +2386,9 @@ namespace spacer {
           if (n == mynode) continue;
 
 
-          Z3GASNET_PROFILING_CALL(m_stats.m_msg_send.start());
+#ifdef Z3GASNET_PROFILING
+          m_stats.m_msg_send.start();
+#endif
 
         //std::string &s(m_invariants);
         //std::replace( s.begin(), s.end(), '\n', '\t');
@@ -2397,10 +2399,11 @@ namespace spacer {
         //STRACE("gas", Z3GASNET_TRACE_PREFIX 
         //    << "sending invariant to node: " << n  << ": " <<s <<"\n" ;);
 
-          Z3GASNET_PROFILING_CALL(
-              m_stats.m_msg_send.stop();
-              m_stats.m_msg_bytes += m_invariants.size()+ 1 + 
-              sizeof(gasnet_handlerarg_t))
+#ifdef Z3GASNET_PROFILING
+        m_stats.m_msg_send.stop();
+        m_stats.m_msg_bytes += m_invariants.size()+ 1 + 
+            sizeof(gasnet_handlerarg_t);
+#endif
         }
         }
 #endif
