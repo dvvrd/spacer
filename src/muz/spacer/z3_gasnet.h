@@ -60,6 +60,10 @@ DM-XXXXXXX
 #include<ostream>
 #include<vector>
 #include<queue>
+#define Z3GASNET_PROFILING
+#ifdef Z3GASNET_PROFILING
+#include"spacer_wall_stopwatch.h"
+#endif
 
 // gasnet documentation states that messages are sent best
 // effort.  To check during software construction that messages
@@ -105,18 +109,14 @@ DM-XXXXXXX
 //and there arn't too many of them
 #define Z3GASNET_BARRIER_LEVEL_SOLVED 1
 
-//We adopt trace mode as a sign that we should profile
-#ifdef _TRACE
 //the define can be used for larger sections of code only
 //applicable with proiling
-#define Z3GASNET_PROFILING
 #ifdef Z3GASNET_PROFILING
 //this define can be used for  sections of code applicable
 //only when profiling
 #define Z3GASNET_PROFILING_CALL(code) code;
 #else
 #define Z3GASNET_PROFILING_CALL(code)
-#endif
 #endif
 
 namespace z3gasnet
@@ -224,6 +224,19 @@ struct work_item
 };
 typedef std::queue<work_item*> work_queue;
 
+#ifdef Z3GASNET_PROFILING
+struct stats {
+    unsigned pop_cnt;
+    unsigned transmit_cnt;
+    unsigned pop_bytes;
+    unsigned transmit_bytes;
+    spacer::spacer_wall_stopwatch pop_time;
+    spacer::spacer_wall_stopwatch transmit_time;
+    stats() { reset(); }
+    void reset() { memset(this, 0, sizeof(*this)); }
+};
+#endif
+
 //TODO think about moving everything aboce inside the context class,
 //  except maybe the types and typedefs
 
@@ -252,6 +265,9 @@ public:
   //destroy static data
   //static void destroy();
 
+#ifdef Z3GASNET_PROFILING      
+  static void collect_statistics(std::ostream &stat_stream, double total_time);
+#endif
 
 private:
   // the registered active messaging handlers
@@ -296,6 +312,9 @@ private:
   static uintptr_t get_shared_segment_start();
   static uintptr_t get_shared_segment_end();
 
+#ifdef Z3GASNET_PROFILING      
+  static stats m_stats;
+#endif
 
 };
 

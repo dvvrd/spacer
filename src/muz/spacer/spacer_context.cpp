@@ -48,14 +48,11 @@ Notes:
 #include "blast_term_ite_tactic.h"
 #ifdef Z3GASNET
 #include "z3_gasnet.h"
-#include <sstream>
 #include "spacer_marshal.h"
-#ifdef _TRACE
-#include <algorithm>
+//#ifdef Z3GASNET_TRUST_BUT_VERIFY
+//#include <algorithm>
+//#endif
 #endif
-#endif
-//TODO DHK - added for debugging
-#include<sstream>
 
 #include "timeit.h"
 #include "luby.h"
@@ -2386,10 +2383,6 @@ namespace spacer {
           if (n == mynode) continue;
 
 
-#ifdef Z3GASNET_PROFILING
-          m_stats.m_msg_send.start();
-#endif
-
         //std::string &s(m_invariants);
         //std::replace( s.begin(), s.end(), '\n', '\t');
         //TODO DHK Optimization, don't reserve multiple buffers when sending
@@ -2399,11 +2392,6 @@ namespace spacer {
         //STRACE("gas", Z3GASNET_TRACE_PREFIX 
         //    << "sending invariant to node: " << n  << ": " <<s <<"\n" ;);
 
-#ifdef Z3GASNET_PROFILING
-        m_stats.m_msg_send.stop();
-        m_stats.m_msg_bytes += m_invariants.size()+ 1 + 
-            sizeof(gasnet_handlerarg_t);
-#endif
         }
         }
 #endif
@@ -2972,12 +2960,6 @@ namespace spacer {
         st.update("SPACER max depth", m_stats.m_max_depth);
         st.update("SPACER inductive level", m_inductive_lvl);
         st.update("SPACER cex depth", m_stats.m_cex_depth);
-#ifdef Z3GASNET_PROFILING
-        st.update("SPACER num messages", m_stats.m_msg_cnt);
-        st.update("SPACER message bytes", m_stats.m_msg_bytes);
-        st.update("SPACER message wait", m_stats.m_msg_wait.get_seconds());
-        st.update("SPACER message send", m_stats.m_msg_send.get_seconds());
-#endif
         m_pm.collect_statistics(st);
 
         for (unsigned i = 0; i < m_core_generalizers.size(); ++i) {
@@ -2992,12 +2974,6 @@ namespace spacer {
         verbose_stream () << "BRUNCH_STAT inductive_lvl " << m_inductive_lvl << "\n";
         verbose_stream () << "BRUNCH_STAT max_depth " << m_stats.m_max_depth << "\n";
         verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_cex_depth << "\n";
-#ifdef Z3GASNET_PROFILING
-        verbose_stream () << "BRUNCH_STAT msg_cnt " << m_stats.m_msg_cnt << "\n";
-        verbose_stream () << "BRUNCH_STAT msg_bytes " << m_stats.m_msg_bytes << "\n";
-        verbose_stream () << "BRUNCH_STAT msg_wait " << m_stats.m_msg_wait.get_seconds() << "\n";
-        verbose_stream () << "BRUNCH_STAT msg_send " << m_stats.m_msg_send.get_seconds() << "\n";
-#endif
 
     }
 

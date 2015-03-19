@@ -40,6 +40,9 @@ Revision History:
 #include"gparams.h"
 #include"env_params.h"
 #include"z3_gasnet.h"
+#ifdef Z3GASNET_PROFILING
+#include"spacer_wall_stopwatch.h"
+#endif
 #include<vector>
 
 #ifdef Z3GASNET
@@ -439,11 +442,18 @@ int main(int argc, char ** argv) {
         // it will strip off the arguments it uses inside gasnet_init and 
         // the returned state of argc, argv can be used as normal by the the app
         Z3GASNET_CHECKCALL(gasnet_init(&argc, &argv));
+
+
         // gasnet will block here until all nodes of the job are attached
         Z3GASNET_CHECKCALL(gasnet_attach(
               z3gasnet::get_handler_table(),
               z3gasnet::get_num_handler_table_entires(),
               gasnet_getMaxLocalSegmentSize(),0));
+
+#ifdef Z3GASNET_PROFILING
+        spacer::spacer_wall_stopwatch total_time;
+        total_time.start();
+#endif
 
         z3gasnet::context::set_seginfo_table();
 
@@ -522,13 +532,30 @@ int main(int argc, char ** argv) {
 #ifdef _WINDOWS
         _CrtDumpMemoryLeaks();
 #endif
+
+#ifdef Z3GASNET
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
             << "Ready to exit\n";);
 
-        Z3GASNET_CALL(gasnet_barrier_notify(0,0));
-        Z3GASNET_CHECKCALL(gasnet_barrier_wait(0,0));
+#ifdef Z3GASNET_PROFILING
+        total_time.stop();
 
-        Z3GASNET_CALL(gasnet_exit(return_value));
+#ifdef _TRACE
+        STRACE("gas", Z3GASNET_TRACE_PREFIX
+            << "Communications Stats:\n" ;);
+        z3gasnet::context::collect_statistics(tout, total_time.get_seconds());
+#else
+        if (g_display_statistics) 
+            z3gasnet::context::collect_statistics(
+                verbose_stream(), total_time.get_seconds());
+#endif
+
+#endif
+
+        gasnet_barrier_notify(0,0);
+        Z3GASNET_CHECKCALL(gasnet_barrier_wait(0,0));
+        gasnet_exit(return_value);
+#endif
 
         return return_value;
     }

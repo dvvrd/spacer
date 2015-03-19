@@ -88,22 +88,6 @@ bool node_is_master()
   return !gasnet_mynode();
 }
 
-
-/*
-void ping_shorthandler(gasnet_token_t token) {
-  std::cout << "ping handled on node" << gasnet_mynode() << std::endl;
-  Z3GASNET_CHECKCALL(gasnet_AMReplyShort0(token, hidx_pong_shorthandler)); 
-  std::cout << "replied pong on node" << gasnet_mynode() << std::endl;
-} 
-
-int ponghandled = 0;
-void pong_shorthandler(gasnet_token_t token) 
-{
-  std::cout << "pong handled on node " << gasnet_mynode() << std::endl;
-  ponghandled++;
-}
-*/
-
 typedef void (*handler_fn_t)();
 
 gasnet_handlerentry_t *get_handler_table()
@@ -346,6 +330,11 @@ uintptr_t context::reserve_buffer(size_t size)
 
 void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
 {
+#ifdef Z3GASNET_PROFILING
+    m_stats.transmit_cnt++;
+    m_stats.transmit_time.start();
+#endif
+
 #ifdef Z3GASNET_TRUST_BUT_VERIFY
     MD5 md5;
     std::string hash(md5.digestMemory((BYTE*) const_cast<char *>(msg.c_str()),msg.size()+1));
@@ -361,9 +350,14 @@ void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
     // for messages that can fit in medium size payload, send them
     // instantly
     if (msg.size() + 1 <= gasnet_AMMaxMedium())
+    {
+#ifdef Z3GASNET_PROFILING
+      m_stats.transmit_bytes+=msg.size()+1;
+#endif
       Z3GASNET_CHECKCALL(gasnet_AMRequestMedium0(
             node_index, m_queue_msg_handler_index,
             const_cast<char*>(msg.c_str()), msg.size()+1 ));
+    }
     else 
     {
       // for messages that are long
@@ -385,6 +379,9 @@ void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
       //shared memory segment
       memcpy((void*)mybuffer[0],msg.c_str(),msg.size()+1);
 
+#ifdef Z3GASNET_PROFILING
+      m_stats.transmit_bytes+=sizeof(mybuffer);
+#endif
       //send the remote node the location where they may write on
       //the our shared memory segment
       Z3GASNET_CHECKCALL(gasnet_AMRequestMedium0(
@@ -392,23 +389,12 @@ void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
             (void*) mybuffer, sizeof(mybuffer) ));
 
     }
+
+#ifdef Z3GASNET_PROFILING
+     m_stats.transmit_time.stop();
+#endif
 }
   
-/*
-const char * const context::get_front_msg(size_t &string_size)
-{
-  const msg_rec *m = NULL;
-  {
-    scoped_interrupt_holder interrupt_lock(true);
-    m = m_msg_queue.front();
-  }
-  const void * const vb = m->get_buffer();
-  string_size = m->get_buffer_size();
-
-  return (const char * const) vb;
-}
-*/
- 
 bool context::process_work_queue_item()
 {
   gasnet_hsl_lock(&m_handler_lock);
@@ -451,11 +437,14 @@ bool context::process_work_queue_item()
 
 bool context::pop_front_msg(std::string &next_message)
 {
+#ifdef Z3GASNET_PROFILING
+    m_stats.pop_time.start();
+#endif
+
   // Poll GASNet to assure any pending message handlers get called
   Z3GASNET_CHECKCALL(gasnet_AMPoll());
-
-  // perform any reads in the work q
-  while (process_work_queue_item()) ;
+  // perform one read from work q
+  process_work_queue_item();
 
   msg_rec *m = NULL;
   size_t n;
@@ -480,12 +469,20 @@ bool context::pop_front_msg(std::string &next_message)
     SASSERT(m->get_buffer_size());
     SASSERT(m->get_buffer());
 
-  //TODO Optimization - replace with .assign, should be more efficient
+#ifdef Z3GASNET_PROFILING
+    m_stats.pop_cnt++;
+    m_stats.pop_bytes += m->get_buffer_size();
+#endif
+
+  //TODO DHK Optimization - see if client can use bytes directly to avoid copy
     next_message.assign((const char *) m->get_buffer(),m->get_buffer_size()-1);
 
     dealloc(m);
   }
 
+#ifdef Z3GASNET_PROFILING
+    m_stats.pop_time.stop();
+#endif
   return n > 0;
 }
 
@@ -515,6 +512,29 @@ void context::queue_long_msg_handler(gasnet_token_t token,
   }
 }
 
+#ifdef Z3GASNET_PROFILING
+void context::collect_statistics(std::ostream &stats_stream, double total_time)
+{
+  //TODO figure out wha tis up with z3 statistics handling
+
+    stats_stream 
+      << "BRUNCH_STAT pop_cnt " << m_stats.pop_cnt << "\n"
+      << "BRUNCH_STAT pop_time " << m_stats.pop_time.get_seconds() << "\n"
+      << "BRUNCH_STAT pop_bytes " << m_stats.pop_bytes << "\n"
+      << "BRUNCH_STAT transmit_cnt " << m_stats.transmit_cnt << "\n"
+      << "BRUNCH_STAT transmit_time " << m_stats.transmit_time.get_seconds() << "\n"
+      << "BRUNCH_STAT transmit_bytes " << m_stats.transmit_bytes << "\n"
+      << "BRUNCH_STAT total_time " << total_time << "\n"
+      << "BRUNCH_STAT comm_ohd " << (
+          (m_stats.pop_time.get_seconds() + m_stats.transmit_time.get_seconds()) 
+          / total_time) << "\n"
+      << "BRUNCH_STAT thuput_mbps " << (
+          (m_stats.pop_bytes + m_stats.transmit_bytes) / 1024.0 / 1024.0 /
+          (m_stats.pop_time.get_seconds() + m_stats.transmit_time.get_seconds())) 
+          << "\n";
+    stats_stream.flush();
+}
+#endif
 
 // instantiations for static members of context
 std::vector<gasnet_handlerentry_t> context::m_handlertable;
@@ -529,6 +549,9 @@ uintptr_t context::m_next_seg_loc;
 gasnet_handler_t context::m_queue_long_msg_handler_index;
 gasnet_hsl_t context::m_handler_lock = GASNET_HSL_INITIALIZER;
 work_queue context::m_work_queue;
+#ifdef Z3GASNET_PROFILING
+stats context::m_stats;
+#endif
 
 } /// end z3gasnet namespace
 #endif
