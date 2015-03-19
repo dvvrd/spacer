@@ -49,9 +49,6 @@ Notes:
 #ifdef Z3GASNET
 #include "z3_gasnet.h"
 #include "spacer_marshal.h"
-//#ifdef Z3GASNET_TRUST_BUT_VERIFY
-//#include <algorithm>
-//#endif
 #endif
 
 #include "timeit.h"
