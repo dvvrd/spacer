@@ -60,7 +60,13 @@ DM-XXXXXXX
 #include<ostream>
 #include<vector>
 #include<queue>
-# ifdef _TRACE
+
+// gasnet documentation states that messages are sent best
+// effort.  To check during software construction that messages
+// arrive with the correct contents, use the following define
+#define Z3GASNET_TRUST_BUT_VERIFY
+
+#ifdef Z3GASNET_TRUST_BUT_VERIFY
 #include<list>
 #endif
 
@@ -131,22 +137,8 @@ bool node_is_master();
 gasnet_handlerentry_t *get_handler_table();
 int get_num_handler_table_entires();
 
+// typedef for generic handler function pointer
 typedef void (*handler_fn_t)();
-
-
-// For pdr_dl_interface.cpp 
-extern const int handler_contextsolve_index;
-void handler_contextsolve(gasnet_token_t token, gasnet_handlerarg_t ans);
-extern gasnet_handlerarg_t contextsolve_answer;
-
-// For pdr_dl_interface.cpp 
-extern const int replyhandler_contextsolve_index;
-void replyhandler_contextsolve(gasnet_token_t token);
-extern int contextsolve_nodes_recieved;
-
-// For spacer_context.cpp solve_core
-extern const int handler_solve_core_iteration_index;
-void handler_solve_core_iteration(gasnet_token_t token, void* context_addr, size_t nbytes, gasnet_handlerarg_t ans);
 
 
 // This function should be called at static initialization time, before 
@@ -156,7 +148,7 @@ gasnet_handler_t register_handler(handler_fn_t handler);
 
 // This function will find a handler by its function pointer
 // if it is found its index will be returned.  Valid index values
-// for handlers are from [128..255] acprding to gasnet docs.  If it is not
+// for handlers are from [128..255] acording to gasnet docs.  If it is not
 // found 0 will be returned, 0 should never be used as a user defined
 // handler value
 gasnet_handler_t  find_handler(handler_fn_t handler);
@@ -176,6 +168,9 @@ struct scoped_interrupt_holder
 private:
   bool m_hold;
 };
+
+// when handler and client code share data structures
+// this lock is used
 struct scoped_hsl_lock
 {
   scoped_hsl_lock(gasnet_hsl_t *lock, const bool &hold);
@@ -185,6 +180,11 @@ private:
   gasnet_hsl_t *m_lock;
 };
 
+// the message q is filled with local coppies of all
+// messages.  medium messges are filled as they are
+// recieved, in the message handler.  long messages are
+// filled in the main thread as work is pulled off of
+// the work queue
 class msg_rec
 {
   private:
@@ -212,34 +212,32 @@ class msg_rec
 
 typedef std::queue<msg_rec*> msg_queue;
 
+// the work item queue is filled in the long
+// message handler, each item in the queue
+// provides enough information for where to
+// read on a remote node's shared segment
+struct work_item
+{
+  uintptr_t addr;
+  size_t size;
+  gasnet_node_t node;
+};
+typedef std::queue<work_item*> work_queue;
 
-// holds the static data needed to initialize gasnet
-// gasnet wants us to provide the table of functions
-// to call before gasnet_attach(), while in main.  
-// message handlers are registered by client static
-// initializers called registrar s
-//
-// holds the global message q
+//TODO think about moving everything aboce inside the context class,
+//  except maybe the types and typedefs
+
 class context
 {
 public:
   static std::vector<gasnet_handlerentry_t> &get_handlertable() {
     return context::m_handlertable; 
   }
-  static void register_queue_msg_handler();
+  static void register_queue_msg_handlers();
 
   //sends a string message to the node at node_index
   static void transmit_msg(gasnet_node_t node_index, const std::string &msg);
   
-  //gets the contents of the first message in this node's
-  //queue interpreted as a string
-  //the returned pointer should NOT be deallocated by the caller.
-  //if the message queue is empty, NULL is returned and string_size is unmodified
-  //otherwise the returned pointer points to a null terminated string 
-  //and string_size is set to the string length, this is the number of charachters 
-  //before (and not including) the null terminator
-  // -- static const char * const get_front_msg(size_t &string_size);
-
   //removes the first message in this node's queue, and returns
   //false if there were no elements and next_message is unmodified
   //returns true and sets next_messsage to the message before popping
@@ -250,59 +248,54 @@ public:
   //memory segments on all of the nodes
   static void set_seginfo_table();
 
+  //TODO if any nodes are left in the queue, they will leak at exit
   //destroy static data
-  static void destroy();
+  //static void destroy();
 
 
 private:
-  static void queue_msg_handler(gasnet_token_t token,
-            void* buffer, size_t buffer_size, 
-            gasnet_handlerarg_t sender_node_index);
-
+  // the registered active messaging handlers
   static std::vector<gasnet_handlerentry_t> m_handlertable;
-  static msg_queue m_msg_queue;
-  static gasnet_handler_t m_queue_msg_handler_index;
+
+  // the representation of the global address space
   static std::vector<gasnet_seginfo_t> m_seginfo_table;
-#ifdef _TRACE
-  static void queue_msg_response_handler(gasnet_token_t token,
-            void* buffer, size_t buffer_size, 
-            gasnet_handlerarg_t sender_node_index);
-  static std::list<std::string> m_unack_messages;
-  static gasnet_handler_t m_queue_msg_response_handler_index;
-#endif
-
-
-  /*
-//dhk
-  typedef std::list<std::pair<uintptr_t,size_t> > free_list;
-  static free_list m_rcv_node_free_list;
   
-  //get the next free spot of the local nodes representation of the
-  //shered memory segment on the receiving node
-  static uintptr_t receive_node_malloc(size_t size);
-  //free up a previously reserved spot of the remote segment
-  void receive_node_free(uintptr_t remote_address, size_t numbytes);
+  // the following two queue's are shared between handler context
+  // and client code and should be accessed via the handler lock
+  static bool process_work_queue_item();
+  static gasnet_hsl_t m_handler_lock;
+  static work_queue m_work_queue;
+  static msg_queue m_msg_queue;
 
-  //get the index of the node who receives all instruction from this
-  //local node
-  static gasnet_node_t get_rcv_node();
-  */
 
-#ifdef _TRACE
-  static void free_list_to_stream(std::ostream &stream);
+  // handler for medium size instantaneous messages
+  static void queue_msg_handler(gasnet_token_t token,
+            void* buffer, size_t buffer_size);
+  static gasnet_handler_t m_queue_msg_handler_index;
+
+  // handler for long messages which are added to the work queue
+  static void queue_long_msg_handler(gasnet_token_t token,
+            void* buffer, size_t buffer_size);
+  static gasnet_handler_t m_queue_long_msg_handler_index;
+
+#ifdef Z3GASNET_TRUST_BUT_VERIFY
+  // handler for verifying messages were delivered with the correct
+  // contents
+  static void queue_msg_response_handler(gasnet_token_t token,
+            void* buffer, size_t buffer_size);
+  static gasnet_handler_t m_queue_msg_response_handler_index;
+  // remembers hashes of what messages were sent
+  static std::list<std::string> m_unack_messages;
 #endif
-  static uintptr_t m_next_seg_loc;
 
-  static uintptr_t get_shared_segment_start();
-  static uintptr_t get_shared_segment_end();
+  // for reserving spots on the local node's shared segment
   static size_t get_shared_segment_size();
   static bool can_reserve_buffer(size_t size);
   static uintptr_t reserve_buffer(size_t size);
+  static uintptr_t m_next_seg_loc;
+  static uintptr_t get_shared_segment_start();
+  static uintptr_t get_shared_segment_end();
 
-  static gasnet_handler_t m_queue_long_msg_handler_index;
-  static void queue_long_msg_handler(gasnet_token_t token,
-            void* buffer, size_t buffer_size);
-  static gasnet_hsl_t m_handler_lock;
 
 };
 

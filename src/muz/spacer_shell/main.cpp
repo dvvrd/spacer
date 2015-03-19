@@ -433,9 +433,7 @@ int main(int argc, char ** argv) {
 #ifdef Z3GASNET
 
         //Register the messange handlers 
-        spacer::context::register_set_context_pool_member_handler();    //deprecated
-        spacer::context::register_share_string_handler();               //deprecated
-        z3gasnet::context::register_queue_msg_handler();
+        z3gasnet::context::register_queue_msg_handlers();
 
         // gasnet places itself in front of any applicaiton cmdline handling
         // it will strip off the arguments it uses inside gasnet_init and 
