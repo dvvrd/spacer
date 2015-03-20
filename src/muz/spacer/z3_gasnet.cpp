@@ -217,6 +217,9 @@ void context::register_queue_msg_handlers()
 void context::queue_msg_handler(gasnet_token_t token,
           void* buffer, size_t buffer_size)
 {
+#ifdef Z3GASNET_PROFILING
+    m_stats.handler_time.start();
+#endif
 
     //We don't have a use case for sending ourselves messages at this time
     //but there is no reason we couldn't support this
@@ -245,12 +248,19 @@ void context::queue_msg_handler(gasnet_token_t token,
           m_queue_msg_response_handler_index, 
           const_cast<char *>(hash.c_str()), hash.size() + 1));
 #endif
+#ifdef Z3GASNET_PROFILING
+    m_stats.handler_time.stop();
+#endif
 }
 
 #ifdef Z3GASNET_TRUST_BUT_VERIFY
 void context::queue_msg_response_handler(gasnet_token_t token,
           void* buffer, size_t buffer_size)
 {
+#ifdef Z3GASNET_PROFILING
+    m_stats.handler_time.start();
+#endif
+
   std::list<std::string>::iterator i = m_unack_messages.begin();
   std::list<std::string>::iterator end = m_unack_messages.end();
   std::string acked_msg((const char *)buffer, buffer_size -1);
@@ -281,6 +291,9 @@ void context::queue_msg_response_handler(gasnet_token_t token,
 
   SASSERT(acked);
 
+#ifdef Z3GASNET_PROFILING
+    m_stats.handler_time.stop();
+#endif
 }
 #endif
 
@@ -498,6 +511,9 @@ void context::set_seginfo_table()
 void context::queue_long_msg_handler(gasnet_token_t token,
             void* buffer, size_t buffer_size)
 {
+#ifdef Z3GASNET_PROFILING
+    m_stats.handler_time.start();
+#endif
   SASSERT(buffer_size == sizeof(uintptr_t)*2);
   uintptr_t *remote_buffer = (uintptr_t*) buffer;
 
@@ -510,28 +526,28 @@ void context::queue_long_msg_handler(gasnet_token_t token,
     scoped_hsl_lock lock(&m_handler_lock,true);
     m_work_queue.push(read);
   }
+#ifdef Z3GASNET_PROFILING
+    m_stats.handler_time.stop();
+#endif
 }
 
 #ifdef Z3GASNET_PROFILING
 void context::collect_statistics(std::ostream &stats_stream, double total_time)
 {
-  //TODO figure out wha tis up with z3 statistics handling
+  //TODO DHK figure out what is up with z3 statistics handling
+  stats &s = m_stats;
 
     stats_stream 
-      << "BRUNCH_STAT pop_cnt " << m_stats.pop_cnt << "\n"
-      << "BRUNCH_STAT pop_time " << m_stats.pop_time.get_seconds() << "\n"
-      << "BRUNCH_STAT pop_bytes " << m_stats.pop_bytes << "\n"
-      << "BRUNCH_STAT transmit_cnt " << m_stats.transmit_cnt << "\n"
-      << "BRUNCH_STAT transmit_time " << m_stats.transmit_time.get_seconds() << "\n"
-      << "BRUNCH_STAT transmit_bytes " << m_stats.transmit_bytes << "\n"
+      << "BRUNCH_STAT pop_cnt " << s.pop_cnt << "\n"
+      << "BRUNCH_STAT pop_time " << s.pop_time.get_seconds() << "\n"
+      << "BRUNCH_STAT pop_bytes " << s.pop_bytes << "\n"
+      << "BRUNCH_STAT transmit_cnt " << s.transmit_cnt << "\n"
+      << "BRUNCH_STAT transmit_time " << s.transmit_time.get_seconds() << "\n"
+      << "BRUNCH_STAT transmit_bytes " << s.transmit_bytes << "\n"
+      << "BRUNCH_STAT handler_time " << s.handler_time.get_seconds() << "\n"
       << "BRUNCH_STAT total_time " << total_time << "\n"
-      << "BRUNCH_STAT comm_ohd " << (
-          (m_stats.pop_time.get_seconds() + m_stats.transmit_time.get_seconds()) 
-          / total_time) << "\n"
-      << "BRUNCH_STAT thuput_mbps " << (
-          (m_stats.pop_bytes + m_stats.transmit_bytes) / 1024.0 / 1024.0 /
-          (m_stats.pop_time.get_seconds() + m_stats.transmit_time.get_seconds())) 
-          << "\n";
+      << "BRUNCH_STAT comm_ohd " << s.sum_time() / total_time << "\n"
+      << "BRUNCH_STAT thuput_mbps " << s.sum_bytes()/1024.0/1024.0/s.sum_time() << "\n";
     stats_stream.flush();
 }
 #endif

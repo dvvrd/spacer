@@ -61,9 +61,11 @@ DM-XXXXXXX
 #include<vector>
 #include<queue>
 #define Z3GASNET_PROFILING
+
 #ifdef Z3GASNET_PROFILING
 #include"spacer_wall_stopwatch.h"
 #endif
+#include<omp.h>
 
 // gasnet documentation states that messages are sent best
 // effort.  To check during software construction that messages
@@ -76,7 +78,7 @@ DM-XXXXXXX
 
 #define Z3GASNET_INIT_VERBOSE_STREAM_NAME std::cout
 
-#define Z3GASNET_TRACE_PREFIX tout << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): " 
+#define Z3GASNET_TRACE_PREFIX tout << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << ":" << omp_get_thread_num() << "): " << __FILE__ << "(" << __LINE__ <<"): " 
 
 #define Z3GASNET_VERBOSE_STREAM( stream, code ) do {stream << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): "  code ; stream.flush();} while (false)
 
@@ -232,7 +234,11 @@ struct stats {
     unsigned transmit_bytes;
     spacer::spacer_wall_stopwatch pop_time;
     spacer::spacer_wall_stopwatch transmit_time;
+    spacer::spacer_wall_stopwatch handler_time;
     stats() { reset(); }
+    double sum_time() { return pop_time.get_seconds() + 
+      transmit_time.get_seconds() + handler_time.get_seconds(); }
+    unsigned sum_bytes() { return pop_bytes +  transmit_bytes; }
     void reset() { memset(this, 0, sizeof(*this)); }
 };
 #endif
