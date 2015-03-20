@@ -101,6 +101,8 @@ def parseArgs (argv):
                     action='store', help='number of nodes in GASNet job', default=-1)   
     p.add_argument ('--distprofile', dest='distprofile',
                     action='store', help='distribution profile for spacer', default=None)
+    p.add_argument ('--gasnet-spawnfn', dest='gasnet_spawnfn',
+                    action='store', help='GASNet spawning mode, used for launching job on UDP conduit', default='L')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -217,6 +219,10 @@ def compute_z3_args (args):
 
     if args.distprofile:
         z3_args += ' -profile:%s' % args.distprofile
+
+    if args.gasnet_spawnfn:
+        os.environ['GASNET_SPAWNFN'] = args.gasnet_spawnfn
+
         
     z3_args += ' ' + args.file
 
