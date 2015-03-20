@@ -1,6 +1,8 @@
 # simple statistics module
 
 import resource
+from datetime import datetime
+from datetime import timedelta
 
 def _systemtime ():
   ru_self = resource.getrusage (resource.RUSAGE_SELF)
@@ -10,9 +12,9 @@ def _systemtime ():
 class WallStopwatch:
   """ A stop watch for wall time """
   def __init__ (self):
-    self._wall_started = 0
-    self._wall_finished = -1
-    self._wall_elapsed = 0
+    self._wall_started = timedelta(seconds=0)
+    self._wall_finished = timedelta(seconds=-1)
+    self._wall_elapsed = timedelta(seconds=0)
     self.start ()
         
         
@@ -20,8 +22,8 @@ class WallStopwatch:
   def elapsed (self): 
     """ Returns time (in seconds) since the stopwatch has been started. """
     if self._wall_finished < self._wall_started:
-        return (self._wall_elapsed + (datetime.now() - self._started)).total_seconds()
-    return (self._elapsed + (self._finished - self._started)).total_seconds()
+        return (self._wall_elapsed + (datetime.now() - self._started)).seconds
+    return (self._wall_elapsed + (self._wall_finished - self._wall_started)).seconds
 
   def start (self):
     """ Starts or resumes the stopwatch """
@@ -124,7 +126,6 @@ def start (key):
     if wsw is None:
         wsw = WallStopwatch ()
         put ("Wall_"+key, wsw)
-        return wsw
     else:
         wsw.start ()
 
@@ -132,9 +133,11 @@ def start (key):
     if sw is None:
         sw = Stopwatch ()
         put (key, sw)
-        return sw
     else:
         sw.start ()
+
+    return (sw,wsw)
+
 def stop (key):
     """ Stops a named stopwatch """
     sw = get (key)
