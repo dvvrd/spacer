@@ -18,7 +18,10 @@ profiles = {
     ## between propagations
     'ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux'],
     ## inspired by gpdr: no priority queue. 
-    'gpdr': ['--use-heavy-mev', '--no-elim-aux']
+    'gpdr': ['--use-heavy-mev', '--no-elim-aux'],
+
+    ## three nodes in the spacer job each assigned a differnt profile
+    'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr']
 }
 
 def parseArgs (argv):
@@ -96,6 +99,8 @@ def parseArgs (argv):
                     action='store', help='MEM limit (MB)', default=-1)   
     p.add_argument ('--jobsize', dest='jobsize', type=int,
                     action='store', help='number of nodes in GASNet job', default=-1)   
+    p.add_argument ('--distprofile', dest='distprofile',
+                    action='store', help='distribution profile for spacer', default=None)
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -209,6 +214,9 @@ def compute_z3_args (args):
         z3_args += ' fixedpoint.spacer.elim_aux=true' 
     else:
         z3_args += ' fixedpoint.spacer.elim_aux=false'
+
+    if args.distprofile:
+        z3_args += ' -profile:%s' % args.distprofile
         
     z3_args += ' ' + args.file
 
