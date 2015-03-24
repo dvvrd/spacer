@@ -21,9 +21,6 @@ Originally adapted from the C reference implementation on this page
 Tested in Visual Studio 2010.
 Sample use:
 
-Main.cpp
-#include "md5.h"
-
 int main()
 {
   MD5 md5 ;

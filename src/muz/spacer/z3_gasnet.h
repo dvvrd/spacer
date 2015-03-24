@@ -67,6 +67,7 @@ DM-XXXXXXX
 #endif
 #include<omp.h>
 
+
 // gasnet documentation states that messages are sent best
 // effort.  To check during software construction that messages
 // arrive with the correct contents, use the following define
@@ -75,6 +76,8 @@ DM-XXXXXXX
 #ifdef Z3GASNET_TRUST_BUT_VERIFY
 #include<list>
 #endif
+
+#include "fixedpoint_params.hpp"
 
 #define Z3GASNET_INIT_VERBOSE_STREAM_NAME std::cout
 
@@ -120,6 +123,7 @@ DM-XXXXXXX
 #else
 #define Z3GASNET_PROFILING_CALL(code)
 #endif
+
 
 namespace z3gasnet
 {
@@ -275,6 +279,13 @@ public:
   static void collect_statistics(std::ostream &stat_stream, double total_time);
 #endif
 
+  //typedef fixedpoint_params * params_ref_type1;
+  //typedef fixedpoint_params const& params_ref_type;
+  typedef void* params_ref_type;
+  // stats are set when spacer_context is initialized
+  static void set_params(params_ref_type  params);
+  static const fixedpoint_params & get_params();
+
 private:
   // the registered active messaging handlers
   static std::vector<gasnet_handlerentry_t> m_handlertable;
@@ -321,6 +332,10 @@ private:
 #ifdef Z3GASNET_PROFILING      
   static stats m_stats;
 #endif
+
+  
+
+  static params_ref_type m_params;
 
 };
 

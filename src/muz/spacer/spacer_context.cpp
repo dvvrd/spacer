@@ -1568,13 +1568,15 @@ namespace spacer {
     m_expanded_lvl(0),
     m_cancel(false)
   {
+#ifdef Z3GASNET
+    z3gasnet::context::set_params(
+        (void*) const_cast<fixedpoint_params*>(&m_params));
+#endif
   }
 
   context::~context() {
     reset_core_generalizers();
     reset();
-    //TODO DHK gracefully leave distributed context pool
-
   }
 
 

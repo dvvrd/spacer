@@ -60,9 +60,9 @@ DM-XXXXXXX
 #include"trace.h"
 #include<sstream>
 
-#ifdef Z3GASNET_TRUST_BUT_VERIFY
+//#ifdef Z3GASNET_TRUST_BUT_VERIFY
 #include"md5.h"
-#endif
+//#endif
 
 
 namespace z3gasnet
@@ -203,6 +203,9 @@ void context::register_queue_msg_handlers()
   m_queue_msg_handler_index = register_handler(
       (handler_fn_t)queue_msg_handler);
 #ifdef Z3GASNET_TRUST_BUT_VERIFY
+  // though this should be optinally done if gasnet_verify_msgs
+  // parameter is set, this funciton is called from main before
+  // spacer context has a chance to initialize m_params
   m_queue_msg_response_handler_index = register_handler(
       (handler_fn_t)queue_msg_response_handler);
 #endif
@@ -237,16 +240,19 @@ void context::queue_msg_handler(gasnet_token_t token,
     }
 
 #ifdef Z3GASNET_TRUST_BUT_VERIFY
-    MD5 md5;
-    std::string hash(md5.digestMemory((BYTE *) buffer, (int) buffer_size));
-    STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "receive " << buffer_size
-        << " bytes, from node: " << sender_node_index
-        << ", md5: " << hash << "\n" ;);
+    if (get_params().gasnet_verify_msgs())
+    {
+      MD5 md5;
+      std::string hash(md5.digestMemory((BYTE *) buffer, (int) buffer_size));
+      STRACE("gas", Z3GASNET_TRACE_PREFIX 
+          << "receive " << buffer_size
+          << " bytes, from node: " << sender_node_index
+          << ", md5: " << hash << "\n" ;);
 
-    Z3GASNET_CHECKCALL(gasnet_AMReplyMedium0( token,
-          m_queue_msg_response_handler_index, 
-          const_cast<char *>(hash.c_str()), hash.size() + 1));
+      Z3GASNET_CHECKCALL(gasnet_AMReplyMedium0( token,
+            m_queue_msg_response_handler_index, 
+            const_cast<char *>(hash.c_str()), hash.size() + 1));
+    }
 #endif
 #ifdef Z3GASNET_PROFILING
     m_stats.handler_time.stop();
@@ -349,15 +355,18 @@ void context::transmit_msg(gasnet_node_t node_index, const std::string &msg)
 #endif
 
 #ifdef Z3GASNET_TRUST_BUT_VERIFY
-    MD5 md5;
-    std::string hash(md5.digestMemory((BYTE*) const_cast<char *>(msg.c_str()),msg.size()+1));
+    if (get_params().gasnet_verify_msgs())
     {
-      scoped_interrupt_holder lock(true);
-      m_unack_messages.push_back(hash);
+      MD5 md5;
+      std::string hash(md5.digestMemory((BYTE*) const_cast<char *>(msg.c_str()),msg.size()+1));
+      {
+        scoped_interrupt_holder lock(true);
+        m_unack_messages.push_back(hash);
+      }
+      STRACE("gas", Z3GASNET_TRACE_PREFIX 
+          << "transmit " << msg.size()+1 << " bytes to node: " << node_index 
+          << ", md5: " << hash << "\n" ;);
     }
-    STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "transmit " << msg.size()+1 << " bytes to node: " << node_index 
-        << ", md5: " << hash << "\n" ;);
 #endif
 
     // for messages that can fit in medium size payload, send them
@@ -426,17 +435,20 @@ bool context::process_work_queue_item()
 
 
 #ifdef Z3GASNET_TRUST_BUT_VERIFY
-  MD5 md5;
-  std::string hash(md5.digestMemory((BYTE*) back->m_buffer,item->size));
+  if (get_params().gasnet_verify_msgs())
+  {
+    MD5 md5;
+    std::string hash(md5.digestMemory((BYTE*) back->m_buffer,item->size));
 
-  STRACE("gas", Z3GASNET_TRACE_PREFIX 
-      << "bulk get " << item->size
-      << " bytes, from node: " << item->node
-      << ", md5: " << hash << "\n" ;);
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "bulk get " << item->size
+        << " bytes, from node: " << item->node
+        << ", md5: " << hash << "\n" ;);
 
-  Z3GASNET_CHECKCALL(gasnet_AMRequestMedium0( item->node,
-        m_queue_msg_response_handler_index, 
-        const_cast<char *>(hash.c_str()), hash.size() + 1));
+    Z3GASNET_CHECKCALL(gasnet_AMRequestMedium0( item->node,
+          m_queue_msg_response_handler_index, 
+          const_cast<char *>(hash.c_str()), hash.size() + 1));
+  }
 #endif
 
   dealloc(item);
@@ -552,6 +564,10 @@ void context::collect_statistics(std::ostream &stats_stream, double total_time)
 }
 #endif
 
+void context::set_params(context::params_ref_type  params){ m_params = params; }
+const fixedpoint_params & context::get_params() { 
+  return *((fixedpoint_params *) m_params); }
+
 // instantiations for static members of context
 std::vector<gasnet_handlerentry_t> context::m_handlertable;
 msg_queue context::m_msg_queue;
@@ -568,6 +584,7 @@ work_queue context::m_work_queue;
 #ifdef Z3GASNET_PROFILING
 stats context::m_stats;
 #endif
+context::params_ref_type context::m_params = NULL;
 
 } /// end z3gasnet namespace
 #endif

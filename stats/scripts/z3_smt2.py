@@ -103,6 +103,8 @@ def parseArgs (argv):
                     action='store', help='distribution profile for spacer', default=None)
     p.add_argument ('--gasnet-spawnfn', dest='gasnet_spawnfn',
                     action='store', help='GASNet spawning mode, used for launching job on UDP conduit', default='L')
+    p.add_argument ('--verify-msgs', dest='verify_msgs',
+                    action='store_true', help='Compute hashes and send reciept confirmation for all messages', default=False)
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -222,6 +224,9 @@ def compute_z3_args (args):
 
     if args.gasnet_spawnfn:
         os.environ['GASNET_SPAWNFN'] = args.gasnet_spawnfn
+
+    if (args.verify_msgs):
+        z3_args += ' fixedpoint.gasnet.verify_msgs=true'
 
         
     z3_args += ' ' + args.file
