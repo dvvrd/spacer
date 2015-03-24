@@ -517,6 +517,10 @@ void context::set_seginfo_table()
   Z3GASNET_CHECKCALL(gasnet_getSegmentInfo(&m_seginfo_table.front(),gasnet_nodes()));
 
   m_next_seg_loc = get_shared_segment_start();
+  
+#ifdef Z3GASNET_PROFILING
+  m_stats.total_time.start();
+#endif
 
 }
   
@@ -544,10 +548,11 @@ void context::queue_long_msg_handler(gasnet_token_t token,
 }
 
 #ifdef Z3GASNET_PROFILING
-void context::collect_statistics(std::ostream &stats_stream, double total_time)
+void context::print_statistics(std::ostream &stats_stream)
 {
   //TODO DHK figure out what is up with z3 statistics handling
   stats &s = m_stats;
+  double total_time = s.total_time.get_seconds();
 
     stats_stream 
       << "BRUNCH_STAT pop_cnt " << s.pop_cnt << "\n"

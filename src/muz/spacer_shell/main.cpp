@@ -450,11 +450,6 @@ int main(int argc, char ** argv) {
               z3gasnet::get_num_handler_table_entires(),
               gasnet_getMaxLocalSegmentSize(),0));
 
-#ifdef Z3GASNET_PROFILING
-        spacer::spacer_wall_stopwatch total_time;
-        total_time.start();
-#endif
-
         z3gasnet::context::set_seginfo_table();
 
 #endif
@@ -536,21 +531,6 @@ int main(int argc, char ** argv) {
 #ifdef Z3GASNET
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
             << "Ready to exit\n";);
-
-#ifdef Z3GASNET_PROFILING
-        total_time.stop();
-
-#ifdef _TRACE
-        STRACE("gas", Z3GASNET_TRACE_PREFIX
-            << "Communications Stats:\n" ;);
-        z3gasnet::context::collect_statistics(tout, total_time.get_seconds());
-#else
-        if (g_display_statistics) 
-            z3gasnet::context::collect_statistics(
-                verbose_stream(), total_time.get_seconds());
-#endif
-
-#endif
 
         gasnet_barrier_notify(0,0);
         Z3GASNET_CHECKCALL(gasnet_barrier_wait(0,0));

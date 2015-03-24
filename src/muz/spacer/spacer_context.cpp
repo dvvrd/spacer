@@ -2974,6 +2974,10 @@ namespace spacer {
         verbose_stream () << "BRUNCH_STAT max_depth " << m_stats.m_max_depth << "\n";
         verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_cex_depth << "\n";
 
+#ifdef Z3GASNET
+        z3gasnet::context::print_statistics(verbose_stream());
+#endif
+
     }
 
     void context::reset_statistics() {

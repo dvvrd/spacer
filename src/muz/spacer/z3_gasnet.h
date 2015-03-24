@@ -60,6 +60,8 @@ DM-XXXXXXX
 #include<ostream>
 #include<vector>
 #include<queue>
+
+// measures the time, data, and number of messages
 #define Z3GASNET_PROFILING
 
 #ifdef Z3GASNET_PROFILING
@@ -71,6 +73,7 @@ DM-XXXXXXX
 // gasnet documentation states that messages are sent best
 // effort.  To check during software construction that messages
 // arrive with the correct contents, use the following define
+// Also now can be turned on and off by parameter gasnet.verify_msgs
 #define Z3GASNET_TRUST_BUT_VERIFY
 
 #ifdef Z3GASNET_TRUST_BUT_VERIFY
@@ -239,6 +242,7 @@ struct stats {
     spacer::spacer_wall_stopwatch pop_time;
     spacer::spacer_wall_stopwatch transmit_time;
     spacer::spacer_wall_stopwatch handler_time;
+    spacer::spacer_wall_stopwatch total_time;
     stats() { reset(); }
     double sum_time() { return pop_time.get_seconds() + 
       transmit_time.get_seconds() + handler_time.get_seconds(); }
@@ -276,7 +280,7 @@ public:
   //static void destroy();
 
 #ifdef Z3GASNET_PROFILING      
-  static void collect_statistics(std::ostream &stat_stream, double total_time);
+  static void print_statistics(std::ostream &stat_stream);
 #endif
 
   //typedef fixedpoint_params * params_ref_type1;
