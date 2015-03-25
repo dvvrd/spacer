@@ -51,7 +51,7 @@ Notes:
 #include "spacer_marshal.h"
 #endif
 
-#include "timeit.h"
+#include "spacer_timeit.h"
 #include "luby.h"
 
 namespace spacer {
@@ -2414,8 +2414,8 @@ namespace spacer {
 
   bool context::check_reachability () 
   {
-    timeit _timer (get_verbosity_level () >= 1, "spacer::context::check_reachability", 
-        verbose_stream ());
+    spacer_timeit _timer (get_verbosity_level () >= 1, "spacer::context::check_reachability", 
+        verbose_stream (), &m_stats.m_accum_reach_time);
 
     model_node_ref last_reachable;
 
@@ -2717,8 +2717,8 @@ namespace spacer {
   bool context::propagate(unsigned min_prop_lvl, 
                           unsigned max_prop_lvl, unsigned full_prop_lvl) {    
     
-    timeit _timer (get_verbosity_level () >= 1, "spacer::context::propagate", 
-                   verbose_stream ());
+    spacer_timeit _timer (get_verbosity_level () >= 1, "spacer::context::propagate", 
+                   verbose_stream (), &m_stats.m_accum_prop_time);
     
     if (full_prop_lvl < max_prop_lvl) full_prop_lvl = max_prop_lvl;
     
@@ -2959,6 +2959,8 @@ namespace spacer {
         st.update("SPACER max depth", m_stats.m_max_depth);
         st.update("SPACER inductive level", m_inductive_lvl);
         st.update("SPACER cex depth", m_stats.m_cex_depth);
+        st.update("SPACER accum prop time", m_stats.m_accum_prop_time.get_seconds());
+        st.update("SPACER accum reach time", m_stats.m_accum_reach_time.get_seconds());
         m_pm.collect_statistics(st);
 
         for (unsigned i = 0; i < m_core_generalizers.size(); ++i) {
@@ -2973,6 +2975,8 @@ namespace spacer {
         verbose_stream () << "BRUNCH_STAT inductive_lvl " << m_inductive_lvl << "\n";
         verbose_stream () << "BRUNCH_STAT max_depth " << m_stats.m_max_depth << "\n";
         verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_cex_depth << "\n";
+        verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_accum_reach_time.get_seconds() << "\n";
+        verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_accum_prop_time.get_seconds() << "\n";
 
 #ifdef Z3GASNET
         z3gasnet::context::print_statistics(verbose_stream());
