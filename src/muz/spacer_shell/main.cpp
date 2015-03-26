@@ -401,7 +401,7 @@ void set_profile(std::vector<std::string> profile_vec)
   {
     SASSERT(profile_vec[0] == "def");
     profile_vec.clear();
-    for (size_t i = 0; i < stock_profiles; i++)
+    for (size_t i = 0; i < stock_profiles && i < gasnet_nodes(); i++)
       profile_vec.push_back(g_profile_names[i]);
     SASSERT(profile_vec[0] == "def");
   }

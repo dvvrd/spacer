@@ -21,7 +21,10 @@ profiles = {
     'gpdr': ['--use-heavy-mev', '--no-elim-aux'],
 
     ## three nodes in the spacer job each assigned a differnt profile
-    'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr']
+    'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
+    
+    ## use distributed mode CLI, but not running distributed, use just one node
+    'solodistdef': ['--jobsize','1','--distprofile', 'def']
 }
 
 def parseArgs (argv):
