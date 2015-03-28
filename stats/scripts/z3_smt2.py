@@ -27,7 +27,7 @@ profiles = {
     'solodistdef': ['--jobsize','1','--distprofile', 'def'],
 
     ## distributed mode CLI, but running two copies of def
-    'solodistdef': ['--jobsize','2','--distprofile', 'def,def']
+    'dualdistdef': ['--jobsize','2','--distprofile', 'def,def']
 }
 
 def parseArgs (argv):
