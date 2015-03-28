@@ -280,18 +280,15 @@ def main (argv):
     cmd = RunCmd(z3_args.split(), args.cpu, args.mem)
     with stats.timer ('Query'):
         returncode = cmd.Run()
-    res = cmd.stdout
+    out = cmd.stdout
 
-    if res is None:
-        res = 'unknown'
-    elif 'unsat' in res:
+    print out
+
+    res = 'unknown'
+    if 'unsat' in out:
         res = 'unsat'
-    elif 'sat' in res:
+    elif 'sat' in out:
         res = 'sat'
-    else:
-        res = 'unknown'
-
-    print 'Result:', res
 
     if res == 'sat':
         if args.smt2lib: stat ('Result', 'SAFE')
