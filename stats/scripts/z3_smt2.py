@@ -24,7 +24,10 @@ profiles = {
     'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
     
     ## use distributed mode CLI, but not running distributed, use just one node
-    'solodistdef': ['--jobsize','1','--distprofile', 'def']
+    'solodistdef': ['--jobsize','1','--distprofile', 'def'],
+
+    ## distributed mode CLI, but running two copies of def
+    'solodistdef': ['--jobsize','2','--distprofile', 'def,def']
 }
 
 def parseArgs (argv):
