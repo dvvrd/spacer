@@ -27,7 +27,16 @@ profiles = {
     'solodistdef': ['--jobsize','1','--distprofile', 'def'],
 
     ## distributed mode CLI, but running two copies of def
-    'dualdistdef': ['--jobsize','2','--distprofile', 'def,def']
+    'dualdistdef': ['--jobsize','2','--distprofile', 'def,def'],
+
+    ## distributed mode CLI, but running two copies of def
+    'tridistdef': ['--jobsize','3','--distprofile', 'def,def,def'],
+
+    ## distributed mode CLI, three copies of ic3
+    'tridistic3': ['--jobsize','3','--distprofile', 'ic3,ic3,ic3'],
+
+    ## distributed mode CLI, three copies of gpdr
+    'tridistgpdr': ['--jobsize','3','--distprofile', 'gpdr,gpdr,gpdr']
 }
 
 def parseArgs (argv):
