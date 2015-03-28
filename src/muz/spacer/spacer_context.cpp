@@ -2057,22 +2057,25 @@ namespace spacer {
         fact = m_query->get_last_reach_fact ();
         r = &fact->get_rule ();
 
-        unsigned cex_depth = 0;
-
         // initialize queues
+        facts.append (fact->get_justifications ());
         // assume that the query is only on a single predicate
         // (i.e. disallow fancy queries for now)
-        facts.append (fact->get_justifications ());
-        if (facts.size () != 1) 
-        {
-          // XXX AG: Escape if an assertion is about to fail
-          IF_VERBOSE(1, 
-                     verbose_stream () << 
-                     "Warning: counterexample is trivial or non-existent\n";);
-          return cex_depth;
+        if (facts.empty ()) {
+            IF_VERBOSE (1,
+                        verbose_stream () << "Warning: error is trivially reachable\n";);
+            return 0;
         }
-        SASSERT (facts.size () == 1);
+        else if (facts.size () > 1) {
+            IF_VERBOSE (1,
+                        verbose_stream () << "Warning: unhandled query type\n";);
+            return 0;
+        }
+
+        unsigned cex_depth = 0;
+
         m_query->find_predecessors (*r, preds);
+        // assume single query predicate in the input rules
         SASSERT (preds.size () == 1);
         pts.push_back (&(get_pred_transformer (preds[0])));
 
@@ -2133,23 +2136,26 @@ namespace spacer {
         r = &fact->get_rule ();
 
         // initialize queues
+        facts.append (fact->get_justifications ());
         // assume that the query is only on a single predicate
         // (i.e. disallow fancy queries for now)
-        facts.append (fact->get_justifications ());
-        if (facts.size () != 1) 
-        {
-          // XXX AG: Escape if an assertion is about to fail
-          IF_VERBOSE(1, 
-                     verbose_stream () << 
-                     "Warning: counterexample is trivial or non-existent\n";);
-          return;
+        if (facts.empty ()) {
+            IF_VERBOSE (1,
+                        verbose_stream () << "Warning: error is trivially reachable\n";);
+            return;
         }
-        SASSERT (facts.size () == 1);
+        else if (facts.size () > 1) {
+            IF_VERBOSE (1,
+                        verbose_stream () << "Warning: unhandled query type\n";);
+            return;
+        }
+
         m_query->find_predecessors (*r, preds);
+        // assume single query predicate in the input rules
         SASSERT (preds.size () == 1);
         pts.push_back (&(get_pred_transformer (preds[0])));
 
-        // populate rules according to a preorder traversal of the query derivation tree
+        // populate rules using bfs of the query derivation tree
         for (unsigned curr = 0; curr < pts.size (); curr++) {
             // get current pt and fact
             pt = pts.get (curr);
@@ -2209,31 +2215,46 @@ namespace spacer {
 
     expr_ref context::get_ground_sat_answer () {
         if (m_last_result != l_true) {
-            verbose_stream () << "Sat answer unavailable when result is false\n";
+            IF_VERBOSE (1,
+                        verbose_stream ()
+                        << "Sat answer unavailable when result is false\n";);
             return expr_ref (m);
         }
 
         // treat the following as queues: read from left to right and insert at the right
-        reach_fact_ref_vector reach_facts;
         ptr_vector<func_decl> preds;
         ptr_vector<pred_transformer> pts;
+        reach_fact_ref_vector facts;
         expr_ref_vector cex (m), // pre-order list of ground instances of predicates
                         cex_facts (m); // equalities for the ground cex using signature constants
 
         // temporary
-        reach_fact *reach_fact;
+        reach_fact *fact;
         pred_transformer* pt;
         expr_ref cex_fact (m);
         datalog::rule const* r;
 
         // get and discard query rule
-        reach_fact = m_query->get_last_reach_fact ();
-        r = &reach_fact->get_rule ();
+        fact = m_query->get_last_reach_fact ();
+        r = &fact->get_rule ();
 
         // initialize queues
-        reach_facts.append (reach_fact->get_justifications ());
-        SASSERT (reach_facts.size () == 1);
+        facts.append (fact->get_justifications ());
+        // assume that the query is only on a single predicate
+        // (i.e. disallow fancy queries for now)
+        if (facts.empty ()) {
+            IF_VERBOSE (1,
+                        verbose_stream () << "Warning: error is trivially reachable\n";);
+            return expr_ref (m);
+        }
+        else if (facts.size () > 1) {
+            IF_VERBOSE (1,
+                        verbose_stream () << "Warning: unhandled query type\n";);
+            return expr_ref (m);
+        }
+
         m_query->find_predecessors (*r, preds);
+        // assume single query predicate in the input rules
         SASSERT (preds.size () == 1);
         pts.push_back (&(get_pred_transformer (preds[0])));
         cex_facts.push_back (m.mk_true ());
@@ -2247,23 +2268,21 @@ namespace spacer {
         for (unsigned curr = 0; curr < pts.size (); curr++) {
             // pick next pt, fact, and cex_fact
             pt = pts.get (curr);
-            reach_fact = reach_facts[curr];
-            
+            fact = facts.get (curr);
             cex_fact = cex_facts.get (curr);
 
             ptr_vector<pred_transformer> child_pts;
 
-            // get justifying rule and child facts for the derivation of reach_fact at pt
-            r = &reach_fact->get_rule ();
-            const reach_fact_ref_vector &child_reach_facts = 
-              reach_fact->get_justifications ();
+            // get justifying rule and child facts for the derivation of fact at pt
+            r = &fact->get_rule ();
+            const reach_fact_ref_vector &child_reach_facts = fact->get_justifications ();
             // get child pts
-            preds.reset (); pt->find_predecessors (*r, preds);
+            pt->find_predecessors (*r, preds);
             for (unsigned j = 0; j < preds.size (); j++) {
                 child_pts.push_back (&(get_pred_transformer (preds[j])));
             }
             // update the queues
-            reach_facts.append (child_reach_facts);
+            facts.append (child_reach_facts);
             pts.append (child_pts);
 
             // update cex and cex_facts by making a local sat check:
