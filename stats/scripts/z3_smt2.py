@@ -25,6 +25,8 @@ profiles = {
     
     ## use distributed mode CLI, but not running distributed, use just one node
     'solodistdef': ['--jobsize','1','--distprofile', 'def'],
+    'solodistgpdr': ['--jobsize','1','--distprofile', 'gpdr'],
+    'solodistic3': ['--jobsize','1','--distprofile', 'ic3'],
 
     ## distributed mode CLI, but running two copies of def
     'dualdistdef': ['--jobsize','2','--distprofile', 'def,def'],
