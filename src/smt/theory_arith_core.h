@@ -72,7 +72,9 @@ namespace smt {
             m_value        .push_back(inf_numeral());
         }
         m_old_value        .push_back(inf_numeral());
+        SASSERT(m_var_occs.size() == r);
         m_var_occs         .push_back(atoms());
+        SASSERT(m_var_occs.back().empty());
         m_unassigned_atoms .push_back(0);
         m_var_pos          .push_back(-1);
         m_bounds[0]        .push_back(0);
@@ -85,10 +87,12 @@ namespace smt {
         if (is_pure_monomial(n->get_owner()))
             m_nl_monomials.push_back(r);
         SASSERT(check_vector_sizes());
+        SASSERT(m_var_occs[r].empty());
         TRACE("mk_arith_var", 
               tout << "#" << n->get_owner_id() << " :=\n" << mk_ll_pp(n->get_owner(), get_manager()) << "\n";
               tout << "is_attached_to_var: " << is_attached_to_var(n) << ", var: " << n->get_th_var(get_id()) << "\n";);
         get_context().attach_th_var(n, this, r);
+        SASSERT(m_var_occs.back().empty());
         return r;
     }
 
@@ -812,6 +816,7 @@ namespace smt {
     void theory_arith<Ext>::mk_bound_axioms(atom * a1) {
         theory_var v = a1->get_var();
         atoms & occs = m_var_occs[v];
+        TRACE("mk_bound_axioms", tout << "add bound axioms for v" << v << " " << a1 << "\n";);
         if (!get_context().is_searching()) {
             //
             // NB. We make an assumption that user push calls propagation 
@@ -823,7 +828,7 @@ namespace smt {
         }
         inf_numeral const & k1(a1->get_k());
         atom_kind kind1 = a1->get_atom_kind();
-        TRACE("mk_bound_axioms", tout << "making bound axioms for v" << v << " " << kind1 << " " << k1 << "\n";);
+        TRACE("mk_bound_axioms", display_atom(tout << "making bound axioms for " << a1 << " ", a1, true); tout << "\n";);
         typename atoms::iterator it  = occs.begin();
         typename atoms::iterator end = occs.end();
 
@@ -833,6 +838,12 @@ namespace smt {
             atom * a2 = *it;            
             inf_numeral const & k2(a2->get_k());
             atom_kind kind2 = a2->get_atom_kind();
+            TRACE("mk_bound_axioms", display_atom(tout << "compare " << a2 << " ", a2, true); tout << "\n";);
+
+            if (k1 == k2 && kind1 == kind2) {
+                continue;
+            }
+
             SASSERT(k1 != k2 || kind1 != kind2);
             if (kind2 == A_LOWER) {
                 if (k2 < k1) {
@@ -861,6 +872,7 @@ namespace smt {
 
     template<typename Ext>
     void theory_arith<Ext>::mk_bound_axiom(atom* a1, atom* a2) {
+        TRACE("mk_bound_axioms", tout << a1 << " " << a2 << "\n";);
         theory_var v = a1->get_var();
         literal   l1(a1->get_bool_var()); 
         literal   l2(a2->get_bool_var()); 
@@ -1090,7 +1102,8 @@ namespace smt {
         occs.push_back(a);
         m_atoms.push_back(a);
         insert_bv2a(bv, a);
-        TRACE("arith_internalize", tout << "succeeded... v: " << v << " " << kind << " " << k << "\n";);
+        TRACE("arith_internalize", tout << "succeeded... v" << v << " " << kind << " " << k << "\n";
+              for (unsigned i = 0; i + 1 < occs.size(); ++i) tout << occs[i] << "\n";);
         return true;
     }
 
@@ -1362,6 +1375,9 @@ namespace smt {
         if (!make_feasible()) {
             failed();
             return false;
+        }
+        if (get_context().get_cancel_flag()) {
+            return true;
         }
         CASSERT("arith", satisfy_bounds());
         discard_update_trail();
@@ -2062,7 +2078,7 @@ namespace smt {
                 continue;
             SASSERT(curr_error > inf_numeral(0));
             if (best == null_theory_var || (!least && curr_error > best_error) || (least && curr_error < best_error)) {
-                TRACE("select_pivot", tout << "best: " << best << " v: " << v 
+                TRACE("select_pivot", tout << "best: " << best << " v" << v 
                       << ", best_error: " << best_error << ", curr_error: " << curr_error << "\n";);
                 best = v;
                 best_error = curr_error;
@@ -2132,6 +2148,9 @@ namespace smt {
                 return false;
             }
             TRACE("arith_make_feasible_detail", display(tout););
+            if (get_context().get_cancel_flag()) {
+                return true;
+            }
         }
         TRACE("arith_make_feasible", tout << "make_feasible: sat\n"; display(tout););
         CASSERT("arith", wf_rows());
@@ -2619,9 +2638,9 @@ namespace smt {
                       << limit_k1 << " delta: " << delta << " coeff: " << coeff << "\n";);
                 inf_numeral k_2 = k_1;
                 atom * new_atom = 0;
-                atoms & as           = m_var_occs[it->m_var];
-                typename atoms::iterator it  = as.begin();
-                typename atoms::iterator end = as.end();
+                atoms const & as           = m_var_occs[it->m_var];
+                typename atoms::const_iterator it  = as.begin();
+                typename atoms::const_iterator end = as.end();
                 for (; it != end; ++it) {
                     atom * a    = *it;
                     if (a == b)
@@ -2676,12 +2695,12 @@ namespace smt {
 
     template<typename Ext>
     void theory_arith<Ext>::mk_implied_bound(row const & r, unsigned idx, bool is_lower, theory_var v, bound_kind kind, inf_numeral const & k) {
-        atoms & as                       = m_var_occs[v];
+        atoms const & as                 = m_var_occs[v];
         antecedents& ante                = get_antecedents();
         inf_numeral const & epsilon      = get_epsilon(v);
         inf_numeral delta;
-        typename atoms::iterator     it  = as.begin();
-        typename atoms::iterator     end = as.end();
+        typename atoms::const_iterator     it  = as.begin();
+        typename atoms::const_iterator     end = as.end();
         for (; it != end; ++it) {
             atom * a = *it;
             bool_var bv = a->get_bool_var();
@@ -3269,6 +3288,7 @@ namespace smt {
             m_bounds[1]       .shrink(old_num_vars);
             SASSERT(check_vector_sizes());
         }
+        SASSERT(m_var_occs.size() == old_num_vars);
     }
 
     template<typename Ext>
