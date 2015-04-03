@@ -50,6 +50,13 @@ Revision History:
 #include "spacer_context.h"
 #endif
 
+extern "C" {
+#include "z3.h"
+}
+
+#include "pmuz.h"
+
+
 typedef enum { IN_UNSPECIFIED, IN_SMTLIB, IN_SMTLIB_2, IN_DATALOG, IN_DIMACS, IN_WCNF, IN_OPB, IN_Z3_LOG } input_kind;
 
 std::string         g_aux_input_file;
@@ -227,7 +234,7 @@ void parse_cmd_line_args(int argc, char ** argv) {
             else if (strcmp(opt_name, "t") == 0) {
                 if (!opt_arg)
                     error("option argument (-t:timeout) is missing.");
-                gparams::set("timeout", opt_arg);
+                Z3_global_param_set("timeout", opt_arg);
             }
             else if (strcmp(opt_name, "nw") == 0) {
                 enable_warning_messages(false);
@@ -273,7 +280,7 @@ void parse_cmd_line_args(int argc, char ** argv) {
             else if (strcmp(opt_name, "memory") == 0) {
                 if (!opt_arg)
                     error("option argument (-memory:val) is missing.");
-                gparams::set("memory_max_size", opt_arg);
+                Z3_global_param_set("memory_max_size", opt_arg);
             }
             else if (strcmp(opt_name, "profile") == 0) {
                 g_profiles=!opt_arg ? "def" : opt_arg;
@@ -288,7 +295,7 @@ void parse_cmd_line_args(int argc, char ** argv) {
             char * key   = argv[i];
             *eq_pos      = 0;
             char * value = eq_pos+1; 
-            gparams::set(key, value);
+            Z3_global_param_set(key, value);
         }
         else {
             if (g_input_file) {
@@ -364,22 +371,22 @@ void set_profile_params(const std::string &profile)
 
   if (profile == "def")
   {
-    gparams::set("fixedpoint.use_heavy_mev","true");
-    gparams::set("fixedpoint.reset_obligation_queue","false");
-    gparams::set("fixedpoint.pdr.flexible_trace","true");
-    gparams::set("fixedpoint.spacer.elim_aux","false");
+    Z3_global_param_set("fixedpoint.use_heavy_mev","true");
+    Z3_global_param_set("fixedpoint.reset_obligation_queue","false");
+    Z3_global_param_set("fixedpoint.pdr.flexible_trace","true");
+    Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
     
   }
   else if (profile == "ic3")
   {
-    gparams::set("fixedpoint.use_heavy_mev","true");
-    gparams::set("fixedpoint.pdr.flexible_trace","true");
-    gparams::set("fixedpoint.spacer.elim_aux","false");
+    Z3_global_param_set("fixedpoint.use_heavy_mev","true");
+    Z3_global_param_set("fixedpoint.pdr.flexible_trace","true");
+    Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
   }
   else if (profile == "gpdr")
   {
-    gparams::set("fixedpoint.use_heavy_mev","true");
-    gparams::set("fixedpoint.spacer.elim_aux","false");
+    Z3_global_param_set("fixedpoint.use_heavy_mev","true");
+    Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
   }
   else 
   {
@@ -464,69 +471,12 @@ int main(int argc, char ** argv) {
 
         env_params::updt_params();
 
-        if (g_input_file && g_standard_input) {
-            error("using standard input to read formula.");
-        }
-        if (!g_input_file && !g_standard_input) {
-            error("input file was not specified.");
-        }
-        
-        if (g_input_kind == IN_UNSPECIFIED) {
-            g_input_kind = IN_SMTLIB_2;
-            char const * ext = get_extension(g_input_file);
-            if (ext) {
-                if (strcmp(ext, "datalog") == 0 || strcmp(ext, "dl") == 0) {
-                    g_input_kind = IN_DATALOG;
-                }
-                else if (strcmp(ext, "dimacs") == 0 || strcmp(ext, "cnf") == 0) {
-                    g_input_kind = IN_DIMACS;
-                }
-                else if (strcmp(ext, "wcnf") == 0) {
-                    g_input_kind = IN_WCNF;
-                }
-                else if (strcmp(ext, "opb") == 0) {
-                    g_input_kind = IN_OPB;
-                }
-                else if (strcmp(ext, "log") == 0) {
-                    g_input_kind = IN_Z3_LOG;
-                }
-                else if (strcmp(ext, "smt2") == 0) {
-                    g_input_kind = IN_SMTLIB_2;
-                }
-                else if (strcmp(ext, "smt") == 0) {
-                    g_input_kind = IN_SMTLIB;
-                }
-            }
-	}
-        switch (g_input_kind) {
-        case IN_SMTLIB:
-            return_value = read_smtlib_file(g_input_file);
-            break;
-        case IN_SMTLIB_2:
-            memory::exit_when_out_of_memory(true, "(error \"out of memory\")");
-            return_value = read_smtlib2_commands(g_input_file);
-            break;
-        case IN_DIMACS:
-            return_value = read_dimacs(g_input_file);
-            break;
-        case IN_WCNF:
-            return_value = parse_opt(g_input_file, true);
-            break;
-        case IN_OPB:
-            return_value = parse_opt(g_input_file, false);
-            break;
-        case IN_DATALOG:
-            read_datalog(g_input_file);
-            break;
-        case IN_Z3_LOG:
-            replay_z3_log(g_input_file);
-            break;
-        default:
-            UNREACHABLE();
-        }
-#ifdef _WINDOWS
-        _CrtDumpMemoryLeaks();
-#endif
+        //-- solve
+        spacer::PMuz pmuz(g_input_file);
+        pmuz.init();
+        pmuz.createProblem();
+        pmuz.solve();
+        pmuz.destroy();
 
 #ifdef Z3GASNET
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
