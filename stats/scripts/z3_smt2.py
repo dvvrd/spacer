@@ -171,7 +171,7 @@ def compute_z3_args (args):
         z3_args += ' fixedpoint.validate_theory_core=true'
 
     if args.print_stats:
-        z3_args += ' fixedpoint.print.statistics=true'
+        z3_args += ' fixedpoint.print_statistics=true'
 
     if args.dfs:
         z3_args += ' fixedpoint.pdr.bfs_model_search=false'
