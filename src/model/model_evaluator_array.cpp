@@ -24,7 +24,6 @@ Revision History:
 #include"bv_rewriter.h"
 #include"datatype_rewriter.h"
 #include"array_rewriter.h"
-#include"float_rewriter.h"
 #include"rewriter_def.h"
 #include"cooperate.h"
 #include"ast_pp.h"
