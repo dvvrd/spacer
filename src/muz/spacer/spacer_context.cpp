@@ -1056,14 +1056,14 @@ namespace spacer {
       
     unsigned tgt_level = next_level(src_level);
     m_pt.ensure_level(next_level(tgt_level));
-    expr_ref_vector& src = m_levels[src_level];
         
 
-    CTRACE("spacer", !src.empty(), 
+    TRACE("spacer", 
            tout << "propagating " << src_level << " to " << tgt_level;
            tout << " for relation " << m_pt.head()->get_name() << "\n";);
                 
-    for (unsigned i = 0; i < src.size(); ) {
+    for (unsigned i = 0; i < m_levels[src_level].size(); ) {
+      expr_ref_vector &src= m_levels[src_level];
       expr * curr = src[i].get();                  
       unsigned stored_lvl;
       VERIFY(m_prop2level.find(curr, stored_lvl));
@@ -1075,8 +1075,11 @@ namespace spacer {
         src.pop_back();
       }
       else if (m_pt.is_invariant(tgt_level, curr, solver_level)) {
+        // -- might invalidate src reference
         add_lemma (curr, solver_level);
         TRACE("spacer", tout << "is invariant: "<< pp_level(solver_level) << " " << mk_pp(curr, m) << "\n";);              
+        // shadow higher-level src
+        expr_ref_vector &src = m_levels[src_level];
         src[i] = src.back();
         src.pop_back();
         ++m_pt.m_stats.m_num_propagations;
@@ -1086,15 +1089,12 @@ namespace spacer {
         ++i;
       }
     }        
-    IF_VERBOSE(3, verbose_stream() << "propagate: " << pp_level(src_level) << "\n";
-               for (unsigned i = 0; i < src.size(); ++i) {
-                 verbose_stream() << mk_pp(src[i].get(), m) << "\n";   
-               });
-    CTRACE ("spacer", src.empty (), 
+
+    CTRACE ("spacer", m_levels[src_level].empty (), 
             tout << "Fully propagated level " 
             << src_level << " of " << m_pt.head ()->get_name () << "\n";);
         
-    return src.empty();
+    return m_levels[src_level].empty();
   }
   
   bool pred_transformer::legacy_frames::add_lemma (expr * lemma, unsigned lvl)
