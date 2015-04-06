@@ -24,7 +24,28 @@ profiles = {
     'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
     
     ## use distributed mode CLI, but not running distributed, use just one node
-    'solodistdef': ['--jobsize','1','--distprofile', 'def']
+    'solodistdef': ['--jobsize','1','--distprofile', 'def'],
+    'solodistgpdr': ['--jobsize','1','--distprofile', 'gpdr'],
+    'solodistic3': ['--jobsize','1','--distprofile', 'ic3'],
+
+    ## these are just solodist, but in experiments we are changing from the
+    ## default 16 cores per machine (1 process per machine) to 5 cores per
+    ## machine, this should match the distributed profiles that fork 3 jobs
+    'solodist5cpudef': ['--jobsize','1','--distprofile', 'def'],
+    'solodist5cpugpdr': ['--jobsize','1','--distprofile', 'gpdr'],
+    'solodist5cpuic3': ['--jobsize','1','--distprofile', 'ic3'],
+
+    ## distributed mode CLI, but running two copies of def
+    'dualdistdef': ['--jobsize','2','--distprofile', 'def,def'],
+
+    ## distributed mode CLI, but running two copies of def
+    'tridistdef': ['--jobsize','3','--distprofile', 'def,def,def'],
+
+    ## distributed mode CLI, three copies of ic3
+    'tridistic3': ['--jobsize','3','--distprofile', 'ic3,ic3,ic3'],
+
+    ## distributed mode CLI, three copies of gpdr
+    'tridistgpdr': ['--jobsize','3','--distprofile', 'gpdr,gpdr,gpdr']
 }
 
 def parseArgs (argv):
