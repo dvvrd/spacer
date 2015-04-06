@@ -22,18 +22,8 @@ Revision History:
 
 --*/
 #include<iostream>
-#include"memory_manager.h"
 #include"trace.h"
-#include"debug.h"
-#include"util.h"
-#include"pp.h"
-#include"smtlib_frontend.h"
-#include"z3_log_frontend.h"
-#include"warning.h"
 #include"version.h"
-#include"dimacs_frontend.h"
-#include"datalog_frontend.h"
-#include"opt_frontend.h"
 #include"timeout.h"
 #include"z3_exception.h"
 #include"error_codes.h"
@@ -302,6 +292,8 @@ void parse_cmd_line_args(int argc, char ** argv) {
                 warning_msg("input file was already specified.");
             }
             else {
+                std::cerr << "input file set to: " << arg << "\n";
+                std::cerr.flush();
                 g_input_file = arg;
             }
         }
@@ -437,8 +429,8 @@ int main(int argc, char ** argv) {
 
 
         unsigned return_value = 0;
-        memory::initialize(0);
-        memory::exit_when_out_of_memory(true, "ERROR: out of memory");
+        //memory::initialize(0);
+        //memory::exit_when_out_of_memory(true, "ERROR: out of memory");
 
 #ifdef Z3GASNET
 
