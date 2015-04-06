@@ -475,7 +475,20 @@ int main(int argc, char ** argv) {
         spacer::PMuz pmuz(g_input_file);
         pmuz.init();
         pmuz.createProblem();
-        pmuz.solve();
+        Z3_lbool solution = pmuz.solve();
+        if (solution == Z3_L_TRUE)
+        {
+          std::cout << "sat\n";
+        }
+        else if (solution == Z3_L_FALSE)
+        {
+          std::cout << "unsat\n";
+        }
+        else
+        {
+          std::cout << "unknown\n";
+        }
+        return_value = Z3_get_error_code(pmuz.getZ3Context());
         pmuz.destroy();
 
 #ifdef Z3GASNET

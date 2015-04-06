@@ -111,7 +111,9 @@ namespace spacer
     void createProblem();
     
     //-- solver the problem
-    void solve();
+    Z3_lbool solve();
+
+    Z3_context &getZ3Context() { return ctx; }
   };
   
 } //namespace pmuz

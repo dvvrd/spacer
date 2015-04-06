@@ -359,6 +359,7 @@ int main(int argc, char ** argv) {
 #ifdef _WINDOWS
         _CrtDumpMemoryLeaks();
 #endif
+        std::cerr << "!orig return value:" << (int) return_value << "\n";
         return return_value;
     }
     catch (z3_exception & ex) {
