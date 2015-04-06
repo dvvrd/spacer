@@ -292,8 +292,6 @@ void parse_cmd_line_args(int argc, char ** argv) {
                 warning_msg("input file was already specified.");
             }
             else {
-                std::cerr << "input file set to: " << arg << "\n";
-                std::cerr.flush();
                 g_input_file = arg;
             }
         }
