@@ -81,9 +81,9 @@ void display_usage() {
 #endif
     std::cout << "]. (C) Copyright 2006-2014 Microsoft Corp, (C) Copyright 2015 Software Engineering Institute - Carnegie Mellon University.\n";
 #ifdef Z3GASNET
-    std::cout << "Usage: spacer JOB_SIZE [options] [-file:]file\n";
+    std::cout << "Usage: pmuz JOB_SIZE [options] [-file:]file\n";
 #else
-    std::cout << "Usage: spacer [options] [-file:]file\n";
+    std::cout << "Usage: pmuz [options] [-file:]file\n";
 #endif
     std::cout << "\nInput format:\n";
     std::cout << "  -smt        use parser for SMT input format.\n";
