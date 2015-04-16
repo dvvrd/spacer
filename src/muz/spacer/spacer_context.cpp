@@ -50,6 +50,7 @@ Notes:
 #include "z3_gasnet.h"
 #include "spacer_marshal.h"
 #include "pmuz_globals.h"
+#include "spacer_exception.h"
 #endif
 
 #include "spacer_timeit.h"
