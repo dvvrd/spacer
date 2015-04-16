@@ -31,9 +31,15 @@ profiles = {
     ## these are just solodist, but in experiments we are changing from the
     ## default 16 cores per machine (1 process per machine) to 5 cores per
     ## machine, this should match the distributed profiles that fork 3 jobs
+    ##  we give differnt profile names so runs can be differntiated
     'solodist5cpudef': ['--jobsize','1','--distprofile', 'def'],
     'solodist5cpugpdr': ['--jobsize','1','--distprofile', 'gpdr'],
     'solodist5cpuic3': ['--jobsize','1','--distprofile', 'ic3'],
+
+    # solo distributed variants with restarts 
+    'solodistdefrestart': ['--jobsize','1','--distprofile', 'def', '--restart','1'],
+    'solodistgpdrrestart': ['--jobsize','1','--distprofile', 'gpdr', '--restart','1'],
+    'solodistic3restart': ['--jobsize','1','--distprofile', 'ic3', '--restart','1'],
 
     ## distributed mode CLI, but running two copies of def
     'dualdistdef': ['--jobsize','2','--distprofile', 'def,def'],
@@ -129,6 +135,8 @@ def parseArgs (argv):
                     action='store', help='GASNet spawning mode, used for launching job on UDP conduit', default='L')
     p.add_argument ('--verify-msgs', dest='verify_msgs',
                     action='store_true', help='Compute hashes and send reciept confirmation for all messages', default=False)
+    p.add_argument ('--restart', dest='restart', type=int, default=-1,
+                    action='store', help='restart z3 nodes after performing given ammount of work budget, or -1 to disable restarts')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -168,10 +176,10 @@ def which(program):
     return None
 
 def compute_z3_args (args):
-    z3_args = which ('spacer')
+    z3_args = which ('pmuz')
 
     if args.jobsize != -1:
-        z3_args += ' %d' % args.jobsize
+        z3_args += ' %d' % int(args.jobsize)
 
     if z3_args is None:
         print 'No executable named "z3" found in current directory or PATH'
@@ -251,6 +259,10 @@ def compute_z3_args (args):
 
     if (args.verify_msgs):
         z3_args += ' fixedpoint.gasnet.verify_msgs=true'
+
+    if args.restart > -1:
+        z3_args += ' fixedpoint.pmuz.node_work_budget=%d' % args.restart
+        z3_args += ' fixedpoint.pmuz.node_restarts=true'
 
         
     z3_args += ' ' + args.file
