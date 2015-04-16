@@ -22,6 +22,7 @@ profiles = {
 
     ## three nodes in the spacer job each assigned a differnt profile
     'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
+    'trifectar1k': ['--jobsize','3','--distprofile', 'def,ic3,gpdr', '--restart', '1000'],
     
     ## use distributed mode CLI, but not running distributed, use just one node
     'solodistdef': ['--jobsize','1','--distprofile', 'def'],
@@ -37,9 +38,9 @@ profiles = {
     'solodist5cpuic3': ['--jobsize','1','--distprofile', 'ic3'],
 
     # solo distributed variants with restarts 
-    'solodistdefrestart': ['--jobsize','1','--distprofile', 'def', '--restart','1'],
-    'solodistgpdrrestart': ['--jobsize','1','--distprofile', 'gpdr', '--restart','1'],
-    'solodistic3restart': ['--jobsize','1','--distprofile', 'ic3', '--restart','1'],
+    'solodistdefr1k': ['--jobsize','1','--distprofile', 'def', '--restart','1000'],
+    'solodistgpdr1k': ['--jobsize','1','--distprofile', 'gpdr', '--restart','1000'],
+    'solodistic3r1k': ['--jobsize','1','--distprofile', 'ic3', '--restart','1000'],
 
     ## distributed mode CLI, but running two copies of def
     'dualdistdef': ['--jobsize','2','--distprofile', 'def,def'],
