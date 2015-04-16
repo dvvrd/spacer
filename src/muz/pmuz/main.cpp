@@ -45,6 +45,7 @@ extern "C" {
 }
 
 #include "pmuz.h"
+#include "pmuz_globals.h"
 
 
 typedef enum { IN_UNSPECIFIED, IN_SMTLIB, IN_SMTLIB_2, IN_DATALOG, IN_DIMACS, IN_WCNF, IN_OPB, IN_Z3_LOG } input_kind;
@@ -420,6 +421,49 @@ void set_profile(std::vector<std::string> profile_vec)
 
 }
 
+unsigned core_main(bool &repeat, unsigned restarts)
+{
+  using namespace spacer;
+
+  repeat = false; 
+  //-- solve
+  spacer::PMuz pmuz(g_input_file);
+  pmuz.init();
+  pmuz.createProblem();
+#ifdef Z3GASNET
+  unsigned budget = 1;
+  SASSERT( restarts >= 0 );
+  while(restarts--) budget *= 2;
+  pmuz_globals::m_globals.m_cur_budget = budget;
+  STRACE("gas", Z3GASNET_TRACE_PREFIX 
+      << "Setting global budget to: " << budget << "\n";);
+#endif
+  Z3_lbool solution = pmuz.solve();
+  if (solution == Z3_L_TRUE)
+  {
+    std::cout << "sat\n";
+  }
+  else if (solution == Z3_L_FALSE)
+  {
+    std::cout << "unsat\n";
+  }
+  else if (pmuz_globals::m_globals.m_restarted) {
+#ifdef Z3GASNET
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "Main is restarting pmuz node";);
+
+    repeat = true;
+#endif
+  }
+  else 
+  {
+        std::cout << "unknown\n";
+  }
+
+  unsigned return_value = Z3_get_error_code(pmuz.getZ3Context());
+  pmuz.destroy();
+  return return_value;
+}
 
 int main(int argc, char ** argv) {
 
@@ -461,25 +505,11 @@ int main(int argc, char ** argv) {
 
         env_params::updt_params();
 
-        //-- solve
-        spacer::PMuz pmuz(g_input_file);
-        pmuz.init();
-        pmuz.createProblem();
-        Z3_lbool solution = pmuz.solve();
-        if (solution == Z3_L_TRUE)
-        {
-          std::cout << "sat\n";
-        }
-        else if (solution == Z3_L_FALSE)
-        {
-          std::cout << "unsat\n";
-        }
-        else
-        {
-          std::cout << "unknown\n";
-        }
-        return_value = Z3_get_error_code(pmuz.getZ3Context());
-        pmuz.destroy();
+        bool repeat = false;
+        unsigned restarts = 0;
+        do { return_value = core_main(repeat,restarts++); } while (repeat);
+
+        verbose_stream () << "BRUNCH_STAT node_restarts " << restarts << "\n";
 
 #ifdef Z3GASNET
         STRACE("gas", Z3GASNET_TRACE_PREFIX 

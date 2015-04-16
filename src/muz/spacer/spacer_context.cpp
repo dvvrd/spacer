@@ -49,10 +49,12 @@ Notes:
 #ifdef Z3GASNET
 #include "z3_gasnet.h"
 #include "spacer_marshal.h"
+#include "pmuz_globals.h"
 #endif
 
 #include "spacer_timeit.h"
 #include "luby.h"
+
 
 namespace spacer {
     
@@ -1569,8 +1571,22 @@ namespace spacer {
     m_cancel(false)
   {
 #ifdef Z3GASNET
+    // sorry for the hack, I couldn't firgure out the right way of getting static reference to paramas object
     z3gasnet::context::set_params(
         (void*) const_cast<fixedpoint_params*>(&m_params));
+
+    // set the initial budget from preferences and the current
+    // work budget
+    if (get_params().pmuz_node_restarts()) {
+      pmuz_globals::m_globals.m_restarted = false;
+      m_node_budget = get_params().pmuz_node_work_budget() *
+                      pmuz_globals::m_globals.m_cur_budget;
+
+      STRACE("gas", Z3GASNET_TRACE_PREFIX 
+          << "Working with budget of: " << m_node_budget << "\n" ;);
+    }
+
+    
 #endif
   }
 
@@ -2039,6 +2055,23 @@ namespace spacer {
   }
 
   void context::checkpoint() {
+#ifdef Z3GASNET
+    if (get_params().pmuz_node_restarts()) {
+      if (!(m_node_budget % 100))
+      {
+        STRACE("gas", Z3GASNET_TRACE_PREFIX 
+            << "checkpointing with current budget: " 
+            << m_node_budget << "\n";);
+      }
+
+      if (!m_node_budget)
+      {
+        pmuz_globals::m_globals.m_restarted = true;
+        throw restart_exception("node restarted"); 
+      }
+      else m_node_budget--;
+    }
+#endif
     if (m_cancel) {
       throw default_exception("spacer canceled");
     }
@@ -2371,7 +2404,7 @@ namespace spacer {
         //TODO optimization on string coppies
         m_invariants = marshal( get_constraints(infty_level()), m);
       
-        // temporarily for construction, just check we can unmarshal what we marshalled
+        // just check we can unmarshal what we marshalled
         SASSERT( unmarshal( m_invariants, m));
 
         gasnet_node_t mynode = gasnet_mynode();

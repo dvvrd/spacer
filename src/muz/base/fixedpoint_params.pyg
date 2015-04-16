@@ -160,6 +160,8 @@ def_module_params('fixedpoint',
                           ('spacer.reach_as_init', BOOL, True, "Extend initial rules with computed reachability facts"),
                           ('spacer.blast_term_ite', BOOL, True, "Expand non-Boolean ite-terms"),
                           ('gasnet.verify_msgs', BOOL, False, "Perform application level verification that messages were delivered intact"),
+                          ('pmuz.node_restarts', BOOL, False, "Perform node restarts"),
+                          ('pmuz.node_work_budget', UINT, 100, "The ammount of work a node can perform before being restarted"),
                           ))
 
 

@@ -721,6 +721,8 @@ namespace spacer {
         std::string m_invariants;
         void get_invariants(std::string &invariants);
 
+        unsigned m_node_budget;
+
 #endif
         
         // Functions used by search.

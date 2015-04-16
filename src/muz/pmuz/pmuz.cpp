@@ -65,6 +65,7 @@
 extern "C" {
 #include "z3.h"
 }
+#include "pmuz_globals.h"
 
 /*********************************************************************/
 //-- options
@@ -165,13 +166,20 @@ void PMuz::createProblem()
 //-- solver the problem
 Z3_lbool PMuz::solve()
 {
+  using namespace spacer;
   Z3_lbool res;
   //-- call query directly
   if(directQuery) {
     res = Z3_fixedpoint_query(ctx, fxpt, query);
     if(res == Z3_L_TRUE) std::cout << "VERIFICATION FAILED\n";
     else if(res == Z3_L_FALSE) std::cout << "VERIFICATION SUCCESSFUL\n";
-    else std::cout << "VERIFICATION UNDEFINED\n";
+    else
+    {
+      if (!pmuz_globals::m_globals.m_restarted)
+      {
+        std::cout << "VERIFICATION UNDEFINED\n";
+      }
+    }
   }
   //-- use exposed lowel-level IC3 API
   else {
