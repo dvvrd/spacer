@@ -48,8 +48,9 @@ profiles = {
     ## distributed mode CLI, but running two copies of def
     'tridistdef': ['--jobsize','3','--distprofile', 'def,def,def'],
 
-    ## distributed mode CLI, three copies of ic3
+    ## distributed mode CLI, n copies of ic3
     'tridistic3': ['--jobsize','3','--distprofile', 'ic3,ic3,ic3'],
+    'octdistic3': ['--jobsize','8','--distprofile', 'ic3,ic3,ic3,ic3,ic3,ic3,ic3,ic3'],
 
     ## distributed mode CLI, three copies of gpdr
     'tridistgpdr': ['--jobsize','3','--distprofile', 'gpdr,gpdr,gpdr']
