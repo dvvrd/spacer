@@ -175,7 +175,7 @@ Z3_lbool PMuz::solve()
     else if(res == Z3_L_FALSE) std::cout << "VERIFICATION SUCCESSFUL\n";
     else
     {
-      if (!pmuz_globals::m_globals.m_restarted)
+      if (!pmuz_globals::m_globals.m_spacer_context_restart)
       {
         std::cout << "VERIFICATION UNDEFINED\n";
       }

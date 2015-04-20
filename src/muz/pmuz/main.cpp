@@ -447,10 +447,10 @@ unsigned core_main(bool &repeat, unsigned restarts)
   {
     std::cout << "unsat\n";
   }
-  else if (pmuz_globals::m_globals.m_restarted) {
+  else if (pmuz_globals::m_globals.m_spacer_context_restart) {
 #ifdef Z3GASNET
     STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "Main is restarting pmuz node";);
+        << "Main is restarting pmuz node\n";);
 
     repeat = true;
 #endif

@@ -224,12 +224,8 @@ void context::queue_msg_handler(gasnet_token_t token,
     m_stats.handler_time.start();
 #endif
 
-    //We don't have a use case for sending ourselves messages at this time
-    //but there is no reason we couldn't support this
     gasnet_node_t sender_node_index;
     Z3GASNET_CHECKCALL(gasnet_AMGetMsgSource(token, &sender_node_index));
-
-    SASSERT(sender_node_index != gasnet_mynode());
 
     msg_rec *front = alloc( msg_rec, 
           buffer, buffer_size, sender_node_index);
@@ -557,10 +553,10 @@ void context::print_statistics(std::ostream &stats_stream)
     stats_stream 
       << "BRUNCH_STAT pop_cnt " << s.pop_cnt << "\n"
       << "BRUNCH_STAT pop_time " << s.pop_time.get_seconds() << "\n"
-      << "BRUNCH_STAT pop_bytes " << s.pop_bytes << "\n"
+      << "BRUNCH_STAT pop_mbytes " << s.pop_bytes/1024.0/1024.0 << "\n"
       << "BRUNCH_STAT transmit_cnt " << s.transmit_cnt << "\n"
       << "BRUNCH_STAT transmit_time " << s.transmit_time.get_seconds() << "\n"
-      << "BRUNCH_STAT transmit_bytes " << s.transmit_bytes << "\n"
+      << "BRUNCH_STAT transmit_mbytes " << s.transmit_bytes/1024.0/1024.0 << "\n"
       << "BRUNCH_STAT handler_time " << s.handler_time.get_seconds() << "\n"
       << "BRUNCH_STAT total_time " << total_time << "\n"
       << "BRUNCH_STAT comm_ohd " << s.sum_time() / total_time << "\n"

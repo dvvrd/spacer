@@ -58,9 +58,10 @@
 namespace spacer {
 struct pmuz_globals
 {
-  pmuz_globals() : m_cur_budget(0), m_restarted(false) {}
+  pmuz_globals() : m_cur_budget(0), m_spacer_context_restart(false) {}
   unsigned m_cur_budget;
-  bool m_restarted;
+  bool m_spacer_context_restart;
+
 
   static pmuz_globals m_globals;
   static int m_intglobals;

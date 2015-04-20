@@ -717,6 +717,7 @@ namespace spacer {
         proof_converter_ref  m_pc;
 
 #ifdef Z3GASNET
+        unsigned add_remote_constraints();
 
         std::string m_invariants;
         void get_invariants(std::string &invariants);

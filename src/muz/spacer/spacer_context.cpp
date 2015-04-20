@@ -1576,16 +1576,6 @@ namespace spacer {
     z3gasnet::context::set_params(
         (void*) const_cast<fixedpoint_params*>(&m_params));
 
-    // set the initial budget from preferences and the current
-    // work budget
-    if (get_params().pmuz_node_restarts()) {
-      pmuz_globals::m_globals.m_restarted = false;
-      m_node_budget = get_params().pmuz_node_work_budget() *
-                      pmuz_globals::m_globals.m_cur_budget;
-
-      STRACE("gas", Z3GASNET_TRACE_PREFIX 
-          << "Working with budget of: " << m_node_budget << "\n" ;);
-    }
 
     
 #endif
@@ -2005,6 +1995,27 @@ namespace spacer {
   lbool context::solve(unsigned from_lvl) {
     m_last_result = l_undef;
     try {
+
+#ifdef Z3GASNET
+      if (get_params().pmuz_node_restarts()) {
+        if (pmuz_globals::m_globals.m_spacer_context_restart)
+        {
+          // load remote invariants
+          unsigned num_added = add_remote_constraints();
+          STRACE("gas", Z3GASNET_TRACE_PREFIX 
+              << "Added: " << num_added <<" after restart" << "\n" ;);
+        }
+        // set the initial budget from preferences and the current
+        // work budget
+        m_node_budget = get_params().pmuz_node_work_budget() *
+                        pmuz_globals::m_globals.m_cur_budget;
+
+        STRACE("gas", Z3GASNET_TRACE_PREFIX 
+            << "Working with budget of: " << m_node_budget << "\n" ;);
+        pmuz_globals::m_globals.m_spacer_context_restart = false;
+      }
+#endif
+
       m_last_result = solve_core (from_lvl);
       if (m_last_result == l_false)
       {
@@ -2067,7 +2078,18 @@ namespace spacer {
 
       if (!m_node_budget)
       {
-        pmuz_globals::m_globals.m_restarted = true;
+        pmuz_globals::m_globals.m_spacer_context_restart = true;
+        // send self a message with the invariants, it will be picked
+        // up after the restart
+
+        //TODO optimization on string coppies
+        m_invariants = marshal( get_constraints(infty_level()), m);
+        // just check we can unmarshal what we marshalled
+        SASSERT( unmarshal( m_invariants, m));
+        if (m_invariants.size())
+        {
+            z3gasnet::context::transmit_msg(gasnet_mynode(), m_invariants);
+        }
         throw restart_exception("node restarted"); 
       }
       else m_node_budget--;
@@ -2596,33 +2618,11 @@ namespace spacer {
       return l_false;
     }
 
+
 #ifdef Z3GASNET
-    std::string remote_node_invariants;
-    while (z3gasnet::context::pop_front_msg(remote_node_invariants))
-    {
-
-      // TODO DHK Optimization - use message bytes directly for unmarshall string
-      expr_ref remote_invs = unmarshal(remote_node_invariants, m);
-      if (remote_invs)
-      {
-        add_constraints (infty_level(), remote_invs);
-        // STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        //     << "Added invariants from remote node: " << remote_node_invariants <<"\n";);
-      }
-      else
-      {
-        std::string &s(remote_node_invariants);
-        std::replace( s.begin(), s.end(), '\n', '\t');
-        STRACE("gas", Z3GASNET_TRACE_PREFIX 
-            << "Failed to unmarshall: " << remote_node_invariants <<"\n";);
-      }
-      
-      //SASSERT(remote_invs);
-
-    }
-      
+    add_remote_constraints();
 #endif
-      
+
       lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
                          reach_pred_used, num_reuse_reach);
       switch (res) 
@@ -3012,7 +3012,7 @@ namespace spacer {
         verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_accum_reach_time.get_seconds() << "\n";
         verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_accum_prop_time.get_seconds() << "\n";
 
-#ifdef Z3GASNET
+#ifdef Z3GASNET_PROFILING
         z3gasnet::context::print_statistics(verbose_stream());
 #endif
 
@@ -3143,5 +3143,36 @@ namespace spacer {
     }
   }
   
+#ifdef Z3GASNET
+  unsigned context::add_remote_constraints()
+  {
+    std::string remote_node_invariants;
+    unsigned ret = 0;
+    while (z3gasnet::context::pop_front_msg(remote_node_invariants))
+    {
+
+      // TODO DHK Optimization - use message bytes directly for unmarshall string
+      expr_ref remote_invs = unmarshal(remote_node_invariants, m);
+      if (remote_invs)
+      {
+        ret++;
+        add_constraints (infty_level(), remote_invs);
+        // STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        //     << "Added invariants from remote node: " << remote_node_invariants <<"\n";);
+      }
+      else
+      {
+        std::string &s(remote_node_invariants);
+        std::replace( s.begin(), s.end(), '\n', '\t');
+        STRACE("gas", Z3GASNET_TRACE_PREFIX 
+            << "Failed to unmarshall: " << s << "\n" ;);
+        //SASSERT(remote_invs);
+      }
+        
+    }
+    return ret;
+  }
+        
+#endif
   
 }
