@@ -38,6 +38,8 @@ Revision History:
 #ifdef Z3GASNET
 //Have to include in main  here for access to message handlers
 #include "spacer_context.h"
+#include <iostream>
+#include <ostream>
 #endif
 
 extern "C" {
@@ -465,6 +467,36 @@ unsigned core_main(bool &repeat, unsigned restarts)
   return return_value;
 }
 
+
+
+// borrowed from 
+// http://forums.codeguru.com/showthread.php?460071-ostream-bit-bucket
+class null_out_buf : public std::streambuf {
+public:
+    virtual std::streamsize xsputn ( const char * s, std::streamsize n ) { return n; }
+};
+
+class null_out_stream : public std::ostream {
+public:
+    null_out_stream() : std::ostream(&buf) {}
+private:
+   null_out_buf buf;
+};
+
+std::ostream &get_default_verbose_stream()
+{
+  //In local spawning mode, it makes no sense to see mulitple verbose streams from
+  //multiple processes because they are not synchronized
+  //if not the master node 0, then set the null stream as default
+  char *spawnfn = gasnet_getenv("GASNET_SPAWNFN");
+  if (spawnfn && !strncmp("L",spawnfn,1) && gasnet_mynode()) 
+  {
+    static null_out_stream nullstream;
+    return nullstream;
+  }
+  return std::cerr;
+}
+
 int main(int argc, char ** argv) {
 
     try{
@@ -484,6 +516,9 @@ int main(int argc, char ** argv) {
         // the returned state of argc, argv can be used as normal by the the app
         Z3GASNET_CHECKCALL(gasnet_init(&argc, &argv));
 
+        //control verbose output, so we can avoid forked processes outputting
+        //to the same stream
+        set_verbose_stream(get_default_verbose_stream());
 
         // gasnet will block here until all nodes of the job are attached
         Z3GASNET_CHECKCALL(gasnet_attach(
