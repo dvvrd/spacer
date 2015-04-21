@@ -544,14 +544,25 @@ int main(int argc, char ** argv) {
         unsigned restarts = 0;
         do { return_value = core_main(repeat,restarts++); } while (repeat);
 
-        verbose_stream () << "BRUNCH_STAT node_restarts " << restarts << "\n";
+        verbose_stream () << "BRUNCH_STAT node_restarts " << restarts-1 << "\n";
 
 #ifdef Z3GASNET
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
             << "Ready to exit\n";);
+        /*
+        spacer::spacer_wall_stopwatch exittimer;
+        exittimer.start();
 
         gasnet_barrier_notify(0,0);
         Z3GASNET_CHECKCALL(gasnet_barrier_wait(0,0));
+
+        exittimer.stop();
+
+        STRACE("gas", Z3GASNET_TRACE_PREFIX 
+            << "Exiting after " << exittimer.get_seconds() << "\n";);
+
+        */
+
         gasnet_exit(return_value);
 #endif
 
