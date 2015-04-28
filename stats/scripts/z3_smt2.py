@@ -18,7 +18,10 @@ profiles = {
     ## between propagations
     'ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux'],
     ## inspired by gpdr: no priority queue. 
-    'gpdr': ['--use-heavy-mev', '--no-elim-aux']
+    'gpdr': ['--use-heavy-mev', '--no-elim-aux'],
+    ## options used for cav'15 paper
+    'cav15': ['--use-heavy-mev', '--keep-obligations',
+              '--flexible-trace']
 }
 
 def parseArgs (argv):
