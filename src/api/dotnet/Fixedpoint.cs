@@ -204,6 +204,15 @@ namespace Microsoft.Z3
         }
 
         /// <summary>
+        /// Retrieve a ground counterexample from last query call.
+        /// </summary>                
+        public Expr GetGroundSatAnswer()
+        {
+            IntPtr ans = Native.Z3_fixedpoint_get_ground_sat_answer(Context.nCtx, NativeObject);
+            return (ans == IntPtr.Zero) ? null : Expr.Create(Context, ans);
+        }
+
+        /// <summary>
         /// Retrieve explanation why fixedpoint engine returned status Unknown.
         /// </summary>                
         public string GetReasonUnknown()
