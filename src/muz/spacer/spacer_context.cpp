@@ -2237,7 +2237,10 @@ namespace spacer {
         SASSERT (preds.size () == 1);
         pts.push_back (&(get_pred_transformer (preds[0])));
         cex_facts.push_back (m.mk_true ());
-        cex.push_back (m.mk_const (preds[0]));
+        
+        // XXX a hack to avoid assertion when query predicate is not nullary
+        if (preds[0]->get_arity () == 0)
+          cex.push_back (m.mk_const (preds[0]));
 
         // smt context to obtain local cexes
         scoped_ptr<smt::kernel> cex_ctx = alloc (smt::kernel, m, get_fparams ());

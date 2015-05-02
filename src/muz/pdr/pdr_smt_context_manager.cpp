@@ -76,7 +76,11 @@ namespace pdr {
         // fml = m_pushed?e:m.mk_implies(m_pred, e);
         fml = m_pushed?e:m.mk_or(m.mk_not (m_pred), e);
         
-        if (true)
+        // XXX This was a hack to deal with using the solver in both
+        // XXX proof and non-proof modes. Somehow it is causing divergence.
+        // XXX Disabling. The underlying problem needs to be fixed
+        // XXX more thoroughly.
+        if (false)
         {
           /** pre-simplify and normalize the expression in no_proof 
               mode before asserting */
