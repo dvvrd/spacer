@@ -213,6 +213,33 @@ namespace Microsoft.Z3
         }
 
         /// <summary>
+        /// Obtain the list of rules along the counterexample trace.
+        /// </summary>
+        public Expr[] GetRulesAlongTrace()
+        {
+            ASTVector nRules = new ASTVector(Context, Native.Z3_fixedpoint_get_rules_along_trace(Context.nCtx, NativeObject));
+            uint n = nRules.Size;
+            Expr[] res = new Expr[n];
+            for (uint i = 0; i < n; i++)
+                res[i] = Expr.Create(Context, nRules[i].NativeObject);
+            return res;
+        }
+
+        /// <summary>
+        /// Obtain the list of rules along the counterexample trace.
+        /// </summary>
+        public Symbol[] GetRuleNamesAlongTrace()
+        {
+            IntPtr ans = Native.Z3_fixedpoint_get_rule_names_along_trace(Context.nCtx, NativeObject);
+            StringSymbol pathString = (StringSymbol) StringSymbol.Create(Context, ans);
+            String[] pathComponents = pathString.String.Split(new Char [] { ';' });
+            Symbol[] res = new Symbol[pathComponents.Length];
+            for (uint i = 0; i < pathComponents.Length; i++)
+                res[i] = new StringSymbol(Context, pathComponents[i]);
+            return res;
+        }
+
+        /// <summary>
         /// Retrieve explanation why fixedpoint engine returned status Unknown.
         /// </summary>                
         public string GetReasonUnknown()
