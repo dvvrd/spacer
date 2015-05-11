@@ -131,7 +131,7 @@ namespace opt {
             void push();
             void pop();
             void add(expr* hard);
-            void set(ptr_vector<expr> & hard);
+            bool set(ptr_vector<expr> & hard);
             unsigned add(expr* soft, rational const& weight, symbol const& id);
             unsigned add(app* obj, bool is_max);
         };
@@ -144,6 +144,8 @@ namespace opt {
         ref<solver>         m_solver;
         ref<solver>         m_sat_solver;
         scoped_ptr<pareto_base>          m_pareto;
+        sref_vector<model>  m_box_models;
+        unsigned            m_box_index;
         params_ref          m_params;
         optsmt              m_optsmt; 
         map_t               m_maxsmts;
@@ -269,6 +271,7 @@ namespace opt {
         void    add_maxsmt(symbol const& id);
         void    set_simplify(tactic *simplify);
         void    set_pareto(pareto_base* p);        
+        void    clear_state();
 
         bool is_numeral(expr* e, rational& n) const;
 

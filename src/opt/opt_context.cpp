@@ -75,9 +75,14 @@ namespace opt {
         m_hard.push_back(hard);
     }
 
-    void context::scoped_state::set(ptr_vector<expr> & hard) {
+    bool context::scoped_state::set(ptr_vector<expr> & hard) {
+        bool eq = hard.size() == m_hard.size();
+        for (unsigned i = 0; eq && i < hard.size(); ++i) {
+            eq = hard[i] == m_hard[i].get();
+        }
         m_hard.reset();
         m_hard.append(hard.size(), hard.c_ptr());
+        return !eq;
     }
 
     unsigned context::scoped_state::add(expr* f, rational const& w, symbol const& id) {
@@ -118,6 +123,7 @@ namespace opt {
         m_bv(m),
         m_hard_constraints(m),
         m_solver(0),
+        m_box_index(UINT_MAX),
         m_optsmt(m),
         m_scoped_state(m),
         m_fm(m),
@@ -153,29 +159,30 @@ namespace opt {
         for (unsigned i = 0; i < n; ++i) {
             m_scoped_state.pop();
         }
-        m_model.reset();
+        clear_state();
         reset_maxsmts();
         m_optsmt.reset();        
         m_hard_constraints.reset();
     }
 
     void context::set_hard_constraints(ptr_vector<expr>& fmls) {
-        m_scoped_state.set(fmls);
-        m_model.reset();
+        if (m_scoped_state.set(fmls)) {
+            clear_state();
+        }
     }
 
     void context::add_hard_constraint(expr* f) { 
         m_scoped_state.add(f);
-        m_model.reset();
+        clear_state();
     }
 
     unsigned context::add_soft_constraint(expr* f, rational const& w, symbol const& id) { 
-        m_model.reset();
+        clear_state();
         return m_scoped_state.add(f, w, id);
     }
 
     unsigned context::add_objective(app* t, bool is_max) {
-        m_model.reset();
+        clear_state();
         return m_scoped_state.add(t, is_max);
     }
 
@@ -199,6 +206,10 @@ namespace opt {
         if (m_pareto) {
             return execute_pareto();
         }
+        if (m_box_index != UINT_MAX) {
+            return execute_box();
+        }
+        clear_state();
         init_solver(); 
         import_scoped_state(); 
         normalize();
@@ -313,13 +324,32 @@ namespace opt {
     }    
 
     lbool context::execute_box() {
+        if (m_box_index < m_objectives.size()) {
+            m_model = m_box_models[m_box_index];
+            ++m_box_index;           
+            return l_true;
+        }
+        if (m_box_index != UINT_MAX && m_box_index >= m_objectives.size()) {
+            m_box_index = UINT_MAX;
+            return l_false;
+        }
+        m_box_index = 1;
+        m_box_models.reset();
         lbool r = m_optsmt.box();
-        for (unsigned i = 0; r == l_true && i < m_objectives.size(); ++i) {
+        for (unsigned i = 0, j = 0; r == l_true && i < m_objectives.size(); ++i) {
             objective const& obj = m_objectives[i];
             if (obj.m_type == O_MAXSMT) {
                 solver::scoped_push _sp(get_solver());
                 r = execute(obj, false, false);
+                if (r == l_true) m_box_models.push_back(m_model.get());
             }
+            else {
+                m_box_models.push_back(m_optsmt.get_model(j));
+                ++j;
+            }
+        }
+        if (r == l_true && m_objectives.size() > 0) {
+            m_model = m_box_models[0];
         }
         return r;
     }
@@ -1098,6 +1128,12 @@ namespace opt {
         {
             m_simplify = tac;
         }
+    }
+
+    void context::clear_state() {
+        set_pareto(0);
+        m_box_index = UINT_MAX;
+        m_model.reset();
     }
 
     void context::set_pareto(pareto_base* p) {

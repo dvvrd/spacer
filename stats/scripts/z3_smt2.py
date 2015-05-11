@@ -53,7 +53,11 @@ profiles = {
     'octdistic3': ['--jobsize','8','--distprofile', 'ic3,ic3,ic3,ic3,ic3,ic3,ic3,ic3'],
 
     ## distributed mode CLI, three copies of gpdr
-    'tridistgpdr': ['--jobsize','3','--distprofile', 'gpdr,gpdr,gpdr']
+    'tridistgpdr': ['--jobsize','3','--distprofile', 'gpdr,gpdr,gpdr'],
+
+    ## options used for cav'15 paper
+    'cav15': ['--use-heavy-mev', '--keep-obligations',
+              '--flexible-trace']
 }
 
 def parseArgs (argv):
@@ -219,7 +223,7 @@ def compute_z3_args (args):
         z3_args += ' fixedpoint.validate_theory_core=true'
 
     if args.print_stats:
-        z3_args += ' fixedpoint.print.statistics=true'
+        z3_args += ' fixedpoint.print_statistics=true'
 
     if args.dfs:
         z3_args += ' fixedpoint.pdr.bfs_model_search=false'
