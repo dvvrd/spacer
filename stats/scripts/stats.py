@@ -1,11 +1,56 @@
 # simple statistics module
 
 import resource
+from datetime import datetime
+from datetime import timedelta
 
 def _systemtime ():
   ru_self = resource.getrusage (resource.RUSAGE_SELF)
   ru_ch = resource.getrusage (resource.RUSAGE_CHILDREN)
   return ru_self.ru_utime + ru_ch.ru_utime
+
+class WallStopwatch:
+  """ A stop watch for wall time """
+  def __init__ (self):
+    self._wall_started = timedelta(seconds=0)
+    self._wall_finished = timedelta(seconds=-1)
+    self._wall_elapsed = timedelta(seconds=0)
+    self.start ()
+        
+        
+  @property
+  def elapsed (self): 
+    """ Returns time (in seconds) since the stopwatch has been started. """
+    if self._wall_finished < self._wall_started:
+        td = self._wall_elapsed + (datetime.now() - self._started)
+    else:
+        td = self._wall_elapsed + (self._wall_finished - self._wall_started)
+    return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / float(10**6)
+
+  def start (self):
+    """ Starts or resumes the stopwatch """
+    # collect elapsed time so far
+    if self._wall_finished >= self._wall_started:
+        self._wall_elapsed += (self._wall_finished - self._wall_started)
+
+    self._wall_started = datetime.now()
+
+    self._wall_finished = self._wall_started - timedelta(seconds=1)
+
+  def stop (self):
+    """ Stops the stopwatch """
+    if self._wall_finished < self._wall_started:
+      self._wall_finished = datetime.now()
+
+  def reset (self):
+    """ Resets the stopwatch by erasing all elapsed time """
+    self._wall_started = datetime.now()
+    self._wall_finished = self._wall_started - timedelta(seconds=1)
+    self.start ()
+
+  def __str__ (self):
+      """ Reports time in seconds up to two decimal places """
+      return "{0:.2f}".format (self.elapsed)
 
 class Stopwatch:
   """ A stop watch """
@@ -22,7 +67,7 @@ class Stopwatch:
     if self._finished < self._started:
         return self._elapsed + (_systemtime () - self._started)
     return self._elapsed + (self._finished - self._started)
-    
+
   def start (self):
     """ Starts or resumes the stopwatch """
     # collect elapsed time so far
@@ -30,7 +75,8 @@ class Stopwatch:
         self._elapsed += (self._finished - self._started)
 
     self._started = _systemtime ()
-    self._finished = -1
+    self._wall_started = datetime.now()
+
 
   def stop (self):
     """ Stops the stopwatch """
@@ -54,11 +100,14 @@ def lap (name):
         def __init__ (self, name):
             self._name = name
             self._sw = Stopwatch ()
+            self._wsw = WallStopwatch ()
         def __enter__ (self):
             self._sw.reset ()
+            self._wsw.reset ()
             return None
         def __exit__ (self, exc_type, exc_value, traceback):
             print 'DONE', name, 'in', str(self._sw)
+            print 'DONE', name, 'in Walltime', str(self._wsw)
             return False
     return ContextManager (name)
   
@@ -75,17 +124,29 @@ def put (key, v):
 
 def start (key): 
     """ Starts (or resumes) a named stopwatch """
+    wsw = get ("Wall_"+key)
+    if wsw is None:
+        wsw = WallStopwatch ()
+        put ("Wall_"+key, wsw)
+    else:
+        wsw.start ()
+
     sw = get (key)
     if sw is None:
         sw = Stopwatch ()
         put (key, sw)
-        return sw
     else:
         sw.start ()
+
+    return (sw,wsw)
+
 def stop (key):
     """ Stops a named stopwatch """
     sw = get (key)
     if sw is not None: sw.stop ()
+
+    wsw = get ("Wall_"+key)
+    if wsw is not None: wsw.stop ()
 
 def count (key):
     """ Increments a named counter """
