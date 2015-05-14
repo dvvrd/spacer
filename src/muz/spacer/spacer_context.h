@@ -362,6 +362,8 @@ namespace spacer {
         void propagate_to_infinity(unsigned level);
         /// \brief  Add a lemma to the current context and all users
         void add_lemma (expr * lemma, unsigned lvl);
+        void add_lemma (expr * lemma, unsigned lvl,
+          unsigned &added_lemmas, unsigned &redundant_lemmas);
         expr* get_reach_case_var (unsigned idx) const;
       bool has_reach_facts () const { return !m_reach_facts.empty () ;}
       
@@ -692,8 +694,10 @@ namespace spacer {
             unsigned m_cex_depth;
             spacer_wall_stopwatch m_accum_reach_time;
             spacer_wall_stopwatch m_accum_prop_time;
-            
-
+#ifdef Z3GASNET
+            unsigned m_novel_remote_lemmas;
+            unsigned m_redundant_remote_lemmas;
+#endif
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
         };
@@ -848,6 +852,8 @@ namespace spacer {
       
         expr_ref get_constraints (unsigned lvl);
         void add_constraints (unsigned lvl, expr_ref c);
+        void add_constraints (unsigned level, expr_ref c,
+          unsigned &added_lemmas, unsigned &redundant_lemmas);
     };
 
 };

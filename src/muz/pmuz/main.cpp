@@ -485,6 +485,7 @@ private:
 
 std::ostream &get_default_verbose_stream()
 {
+#ifdef Z3GASNET
   //In local spawning mode, it makes no sense to see mulitple verbose streams from
   //multiple processes because they are not synchronized
   //if not the master node 0, then set the null stream as default
@@ -495,6 +496,9 @@ std::ostream &get_default_verbose_stream()
     return nullstream;
   }
   return std::cerr;
+#else
+  return std::cerr;
+#endif
 }
 
 int main(int argc, char ** argv) {

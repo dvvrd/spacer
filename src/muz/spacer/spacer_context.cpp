@@ -358,10 +358,17 @@ namespace spacer {
   
   void pred_transformer::add_lemma (expr * lemma, unsigned lvl)
   {
+      unsigned unused = 0;
+      add_lemma(lemma,lvl,unused,unused);
+  }
+  void pred_transformer::add_lemma (expr * lemma, unsigned lvl,
+          unsigned &added_lemmas, unsigned &redundant_lemmas)
+  {
     expr_ref_vector lemmas (m);
     qe::flatten_and (lemma, lemmas);
     for (unsigned i = 0, sz = lemmas.size(); i < sz; ++i)
-      m_frames.add_lemma (lemmas.get (i), lvl);
+      if (m_frames.add_lemma (lemmas.get (i), lvl)) added_lemmas++;
+      else redundant_lemmas++;
   }
   
 
@@ -2998,6 +3005,10 @@ namespace spacer {
         st.update("SPACER cex depth", m_stats.m_cex_depth);
         st.update("SPACER accum prop time", m_stats.m_accum_prop_time.get_seconds());
         st.update("SPACER accum reach time", m_stats.m_accum_reach_time.get_seconds());
+#ifdef Z3GASNET
+        st.update("SPACER redundant remote lemmas", m_stats.m_redundant_remote_lemmas);
+        st.update("SPACER novel remote lemmas", m_stats.m_novel_remote_lemmas);
+#endif
         m_pm.collect_statistics(st);
 
         for (unsigned i = 0; i < m_core_generalizers.size(); ++i) {
@@ -3014,6 +3025,10 @@ namespace spacer {
         verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_cex_depth << "\n";
         verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_accum_reach_time.get_seconds() << "\n";
         verbose_stream () << "BRUNCH_STAT cex_depth " << m_stats.m_accum_prop_time.get_seconds() << "\n";
+#ifdef Z3GASNET
+        verbose_stream () << "BRUNCH_STAT redundant_remote_lemmas " << m_stats.m_redundant_remote_lemmas << "\n";
+        verbose_stream () << "BRUNCH_STAT novel_remote_lemmas " << m_stats.m_novel_remote_lemmas << "\n";
+#endif
 
 #ifdef Z3GASNET_PROFILING
         z3gasnet::context::print_statistics(verbose_stream());
@@ -3125,6 +3140,12 @@ namespace spacer {
   
   void context::add_constraints (unsigned level, expr_ref c)
   {
+      unsigned unused = 0;
+      add_constraints(level,c,unused,unused);
+  }
+  void context::add_constraints (unsigned level, expr_ref c,
+          unsigned &added_lemmas, unsigned &redundant_lemmas)
+  {
     if (!c.get ()) return;
     if (m.is_true (c)) return;
     
@@ -3141,7 +3162,8 @@ namespace spacer {
         SASSERT (is_app (e1));
         pred_transformer *r = 0;
         if (m_rels.find (to_app (e1)->get_decl (), r))
-          r->add_lemma (e2, level);
+          r->add_lemma (e2, level,
+                  added_lemmas, redundant_lemmas);
       }
     }
   }
@@ -3159,7 +3181,9 @@ namespace spacer {
       if (remote_invs)
       {
         ret++;
-        add_constraints (infty_level(), remote_invs);
+        add_constraints (infty_level(), remote_invs,
+                m_stats.m_novel_remote_lemmas,
+                m_stats.m_redundant_remote_lemmas);
         // STRACE("gas", Z3GASNET_TRACE_PREFIX 
         //     << "Added invariants from remote node: " << remote_node_invariants <<"\n";);
       }
