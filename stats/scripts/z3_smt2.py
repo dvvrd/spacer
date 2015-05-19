@@ -19,7 +19,10 @@ profiles = {
     'ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux'],
     ## inspired by gpdr: no priority queue. 
     'gpdr': ['--use-heavy-mev', '--no-elim-aux'],
-
+    ## options used for cav'15 paper
+    'cav15': ['--use-heavy-mev', '--keep-obligations',
+              '--flexible-trace'],
+	
     ## three nodes in the spacer job each assigned a differnt profile
     'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
     'trifectar1k': ['--jobsize','3','--distprofile', 'def,ic3,gpdr', '--restart', '1000'],
