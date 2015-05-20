@@ -77,8 +77,8 @@ class hnf::imp {
     expr_ref_vector       m_todo;
     proof_ref_vector      m_proofs;
     expr_ref_vector       m_refs;
-    symbol                m_name;
     svector<symbol>       m_names;
+    svector<symbol>       m_arg_names;
     ptr_vector<sort>      m_sorts;
     quantifier_hoister    m_qh;
     obj_map<expr, app*>   m_memoize_disj;
@@ -98,8 +98,8 @@ public:
         m_cancel(false),
         m_todo(m),
         m_proofs(m),
-        m_refs(m), 
-        m_name("P"),
+        m_refs(m),
+        m_names(),
         m_qh(m),
         m_fresh_predicates(m),
         m_body(m),
@@ -172,13 +172,8 @@ public:
         m_cancel = f;
     }
 
-    void set_name(symbol const& n) {
-        if (n == symbol::null) {
-            m_name = symbol("P");
-        }
-        else {
-            m_name = n;
-        }
+    void set_names(svector<symbol> const& ns) {
+        m_names = ns;
     }
 
     func_decl_ref_vector const& get_fresh_predicates() {
@@ -230,11 +225,11 @@ private:
         expr_ref fml0(m), fml1(m), fml2(m), head(m);
         proof_ref p(m);
         fml0 = fml;
-        m_names.reset();
+        m_arg_names.reset();
         m_sorts.reset();
         m_body.reset();
         m_defs.reset();
-        m_qh.pull_quantifier(true, fml0, &m_sorts, &m_names);
+        m_qh.pull_quantifier(true, fml0, &m_sorts, &m_arg_names);
         if (premise){
             fml1 = bind_variables(fml0);
             if (!m_sorts.empty()) {
@@ -392,7 +387,15 @@ private:
             }
         }
         func_decl_ref f(m);
-        f = m.mk_fresh_func_decl(m_name.str().c_str(), "", sorts1.size(), sorts1.c_ptr(), m.mk_bool_sort());
+        std::stringstream name_string;
+        for (unsigned int name_idx = 0; name_idx < m_names.size(); ++name_idx) {
+            if (name_idx > 0) {
+                name_string << ";";
+            }
+            name_string << m_names[name_idx];
+        }
+
+        f = m.mk_fresh_func_decl(name_string.str().c_str(), "", sorts1.size(), sorts1.c_ptr(), m.mk_bool_sort());
         m_fresh_predicates.push_back(f);
         return app_ref(m.mk_app(f, args.size(), args.c_ptr()), m);
     }
@@ -490,11 +493,11 @@ private:
     }
 
     expr_ref bind_variables(expr* e) {
-        SASSERT(m_sorts.size() == m_names.size());
+        SASSERT(m_sorts.size() == m_arg_names.size());
         if (m_sorts.empty()) {
             return expr_ref(e, m);
         }
-        return expr_ref(m.mk_forall(m_sorts.size(), m_sorts.c_ptr(), m_names.c_ptr(), e), m);
+        return expr_ref(m.mk_forall(m_sorts.size(), m_sorts.c_ptr(), m_arg_names.c_ptr(), e), m);
     }
 
 };
@@ -522,8 +525,8 @@ void hnf::set_cancel(bool f) {
     m_imp->set_cancel(f);
 }
 
-void hnf::set_name(symbol const& n) {
-    m_imp->set_name(n);
+void hnf::set_names(svector<symbol> const& names) {
+    m_imp->set_names(names);
 }
 
 void hnf::reset() {

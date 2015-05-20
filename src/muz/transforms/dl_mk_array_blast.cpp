@@ -290,7 +290,7 @@ namespace datalog {
         proof_ref p(m);
         rule_set new_rules(m_ctx);
         TRACE("dl", tout << fml2 << "\n";);
-        rm.mk_rule(fml2, p, new_rules, r.name());
+        rm.mk_rule(fml2, p, new_rules, r.get_names());
         
 
         rule_ref new_rule(rm);

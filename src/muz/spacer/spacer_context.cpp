@@ -2093,7 +2093,7 @@ namespace spacer {
             // get rule justifying the derivation of fact at pt
             r = &fact->get_rule ();
             TRACE ("spacer",
-                    tout << "next rule: " << r->name ().str () << "\n";
+                    tout << "next rule: " << r->get_names_as_symbol().str() << "\n";
                   );
             // add child facts and pts
             facts.append (fact->get_justifications ());
@@ -2158,7 +2158,7 @@ namespace spacer {
             r = &fact->get_rule ();
             rules.push_back (const_cast<datalog::rule *> (r));
             TRACE ("spacer",
-                    tout << "next rule: " << r->name ().str () << "\n";
+                    tout << "next rule: " << r->get_names_as_symbol().str() << "\n";
                   );
             // add child facts and pts
             facts.append (fact->get_justifications ());

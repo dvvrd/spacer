@@ -153,7 +153,7 @@ namespace datalog {
             tail.append(m_eqs);
             tail.push_back(a.mk_gt(m.mk_var(num_vars, a.mk_real()), a.mk_numeral(rational(0), false)));
             neg.resize(tail.size(), false);
-            new_rule = rm.mk(new_pred, tail.size(), tail.c_ptr(), neg.c_ptr(), r.name(), true);
+            new_rule = rm.mk(new_pred, tail.size(), tail.c_ptr(), r.get_names(), neg.c_ptr(), true);
             result->add_rule(new_rule);                
             if (source.is_output_predicate(r.get_decl())) {
                 result->set_output_predicate(new_rule->get_decl());

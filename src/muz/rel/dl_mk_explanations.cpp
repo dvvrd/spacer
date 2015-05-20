@@ -691,7 +691,8 @@ namespace datalog {
     }
 
     symbol mk_explanations::get_rule_symbol(rule * r) {
-        if (r->name() == symbol::null) {
+        symbol r_name = r->get_names_as_symbol();
+        if (r_name == symbol::null) {
             std::stringstream sstm;
             r->display(m_context, sstm);
             std::string res = sstm.str();
@@ -699,7 +700,7 @@ namespace datalog {
             return symbol(res.c_str());
         }
         else {
-            return r->name();
+            return r_name;
         }
     }
 
@@ -749,7 +750,7 @@ namespace datalog {
         neg_flags.push_back(false);
         SASSERT(e_tail.size()==neg_flags.size());
 
-        return m_context.get_rule_manager().mk(e_head, e_tail.size(), e_tail.c_ptr(), neg_flags.c_ptr());
+        return m_context.get_rule_manager().mk(e_head, e_tail.size(), e_tail.c_ptr(), svector<symbol>(), neg_flags.c_ptr());
     }
 
     void mk_explanations::transform_rules(const rule_set & src, rule_set & dst) {
@@ -776,7 +777,7 @@ namespace datalog {
             app_ref orig_lit(m_manager.mk_app(orig_decl, lit_args.c_ptr()), m_manager);
             app_ref e_lit(get_e_lit(orig_lit, arity), m_manager);
             app * tail[] = { e_lit.get() };
-            dst.add_rule(m_context.get_rule_manager().mk(orig_lit, 1, tail, 0));
+            dst.add_rule(m_context.get_rule_manager().mk(orig_lit, 1, tail, svector<symbol>(), 0));
         }
     }
 

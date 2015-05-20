@@ -602,7 +602,7 @@ namespace datalog {
                 compile_expr(r.get_tail(i), tmp);
                 body.push_back(to_app(tmp));
             }
-            rule* r_new = rm.mk(head, body.size(), body.c_ptr(), 0, r.name(), false);
+            rule* r_new = rm.mk(head, body.size(), body.c_ptr(), r.get_names(), 0, false);
             new_rules.add_rule(r_new);
             IF_VERBOSE(20, r_new->display(m_ctx, verbose_stream()););
             if (old_rules.is_output_predicate(r.get_decl())) {

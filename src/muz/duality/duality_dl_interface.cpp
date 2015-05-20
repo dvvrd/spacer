@@ -155,7 +155,7 @@ lbool dl_interface::query(::expr * query) {
 
 
   expr_ref_vector rules(m_ctx.get_manager());
-  svector< ::symbol> names;  
+  svector<svector< ::symbol>> names;
   vector<unsigned> bounds;
   // m_ctx.get_rules_as_formulas(rules, names);
 

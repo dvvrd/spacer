@@ -926,7 +926,7 @@ namespace datalog {
                     names.push_back(symbol("path"));
                     SASSERT(names.size() == q_sorts.size());
                     SASSERT(vars.size() == names.size());
-                    symbol qid = r.name(), skid;               
+                    symbol qid = r.get_names_as_symbol(), skid;
                     tmp = m.mk_app(mk_predicate(p), trace_arg.get(), path_var.get());
                     patterns.reset();
                     patterns.push_back(m.mk_pattern(to_app(tmp)));
