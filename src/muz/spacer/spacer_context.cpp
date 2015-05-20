@@ -2128,9 +2128,13 @@ namespace spacer {
         datalog::rule const* r;
         pred_transformer* pt;
 
-        // get and discard query rule
+        // get query rule
         fact = m_query->get_last_reach_fact ();
         r = &fact->get_rule ();
+        rules.push_back (const_cast<datalog::rule *> (r));
+        TRACE ("spacer",
+                tout << "Initial rule: " << r->get_names_as_symbol().str() << "\n";
+               );
 
         // initialize queues
         // assume that the query is only on a single predicate
