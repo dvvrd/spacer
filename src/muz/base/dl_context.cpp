@@ -1069,7 +1069,7 @@ namespace datalog {
         }
     }
    
-    void context::get_raw_rule_formulas(expr_ref_vector& rules, svector<svector<symbol>>& names, vector<unsigned> &bounds){
+    void context::get_raw_rule_formulas(expr_ref_vector& rules, svector<svector<symbol> >& names, vector<unsigned> &bounds){
         for (unsigned i = 0; i < m_rule_fmls.size(); ++i) {
 	    expr_ref r = bind_vars(m_rule_fmls[i].get(), true);
 	    rules.push_back(r.get());
@@ -1078,7 +1078,7 @@ namespace datalog {
         }
     }
 
-    void context::get_rules_as_formulas(expr_ref_vector& rules, expr_ref_vector& queries, svector<svector<symbol>>& names) {
+    void context::get_rules_as_formulas(expr_ref_vector& rules, expr_ref_vector& queries, svector<svector<symbol> >& names) {
         expr_ref fml(m);
         rule_manager& rm = get_rule_manager();
         
@@ -1138,7 +1138,7 @@ namespace datalog {
         expr* const* axioms = m_background.c_ptr();
         expr_ref fml(m);
         expr_ref_vector rules(m), queries(m);
-        svector<svector<symbol>> names;
+        svector<svector<symbol> > names;
         bool use_fixedpoint_extensions = m_params->print_fixedpoint_extensions();
         bool print_low_level = m_params->print_low_level_smt2();
         bool do_declare_vars = m_params->print_with_variable_declarations();

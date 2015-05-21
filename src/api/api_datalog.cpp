@@ -541,7 +541,7 @@ extern "C" {
         Z3_ast_vector_ref* v = alloc(Z3_ast_vector_ref, m);
         mk_c(c)->save_object(v);
         expr_ref_vector rules(m), queries(m);
-        svector<svector<symbol>> names;
+        svector<svector<symbol> > names;
         
         to_fixedpoint_ref(d)->ctx().get_rules_as_formulas(rules, queries, names);
         for (unsigned i = 0; i < rules.size(); ++i) {
