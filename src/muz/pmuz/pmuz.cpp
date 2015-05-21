@@ -111,6 +111,7 @@ void PMuz::createProblem()
 {
   //-- if using datalog input
   if(inputDatalog) {
+    std::cout << "input file = " << inputFile;
     Z3_ast_vector queries = Z3_fixedpoint_from_file (ctx, fxpt, inputFile.c_str());
     std::cout << "number of queries = " << Z3_ast_vector_size(ctx, queries) << '\n';
     query = Z3_ast_vector_get(ctx, queries, 0);
