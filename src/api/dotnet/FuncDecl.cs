@@ -343,5 +343,20 @@ namespace Microsoft.Z3
             return Expr.Create(Context, this, args);
         }
 
+        /// <summary>
+        /// Translates (copies) the function declaration to the Context <paramref name="ctx"/>.
+        /// </summary>
+        /// <param name="ctx">A context</param>
+        /// <returns>A copy of the function declaration which is associated with <paramref name="ctx"/></returns>
+        new public FuncDecl Translate(Context ctx)
+        {
+            Contract.Requires(ctx != null);
+            Contract.Ensures(Contract.Result<AST>() != null);
+
+            if (ReferenceEquals(Context, ctx))
+                return this;
+            else
+                return new FuncDecl(ctx, Native.Z3_translate(Context.nCtx, NativeObject, ctx.nCtx));
+        }
     }
 }
