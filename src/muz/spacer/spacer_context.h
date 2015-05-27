@@ -526,7 +526,37 @@ namespace spacer {
       if (n1.depth () < n2.depth ()) return true;
       if (n1.depth () > n2.depth ()) return false;
       
-      return &n1 < &n2;
+      // -- a more deterministic order of proof obligations in a queue
+      if (true)
+      {
+        const expr* p1 = n1.post ();
+        const expr* p2 = n2.post ();
+        ast_manager &m = n1.get_ast_manager ();
+      
+      
+        // -- order by size. Less conjunctions is a proxy for
+        // -- generality.  Currently, this takes precedence over
+        // -- predicates which might not be the best choice
+        unsigned sz1 = 1;
+        unsigned sz2 = 1;
+      
+        if (m.is_and (p1)) sz1 = to_app (p1)->get_num_args ();
+        if (m.is_and (p2)) sz2 = to_app (p2)->get_num_args ();
+        if (sz1 < sz2) return true;
+        if (sz1 > sz2) return false;
+      
+        // -- when all else fails, order by identifiers of the
+        // -- expressions.  This roughly means that expressions created
+        // -- earlier are preferred.  Note that variables in post are
+        // -- based on names of the predicates. Hence this guarantees an
+        // -- order over predicates as well. That is, two expressions
+        // -- are equal if and only if they correspond to the same proof
+        // -- obligation of the same predicate.
+        ast_lt_proc ast_lt;
+        return ast_lt (p1, p2);
+      }
+      else
+        return &n1 < &n2;
     }
   };
   
