@@ -2480,7 +2480,7 @@ namespace spacer {
 
   bool context::check_reachability ()
   {
-    timeit _timer (get_verbosity_level () >= 1, "spacer::context::check_reachability", 
+    spacer_timeit _timer (get_verbosity_level () >= 1, "spacer::context::check_reachability", 
                    verbose_stream ());
 
       model_node_ref last_reachable;
