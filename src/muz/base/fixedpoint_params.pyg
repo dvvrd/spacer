@@ -162,6 +162,7 @@ def_module_params('fixedpoint',
                           ('gasnet.verify_msgs', BOOL, False, "Perform application level verification that messages were delivered intact"),
                           ('pmuz.node_restarts', BOOL, False, "Perform node restarts"),
                           ('pmuz.node_work_budget', UINT, 100, "The ammount of work a node can perform before being restarted"),
+                          ('spacer.nondet_tie_break', BOOL, False, "Break ties in obligation queue non-deterministicly")
                           ))
 
 
