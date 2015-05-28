@@ -2528,8 +2528,6 @@ namespace spacer {
     {
       SASSERT(n.is_open());
       
-      if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
-
       TRACE ("spacer", 
              tout << "expand-node: " << n.pt().head()->get_name() 
              << " level: " << n.level() 
@@ -2649,6 +2647,9 @@ namespace spacer {
         timeit _timer (is_trace_enabled("spacer_timeit"), 
                        "spacer::expand_node::false", 
                        verbose_stream ());
+
+        // -- only update expanded level when new lemmas are generated at it.
+        if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
 
         TRACE("spacer", tout << "cube:\n"; 
               for (unsigned j = 0; j < cube.size(); ++j) 
