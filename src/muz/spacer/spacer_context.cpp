@@ -2349,7 +2349,7 @@ namespace spacer {
       
       for (unsigned i = 0; i < max_level; ++i) {
         checkpoint();
-        m_expanded_lvl = lvl;
+        m_expanded_lvl = infty_level ();
         m_stats.m_max_query_lvl = lvl;
 
         if (check_reachability()) return l_true;
