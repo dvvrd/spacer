@@ -2482,8 +2482,6 @@ namespace spacer {
     {
       SASSERT(n.is_open());
       
-      if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
-
       TRACE ("spacer", 
              tout << "expand-node: " << n.pt().head()->get_name() 
              << " level: " << n.level() 
@@ -2609,6 +2607,10 @@ namespace spacer {
       }
         // n is unreachable, create new summary facts
       case l_false: {
+
+        // -- only update expanded level when new lemmas are generated at it.
+        if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
+
         TRACE("spacer", tout << "cube:\n"; 
               for (unsigned j = 0; j < cube.size(); ++j) 
                 tout << mk_pp(cube[j].get(), m) << "\n";);
