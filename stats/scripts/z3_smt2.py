@@ -310,23 +310,33 @@ class RunCmd(threading.Thread):
         self.stdout, unused = self.p.communicate()
 
     def Run(self):
-        self.start()
+        returncode=19
 
-        if self.cpu > 0:
-            self.join(self.cpu+5)
-        else:
-            self.join()
+        try:
+            self.start()
 
-        if self.is_alive():
-            print 'z3 is still alive, terminating'
-            self.p.terminate()      
-            self.join(5)
+            if self.cpu > 0:
+                self.join(self.cpu+5)
+            else:
+                self.join()
 
-        if self.is_alive():
-            print 'z3 is still alive after attempt to terminate, sending kill'
-            self.p.kill()
+            if self.is_alive():
+                print 'z3 is still alive, terminating'
+                self.p.terminate()
+                self.join(5)
 
-        return self.p.returncode
+            if self.is_alive():
+                print 'z3 is still alive after attempt to terminate, sending kill'
+                self.p.kill()
+            returncode = self.p.returncode
+
+        except Exception as e:
+            print 'Error wall watching cmd execution:', e.message
+        finally:
+            returncode = 20
+
+
+        return returncode
 
 
 def main (argv):
