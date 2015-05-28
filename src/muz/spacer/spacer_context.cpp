@@ -1422,6 +1422,10 @@ namespace spacer {
                            m_premises[m_active].pt (), 
                            prev_level (m_parent.level ()),
                            m_parent.depth ());
+    
+    // -- decrease the budget
+    SASSERT (m_parent.budget () > 0);
+    n->set_budget (prev_level (m_parent.budget ()));
     n->set_post (post);
     return n;
   }
@@ -2446,11 +2450,25 @@ namespace spacer {
             
             node->inc_level ();
             if (get_params ().pdr_flexible_trace ())
+            {
+              // -- re-insert the node into the queue with some budget
+              node->init_budget ();
               m_search.push (*node);
+            }
             if (m_search.is_root (*node)) return false;
             break;
           case l_undef:
-            SASSERT (m_search.top () != node.get ());
+            if (m_search.top () == node.get ())
+            {
+              // -- ran out of budget
+              // -- put back in the queue with a higher budget
+              SASSERT (node.budget () < node.level ());
+              m_search.pop ();
+              node->bump_budget ();
+              m_search.push (*node);
+            }
+            else
+              SASSERT (m_search.top () != node.get ());
             break;
           }
         }
@@ -2469,19 +2487,24 @@ namespace spacer {
       TRACE ("spacer", 
              tout << "expand-node: " << n.pt().head()->get_name() 
              << " level: " << n.level() 
-             << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
+             << " depth: " << (n.depth () - m_search.min_depth ()) 
+             << " budget: " << n.budget ()
+             << "\n"
              << mk_pp(n.post(), m) << "\n";);
       
       TRACE ("core_array_eq", 
              tout << "expand-node: " << n.pt().head()->get_name() 
              << " level: " << n.level() 
-             << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
+             << " depth: " << (n.depth () - m_search.min_depth ()) 
+             << " budget: " << n.budget ()
+             << "\n"
              << mk_pp(n.post(), m) << "\n";);
       
       stopwatch watch;
       IF_VERBOSE (1, verbose_stream () << "expand: " << n.pt ().head ()->get_name () 
                   << " (" << n.level () << ", " 
-                  << (n.depth () - m_search.min_depth ()) << ") "
+                  << (n.depth () - m_search.min_depth ()) << ", "
+                  << n.budget () << ") "
                   << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
                   << n.post ()->get_id ();
                   verbose_stream().flush ();
@@ -2565,6 +2588,15 @@ namespace spacer {
                      << std::fixed << std::setprecision(2) 
                      << watch.get_seconds () << "\n";);
           return next ? l_undef : l_true;
+        }
+        
+        if (n.budget () == 0) 
+        {
+          // -- budget exceeded
+          IF_VERBOSE(1, verbose_stream () << " B "
+                     << std::fixed << std::setprecision(2) 
+                     << watch.get_seconds () << "\n";);
+          return l_undef;
         }
         
         // create a child of n

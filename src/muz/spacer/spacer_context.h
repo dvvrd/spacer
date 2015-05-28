@@ -33,6 +33,7 @@ Revision History:
 #include "spacer_reachable_cache.h"
 #include "fixedpoint_params.hpp"
 
+#include <algorithm>
 
 namespace datalog {
     class rule_set;
@@ -425,8 +426,10 @@ namespace spacer {
     expr_ref                m_post;
     /// level at which to decide the post 
     unsigned                m_level;       
-      
+    /// depth 
     unsigned                m_depth;
+    /// budget. Should merge with m_level eventually.
+    unsigned                m_budget;
     
     /// whether a concrete answer to the post is found
     bool                    m_open;     
@@ -439,10 +442,12 @@ namespace spacer {
     ptr_vector<model_node>  m_kids;
 
   public:
-    model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
+    model_node (model_node* parent, pred_transformer& pt, unsigned level, 
+                unsigned depth=0):
       m_ref_count (0),
       m_parent (parent), m_pt (pt), 
-      m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth),
+      m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth), 
+      m_budget(level),
       m_open (true), m_use_farkas (true)
     {if (m_parent) m_parent->add_child (*this);}
     
@@ -467,6 +472,18 @@ namespace spacer {
       
     unsigned level () const { return m_level; }
     unsigned depth () const {return m_depth;}
+    unsigned budget () const {return m_budget;}
+    
+    void set_budget (unsigned v) 
+    {
+      SASSERT (v <= m_level);
+      m_budget = v;
+    }
+    unsigned init_budget () {m_budget = std::min (0U, m_level);}
+    void bump_budget () {m_budget = m_level;}
+    
+    
+    
     
     bool use_farkas_generalizer () const {return m_use_farkas;}
     void set_farkas_generalizer (bool v) {m_use_farkas = v;}
@@ -829,7 +846,10 @@ namespace spacer {
       
     if (n1.depth () < n2.depth ()) return true;
     if (n1.depth () > n2.depth ()) return false;
-      
+
+    if (n1.budget () < n2.budget ()) return true;
+    if (n1.budget () > n2.budget ()) return false;
+    
     // -- a more deterministic order of proof obligations in a queue
     if (!n1.get_context ().get_params ().spacer_nondet_tie_break ())
     {
