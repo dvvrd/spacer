@@ -32,6 +32,7 @@ Revision History:
 #include "dl_transforms.h"
 #include "dl_mk_rule_inliner.h"
 #include "scoped_proof.h"
+#include "fixedpoint_params.hpp"
 
 namespace datalog {
 
@@ -1154,7 +1155,8 @@ namespace datalog {
 
         lbool check() {
             setup();
-            for (unsigned i = 0; ; ++i) {
+            unsigned max_depth = b.m_ctx.get_params().bmc_linear_unrolling_depth();
+            for (unsigned i = 0; i < max_depth; ++i) {
                 IF_VERBOSE(1, verbose_stream() << "level: " << i << "\n";); 
                 b.checkpoint();
                 compile(i);

@@ -161,6 +161,7 @@ def_module_params('fixedpoint',
                           ('spacer.elim_aux', BOOL, True, "Eliminate auxiliary variables in reachability facts"),
                           ('spacer.reach_as_init', BOOL, True, "Extend initial rules with computed reachability facts"),
                           ('spacer.blast_term_ite', BOOL, True, "Expand non-Boolean ite-terms"),
+                          ('bmc.linear_unrolling_depth', UINT, UINT_MAX, "Maximal level to explore"),
                           ))
 
 
