@@ -1423,10 +1423,13 @@ namespace spacer {
                            prev_level (m_parent.level ()),
                            m_parent.depth ());
     
-    // -- decrease the budget
-    SASSERT (m_parent.budget () > 0);
-    n->set_budget (prev_level (m_parent.budget ()));
+    // XXX If current node is a sibling, m_parent might already have budget 0, 
+    // XXX although it had a different budget when the first sibling was created
+    // SASSERT (m_parent.budget () > 0);
+    if (m_parent.budget () > 0)
+      n->set_budget (prev_level (m_parent.budget ()));
     n->set_post (post);
+    
     return n;
   }
   
@@ -2462,7 +2465,7 @@ namespace spacer {
             {
               // -- ran out of budget
               // -- put back in the queue with a higher budget
-              SASSERT (node.budget () < node.level ());
+              SASSERT (node->budget () < node->level ());
               m_search.pop ();
               node->bump_budget ();
               m_search.push (*node);
@@ -2570,6 +2573,9 @@ namespace spacer {
             { 
               // move derivation over to the next obligation
               next->set_derivation (n.detach_derivation ());
+              
+              // -- reset the budget to that of a sibling
+              next->set_budget (n.budget ());
               
               // remove the current node from the queue if it is at the top
               if (m_search.top () == &n) m_search.pop ();
