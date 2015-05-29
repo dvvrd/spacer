@@ -876,6 +876,12 @@ namespace spacer {
       // -- order over predicates as well. That is, two expressions
       // -- are equal if and only if they correspond to the same proof
       // -- obligation of the same predicate.
+      if (p1->get_id () < p2->get_id ()) return true;
+      if (p1->get_id () > p1->get_id ()) return false;
+      
+      // -- if expression comparison fails, compare by predicate id
+      return n1.pt ().head ()->get_id () < n2.pt ().head ()->get_id ();
+      
       ast_lt_proc ast_lt;
       return ast_lt (p1, p2);
     }
