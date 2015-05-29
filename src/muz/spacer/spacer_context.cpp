@@ -2408,7 +2408,7 @@ namespace spacer {
                         verbose_stream () << "Deleting closed node: " 
                         << n->pt ().head ()->get_name ()
                         << "(" << n->level () << ", " << n->depth () << ")"
-                        << " " << n << "\n";);
+                        << " " << n->post ()->get_id () << "\n";);
             m_search.pop ();
             if (m_search.is_root (*n)) return true;
             SASSERT (m_search.top ());
@@ -2483,7 +2483,7 @@ namespace spacer {
                   << " (" << n.level () << ", " 
                   << (n.depth () - m_search.min_depth ()) << ") "
                   << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
-                  << &n;
+                  << n.post ()->get_id ();
                   verbose_stream().flush ();
                   watch.start (););
       
