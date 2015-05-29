@@ -479,7 +479,7 @@ namespace spacer {
       SASSERT (v <= m_level);
       m_budget = v;
     }
-    unsigned init_budget () {m_budget = std::min (0U, m_level);}
+    void init_budget () {m_budget = std::min (0U, m_level);}
     void bump_budget () {m_budget = m_level;}
     
     
