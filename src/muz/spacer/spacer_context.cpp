@@ -2465,6 +2465,8 @@ namespace spacer {
               SASSERT (node.budget () < node.level ());
               m_search.pop ();
               node->bump_budget ();
+              // -- reset unknown child status
+              node->set_has_unknown_child (false);
               m_search.push (*node);
             }
             else
@@ -2509,6 +2511,15 @@ namespace spacer {
                   watch.start (););
       
 
+      if (n.has_unknown_child ())
+      {
+        // -- budget exceeded for children
+        IF_VERBOSE(1, verbose_stream () << " B "
+                   << std::fixed << std::setprecision(2) 
+                   << watch.get_seconds () << "\n";);
+        return l_undef;
+      }
+      
       // check the cache
       // DISABLED FOR NOW
       // if (n.pt().is_must_reachable (n.post())) {

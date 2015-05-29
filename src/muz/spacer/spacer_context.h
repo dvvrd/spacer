@@ -433,6 +433,10 @@ namespace spacer {
     
     /// whether a concrete answer to the post is found
     bool                    m_open;     
+    
+    /// whether has a child node that with unknown reachability status
+    bool                    m_has_unknown_kid;
+    
     /// whether to use farkas generalizer to construct a lemma blocking this node
     bool                    m_use_farkas;
     
@@ -448,7 +452,7 @@ namespace spacer {
       m_parent (parent), m_pt (pt), 
       m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth), 
       m_budget(level),
-      m_open (true), m_use_farkas (true)
+      m_open (true), m_has_unknown_kid (false), m_use_farkas (true)
     {if (m_parent) m_parent->add_child (*this);}
     
     ~model_node() {if (m_parent) m_parent->erase_child (*this);}
@@ -495,6 +499,7 @@ namespace spacer {
     {
       m_derivation = NULL;
       m_open = true;
+      m_has_unknown_kid = false;
     }
     
     bool is_open () const { return m_open; }
@@ -511,6 +516,10 @@ namespace spacer {
     }
     
     void open () { reset (); }
+    
+    bool has_unknown_child () {return m_has_unknown_kid;}
+    void set_has_unknown_child (bool v) {m_has_unknown_kid = v;}
+    
     
     void add_child (model_node &v) {m_kids.push_back (&v);}
     void erase_child (model_node &v) {m_kids.erase (&v);}
@@ -841,6 +850,11 @@ namespace spacer {
     const model_node& n1 = *pn1; 
     const model_node& n2 = *pn2;
       
+    // -- order by degree of bound. More bounded obligations go to the
+    // -- top of the order.
+    if (n1.level () - n1.budget () > n2.level () - n2.budget ()) return true;
+    if (n1.level () - n1.budget () < n2.level () - n2.budget ()) return false;
+    
     if (n1.level () < n2.level ()) return true;
     if (n1.level () > n2.level ()) return false;
       
