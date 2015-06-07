@@ -159,7 +159,9 @@ def_module_params('fixedpoint',
                           ('spacer.elim_aux', BOOL, True, "Eliminate auxiliary variables in reachability facts"),
                           ('spacer.reach_as_init', BOOL, True, "Extend initial rules with computed reachability facts"),
                           ('spacer.blast_term_ite', BOOL, True, "Expand non-Boolean ite-terms"),
-                          ('spacer.nondet_tie_break', BOOL, False, "Break ties in obligation queue non-deterministicly")
+                          ('spacer.nondet_tie_break', BOOL, False, "Break ties in obligation queue non-deterministicly"),
+                          ('spacer.unused1', BOOL, False, "Unused parameter to check deterministic performance on rebuild"),
+                          ('spacer.unused2', UINT, UINT_MAX, "Unused parameter to check deterministic performance on rebuild")
                           ))
 
 
