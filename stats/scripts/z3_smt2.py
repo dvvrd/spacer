@@ -222,9 +222,6 @@ def compute_z3_args (args):
     if args.jobsize != -1:
         z3_args += ' %d' % int(args.jobsize)
 
-    if args.jobsize != -1:
-        z3_args += ' %d' % int(args.jobsize)
-
     if z3_args is None:
         print 'No executable named "z3" found in current directory or PATH'
         return
