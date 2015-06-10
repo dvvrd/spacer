@@ -423,15 +423,12 @@ void set_profile(std::vector<std::string> profile_vec)
 
 }
 
-unsigned core_main(bool &repeat, unsigned restarts)
+unsigned core_main(bool &repeat, unsigned restarts, spacer::PMuz &pmuz)
 {
   using namespace spacer;
 
   repeat = false; 
   //-- solve
-  spacer::PMuz pmuz(g_input_file);
-  pmuz.init();
-  pmuz.createProblem();
 #ifdef Z3GASNET
   unsigned budget = 1;
   SASSERT( restarts >= 0 );
@@ -546,7 +543,10 @@ int main(int argc, char ** argv) {
 
         bool repeat = false;
         unsigned restarts = 0;
-        do { return_value = core_main(repeat,restarts++); } while (repeat);
+        spacer::PMuz pmuz(g_input_file);
+        pmuz.init();
+        pmuz.createProblem();
+        do { return_value = core_main(repeat,restarts++,&pmuz); } while (repeat);
 
         verbose_stream () << "BRUNCH_STAT node_restarts " << restarts-1 << "\n";
 
