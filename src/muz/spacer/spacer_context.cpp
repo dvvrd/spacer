@@ -1,5 +1,26 @@
-/*++
-Copyright (c) 2011 Microsoft Corporation
+/** 
+Spacer
+Copyright (c) 2015 Carnegie Mellon University.
+All Rights Reserved.
+
+THIS SOFTWARE IS PROVIDED "AS IS," WITH NO WARRANTIES
+WHATSOEVER. CARNEGIE MELLON UNIVERSITY EXPRESSLY DISCLAIMS TO THE
+FULLEST EXTENT PERMITTEDBY LAW ALL EXPRESS, IMPLIED, AND STATUTORY
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NON-INFRINGEMENT OF PROPRIETARY RIGHTS.
+
+Released under a modified MIT license, please see SPACER_LICENSE.txt
+for full terms.  DM-0002483
+
+Spacer includes and/or makes use of the following Third-Party Software
+subject to its own license:
+
+Z3
+Copyright (c) Microsoft Corporation
+All rights reserved.
+
+Released under the MIT License (LICENSE.txt)
 
 Module Name:
 
@@ -11,15 +32,12 @@ Abstract:
 
 Author:
 
+    Arie Gurfinkel
     Anvesh Komuravelli
 
-Revision History:
-
-    Based on ../pdr/pdr_context.cpp by
-     Nikolaj Bjorner (nbjorner)
+    Based on muz/pdr/pdr_context.cpp by Nikolaj Bjorner (nbjorner)
 
 Notes:
-
    
 --*/
 
@@ -2478,70 +2496,70 @@ namespace spacer {
     return l_undef;
   }
 
-  bool context::check_reachability () 
+  bool context::check_reachability ()
   {
     spacer_timeit _timer (get_verbosity_level () >= 1, "spacer::context::check_reachability", 
-        verbose_stream (), &m_stats.m_accum_reach_time);
+                   verbose_stream ());
 
-    model_node_ref last_reachable;
+      model_node_ref last_reachable;
 
-    if (get_params().reset_obligation_queue ()) m_search.reset ();
+      if (get_params().reset_obligation_queue ()) m_search.reset ();
 
-    unsigned initial_size = m_search.size ();
-    unsigned restart_initial = 10;
-    unsigned threshold = restart_initial;
-    unsigned luby_idx = 1;
+      unsigned initial_size = m_search.size ();
+      unsigned restart_initial = 10;
+      unsigned threshold = restart_initial;
+      unsigned luby_idx = 1;
 
-    while (m_search.top ())
-    {
-      checkpoint ();
-      model_node_ref node;
-
-      while (last_reachable)
+      while (m_search.top ())
       {
-        node = last_reachable;
-        last_reachable = NULL;
-        if (m_search.is_root (*node)) return true;
-        if (expand_node (*node->parent ()) == l_true)
+        checkpoint ();
+        model_node_ref node;
+
+        while (last_reachable)
         {
-          last_reachable = node->parent ();
-          last_reachable->close ();
+          node = last_reachable;
+          last_reachable = NULL;
+          if (m_search.is_root (*node)) return true;
+          if (expand_node (*node->parent ()) == l_true)
+          {
+            last_reachable = node->parent ();
+            last_reachable->close ();
+          }
         }
-      }
 
-      SASSERT (m_search.top ());
-      while (m_search.top ()->is_closed ()) 
-      { 
-        model_node *n = m_search.top ();
-        IF_VERBOSE (1,
-            verbose_stream () << "Deleting closed node: " 
-            << n->pt ().head ()->get_name ()
-            << "(" << n->level () << ", " << n->depth () << ")"
-            << " " << n << "\n";);
-        m_search.pop ();
-        if (m_search.is_root (*n)) return true;
         SASSERT (m_search.top ());
-      }
+        while (m_search.top ()->is_closed ())
+        {
+          model_node *n = m_search.top ();
+          IF_VERBOSE (1,
+                      verbose_stream () << "Deleting closed node: "
+                      << n->pt ().head ()->get_name ()
+                      << "(" << n->level () << ", " << n->depth () << ")"
+                      << " " << n->post ()->get_id () << "\n";);
+          m_search.pop ();
+          if (m_search.is_root (*n)) return true;
+          SASSERT (m_search.top ());
+        }
 
-      SASSERT (m_search.top ());
+        SASSERT (m_search.top ());
 
-      if (false && m_search.size () - initial_size > threshold)
-      {
-        luby_idx++;
-        threshold = static_cast<unsigned>(get_luby(luby_idx)) * restart_initial;
-        IF_VERBOSE (1, verbose_stream () 
-            << "(restarting :obligations " << m_search.size () 
-            << " :restart_threshold " << threshold
-            << ")\n";);
-        m_search.reset ();
-        initial_size = m_search.size ();
-      }
+        if (false && m_search.size () - initial_size > threshold)
+        {
+          luby_idx++;
+          threshold = static_cast<unsigned>(get_luby(luby_idx)) * restart_initial;
+          IF_VERBOSE (1, verbose_stream ()
+                      << "(restarting :obligations " << m_search.size ()
+                      << " :restart_threshold " << threshold
+                      << ")\n";);
+          m_search.reset ();
+          initial_size = m_search.size ();
+        }
 
 
-      node = m_search.top ();
-      SASSERT (node->level () <= m_search.max_level ());
-      switch (expand_node (*node))
-      {
+        node = m_search.top ();
+        SASSERT (node->level () <= m_search.max_level ());
+        switch (expand_node (*node))
+        {
         case l_true:
           SASSERT (m_search.top () == node.get ());
           m_search.pop ();
@@ -2561,41 +2579,42 @@ namespace spacer {
         case l_undef:
           SASSERT (m_search.top () != node.get ());
           break;
+        }
       }
-    }
-
-    UNREACHABLE();
-    return false;
+      
+      UNREACHABLE();
+      return false;
   }
+
 
   //this processes a goal and creates sub-goal
   lbool context::expand_node(model_node& n) 
   {
     SASSERT(n.is_open());
-
+    
     if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
 
     TRACE ("spacer", 
-        tout << "expand-node: " << n.pt().head()->get_name() 
-        << " level: " << n.level() 
-        << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
-        << mk_pp(n.post(), m) << "\n";);
-
+           tout << "expand-node: " << n.pt().head()->get_name() 
+           << " level: " << n.level() 
+           << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
+           << mk_pp(n.post(), m) << "\n";);
+    
     TRACE ("core_array_eq", 
-        tout << "expand-node: " << n.pt().head()->get_name() 
-        << " level: " << n.level() 
-        << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
-        << mk_pp(n.post(), m) << "\n";);
-
+           tout << "expand-node: " << n.pt().head()->get_name() 
+           << " level: " << n.level() 
+           << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
+           << mk_pp(n.post(), m) << "\n";);
+    
     stopwatch watch;
     IF_VERBOSE (1, verbose_stream () << "expand: " << n.pt ().head ()->get_name () 
-        << " (" << n.level () << ", " 
-        << (n.depth () - m_search.min_depth ()) << ") "
-        << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
-        << &n;
-        verbose_stream().flush ();
-        watch.start (););
-
+                << " (" << n.level () << ", " 
+                << (n.depth () - m_search.min_depth ()) << ") "
+                << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
+                << n.post ()->get_id ();
+                verbose_stream().flush ();
+                watch.start (););
+    
 
     // check the cache
     // DISABLED FOR NOW
@@ -2603,13 +2622,13 @@ namespace spacer {
     //     m_stats.m_num_reuse_reach++;
     //     n.set_reachable (true);
     // }
-
-
+      
+      
     // used in case n is unreachable
     unsigned uses_level = infty_level ();
     expr_ref_vector cube(m);
     model_ref model;
-
+    
     // used in case n is reachable
     bool is_concrete;
     const datalog::rule * r = NULL;
@@ -2617,131 +2636,131 @@ namespace spacer {
     vector<bool> reach_pred_used; 
     unsigned num_reuse_reach = 0;
 
-
+    
     if (get_params ().pdr_flexible_trace () && n.pt ().is_blocked (n, uses_level))
     {
       // if (!m_search.is_root (n)) n.close ();
       IF_VERBOSE (1, verbose_stream () << " K "
-          << std::fixed << std::setprecision(2) 
-          << watch.get_seconds () << "\n";);
+                  << std::fixed << std::setprecision(2) 
+                  << watch.get_seconds () << "\n";);
 
       return l_false;
     }
-
-
+    
 #ifdef Z3GASNET
     add_remote_constraints();
 #endif
 
-      lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
-                         reach_pred_used, num_reuse_reach);
-      switch (res) 
+    lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
+                       reach_pred_used, num_reuse_reach);
+    switch (res) 
+    {
+      //reachable but don't know if this is purely using UA
+    case l_true: {
+      // update stats
+      m_stats.m_num_reuse_reach += num_reuse_reach;
+
+      model_evaluator mev (m, model);
+      // must-reachable
+      if (is_concrete) 
       {
-        //reachable but don't know if this is purely using UA
-      case l_true: {
-        // update stats
-        m_stats.m_num_reuse_reach += num_reuse_reach;
-
-        model_evaluator mev (m, model);
-        // must-reachable
-        if (is_concrete) 
+        // -- update must summary
+        if (r && r->get_uninterpreted_tail_size () > 0)
         {
-          // -- update must summary
-          if (r && r->get_uninterpreted_tail_size () > 0)
-          {
-            reach_fact* rf = mk_reach_fact (n, mev, *r);
-            n.pt ().add_reach_fact (*rf);
-          }
-          
-          // if n has a derivation, create a new child and report l_undef
-          // otherwise if n has no derivation or no new children, report l_true
-          model_node *next = NULL;
-          if (n.has_derivation ())
-          {
-            next = n.get_derivation ().create_next_child ();
-            if (next) 
-            { 
-              // move derivation over to the next obligation
-              next->set_derivation (n.detach_derivation ());
-              
-              // remove the current node from the queue if it is at the top
-              if (m_search.top () == &n) m_search.pop ();
-              
-              m_search.push (*next);
-            }
-          }
-          
-          // -- close n, it is reachable
-          // -- don't worry about remove n from the obligation queue
-          n.close ();
-          
-          IF_VERBOSE(1, verbose_stream () << (next ? " X " : " T ")
-                     << std::fixed << std::setprecision(2) 
-                     << watch.get_seconds () << "\n";);
-          return next ? l_undef : l_true;
+          reach_fact* rf = mk_reach_fact (n, mev, *r);
+          n.pt ().add_reach_fact (*rf);
         }
         
-        // create a child of n
-        create_children (n, *r, mev, reach_pred_used);
-        IF_VERBOSE(1, verbose_stream () << " U "
+        // if n has a derivation, create a new child and report l_undef
+        // otherwise if n has no derivation or no new children, report l_true
+        model_node *next = NULL;
+        if (n.has_derivation ())
+        {
+          next = n.get_derivation ().create_next_child ();
+          if (next) 
+          { 
+            // move derivation over to the next obligation
+            next->set_derivation (n.detach_derivation ());
+            
+            // remove the current node from the queue if it is at the top
+            if (m_search.top () == &n) m_search.pop ();
+            
+            m_search.push (*next);
+          }
+        }
+        
+        // -- close n, it is reachable
+        // -- don't worry about remove n from the obligation queue
+        n.close ();
+        
+        IF_VERBOSE(1, verbose_stream () << (next ? " X " : " T ")
                    << std::fixed << std::setprecision(2) 
                    << watch.get_seconds () << "\n";);
-        return l_undef;
-        
+        return next ? l_undef : l_true;
       }
-        // n is unreachable, create new summary facts
-      case l_false: {
-        TRACE("spacer", tout << "cube:\n"; 
-              for (unsigned j = 0; j < cube.size(); ++j) 
-                tout << mk_pp(cube[j].get(), m) << "\n";);
+      
+      // create a child of n
+      create_children (n, *r, mev, reach_pred_used);
+      IF_VERBOSE(1, verbose_stream () << " U "
+                 << std::fixed << std::setprecision(2) 
+                 << watch.get_seconds () << "\n";);
+      return l_undef;
+      
+    }
+      // n is unreachable, create new summary facts
+    case l_false: {
+      TRACE("spacer", tout << "cube:\n"; 
+            for (unsigned j = 0; j < cube.size(); ++j) 
+              tout << mk_pp(cube[j].get(), m) << "\n";);
 
-        core_generalizer::cores cores;
-        cores.push_back (std::make_pair(cube, uses_level));
-        
-        // -- run all core generalizers
-        for (unsigned i = 0; !cores.empty() && i < m_core_generalizers.size(); ++i) {
-          core_generalizer::cores new_cores;                    
-          for (unsigned j = 0; j < cores.size(); ++j) 
-            (*m_core_generalizers[i])(n, cores[j].first, cores[j].second, new_cores);
-          cores.reset ();
-          cores.append (new_cores);
-        }
-        
-        // -- convert cores into lemmas
-        for (unsigned i = 0; i < cores.size(); ++i) {
-          expr_ref_vector& core = cores[i].first;
-          std::sort (core.c_ptr (), core.c_ptr () + core.size (), ast_lt_proc ());
-          uses_level = cores[i].second;
-          expr_ref lemma (m_pm.mk_not_and(core), m);
-          TRACE("spacer", tout << "invariant state: " 
-                << (is_infty_level(uses_level)?"(inductive)":"") 
-                <<  mk_pp (lemma, m) << "\n";);
-          n.pt().add_lemma (lemma, uses_level);
-        }
-        CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
-        
-        // Optionally check reachability of lemmas
-        if (get_params ().use_lemma_as_cti ())
-        {
-          n.set_post (m_pm.mk_and (cores [0].first));
-          n.set_farkas_generalizer (false);
-        }
-        
-        
-        IF_VERBOSE(1, verbose_stream () << " F "
-                   << std::fixed << std::setprecision(2) 
-                   << watch.get_seconds () << "\n";);
+      core_generalizer::cores cores;
+      cores.push_back (std::make_pair(cube, uses_level));
+      
+      // -- run all core generalizers
+      for (unsigned i = 0; !cores.empty() && i < m_core_generalizers.size(); ++i) {
+        core_generalizer::cores new_cores;                    
+        for (unsigned j = 0; j < cores.size(); ++j) 
+          (*m_core_generalizers[i])(n, cores[j].first, cores[j].second, new_cores);
+        cores.reset ();
+        cores.append (new_cores);
+      }
+      
+      // -- convert cores into lemmas
+      for (unsigned i = 0; i < cores.size(); ++i) {
+        expr_ref_vector& core = cores[i].first;
+        std::sort (core.c_ptr (), core.c_ptr () + core.size (), ast_lt_proc ());
+        uses_level = cores[i].second;
+        expr_ref lemma (m_pm.mk_not_and(core), m);
+        TRACE("spacer", tout << "invariant state: " 
+              << (is_infty_level(uses_level)?"(inductive)":"") 
+              <<  mk_pp (lemma, m) << "\n";);
+        n.pt().add_lemma (lemma, uses_level);
+      }
+      CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
+      
+      // Optionally check reachability of lemmas
+      if (get_params ().use_lemma_as_cti ())
+      {
+        n.set_post (m_pm.mk_and (cores [0].first));
+        n.set_farkas_generalizer (false);
+      }
+      
+      
+      IF_VERBOSE(1, verbose_stream () << " F "
+                 << std::fixed << std::setprecision(2) 
+                 << watch.get_seconds () << "\n";);
 
-        return l_false;
-      }
-        //something went wrong
-      case l_undef: 
-        TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
-        throw unknown_exception();
-      }
-      UNREACHABLE();
+      return l_false;
+    }
+      //something went wrong
+    case l_undef: 
+      TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
       throw unknown_exception();
     }
+    UNREACHABLE();
+    throw unknown_exception();
+  }
+
 
     //
     // check if predicate transformer has a satisfiable predecessor state.
