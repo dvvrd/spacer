@@ -364,6 +364,7 @@ void set_profile_params(const std::string &profile)
 
   if (profile == "def")
   {
+    verbose_stream () << "BRUNCH_STAT distprofile def" << "\n";
     Z3_global_param_set("fixedpoint.use_heavy_mev","true");
     Z3_global_param_set("fixedpoint.reset_obligation_queue","false");
     Z3_global_param_set("fixedpoint.pdr.flexible_trace","true");
@@ -372,12 +373,14 @@ void set_profile_params(const std::string &profile)
   }
   else if (profile == "ic3")
   {
+    verbose_stream () << "BRUNCH_STAT distprofile ic3" << "\n";
     Z3_global_param_set("fixedpoint.use_heavy_mev","true");
     Z3_global_param_set("fixedpoint.pdr.flexible_trace","true");
     Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
   }
   else if (profile == "gpdr")
   {
+    verbose_stream () << "BRUNCH_STAT distprofile gpdr" << "\n";
     Z3_global_param_set("fixedpoint.use_heavy_mev","true");
     Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
   }
@@ -397,7 +400,12 @@ void set_profile(std::vector<std::string> profile_vec)
   //the user should have specified either 1 profile, or exactly 
   //number of nodes profiles
   size_t stock_profiles = sizeof(g_profile_names) / sizeof(char const *);
-  if (profile_vec.size() == 1)
+
+  // when parsing command line if profile was not explicitly
+  // specified, it will be set as one "def".  Here we
+  // detect defaults are desired and set available
+  // profiles to the stock profiles
+  if (profile_vec.size() == 1 && gasnet_nodes() > 1)
   {
     SASSERT(profile_vec[0] == "def");
     profile_vec.clear();
