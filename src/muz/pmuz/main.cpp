@@ -546,7 +546,7 @@ int main(int argc, char ** argv) {
         spacer::PMuz pmuz(g_input_file);
         pmuz.init();
         pmuz.createProblem();
-        do { return_value = core_main(repeat,restarts++,&pmuz); } while (repeat);
+        do { return_value = core_main(repeat,restarts++,pmuz); } while (repeat);
 
         verbose_stream () << "BRUNCH_STAT node_restarts " << restarts-1 << "\n";
 
