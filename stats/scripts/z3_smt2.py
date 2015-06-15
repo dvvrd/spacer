@@ -369,6 +369,7 @@ class RunCmd(threading.Thread):
         except Exception as e:
             print 'Error wall watching cmd execution:', e.message
             returncode = 20
+        finally:
 
 
         return returncode
