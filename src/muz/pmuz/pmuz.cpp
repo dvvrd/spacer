@@ -111,9 +111,7 @@ void PMuz::createProblem()
 {
   //-- if using datalog input
   if(inputDatalog) {
-    std::cout << "input file = " << inputFile;
     Z3_ast_vector queries = Z3_fixedpoint_from_file (ctx, fxpt, inputFile.c_str());
-    std::cout << "number of queries = " << Z3_ast_vector_size(ctx, queries) << '\n';
     query = Z3_ast_vector_get(ctx, queries, 0);
   }
   //-- if using HORN format
@@ -124,7 +122,6 @@ void PMuz::createProblem()
     //-- add rules and query
     Z3_app app = Z3_to_app(ctx, asserts);
     int nconjs = Z3_get_app_num_args(ctx, app);
-    std::cout << "number of asserts = " << nconjs << '\n';
 
     //-- register relations
     for (int k = 0; k < nconjs-1; k++) {

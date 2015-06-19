@@ -364,7 +364,7 @@ void set_profile_params(const std::string &profile)
 
   if (profile == "def")
   {
-    verbose_stream () << "BRUNCH_STAT distprofile def" << "\n";
+    //verbose_stream () << "BRUNCH_STAT distprofile def" << "\n";
     Z3_global_param_set("fixedpoint.use_heavy_mev","true");
     Z3_global_param_set("fixedpoint.reset_obligation_queue","false");
     Z3_global_param_set("fixedpoint.pdr.flexible_trace","true");
@@ -373,14 +373,14 @@ void set_profile_params(const std::string &profile)
   }
   else if (profile == "ic3")
   {
-    verbose_stream () << "BRUNCH_STAT distprofile ic3" << "\n";
+    //verbose_stream () << "BRUNCH_STAT distprofile ic3" << "\n";
     Z3_global_param_set("fixedpoint.use_heavy_mev","true");
     Z3_global_param_set("fixedpoint.pdr.flexible_trace","true");
     Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
   }
   else if (profile == "gpdr")
   {
-    verbose_stream () << "BRUNCH_STAT distprofile gpdr" << "\n";
+    //verbose_stream () << "BRUNCH_STAT distprofile gpdr" << "\n";
     Z3_global_param_set("fixedpoint.use_heavy_mev","true");
     Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
   }
@@ -431,9 +431,12 @@ void set_profile(std::vector<std::string> profile_vec)
 
 }
 
-unsigned core_main(bool &repeat, unsigned restarts, spacer::PMuz &pmuz)
+unsigned core_main(bool &repeat, unsigned restarts)
 {
   using namespace spacer;
+  spacer::PMuz pmuz(g_input_file);
+  pmuz.init();
+  pmuz.createProblem();
 
   repeat = false; 
   //-- solve
@@ -506,10 +509,10 @@ std::ostream &get_default_verbose_stream()
 #endif
 }
 
+
 int main(int argc, char ** argv) {
 
     try{
-
 
         unsigned return_value = 0;
         //memory::initialize(0);
@@ -535,7 +538,11 @@ int main(int argc, char ** argv) {
               z3gasnet::get_num_handler_table_entires(),
               gasnet_getMaxLocalSegmentSize(),0));
 
+
+
         z3gasnet::context::set_seginfo_table();
+
+
 
 #endif
 
@@ -551,16 +558,13 @@ int main(int argc, char ** argv) {
 
         bool repeat = false;
         unsigned restarts = 0;
-        spacer::PMuz pmuz(g_input_file);
-        pmuz.init();
-        pmuz.createProblem();
-        do { return_value = core_main(repeat,restarts++,pmuz); } while (repeat);
+        do { return_value = core_main(repeat,restarts++); } while (repeat);
 
         verbose_stream () << "BRUNCH_STAT node_restarts " << restarts-1 << "\n";
 
 #ifdef Z3GASNET
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
-            << "Ready to exit\n";);
+            << "exit\n";);
         /*
         spacer::spacer_wall_stopwatch exittimer;
         exittimer.start();
@@ -575,6 +579,7 @@ int main(int argc, char ** argv) {
 
         */
 
+        Z3GASNET_VERBOSE_STREAM(std::cerr, << " Exit case 1 with " << return_value << "\n");
         gasnet_exit(return_value);
 #endif
 

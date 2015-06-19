@@ -334,13 +334,16 @@ class RunCmd(threading.Thread):
     def run(self):
         def set_limits ():
             import resource as r    
-            if self.cpu > 0:
-                r.setrlimit (r.RLIMIT_CPU, [self.cpu, self.cpu])
+           #In distributed mode, We measure by wall time.  setrlimit is documented
+           #as limiting CPU time
+           #if self.cpu > 0:
+           #    r.setrlimit (r.RLIMIT_CPU, [self.cpu, self.cpu])
+
             if self.mem > 0:
                 mem_bytes = self.mem * 1024 * 1024
                 r.setrlimit (r.RLIMIT_AS, [mem_bytes, mem_bytes])
                 
-        self.p = subprocess.Popen(self.cmd, 
+        self.p = subprocess.Popen(self.cmd,
                 stdout=subprocess.PIPE,
                 preexec_fn=set_limits)
         self.stdout, unused = self.p.communicate()
@@ -349,18 +352,20 @@ class RunCmd(threading.Thread):
         self.start()
 
         if self.cpu > 0:
-            self.join(self.cpu+5)
+            self.join(self.cpu)
         else:
             self.join()
 
         if self.is_alive():
-            print 'z3 is still alive, terminating'
-            self.p.terminate()      
+            print 'z3 has most likely timed out'
+            self.p.terminate()
             self.join(5)
 
         if self.is_alive():
             print 'z3 is still alive after attempt to terminate, sending kill'
             self.p.kill()
+
+        print "exit code is", self.p.returncode
 
         return self.p.returncode
 
