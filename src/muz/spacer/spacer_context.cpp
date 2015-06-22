@@ -2867,17 +2867,25 @@ namespace spacer {
         
         /// create a derivation and populate it with premises
         derivation *deriv = alloc (derivation, n, r, phi1);
-        for (unsigned i = 0; i < preds.size (); ++i)
+        for (unsigned i = 0, sz = preds.size (); i < sz; ++i)
         {
-          pred_transformer &pt = get_pred_transformer (preds [i]);
+          unsigned j; 
+          if (get_params ().order_children () == 1)
+            // -- reverse order
+            j = sz - i - 1;
+          else 
+            // -- default order
+            j = i;
+          
+          pred_transformer &pt = get_pred_transformer (preds [j]);
           
           const ptr_vector<app> *aux = NULL;
           expr_ref sum(m);
           // XXX This is a bit confusing. The summary is returned over
           // XXX o-variables. But it is simpler if it is returned over n-variables instead.
           sum = pt.get_origin_summary (mev, prev_level (n.level ()),
-                                       i, reach_pred_used [i], &aux);
-          deriv->add_premise (pt, i, sum, reach_pred_used [i], aux);
+                                       j, reach_pred_used [j], &aux);
+          deriv->add_premise (pt, j, sum, reach_pred_used [j], aux);
         }
         
         // create post for the first child and add to queue
