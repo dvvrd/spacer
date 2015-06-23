@@ -115,6 +115,7 @@ def parseArgs (argv):
                     default=False)
     p.add_argument ('--engine', help='Datalog Engine (pdr/spacer)', default='spacer')
     p.add_argument ('--verbose', help='Z3 verbosity', default=0)
+    p.add_argument ('--verbose-file', help='path to file where verbose log is written', default=None)
     p.add_argument ('--no-utvpi', dest='no_utvpi', help='do not check for utvpi/diff-logic',
                     action='store_true', default=False)
     p.add_argument ('--lazy-reach-check', dest='lazy_reach_check',
@@ -228,6 +229,9 @@ def compute_z3_args (args):
 
     z3_args += ' -v:' + str(args.verbose)
 
+    if args.verbose_file is not None:
+        z3_args += ' -vo:' + str(args.verbose_file)
+
     if not args.slice:
         print 'No slicing'
         z3_args += ' fixedpoint.xform.slice=false'
@@ -297,6 +301,7 @@ def compute_z3_args (args):
 
     if args.gasnet_spawnfn:
         os.environ['GASNET_SPAWNFN'] = args.gasnet_spawnfn
+        print 'GASNET_SPAWNFN is', os.environ['GASNET_SPAWNFN']
 
     if (args.verify_msgs):
         z3_args += ' fixedpoint.gasnet.verify_msgs=true'
@@ -400,6 +405,9 @@ def main (argv):
     with stats.timer ('Query'):
         returncode = cmd.Run()
     res = cmd.stdout
+    print 'BEGIN SUBPROCESS STDOUT'
+    print res;
+    print 'END SUBPROCESS STDOUT'
 
     if res is None:
         res = 'unknown'

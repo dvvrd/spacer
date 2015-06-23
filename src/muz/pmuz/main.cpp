@@ -30,6 +30,7 @@ Revision History:
 #include"gparams.h"
 #include"env_params.h"
 #include"z3_gasnet.h"
+#include<sstream>
 #ifdef Z3GASNET_PROFILING
 #include"spacer_wall_stopwatch.h"
 #endif
@@ -60,6 +61,7 @@ bool                g_display_statistics  = false;
 bool                g_display_istatistics = false;
 std::string         g_profiles;
 char const *        g_profile_names[] = { "def","gpdr","ic3"};
+std::string         g_verbose_log_base;
 
 void error(const char * msg) {
     std::cerr << "Error: " << msg << "\n";
@@ -99,6 +101,7 @@ void display_usage() {
     std::cout << "  -h, -?      prints this message.\n";
     std::cout << "  -version    prints version number of Z3.\n";
     std::cout << "  -v:level    be verbose, where <level> is the verbosity level.\n";
+    std::cout << "  -vo:path    path to a file where verbose logging will be written\n";
     std::cout << "  -nw         disable warning messages.\n";
     std::cout << "  -p          display Z3 global (and module) parameters.\n";
     std::cout << "  -pd         display Z3 global (and module) parameter descriptions.\n";
@@ -277,6 +280,9 @@ void parse_cmd_line_args(int argc, char ** argv) {
             }
             else if (strcmp(opt_name, "profile") == 0) {
                 g_profiles=!opt_arg ? "def" : opt_arg;
+            }
+            else if (strcmp(opt_name, "vo") == 0) {
+                g_verbose_log_base=!opt_arg?"pmuz_verbose" : opt_arg;
             }
             else {
                 std::cerr << "Error: invalid command line option: " << arg << "\n";
@@ -491,17 +497,37 @@ private:
    null_out_buf buf;
 };
 
+
 std::ostream &get_default_verbose_stream()
 {
 #ifdef Z3GASNET
-  //In local spawning mode, it makes no sense to see mulitple verbose streams from
-  //multiple processes because they are not synchronized
-  //if not the master node 0, then set the null stream as default
-  char *spawnfn = gasnet_getenv("GASNET_SPAWNFN");
-  if (spawnfn && !strncmp("L",spawnfn,1) && gasnet_mynode()) 
+
+  if (!g_verbose_log_base.size())
   {
-    static null_out_stream nullstream;
-    return nullstream;
+      //In local spawning mode, it makes no sense to see mulitple verbose streams from
+      //multiple processes because they are not synchronized
+      //if not the master node 0, then set the null stream as default
+      char *spawnfn = gasnet_getenv("GASNET_SPAWNFN");
+      if (spawnfn && !strncmp("L",spawnfn,1) && gasnet_mynode()) 
+      {
+        static null_out_stream nullstream;
+        return nullstream;
+      }
+  }
+  else
+  {
+      std::vector<std::string> profile_vec;
+      profiles_string_to_vec(profile_vec, g_profiles);
+
+      std::stringstream nodelogfilename;
+      nodelogfilename << g_verbose_log_base << ".node-" 
+          << (int) gasnet_mynode() << ".profile-"
+          << profile_vec[gasnet_mynode()] << ".verbose-"
+          << (int) get_verbosity_level() << ".log";
+
+      static std::ofstream verbose_file_stream(
+              nodelogfilename.str().c_str());
+      return verbose_file_stream;
   }
   return std::cerr;
 #else
@@ -528,9 +554,6 @@ int main(int argc, char ** argv) {
         // the returned state of argc, argv can be used as normal by the the app
         Z3GASNET_CHECKCALL(gasnet_init(&argc, &argv));
 
-        //control verbose output, so we can avoid forked processes outputting
-        //to the same stream
-        set_verbose_stream(get_default_verbose_stream());
 
         // gasnet will block here until all nodes of the job are attached
         Z3GASNET_CHECKCALL(gasnet_attach(
@@ -547,6 +570,11 @@ int main(int argc, char ** argv) {
 #endif
 
         parse_cmd_line_args(argc, argv);
+        
+        //control verbose output, so we can avoid forked processes outputting
+        //to the same stream
+        set_verbose_stream(get_default_verbose_stream());
+
         if (g_profiles.size())
         {
           std::vector<std::string> profile_vec;
