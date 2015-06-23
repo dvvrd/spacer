@@ -21,9 +21,9 @@ profiles = {
     ## inspired by gpdr: no priority queue. 
     'gpdr': ['--use-heavy-mev', '--no-elim-aux'],
 
-    'Oc1def': ['--use-heavy-mev', '--keep-obligations', '--flexible-trace', '--no-elim-aux', '--order-chidlren','1'],
-    'Oc1ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux', '--order-chidlren','1'],
-    'Oc1gpdr': ['--use-heavy-mev', '--no-elim-aux', '--order-chidlren','1'],
+    'Oc1def': ['--use-heavy-mev', '--keep-obligations', '--flexible-trace', '--no-elim-aux', '--order-childern','1'],
+    'Oc1ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux', '--order-childern','1'],
+    'Oc1gpdr': ['--use-heavy-mev', '--no-elim-aux', '--order-childern','1'],
 
 
     ## three nodes in the spacer job each assigned a differnt profile
@@ -36,9 +36,9 @@ profiles = {
     'solodistgpdr': ['--jobsize','1','--distprofile', 'gpdr'],
     'solodistic3': ['--jobsize','1','--distprofile', 'ic3'],
 
-    'solodistOc1def': ['--jobsize','1','--distprofile', 'def', '--order-chidlren','1' ],
-    'solodistOc1gpdr': ['--jobsize','1','--distprofile', 'gpdr', '--order-chidlren','1' ],
-    'solodistOc1ic3': ['--jobsize','1','--distprofile', 'ic3', '--order-chidlren','1' ],
+    'solodistOc1def': ['--jobsize','1','--distprofile', 'def', '--order-childern','1' ],
+    'solodistOc1gpdr': ['--jobsize','1','--distprofile', 'gpdr', '--order-childern','1' ],
+    'solodistOc1ic3': ['--jobsize','1','--distprofile', 'ic3', '--order-childern','1' ],
 
     ## these are just solodist, but in experiments we are changing from the
     ## default 16 cores per machine (1 process per machine) to 5 cores per
@@ -62,7 +62,7 @@ profiles = {
     ## distributed mode CLI, n copies of ic3
     'tridistic3': ['--jobsize','3','--distprofile', 'ic3,ic3,ic3'],
     'octdistic3': ['--jobsize','8','--distprofile', 'ic3,ic3,ic3,ic3,ic3,ic3,ic3,ic3'],
-    'tridistOc1ic3': ['--jobsize','3','--distprofile', 'ic3,ic3,ic3', '--order-chidlren','1'],
+    'tridistOc1ic3': ['--jobsize','3','--distprofile', 'ic3,ic3,ic3', '--order-childern','1'],
 
     ## distributed mode CLI, three copies of gpdr
     'tridistgpdr': ['--jobsize','3','--distprofile', 'gpdr,gpdr,gpdr'],
