@@ -1,5 +1,26 @@
-/*++
-Copyright (c) 2011 Microsoft Corporation
+/** 
+Spacer
+Copyright (c) 2015 Carnegie Mellon University.
+All Rights Reserved.
+
+THIS SOFTWARE IS PROVIDED "AS IS," WITH NO WARRANTIES
+WHATSOEVER. CARNEGIE MELLON UNIVERSITY EXPRESSLY DISCLAIMS TO THE
+FULLEST EXTENT PERMITTEDBY LAW ALL EXPRESS, IMPLIED, AND STATUTORY
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NON-INFRINGEMENT OF PROPRIETARY RIGHTS.
+
+Released under a modified MIT license, please see SPACER_LICENSE.txt
+for full terms.  DM-0002483
+
+Spacer includes and/or makes use of the following Third-Party Software
+subject to its own license:
+
+Z3
+Copyright (c) Microsoft Corporation
+All rights reserved.
+
+Released under the MIT License (LICENSE.txt)
 
 Module Name:
 
@@ -11,16 +32,13 @@ Abstract:
 
 Author:
 
+    Arie Gurfinkel
     Anvesh Komuravelli
 
-Revision History:
-
-    Based on ../pdr/pdr_context.cpp by
-     Nikolaj Bjorner (nbjorner)
+    Based on muz/pdr/pdr_context.cpp by Nikolaj Bjorner (nbjorner)
 
 Notes:
 
-   
 --*/
 
 
@@ -1057,14 +1075,14 @@ namespace spacer {
       
     unsigned tgt_level = next_level(src_level);
     m_pt.ensure_level(next_level(tgt_level));
-    expr_ref_vector& src = m_levels[src_level];
         
 
-    CTRACE("spacer", !src.empty(), 
+    TRACE("spacer", 
            tout << "propagating " << src_level << " to " << tgt_level;
            tout << " for relation " << m_pt.head()->get_name() << "\n";);
                 
-    for (unsigned i = 0; i < src.size(); ) {
+    for (unsigned i = 0; i < m_levels[src_level].size(); ) {
+      expr_ref_vector &src= m_levels[src_level];
       expr * curr = src[i].get();                  
       unsigned stored_lvl;
       VERIFY(m_prop2level.find(curr, stored_lvl));
@@ -1076,8 +1094,11 @@ namespace spacer {
         src.pop_back();
       }
       else if (m_pt.is_invariant(tgt_level, curr, solver_level)) {
+        // -- might invalidate src reference
         add_lemma (curr, solver_level);
         TRACE("spacer", tout << "is invariant: "<< pp_level(solver_level) << " " << mk_pp(curr, m) << "\n";);              
+        // shadow higher-level src
+        expr_ref_vector &src = m_levels[src_level];
         src[i] = src.back();
         src.pop_back();
         ++m_pt.m_stats.m_num_propagations;
@@ -1087,15 +1108,12 @@ namespace spacer {
         ++i;
       }
     }        
-    IF_VERBOSE(3, verbose_stream() << "propagate: " << pp_level(src_level) << "\n";
-               for (unsigned i = 0; i < src.size(); ++i) {
-                 verbose_stream() << mk_pp(src[i].get(), m) << "\n";   
-               });
-    CTRACE ("spacer", src.empty (), 
+
+    CTRACE ("spacer", m_levels[src_level].empty (), 
             tout << "Fully propagated level " 
             << src_level << " of " << m_pt.head ()->get_name () << "\n";);
         
-    return src.empty();
+    return m_levels[src_level].empty();
   }
   
   bool pred_transformer::legacy_frames::add_lemma (expr * lemma, unsigned lvl)
@@ -2359,6 +2377,9 @@ namespace spacer {
     SASSERT (preds.size () == 1);
     pts.push_back (&(get_pred_transformer (preds[0])));
     cex_facts.push_back (m.mk_true ());
+        
+        // XXX a hack to avoid assertion when query predicate is not nullary
+        if (preds[0]->get_arity () == 0)
     cex.push_back (m.mk_const (preds[0]));
 
     // smt context to obtain local cexes
@@ -2534,7 +2555,7 @@ namespace spacer {
                         verbose_stream () << "Deleting closed node: " 
                         << n->pt ().head ()->get_name ()
                         << "(" << n->level () << ", " << n->depth () << ")"
-                        << " " << n << "\n";);
+                        << " " << n->post ()->get_id () << "\n";);
             m_search.pop ();
             if (m_search.is_root (*n)) return true;
             SASSERT (m_search.top ());
@@ -2609,7 +2630,7 @@ namespace spacer {
                 << " (" << n.level () << ", " 
                 << (n.depth () - m_search.min_depth ()) << ") "
                 << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
-                << &n;
+                  << n.post ()->get_id ();
                 verbose_stream().flush ();
                 watch.start (););
       
@@ -2975,17 +2996,25 @@ namespace spacer {
         
     /// create a derivation and populate it with premises
     derivation *deriv = alloc (derivation, n, r, phi1);
-    for (unsigned i = 0; i < preds.size (); ++i)
+        for (unsigned i = 0, sz = preds.size (); i < sz; ++i)
       {
-        pred_transformer &pt = get_pred_transformer (preds [i]);
+          unsigned j; 
+          if (get_params ().order_children () == 1)
+            // -- reverse order
+            j = sz - i - 1;
+          else 
+            // -- default order
+            j = i;
+          
+          pred_transformer &pt = get_pred_transformer (preds [j]);
           
         const ptr_vector<app> *aux = NULL;
         expr_ref sum(m);
         // XXX This is a bit confusing. The summary is returned over
         // XXX o-variables. But it is simpler if it is returned over n-variables instead.
         sum = pt.get_origin_summary (mev, prev_level (n.level ()),
-                                     i, reach_pred_used [i], &aux);
-        deriv->add_premise (pt, i, sum, reach_pred_used [i], aux);
+                                       j, reach_pred_used [j], &aux);
+          deriv->add_premise (pt, j, sum, reach_pred_used [j], aux);
       }
         
     // create post for the first child and add to queue
@@ -3106,4 +3135,55 @@ namespace spacer {
         }
   */
 
+  expr_ref context::get_constraints (unsigned level)
+  {
+    expr_ref res(m);
+    expr_ref_vector constraints(m);
+
+    decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
+    for (; it != end; ++it) {
+      pred_transformer& r = *it->m_value;
+      expr_ref c = r.get_formulas(level, false);
+
+      if (m.is_true(c)) continue;
+
+      // replace local constants by bound variables.
+      expr_ref_vector args(m);
+      for (unsigned i = 0; i < r.sig_size(); ++i) 
+        args.push_back(m.mk_const(m_pm.o2n(r.sig(i), 0)));
+
+      expr_ref pred(m);
+      pred = m.mk_app(r.head (), r.sig_size(), args.c_ptr());
+
+      constraints.push_back(m.mk_implies(pred, c));
+    }
+
+    if (constraints.empty ()) return expr_ref (m.mk_true (), m);
+    return m_pm.mk_and (constraints);
+  }
+  
+  void context::add_constraints (unsigned level, expr_ref c)
+  {
+    if (!c.get ()) return;
+    if (m.is_true (c)) return;
+    
+    expr_ref_vector constraints (m);
+    constraints.push_back (c);
+    qe::flatten_and (constraints);
+    
+    for (unsigned i = 0, sz = constraints.size (); i < sz; ++i)
+    {
+      expr *c = constraints.get (i);
+      expr *e1, *e2;
+      if (m.is_implies (c, e1, e2))
+      {
+        SASSERT (is_app (e1));
+        pred_transformer *r = 0;
+        if (m_rels.find (to_app (e1)->get_decl (), r))
+          r->add_lemma (e2, level);
+      }
+    }
+  }
+  
+  
 }

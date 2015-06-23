@@ -18,7 +18,45 @@ profiles = {
     ## between propagations
     'ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux'],
     ## inspired by gpdr: no priority queue. 
-    'gpdr': ['--use-heavy-mev', '--no-elim-aux']
+    'gpdr': ['--use-heavy-mev', '--no-elim-aux'],
+    ## options used for cav'15 paper
+    'cav15': ['--use-heavy-mev', '--keep-obligations',
+              '--flexible-trace'],
+	
+    ## three nodes in the spacer job each assigned a differnt profile
+    'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
+    'trifectar1k': ['--jobsize','3','--distprofile', 'def,ic3,gpdr', '--restart', '1000'],
+    
+    ## use distributed mode CLI, but not running distributed, use just one node
+    'solodistdef': ['--jobsize','1','--distprofile', 'def'],
+    'solodistgpdr': ['--jobsize','1','--distprofile', 'gpdr'],
+    'solodistic3': ['--jobsize','1','--distprofile', 'ic3'],
+
+    ## these are just solodist, but in experiments we are changing from the
+    ## default 16 cores per machine (1 process per machine) to 5 cores per
+    ## machine, this should match the distributed profiles that fork 3 jobs
+    ##  we give differnt profile names so runs can be differntiated
+    'solodist5cpudef': ['--jobsize','1','--distprofile', 'def'],
+    'solodist5cpugpdr': ['--jobsize','1','--distprofile', 'gpdr'],
+    'solodist5cpuic3': ['--jobsize','1','--distprofile', 'ic3'],
+
+    # solo distributed variants with restarts 
+    'solodistdefr1k': ['--jobsize','1','--distprofile', 'def', '--restart','1000'],
+    'solodistgpdr1k': ['--jobsize','1','--distprofile', 'gpdr', '--restart','1000'],
+    'solodistic3r1k': ['--jobsize','1','--distprofile', 'ic3', '--restart','1000'],
+
+    ## distributed mode CLI, but running two copies of def
+    'dualdistdef': ['--jobsize','2','--distprofile', 'def,def'],
+
+    ## distributed mode CLI, but running two copies of def
+    'tridistdef': ['--jobsize','3','--distprofile', 'def,def,def'],
+
+    ## distributed mode CLI, n copies of ic3
+    'tridistic3': ['--jobsize','3','--distprofile', 'ic3,ic3,ic3'],
+    'octdistic3': ['--jobsize','8','--distprofile', 'ic3,ic3,ic3,ic3,ic3,ic3,ic3,ic3'],
+
+    ## distributed mode CLI, three copies of gpdr
+    'tridistgpdr': ['--jobsize','3','--distprofile', 'gpdr,gpdr,gpdr']
 }
 
 def parseArgs (argv):
@@ -94,6 +132,16 @@ def parseArgs (argv):
                     action='store', help='CPU time limit (seconds)', default=-1)
     p.add_argument ('--mem', dest='mem', type=int,
                     action='store', help='MEM limit (MB)', default=-1)   
+    p.add_argument ('--jobsize', dest='jobsize', type=int,
+                    action='store', help='number of nodes in GASNet job', default=-1)   
+    p.add_argument ('--distprofile', dest='distprofile',
+                    action='store', help='distribution profile for spacer', default=None)
+    p.add_argument ('--gasnet-spawnfn', dest='gasnet_spawnfn',
+                    action='store', help='GASNet spawning mode, used for launching job on UDP conduit', default='L')
+    p.add_argument ('--verify-msgs', dest='verify_msgs',
+                    action='store_true', help='Compute hashes and send reciept confirmation for all messages', default=False)
+    p.add_argument ('--restart', dest='restart', type=int, default=-1,
+                    action='store', help='restart z3 nodes after performing given ammount of work budget, or -1 to disable restarts')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -135,6 +183,9 @@ def which(program):
 def compute_z3_args (args):
     z3_args = which ('z3')
 
+    if args.jobsize != -1:
+        z3_args += ' %d' % int(args.jobsize)
+
     if z3_args is None:
         print 'No executable named "z3" found in current directory or PATH'
         return
@@ -171,7 +222,7 @@ def compute_z3_args (args):
         z3_args += ' fixedpoint.validate_theory_core=true'
 
     if args.print_stats:
-        z3_args += ' fixedpoint.print.statistics=true'
+        z3_args += ' fixedpoint.print_statistics=true'
 
     if args.dfs:
         z3_args += ' fixedpoint.pdr.bfs_model_search=false'
@@ -204,6 +255,20 @@ def compute_z3_args (args):
         z3_args += ' fixedpoint.spacer.elim_aux=true' 
     else:
         z3_args += ' fixedpoint.spacer.elim_aux=false'
+
+    if args.distprofile:
+        z3_args += ' -profile:%s' % args.distprofile
+
+    if args.gasnet_spawnfn:
+        os.environ['GASNET_SPAWNFN'] = args.gasnet_spawnfn
+
+    if (args.verify_msgs):
+        z3_args += ' fixedpoint.gasnet.verify_msgs=true'
+
+    if args.restart > -1:
+        z3_args += ' fixedpoint.pmuz.node_work_budget=%d' % args.restart
+        z3_args += ' fixedpoint.pmuz.node_restarts=true'
+
         
     z3_args += ' ' + args.file
 
@@ -245,23 +310,32 @@ class RunCmd(threading.Thread):
         self.stdout, unused = self.p.communicate()
 
     def Run(self):
-        self.start()
+        returncode=19
 
-        if self.cpu > 0:
-            self.join(self.cpu+5)
-        else:
-            self.join()
+        try:
+            self.start()
 
-        if self.is_alive():
-            print 'z3 is still alive, terminating'
-            self.p.terminate()      
-            self.join(5)
+            if self.cpu > 0:
+                self.join(self.cpu+5)
+            else:
+                self.join()
 
-        if self.is_alive():
-            print 'z3 is still alive after attempt to terminate, sending kill'
-            self.p.kill()
+            if self.is_alive():
+                print 'z3 is still alive, terminating'
+                self.p.terminate()
+                self.join(5)
 
-        return self.p.returncode
+            if self.is_alive():
+                print 'z3 is still alive after attempt to terminate, sending kill'
+                self.p.kill()
+            returncode = self.p.returncode
+
+        except Exception as e:
+            print 'Error wall watching cmd execution:', e.message
+            returncode = 20
+
+
+        return returncode
 
 
 def main (argv):

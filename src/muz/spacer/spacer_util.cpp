@@ -1188,6 +1188,16 @@ namespace spacer {
                 }
               );
 
+        {
+          // Ensure that top-level AND of fml is flat
+          expr_ref_vector flat(m);
+          qe::flatten_and (fml, flat);
+          if (flat.size () == 1)
+            fml = flat.get (0);
+          else if (flat.size () > 1)
+            fml = m.mk_and (flat.size (), flat.c_ptr ());
+        }
+        
         app_ref_vector arith_vars (m);
         app_ref_vector array_vars (m);
         array_util arr_u (m);
