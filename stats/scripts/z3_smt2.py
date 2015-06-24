@@ -66,7 +66,7 @@ profiles = {
 
     'tridistOc1ic3': ['--jobsize','3','--distprofile', 'Oc1ic3,Oc1ic3,Oc1ic3'],
 
-    'hexOc1fecta': ['--jobsize','6','--distprofile','def,ic3,gpdr,Oc1def,Oc1ic3,Oc1gpdr'],
+    'hexfecta': ['--jobsize','6','--distprofile','def,ic3,gpdr,Oc1def,Oc1ic3,Oc1gpdr'],
 
     'octdistic3': ['--jobsize','8','--distprofile', 'ic3,ic3,ic3,ic3,ic3,ic3,ic3,ic3'], 
 

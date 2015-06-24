@@ -412,7 +412,6 @@ void set_profile_params(const std::string &profile)
 
   if (string_contains(profile,"Oc1"))
   {
-    std::cout <<" ########## setting ordered childs\n" << std::endl;
     Z3_global_param_set("fixedpoint.order_children","1");
   }
 
@@ -472,7 +471,7 @@ unsigned core_main(bool &repeat, unsigned restarts)
 
   std::stringstream msg;
   msg << "BRUNCH_STAT node_restarts " << restarts-1 << "\n";
-  verbose_stream() << msg.str();
+  verbose_stream() << msg.str(); verbose_stream().flush();
 
   unsigned budget = 1;
   SASSERT( restarts >= 0 );
@@ -577,13 +576,19 @@ std::ostream &get_default_verbose_stream()
 #endif
 }
 
-#ifdef Z3GASNET
 
 void print_exit_message(std::string exitcase, int exitcode)
 {
     std::stringstream exitmsg;
+
+#ifdef Z3GASNET
     Z3GASNET_VERBOSE_STREAM(exitmsg, << " Exit case " << exitcase << " with code: " << exitcode << "\n");
+
     std::cout << exitmsg.str();
+#else
+    exitmsg << " Exit case " << exitcase << " with code: " << exitcode << "\n");
+#endif
+
     std::cerr << exitmsg.str();
 }
 
@@ -595,9 +600,12 @@ void stop_main_timer()
     std::stringstream maintimerstat;
     maintimerstat << "BRUNCH_STAT main_time "
         << maintimer.get_seconds() << "\n";
-    verbose_stream() << maintimerstat.str();
+    verbose_stream() << maintimerstat.str(); verbose_stream().flush();
 
 }
+
+#ifdef Z3GASNET
+
 //chained signal hanlder code stolen from
 //http://stackoverflow.com/questions/17102919/it-is-valid-to-have-multiple-signal-handlers-for-same-signal
 
@@ -737,7 +745,6 @@ int main(int argc, char ** argv) {
 
         print_exit_message("END_OF_MAIN",return_value);
 
-        gasnet_exit(return_value);
 #endif
     }
     catch (z3_exception & ex) {
@@ -748,19 +755,22 @@ int main(int argc, char ** argv) {
             return_value = ex.error_code();
 #ifdef Z3GASNET
             print_exit_message("Z3_EXCEPTION_WITH_EC",return_value);
-            gasnet_exit(return_value);
 #endif
         }
         else {
             return_value = ERR_INTERNAL_FATAL;
 #ifdef Z3GASNET
             print_exit_message("Z3_EXCEPTION",return_value);
-            gasnet_exit(return_value);
 #endif
         }
     }
 
     stop_main_timer();
+
+#ifdef Z3GASNET
+    gasnet_exit(return_value);
+    Z3GASNET_VERBOSE_STREAM( std::cout, << "Never shall you see this!!!!!!!!!!!!!!!\n");
+#endif
 
     return return_value;
 }
