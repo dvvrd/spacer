@@ -31,8 +31,10 @@ Revision History:
 #include"env_params.h"
 #include"z3_gasnet.h"
 #include<sstream>
-#ifdef Z3GASNET_PROFILING
+#ifdef Z3GASNET
 #include"spacer_wall_stopwatch.h"
+#else
+#include"stopwatch.h"
 #endif
 #include<vector>
 
@@ -586,13 +588,17 @@ void print_exit_message(std::string exitcase, int exitcode)
 
     std::cout << exitmsg.str();
 #else
-    exitmsg << " Exit case " << exitcase << " with code: " << exitcode << "\n");
+    exitmsg << " Exit case " << exitcase << " with code: " << exitcode << "\n";
 #endif
 
     std::cerr << exitmsg.str();
 }
 
+#ifdef Z3GASNET
 spacer::spacer_wall_stopwatch maintimer;
+#else
+stopwatch maintimer;
+#endif
 
 void stop_main_timer()
 {
