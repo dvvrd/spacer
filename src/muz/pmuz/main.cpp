@@ -31,17 +31,20 @@ Revision History:
 #include"env_params.h"
 #include"z3_gasnet.h"
 #include<sstream>
-#include<signal.h>
-#ifdef Z3GASNET_PROFILING
-#include"spacer_wall_stopwatch.h"
-#endif
 #include<vector>
+
+#ifdef Z3GASNET
+#include"spacer_wall_stopwatch.h"
+#else
+#include"stopwatch.h"
+#endif
 
 #ifdef Z3GASNET
 //Have to include in main  here for access to message handlers
 #include "spacer_context.h"
 #include <iostream>
 #include <ostream>
+#include <signal.h>
 #endif
 
 extern "C" {
@@ -587,13 +590,17 @@ void print_exit_message(std::string exitcase, int exitcode)
 
     std::cout << exitmsg.str();
 #else
-    exitmsg << " Exit case " << exitcase << " with code: " << exitcode << "\n");
+    exitmsg << " Exit case " << exitcase << " with code: " << exitcode << "\n";
 #endif
 
     std::cerr << exitmsg.str();
 }
 
+#ifdef Z3GASNET
 spacer::spacer_wall_stopwatch maintimer;
+#else
+stopwatch maintimer;
+#endif
 
 void stop_main_timer()
 {
