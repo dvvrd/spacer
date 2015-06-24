@@ -55,6 +55,7 @@ DM-XXXXXXX
 #ifdef Z3GASNET
 #pragma GCC system_header //disable some warnings
 #include<gasnet.h>
+#include<gasnet_tools.h>
 #include"lbool.h"
 #include"z3_exception.h"
 #include<ostream>

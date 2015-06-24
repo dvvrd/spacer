@@ -447,6 +447,11 @@ unsigned core_main(bool &repeat, unsigned restarts)
   repeat = false; 
   //-- solve
 #ifdef Z3GASNET
+
+  std::stringstream msg;
+  msg << "BRUNCH_STAT node_restarts " << restarts-1 << "\n";
+  verbose_stream() << msg.str();
+
   unsigned budget = 1;
   SASSERT( restarts >= 0 );
   while(restarts--) budget *= 2;
@@ -454,6 +459,7 @@ unsigned core_main(bool &repeat, unsigned restarts)
   STRACE("gas", Z3GASNET_TRACE_PREFIX 
       << "Setting global budget to: " << budget << "\n";);
 #endif
+
   Z3_lbool solution = pmuz.solve();
   if (solution == Z3_L_TRUE)
   {
@@ -531,16 +537,114 @@ std::ostream &get_default_verbose_stream()
   }
   return std::cerr;
 #else
-  return std::cerr;
+  if (!g_verbose_log_base.size())
+  {
+    return std::cerr;
+  }
+  else
+  {
+      std::stringstream nodelogfilename;
+      nodelogfilename << g_verbose_log_base
+          << ".verbose-" << (int) get_verbosity_level() 
+          << ".log";
+
+      static std::ofstream verbose_file_stream(
+              nodelogfilename.str().c_str());
+      return verbose_file_stream;
+  }
 #endif
 }
 
+#ifdef Z3GASNET
+
+void print_exit_message(std::string exitcase, int exitcode)
+{
+    std::stringstream exitmsg;
+    Z3GASNET_VERBOSE_STREAM(exitmsg, << " Exit case " << exitcase << " with code: " << exitcode << "\n");
+    std::cout << exitmsg.str();
+    std::cerr << exitmsg.str();
+}
+
+spacer::spacer_wall_stopwatch maintimer;
+
+void stop_main_timer()
+{
+    maintimer.stop();
+    std::stringstream maintimerstat;
+    maintimerstat << "BRUNCH_STAT main_time "
+        << maintimer.get_seconds() << "\n";
+    verbose_stream() << maintimerstat.str();
+
+}
+//chained signal hanlder code stolen from
+//http://stackoverflow.com/questions/17102919/it-is-valid-to-have-multiple-signal-handlers-for-same-signal
+
+typedef struct sigaction sigaction_t;
+
+static void (*gasnet_sigquit_handler)(int) = NULL;
+
+static void pmuz_sigquit_handler(int signum)
+{
+    //gasnet does provide a default sigquit handler, see gasnet_internal.c
+    //the default sigquit handler just calls gasnet_exit(1) in case the user
+    //did not set a quit hanlder.  So even though we went through the trouble
+    //of getting a pointer to the old hanlder, we won't call it
+    if (gasnet_sigquit_handler){
+        //gasnet_sigquit_handler(signum);
+    }
+    print_exit_message("SIGQUIT_HANDLER",123);
+    stop_main_timer();
+    gasnet_exit(123);
+}
+
+//custom handler is for testing use kill -50 to trigger it
+static void (*gasnet_sigcustom_handler)(int) = NULL;
+
+static void pmuz_sigcustom_handler(int signum)
+{
+    Z3GASNET_VERBOSE_STREAM( std::cout, << "Got custom signal " << signum << "\n");
+    gasnett_print_backtrace_ifenabled(0);
+    if (gasnet_sigcustom_handler) gasnet_sigcustom_handler(signum);
+}
+
+void set_signal_handlers()
+{
+    // in general, we don't want to overwrite any signal handlers gasnet uses
+    // in the case of SIGQUIT, we could because it is designed to be set by
+    // the user to do application shutdown in the case that some node in the
+    // job has called gasnet_exit
+    
+    sigaction_t gasnet_handler;
+    sigaction(SIGQUIT, NULL, &gasnet_handler);
+    gasnet_sigquit_handler = gasnet_handler.sa_handler;
+    sigaction_t pmuz_handler;
+    memset(&pmuz_handler, 0, sizeof(pmuz_handler));
+    pmuz_handler.sa_handler = pmuz_sigquit_handler;
+    sigemptyset(&pmuz_handler.sa_mask);
+    sigaction(SIGQUIT, &pmuz_handler, NULL);
+
+
+    //randomly chose signal 50 for use for testing, this should be 
+    //removed after constuction is complete
+
+#define SIGCUSTOM 50
+    sigaction(SIGCUSTOM, NULL, &gasnet_handler);
+    gasnet_sigcustom_handler = gasnet_handler.sa_handler;
+    memset(&pmuz_handler, 0, sizeof(pmuz_handler));
+    pmuz_handler.sa_handler = pmuz_sigcustom_handler;
+    sigemptyset(&pmuz_handler.sa_mask);
+    sigaction(SIGCUSTOM, &pmuz_handler, NULL);
+}
+
+#endif
+
 
 int main(int argc, char ** argv) {
+    unsigned return_value = 19;
 
     try{
+        maintimer.start();
 
-        unsigned return_value = 0;
         //memory::initialize(0);
         //memory::exit_when_out_of_memory(true, "ERROR: out of memory");
 
@@ -561,7 +665,7 @@ int main(int argc, char ** argv) {
               z3gasnet::get_num_handler_table_entires(),
               gasnet_getMaxLocalSegmentSize(),0));
 
-
+        set_signal_handlers();
 
         z3gasnet::context::set_seginfo_table();
 
@@ -588,7 +692,6 @@ int main(int argc, char ** argv) {
         unsigned restarts = 0;
         do { return_value = core_main(repeat,restarts++); } while (repeat);
 
-        verbose_stream () << "BRUNCH_STAT node_restarts " << restarts-1 << "\n";
 
 #ifdef Z3GASNET
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
@@ -607,24 +710,36 @@ int main(int argc, char ** argv) {
 
         */
 
-        Z3GASNET_VERBOSE_STREAM(std::cerr, << " Exit case 1 with " << return_value << "\n");
+        //use a temporary string stream to assemble the message, this helps prevent
+        //interleaved stdout/stderr on forked processes
+
+        print_exit_message("END_OF_MAIN",return_value);
+
         gasnet_exit(return_value);
 #endif
-
-        return return_value;
     }
     catch (z3_exception & ex) {
         // unhandled exception
 
         std::cerr << "ERROR: " << ex.msg() << "\n";
         if (ex.has_error_code()) {
-            Z3GASNET_CALL(gasnet_exit(ex.error_code()));
-            return ex.error_code();
+            return_value = ex.error_code();
+#ifdef Z3GASNET
+            print_exit_message("Z3_EXCEPTION_WITH_EC",return_value);
+            gasnet_exit(return_value);
+#endif
         }
         else {
-            Z3GASNET_CALL(gasnet_exit(ERR_INTERNAL_FATAL));
-            return ERR_INTERNAL_FATAL;
+            return_value = ERR_INTERNAL_FATAL;
+#ifdef Z3GASNET
+            print_exit_message("Z3_EXCEPTION",return_value);
+            gasnet_exit(return_value);
+#endif
         }
     }
+
+    stop_main_timer();
+
+    return return_value;
 }
 
