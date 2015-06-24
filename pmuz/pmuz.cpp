@@ -161,6 +161,7 @@ namespace pmuz
     void init()
     {
       //-- set parameters
+      Z3_global_param_set("proof", "true");
       Z3_global_param_set("fixedpoint.engine", "spacer");
       BOOST_FOREACH(const OptVal &ov, z3Opts)
         Z3_global_param_set(ov.first.c_str(), ov.second.c_str());
