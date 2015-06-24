@@ -31,6 +31,7 @@ Revision History:
 #include"env_params.h"
 #include"z3_gasnet.h"
 #include<sstream>
+#include<signal.h>
 #ifdef Z3GASNET_PROFILING
 #include"spacer_wall_stopwatch.h"
 #endif
