@@ -357,7 +357,7 @@ class RunCmd(threading.Thread):
             returncode = self.p.returncode
 
         except Exception as e:
-            print 'Error wall watching cmd execution:', e.message
+            print 'Error when watching cmd execution:', e.message
             returncode = 20
 
         print "exit code is", self.p.returncode

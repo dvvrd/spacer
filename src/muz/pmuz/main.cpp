@@ -470,7 +470,7 @@ unsigned core_main(bool &repeat, unsigned restarts)
 #ifdef Z3GASNET
 
   std::stringstream msg;
-  msg << "BRUNCH_STAT node_restarts " << restarts-1 << "\n";
+  msg << "BRUNCH_STAT node_restarts " << (int)(restarts-1) << "\n";
   verbose_stream() << msg.str(); verbose_stream().flush();
 
   unsigned budget = 1;
@@ -584,12 +584,12 @@ void print_exit_message(std::string exitcase, int exitcode)
 #ifdef Z3GASNET
     Z3GASNET_VERBOSE_STREAM(exitmsg, << " Exit case " << exitcase << " with code: " << exitcode << "\n");
 
-    std::cout << exitmsg.str();
+    std::cout << exitmsg.str(); std::cout.flush();
 #else
     exitmsg << " Exit case " << exitcase << " with code: " << exitcode << "\n");
 #endif
 
-    std::cerr << exitmsg.str();
+    std::cerr << exitmsg.str(); std::cerr.flush();
 }
 
 spacer::spacer_wall_stopwatch maintimer;
