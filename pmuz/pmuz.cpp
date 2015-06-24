@@ -255,7 +255,7 @@ namespace pmuz
         //-- if problem already solved when preparing
         if (res == Z3_L_FALSE) {
           std::cout << "problem solved by simplification ...\n";
-          std::cout << "VERIFICATION FAILED\n";
+          std::cout << "VERIFICATION SUCCESSFUL\n";
         } else {
           //-- initialize search
           assert(Z3_fixedpoint_init_root(ctx, fxpt) == Z3_L_TRUE);
