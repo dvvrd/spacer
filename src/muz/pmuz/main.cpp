@@ -60,7 +60,7 @@ input_kind          g_input_kind          = IN_UNSPECIFIED;
 bool                g_display_statistics  = false;
 bool                g_display_istatistics = false;
 std::string         g_profiles;
-char const *        g_profile_names[] = { "def","gpdr","ic3"};
+char const *        g_profile_names[] = { "def","gpdr","ic3", "Oc1def", "Oc1gpdr", "Oc1ic3" };
 std::string         g_verbose_log_base;
 
 void error(const char * msg) {
@@ -348,6 +348,19 @@ void profiles_string_to_vec(
   }
 }
 
+//stollen from
+//http://stackoverflow.com/questions/874134/find-if-string-endswith-another-string-in-c
+inline bool string_ends_with(std::string const & value, std::string const & ending)
+{
+    if (ending.size() > value.size()) return false;
+    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
+}
+
+inline bool string_contains(std::string const & value, std::string const & substring)
+{
+    return value.find(substring) != std::string::npos;
+}
+
 void set_profile_params(const std::string &profile)
 {
 #ifdef Z3GASNET
@@ -368,7 +381,7 @@ void set_profile_params(const std::string &profile)
       ;);
 #endif
 
-  if (profile == "def")
+  if (string_ends_with(profile,"def"))
   {
     //verbose_stream () << "BRUNCH_STAT distprofile def" << "\n";
     Z3_global_param_set("fixedpoint.use_heavy_mev","true");
@@ -377,14 +390,14 @@ void set_profile_params(const std::string &profile)
     Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
     
   }
-  else if (profile == "ic3")
+  else if (string_ends_with(profile,"ic3"))
   {
     //verbose_stream () << "BRUNCH_STAT distprofile ic3" << "\n";
     Z3_global_param_set("fixedpoint.use_heavy_mev","true");
     Z3_global_param_set("fixedpoint.pdr.flexible_trace","true");
     Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
   }
-  else if (profile == "gpdr")
+  else if (string_ends_with(profile,"gpdr"))
   {
     //verbose_stream () << "BRUNCH_STAT distprofile gpdr" << "\n";
     Z3_global_param_set("fixedpoint.use_heavy_mev","true");
@@ -395,6 +408,15 @@ void set_profile_params(const std::string &profile)
     std::cerr << "Unrecognized profile: " << profile << std::endl;
     throw z3_error(ERR_CMD_LINE);
   }
+
+
+  if (string_contains(profile,"Oc1"))
+  {
+    std::cout <<" ########## setting ordered childs\n" << std::endl;
+    Z3_global_param_set("fixedpoint.order_children","1");
+  }
+
+
 }
 
 void set_profile(std::vector<std::string> profile_vec)

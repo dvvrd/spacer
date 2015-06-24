@@ -26,19 +26,15 @@ profiles = {
     'Oc1gpdr': ['--use-heavy-mev', '--no-elim-aux', '--order-childern','1'],
 
 
-    ## three nodes in the spacer job each assigned a differnt profile
-    'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
-    'triOc1fecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
-    'trifectar1k': ['--jobsize','3','--distprofile', 'def,ic3,gpdr', '--restart', '1000'],
     
     ## use distributed mode CLI, but not running distributed, use just one node
     'solodistdef': ['--jobsize','1','--distprofile', 'def'],
     'solodistgpdr': ['--jobsize','1','--distprofile', 'gpdr'],
     'solodistic3': ['--jobsize','1','--distprofile', 'ic3'],
 
-    'solodistOc1def': ['--jobsize','1','--distprofile', 'def', '--order-childern','1' ],
-    'solodistOc1gpdr': ['--jobsize','1','--distprofile', 'gpdr', '--order-childern','1' ],
-    'solodistOc1ic3': ['--jobsize','1','--distprofile', 'ic3', '--order-childern','1' ],
+    'solodistOc1def': ['--jobsize','1','--distprofile', 'Oc1def'],
+    'solodistOc1gpdr': ['--jobsize','1','--distprofile', 'Oc1gpdr'],
+    'solodistOc1ic3': ['--jobsize','1','--distprofile', 'Oc1ic3'],
 
     ## these are just solodist, but in experiments we are changing from the
     ## default 16 cores per machine (1 process per machine) to 5 cores per
@@ -56,16 +52,23 @@ profiles = {
     ## distributed mode CLI, but running two copies of def
     'dualdistdef': ['--jobsize','2','--distprofile', 'def,def'],
 
+    ## three nodes in the spacer job each assigned a differnt profile
+    'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
+    'triOc1fecta': ['--jobsize','3','--distprofile', 'Oc1def,Oc1ic3,Oc1gpdr'],
+    'trifectar1k': ['--jobsize','3','--distprofile', 'def,ic3,gpdr', '--restart', '1000'],
+
     ## distributed mode CLI, but running two copies of def
     'tridistdef': ['--jobsize','3','--distprofile', 'def,def,def'],
-
     ## distributed mode CLI, n copies of ic3
     'tridistic3': ['--jobsize','3','--distprofile', 'ic3,ic3,ic3'],
-    'octdistic3': ['--jobsize','8','--distprofile', 'ic3,ic3,ic3,ic3,ic3,ic3,ic3,ic3'],
-    'tridistOc1ic3': ['--jobsize','3','--distprofile', 'ic3,ic3,ic3', '--order-childern','1'],
-
     ## distributed mode CLI, three copies of gpdr
     'tridistgpdr': ['--jobsize','3','--distprofile', 'gpdr,gpdr,gpdr'],
+
+    'tridistOc1ic3': ['--jobsize','3','--distprofile', 'Oc1ic3,Oc1ic3,Oc1ic3'],
+
+    'hexOc1fecta': ['--jobsize','6','--distprofile','def,ic3,gpdr,Oc1def,Oc1ic3,Oc1gpdr'],
+
+    'octdistic3': ['--jobsize','8','--distprofile', 'ic3,ic3,ic3,ic3,ic3,ic3,ic3,ic3'], 
 
     ## options used for cav'15 paper
     'cav15': ['--use-heavy-mev', '--keep-obligations',
