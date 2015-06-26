@@ -8,6 +8,7 @@ import threading
 import itertools
 import hashlib
 import pprint
+import random
 
 profiles = {
     ## skip propagation but drive the search as deep as possible
@@ -193,6 +194,8 @@ def parseArgs (argv):
     global profiles
     nargv = []
     in_p = False
+    in_rp = False
+
     for s in argv:
         if in_p:
             if s not in profiles:
@@ -200,8 +203,17 @@ def parseArgs (argv):
             stat('profile', s)
             nargv.extend (profiles[s])
             in_p = False
+        elif in_rp:
+            jobsize = int(s)
+            subset = [ x for x in profiles.keys() if x.startswith(s+'distcombo') ]
+            s = random.choice(subset)
+            stat('profile', s)
+            nargv.extend(profiles[s])
+            in_rp = False
         elif s == '-p': 
             in_p = True
+        elif s == '-rp':
+            in_rp = True
         else: nargv.append (s)
         
     if in_p: 
