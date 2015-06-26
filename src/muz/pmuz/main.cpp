@@ -53,6 +53,7 @@ extern "C" {
 
 #include "pmuz.h"
 #include "pmuz_globals.h"
+#include <algorithm>
 
 
 typedef enum { IN_UNSPECIFIED, IN_SMTLIB, IN_SMTLIB_2, IN_DATALOG, IN_DIMACS, IN_WCNF, IN_OPB, IN_Z3_LOG } input_kind;
@@ -64,8 +65,56 @@ input_kind          g_input_kind          = IN_UNSPECIFIED;
 bool                g_display_statistics  = false;
 bool                g_display_istatistics = false;
 std::string         g_profiles;
-char const *        g_profile_names[] = { "def","gpdr","ic3", "Oc1def", "Oc1gpdr", "Oc1ic3" };
+std::vector<std::string>  g_profile_names; 
 std::string         g_verbose_log_base;
+
+void get_combinations(std::vector<std::vector<size_t> > &combs, size_t n, size_t r)
+{
+   combs.clear();
+   std::vector<bool> v(n);
+   std::fill(v.begin() + r, v.end(), true);
+   do {
+       combs.resize(combs.size()+1);
+       std::vector<size_t> &curcomb = combs.back();
+
+       for (size_t i = 0; i < n; ++i) {
+           if (!v[i]) {
+               curcomb.push_back(i);
+           }
+       }
+   } while (std::next_permutation(v.begin(), v.end()));
+}
+
+void set_profile_names()
+{
+    if (g_profile_names.size()) return;
+
+    const char *profile_base[] = { "def","ic3","gpdr"};
+    const char *profile_tweak[] = { "Oc1","Eat"};
+
+    size_t base_cnt = sizeof(profile_base) / sizeof(char const *);
+    size_t tweak_cnt = sizeof(profile_tweak) / sizeof(char const *);
+
+    for (size_t t1 = 0; t1 <= tweak_cnt; t1++)
+    {
+        std::vector<std::vector<size_t> > combi;
+        get_combinations(combi,tweak_cnt,t1);
+
+        for (size_t c = 0; c < combi.size(); c++)
+        {
+            for (size_t b = 0; b < base_cnt; b++)
+            {
+                std::stringstream profile_name;
+                for (size_t i = 0; i < combi[c].size(); i++)
+                {
+                    profile_name << profile_tweak[combi[c][i]];
+                }
+                profile_name << profile_base[b];
+                g_profile_names.push_back(profile_name.str());
+            }
+        }
+    }
+}
 
 void error(const char * msg) {
     std::cerr << "Error: " << msg << "\n";
@@ -112,11 +161,26 @@ void display_usage() {
     std::cout << "  -pm:name    display Z3 module ('name') parameters.\n";
     std::cout << "  -pp:name    display Z3 parameter description, if 'name' is not provided, then all module names are listed.\n";
 #ifdef Z3GASNET
-    std::cout << "  -profile:name0,name1,...    set predefined profiles of Z3 parameters.  If name list is provided its size should be N.  If no profile names are provided, a predefined set of profiles will be used.\n";
+    std::cout << "  -profile:name0,name1,...    set predefined profiles of Z3 parameters.  If name list is provided its size\n";
+    std::cout << "                              should be N.  If no profile names are provided, a predefined set of profiles\n";
+    std::cout << "                              will be used.\n";
 #else
-    std::cout << "  -profile:name   set predefined profiles of Z3 parameters, if name is not provided 'def' will be used.\n";
+    std::cout << "  -profile:name               set predefined profiles of Z3 parameters, if name is not provided 'def' is used.\n";
 #endif
-    std::cout << "  --"      << "          all remaining arguments are assumed to be part of the input file name. This option allows Z3 to read files with strange names such as: -foo.smt2.\n";
+    std::cout << "              The following are valid profile names:\n";
+    std::cout << "              ";
+
+    set_profile_names();
+    for (size_t i = 0; i < g_profile_names.size(); i++)
+    {
+        std::cout << g_profile_names[i];
+        if (i < g_profile_names.size() -1) std::cout << ",";
+    }
+    std::cout << "\n";
+
+    std::cout << "  --          all remaining arguments are assumed to be part of the input file name. This option allows Z3\n";
+    std::cout << "              to read files with strange names such as: -foo.smt2.\n";
+
     std::cout << "\nResources:\n";
     // timeout and memout are now available on Linux and OSX too.
     std::cout << "  -T:timeout  set the timeout (in seconds).\n";
@@ -331,6 +395,9 @@ void profiles_string_to_vec(
     const std::string  &profiles_str)
 {
   
+  std::stringstream msg;
+  std::cout << msg.str();
+
   using namespace std;
 
   profile_vec.clear();
@@ -350,6 +417,17 @@ void profiles_string_to_vec(
       start = (   ( end > (string::npos - delim.size()) )
                 ?  string::npos  :  end + delim.size());
   }
+
+#ifdef Z3GASNET
+  // handle case where user specified a default profile, which really means
+  // use all of them
+  if (profile_vec.size() == 1 && gasnet_nodes() > 1 && profile_vec[0]=="def")
+  {
+      set_profile_names();
+      profile_vec = g_profile_names;
+  }
+#endif
+
 }
 
 //stollen from
@@ -365,6 +443,17 @@ inline bool string_contains(std::string const & value, std::string const & subst
     return value.find(substring) != std::string::npos;
 }
 
+void set_profile_param(const std::string &profile, const std::string &alias,
+        const std::string &param_name, const std::string &param_value)
+{
+        
+    IF_VERBOSE (1, verbose_stream () << "Setting " << profile
+            << ":" << alias << ":" << param_name
+            << "=" << param_value <<"\n" ;);
+
+    Z3_global_param_set(param_name.c_str(), param_value.c_str());
+
+}
 void set_profile_params(const std::string &profile)
 {
 #ifdef Z3GASNET
@@ -388,24 +477,24 @@ void set_profile_params(const std::string &profile)
   if (string_ends_with(profile,"def"))
   {
     //verbose_stream () << "BRUNCH_STAT distprofile def" << "\n";
-    Z3_global_param_set("fixedpoint.use_heavy_mev","true");
-    Z3_global_param_set("fixedpoint.reset_obligation_queue","false");
-    Z3_global_param_set("fixedpoint.pdr.flexible_trace","true");
-    Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
+    set_profile_param(profile,"def","fixedpoint.use_heavy_mev","true");
+    set_profile_param(profile,"def","fixedpoint.reset_obligation_queue","false");
+    set_profile_param(profile,"def","fixedpoint.pdr.flexible_trace","true");
+    set_profile_param(profile,"def","fixedpoint.spacer.elim_aux","false");
     
   }
   else if (string_ends_with(profile,"ic3"))
   {
     //verbose_stream () << "BRUNCH_STAT distprofile ic3" << "\n";
-    Z3_global_param_set("fixedpoint.use_heavy_mev","true");
-    Z3_global_param_set("fixedpoint.pdr.flexible_trace","true");
-    Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
+    set_profile_param(profile,"ic3","fixedpoint.use_heavy_mev","true");
+    set_profile_param(profile,"ic3","fixedpoint.pdr.flexible_trace","true");
+    set_profile_param(profile,"ic3","fixedpoint.spacer.elim_aux","false");
   }
   else if (string_ends_with(profile,"gpdr"))
   {
     //verbose_stream () << "BRUNCH_STAT distprofile gpdr" << "\n";
-    Z3_global_param_set("fixedpoint.use_heavy_mev","true");
-    Z3_global_param_set("fixedpoint.spacer.elim_aux","false");
+    set_profile_param(profile,"gpdr","fixedpoint.use_heavy_mev","true");
+    set_profile_param(profile,"gpdr","fixedpoint.spacer.elim_aux","false");
   }
   else 
   {
@@ -413,12 +502,15 @@ void set_profile_params(const std::string &profile)
     throw z3_error(ERR_CMD_LINE);
   }
 
-
   if (string_contains(profile,"Oc1"))
   {
-    Z3_global_param_set("fixedpoint.order_children","1");
+    set_profile_param(profile,"Oc1","fixedpoint.order_children","1");
   }
 
+  if (string_contains(profile,"Eat"))
+  {
+    set_profile_param(profile,"Eat","fixedpoint.spacer.elim_aux","true");
+  }
 
 }
 
@@ -428,26 +520,13 @@ void set_profile(std::vector<std::string> profile_vec)
 
 #ifdef Z3GASNET
 
+  set_profile_names();
   //the user should have specified either 1 profile, or exactly 
   //number of nodes profiles
-  size_t stock_profiles = sizeof(g_profile_names) / sizeof(char const *);
 
-  // when parsing command line if profile was not explicitly
-  // specified, it will be set as one "def".  Here we
-  // detect defaults are desired and set available
-  // profiles to the stock profiles
-  if (profile_vec.size() == 1 && gasnet_nodes() > 1)
+  if (profile_vec.size() < gasnet_nodes())
   {
-    SASSERT(profile_vec[0] == "def");
-    profile_vec.clear();
-    for (size_t i = 0; i < stock_profiles && i < gasnet_nodes(); i++)
-      profile_vec.push_back(g_profile_names[i]);
-    SASSERT(profile_vec[0] == "def");
-  }
-  
-  if (profile_vec.size() > gasnet_nodes())
-  {
-    std::cerr << "Either 0, 1 or " << std::min<size_t>(gasnet_nodes(),stock_profiles)
+    std::cerr << "Either 0 or " << (int) profile_vec.size()
       << " profiles should be specified\n";
     throw z3_error(ERR_CMD_LINE);
   }
@@ -474,7 +553,7 @@ unsigned core_main(bool &repeat, unsigned restarts)
 #ifdef Z3GASNET
 
   std::stringstream msg;
-  msg << "BRUNCH_STAT node_restarts " << (int)(restarts-1) << "\n";
+  msg << "BRUNCH_STAT node_restarts " << (int)(restarts) << "\n";
   verbose_stream() << msg.str(); verbose_stream().flush();
 
   unsigned budget = 1;
@@ -549,6 +628,8 @@ std::ostream &get_default_verbose_stream()
   {
       std::vector<std::string> profile_vec;
       profiles_string_to_vec(profile_vec, g_profiles);
+
+      SASSERT(gasnet_mynode() < profile_vec.size());
 
       std::stringstream nodelogfilename;
       nodelogfilename << g_verbose_log_base << ".node-" 
@@ -683,6 +764,7 @@ int main(int argc, char ** argv) {
     try{
         maintimer.start();
 
+
         //memory::initialize(0);
         //memory::exit_when_out_of_memory(true, "ERROR: out of memory");
 
@@ -711,6 +793,7 @@ int main(int argc, char ** argv) {
 
 #endif
 
+
         parse_cmd_line_args(argc, argv);
         
         //control verbose output, so we can avoid forked processes outputting
@@ -723,6 +806,7 @@ int main(int argc, char ** argv) {
           profiles_string_to_vec(profile_vec, g_profiles);
           set_profile(profile_vec);
         }
+
 
         env_params::updt_params();
 

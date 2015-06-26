@@ -5,6 +5,9 @@ import stats
 import subprocess
 import os.path
 import threading
+import itertools
+import hashlib
+import pprint
 
 profiles = {
     ## skip propagation but drive the search as deep as possible
@@ -75,6 +78,29 @@ profiles = {
               '--flexible-trace'],
     
 }
+
+# generate a list of all the distprofiles the can be assigned to one node of pmuz
+nodeprofiles = []
+### Keep the names in sync with code/src/pmuz/main.cpp
+profile_base = [ "def","ic3","gpdr" ];
+profile_tweak = [ "Oc1","Eat" ];
+for n in range(0,len(profile_tweak)+1):
+    for combo in itertools.combinations(profile_tweak, n):
+        prefix = ''.join(combo)
+        for base in profile_base:
+            nodeprofiles.append(prefix+base)
+
+# generate profiles based on all combinations of distprofiles
+for n in range(1,len(nodeprofiles)+1):
+    for combo in itertools.combinations(nodeprofiles, n):
+        combo = ','.join(combo)
+        alias = hashlib.md5(combo).hexdigest().upper()
+
+        profilename="%ddistcombo%s" % (n,alias)
+        profile = ['--jobsize',str(n),'--distprofile',combo]
+        profiles[profilename] = profile
+
+
 
 def parseArgs (argv):
     import argparse as a
@@ -160,6 +186,8 @@ def parseArgs (argv):
                     action='store_true', help='Compute hashes and send reciept confirmation for all messages', default=False)
     p.add_argument ('--restart', dest='restart', type=int, default=-1,
                     action='store', help='restart z3 nodes after performing given ammount of work budget, or -1 to disable restarts')
+    p.add_argument ('--print-profiles', dest='print_profiles', default=False,
+                    action='store_true', help='print the dictionary of available profiles, then exit')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -372,6 +400,11 @@ def main (argv):
 
     returncode = 13
     args = parseArgs (argv[1:])
+
+    if args.print_profiles:
+        pprint.pprint(profiles)
+        sys.exit(0)
+
     stat ('Result', 'UNKNOWN')
 
     z3_args = compute_z3_args (args)
