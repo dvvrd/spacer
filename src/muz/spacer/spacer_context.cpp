@@ -2482,10 +2482,6 @@ namespace spacer {
         {
             mynode = gasnet_mynode();
 
-          
-            // just check we can unmarshal what we marshalled
-            SASSERT( unmarshal( m_invariants, m));
-
             bool marshalled = false;
             for (gasnet_node_t t = 0; t < dstnodes.size();  t++)
             {
@@ -2496,6 +2492,8 @@ namespace spacer {
                   marshalled = true;
                   //TODO optimization on string coppies
                   m_invariants = marshal( get_constraints(infty_level()), m);
+                  // just check we can unmarshal what we marshalled
+                  SASSERT( unmarshal( m_invariants, m));
               }
 
 
