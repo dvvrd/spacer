@@ -67,6 +67,8 @@ bool                g_display_istatistics = false;
 std::string         g_profiles;
 std::vector<std::string>  g_profile_names; 
 std::string         g_verbose_log_base;
+const char *profile_base[] = { "def","ic3","gpdr"};
+const char *profile_tweak[] = { "Oc1","Eat","Ltx"};
 
 void get_combinations(std::vector<std::vector<size_t> > &combs, size_t n, size_t r)
 {
@@ -89,8 +91,6 @@ void set_profile_names()
 {
     if (g_profile_names.size()) return;
 
-    const char *profile_base[] = { "def","ic3","gpdr"};
-    const char *profile_tweak[] = { "Oc1","Eat"};
 
     size_t base_cnt = sizeof(profile_base) / sizeof(char const *);
     size_t tweak_cnt = sizeof(profile_tweak) / sizeof(char const *);
@@ -502,15 +502,16 @@ void set_profile_params(const std::string &profile)
     throw z3_error(ERR_CMD_LINE);
   }
 
-  if (string_contains(profile,"Oc1"))
-  {
-    set_profile_param(profile,"Oc1","fixedpoint.order_children","1");
-  }
+#define PMUZ_SET_PARAM(alias,param,value) if (string_contains(profile,alias)) set_profile_param(profile,alias,param,value);
 
-  if (string_contains(profile,"Eat"))
-  {
-    set_profile_param(profile,"Eat","fixedpoint.spacer.elim_aux","true");
-  }
+  PMUZ_SET_PARAM("Oc1","fixedpoint.order_children","1");
+  PMUZ_SET_PARAM("Eat","fixedpoint.spacer.elim_aux","true");
+  PMUZ_SET_PARAM("Ltr","fixedpoint.spacer.lemma_transmit_style","Right");
+  PMUZ_SET_PARAM("Ltl","fixedpoint.spacer.lemma_transmit_style","Left");
+  PMUZ_SET_PARAM("Lto","fixedpoint.spacer.lemma_transmit_style","OneRandom");
+  PMUZ_SET_PARAM("Ltx","fixedpoint.spacer.lemma_transmit_style","XRandom");
+  PMUZ_SET_PARAM("Ltn","fixedpoint.spacer.lemma_transmit_style","None");
+
 
 }
 

@@ -80,30 +80,39 @@ profiles = {
     
 }
 
-# generate a list of all the distprofiles the can be assigned to one node of pmuz
-nodeprofiles = []
-### Keep the names in sync with code/src/pmuz/main.cpp
 profile_base = [ "def","ic3","gpdr" ];
-profile_tweak = [ "Oc1","Eat" ];
-for n in range(0,len(profile_tweak)+1):
-    for combo in itertools.combinations(profile_tweak, n):
-        prefix = ''.join(combo)
-        for base in profile_base:
-            nodeprofiles.append(prefix+base)
+
+profile_excl = {
+        'Lt' : ["Ltr","Ltl","Lto","Ltx","Ltn"],
+        'Oc' : ["Oc1"],
+        'Eat': ["Eat"]
+        }
+
+def inodeprofiles():
+    for i in profile_base: yield i
+    for n in xrange(1,len(profile_excl)+1):
+        for combo in itertools.combinations(profile_excl.keys(), n):
+            biglist = ( profile_excl[x] for x in combo )
+            for possibility in itertools.product(*biglist):
+                for base in profile_base:
+                    yield ''.join(possibility) + base
+
 
 # generate profiles based on all combinations of distprofiles
-for n in range(1,len(nodeprofiles)+1):
+def iprofiles(n):
+    nodeprofiles = [ x for x in inodeprofiles() ] 
     for combo in itertools.combinations(nodeprofiles, n):
         combo = ','.join(combo)
         alias = hashlib.md5(combo).hexdigest().upper()
 
         profilename="%ddistcombo%s" % (n,alias)
         profile = ['--jobsize',str(n),'--distprofile',combo]
-        profiles[profilename] = profile
+        yield (profilename, profile)
 
 
 
 def parseArgs (argv):
+
     import argparse as a
     p = a.ArgumentParser (description='Z3 Datalog Frontend')
     
@@ -187,8 +196,8 @@ def parseArgs (argv):
                     action='store_true', help='Compute hashes and send reciept confirmation for all messages', default=False)
     p.add_argument ('--restart', dest='restart', type=int, default=-1,
                     action='store', help='restart z3 nodes after performing given ammount of work budget, or -1 to disable restarts')
-    p.add_argument ('--print-profiles', dest='print_profiles', default=False,
-                    action='store_true', help='print the dictionary of available profiles, then exit')
+    p.add_argument ('--print-profiles', dest='print_profiles', type=int, default=-1,
+                    action='store', help='print avilable profiles for specified number of nodes, then exit')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -198,6 +207,7 @@ def parseArgs (argv):
 
     for s in argv:
         if in_p:
+            print 'assigning for', s
             if s not in profiles:
                 break
             stat('profile', s)
@@ -205,10 +215,10 @@ def parseArgs (argv):
             in_p = False
         elif in_rp:
             jobsize = int(s)
-            subset = [ x for x in profiles.keys() if x.startswith(s+'distcombo') ]
-            s = random.choice(subset)
+            subset = list(iprofiles(jobsize))
+            s,a = random.choice(subset)
             stat('profile', s)
-            nargv.extend(profiles[s])
+            nargv.extend(a)
             in_rp = False
         elif s == '-p': 
             in_p = True
@@ -413,8 +423,9 @@ def main (argv):
     returncode = 13
     args = parseArgs (argv[1:])
 
-    if args.print_profiles:
-        pprint.pprint(profiles)
+    if args.print_profiles != -1:
+        for x in iprofiles(args.print_profiles):
+            print x
         sys.exit(0)
 
     stat ('Result', 'UNKNOWN')

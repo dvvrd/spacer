@@ -2447,36 +2447,68 @@ namespace spacer {
         bool ans = propagate(m_expanded_lvl, lvl, UINT_MAX);
 
 #ifdef Z3GASNET
-        // generate string of all invariants, and broadcast it to all 
-        // nodes other then this node
-        //if (gasnet_mynode()==0)
-        {
-
-        //TODO optimization on string coppies
-        m_invariants = marshal( get_constraints(infty_level()), m);
-      
-        // just check we can unmarshal what we marshalled
-        SASSERT( unmarshal( m_invariants, m));
-
+        const std::string tstyle = get_params().spacer_lemma_transmit_style();
+        std::vector<gasnet_node_t> dstnodes;
+        
         gasnet_node_t mynode = gasnet_mynode();
         gasnet_node_t num_nodes = gasnet_nodes();
- //     gasnet_node_t receive_node = (mynode + 1) % num_nodes;
-        for (gasnet_node_t n = 0; n < num_nodes;  n++)
+        if (tstyle == "All") {
+            for (gasnet_node_t i = 0; i < num_nodes; i++) dstnodes.push_back(i);
+        }
+        else if (tstyle == "Right") {
+            dstnodes.push_back((mynode + num_nodes + 1 ) % num_nodes);
+        }
+        else if (tstyle == "Left") {
+            dstnodes.push_back((mynode + num_nodes - 1 ) % num_nodes);
+        }
+        else if (tstyle == "OneRandom") { 
+            dstnodes.push_back(rand() % num_nodes);
+        }
+        else if (tstyle == "NRandom") { 
+            gasnet_node_t num_random_nodes = rand() % (num_nodes+1);
+            for (gasnet_node_t t = 0; t < num_random_nodes; t++)
+            {
+                gasnet_node_t rnode = rand() % num_nodes;
+                if (find(dstnodes.begin(), dstnodes.end(), rnode) == dstnodes.end()) 
+                    dstnodes.push_back(rnode);
+            }
+        }
+        else if (tstyle == "None") { dstnodes.clear(); }
+        else { throw default_exception("Not an option"); }
+        // TODO, idea to check to see if we drop early messages if we could gfet searches to diverg
+
+
+        if (dstnodes.size())
         {
-          if (n == mynode) continue;
+            mynode = gasnet_mynode();
+
+          
+            // just check we can unmarshal what we marshalled
+            SASSERT( unmarshal( m_invariants, m));
+
+            bool marshalled = false;
+            for (gasnet_node_t t = 0; t < dstnodes.size();  t++)
+            {
+              gasnet_node_t n = dstnodes[t];
+              if (n == mynode) continue;
+
+              if (!marshalled) {
+                  marshalled = true;
+                  //TODO optimization on string coppies
+                  m_invariants = marshal( get_constraints(infty_level()), m);
+              }
 
 
-        //std::string &s(m_invariants);
-        //std::replace( s.begin(), s.end(), '\n', '\t');
-        //TODO DHK Optimization, don't reserve multiple buffers when sending
-        //the same message ot multiple nodes
-        z3gasnet::context::transmit_msg(n, m_invariants);
+            //std::string &s(m_invariants);
+            //std::replace( s.begin(), s.end(), '\n', '\t');
+            //TODO DHK Optimization, don't reserve multiple buffers when sending
+            //the same message ot multiple nodes
+            z3gasnet::context::transmit_msg(n, m_invariants);
 
-        //STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        //    << "sending invariant to node: " << n  << ": " <<s <<"\n" ;);
-
+            //STRACE("gas", Z3GASNET_TRACE_PREFIX 
+            //    << "sending invariant to node: " << n  << ": " <<s <<"\n" ;);
         }
-        }
+      }
 #endif
 
         if (ans) return l_false;
