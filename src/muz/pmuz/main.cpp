@@ -662,27 +662,31 @@ std::ostream &get_default_verbose_stream()
 #endif
 }
 
-
-void print_exit_message(std::string exitcase, int exitcode)
-{
-    std::stringstream exitmsg;
-
-#ifdef Z3GASNET
-    Z3GASNET_VERBOSE_STREAM(exitmsg, << " Exit case " << exitcase << " with code: " << exitcode << "\n");
-
-    std::cout << exitmsg.str(); std::cout.flush();
-#else
-    exitmsg << " Exit case " << exitcase << " with code: " << exitcode << "\n";
-#endif
-
-    std::cerr << exitmsg.str(); std::cerr.flush();
-}
-
 #ifdef Z3GASNET
 spacer::spacer_wall_stopwatch maintimer;
 #else
 stopwatch maintimer;
 #endif
+
+void print_exit_message(std::string exitcase, int exitcode)
+{
+
+    std::stringstream exitmsg;
+#ifdef Z3GASNET
+    Z3GASNET_VERBOSE_STREAM(exitmsg, << " Exit case " << exitcase 
+            << " with code: " << exitcode 
+            << " at: " << maintimer.get_seconds() << "\n");
+
+    std::cout << exitmsg.str(); std::cout.flush();
+#else
+    exitmsg << " Exit case " << exitcase 
+            << " with code: " << exitcode 
+            << " at: " << maintimer.get_seconds() << "\n";
+#endif
+
+    IF_VERBOSE (1, verbose_stream () << exitmsg.str(); std::cerr.flush(););
+}
+
 
 void stop_main_timer()
 {
