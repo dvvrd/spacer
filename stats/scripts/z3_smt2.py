@@ -103,21 +103,14 @@ def inodeprofiles():
             biglist = ( profile_excl[x] for x in combo )
             for possibility in itertools.product(*biglist):
                 for base in profile_base:
-                    yield ''.join(possibility) + base
+                    yield ''.join(sorted(possibility)) + base
 
 
 # generate profiles based on all combinations of distprofiles
 def iprofiles(n):
     nodeprofiles = [ x for x in inodeprofiles() ] 
     for combo in itertools.combinations(nodeprofiles, n):
-        combo = ','.join(combo)
-        alias = hashlib.md5(combo).hexdigest().upper()
-
-        profilename="%ddistcombo%s" % (n,alias)
-        profile = ['--jobsize',str(n),'--distprofile',combo]
-        yield (profilename, profile)
-
-
+        yield ','.join(sorted(combo))
 
 def parseArgs (argv):
 
@@ -216,17 +209,22 @@ def parseArgs (argv):
     for s in argv:
         if in_p:
             print 'assigning for', s
-            if s not in profiles:
-                break
-            stat('profile', s)
-            nargv.extend (profiles[s])
+            if s in profiles:
+                stat('profile', s)
+                nargv.extend (profiles[s])
+            elif s.endswith(tuple(profiles)) and all([x.endswith(tuple(profiles)) for x in s.split(',')]):
+                stat('profile', s)
+                nargv.extend(['--jobsize',str(len(s.split(','))),'--distprofile',s])                
+            else:
+                print 'WARNING: not an known profile, or an unknown profile ending with:', profile_base
+                sys.exit(1)
             in_p = False
         elif in_rp:
             jobsize = int(s)
             subset = list(iprofiles(jobsize))
-            s,a = random.choice(subset)
-            stat('profile', s)
-            nargv.extend(a)
+            rp = random.choice(subset)
+            stat('profile', rp)
+            nargv.extend(['--jobsize',s,'--distprofile',rp])
             in_rp = False
         elif s == '-p': 
             in_p = True
@@ -235,7 +233,7 @@ def parseArgs (argv):
         else: nargv.append (s)
         
     if in_p: 
-        print 'WARNING: missing profile'
+        print 'WARNING: missing profile or number of nodes'
         sys.exit (1)
     return p.parse_args (nargv)
 
