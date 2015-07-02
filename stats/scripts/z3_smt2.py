@@ -70,6 +70,9 @@ def parseArgs (argv):
     p.add_argument ('--inline', 
                     help='Enable inlining', 
                     action='store_true', default=False)
+    p.add_argument ('--pve',
+                    help='Enable propagate_variable_equivalences in tail_simplifier',
+                    action='store_true', default=False)
     p.add_argument ('--validate', help='Enable validation',
                     action='store_true', default=False)
     p.add_argument ('--trace', help='Trace levels to enable (spacer, pdr, dl,'
@@ -206,6 +209,11 @@ def compute_z3_args (args):
 
     print 'Engine: ', args.engine
 
+    if args.pve:
+        z3_args += ' fixedpoint.xform.tail_simplifier_pve=true'
+    else:
+        z3_args += ' fixedpoint.xform.tail_simplifier_pve=false'
+        
     if (args.validate):
         z3_args += ' fixedpoint.pdr.validate_result=true'
 
