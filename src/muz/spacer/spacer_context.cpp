@@ -2761,6 +2761,16 @@ namespace spacer {
         if (elim_aux) vars.append (aux_vars.size (), aux_vars.c_ptr ());
 
         res = m_pm.mk_and (path_cons);
+        
+        // -- pick an implicant from the path condition
+        if (get_params ().spacer_reach_dnf ())
+        {
+          expr_ref_vector u(m), lits(m);
+          u.push_back (res);
+          compute_implicant_literals (mev, u, lits);
+          res = m_pm.mk_and (lits);
+        }
+        
 
         TRACE ("spacer",
                 tout << "Reach fact, before QE:\n";

@@ -3,7 +3,7 @@ def_module_params('fixedpoint',
                   export=True,
                   params=(('timeout', UINT, UINT_MAX, 'set timeout'),
                           ('engine', SYMBOL, 'auto-config', 
-                           'Select: auto-config, datalog, duality, pdr, bmc'),
+                           'Select: auto-config, datalog, duality, pdr, bmc, spacer'),
 			  ('datalog.default_table', SYMBOL, 'sparse', 
                            'default table implementation: sparse, hashtable, bitvector, interval'),
                           ('datalog.default_relation', SYMBOL, 'pentagon', 
@@ -159,7 +159,8 @@ def_module_params('fixedpoint',
                           ('spacer.elim_aux', BOOL, True, "Eliminate auxiliary variables in reachability facts"),
                           ('spacer.reach_as_init', BOOL, True, "Extend initial rules with computed reachability facts"),
                           ('spacer.blast_term_ite', BOOL, True, "Expand non-Boolean ite-terms"),
-                          ('spacer.nondet_tie_break', BOOL, False, "Break ties in obligation queue non-deterministicly")
+                          ('spacer.nondet_tie_break', BOOL, False, "Break ties in obligation queue non-deterministicly"),
+                          ('spacer.reach_dnf', BOOL, True, "Restrict reachability facts to DNF")
                           ))
 
 
