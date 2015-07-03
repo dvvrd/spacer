@@ -60,6 +60,11 @@ profiles = {
     'trifecta': ['--jobsize','3','--distprofile', 'def,ic3,gpdr'],
     'triOc1fecta': ['--jobsize','3','--distprofile', 'Oc1def,Oc1ic3,Oc1gpdr'],
     'trifectar1k': ['--jobsize','3','--distprofile', 'def,ic3,gpdr', '--restart', '1000'],
+    'triLtrfecta': ['--jobsize','3','--distprofile', 'Ltrdef,Ltric3,Ltrgpdr'],
+    'triLtlfecta': ['--jobsize','3','--distprofile', 'Ltldef,Ltlic3,Ltlgpdr'],
+    'triLtofecta': ['--jobsize','3','--distprofile', 'Ltodef,Ltoic3,Ltogpdr'],
+    'triLtxfecta': ['--jobsize','3','--distprofile', 'Ltxdef,Ltxic3,Ltxgpdr'],
+    'triLtnfecta': ['--jobsize','3','--distprofile', 'Ltndef,Ltnic3,Ltngpdr'],
 
     ## distributed mode CLI, but running two copies of def
     'tridistdef': ['--jobsize','3','--distprofile', 'def,def,def'],
@@ -73,6 +78,9 @@ profiles = {
     'hexfecta': ['--jobsize','6','--distprofile','def,ic3,gpdr,Oc1def,Oc1ic3,Oc1gpdr'],
 
     'octdistic3': ['--jobsize','8','--distprofile', 'ic3,ic3,ic3,ic3,ic3,ic3,ic3,ic3'], 
+
+    'nonfecta': ['--jobsize','6','--distprofile','def,ic3,gpdr,Oc1def,Oc1ic3,Oc1gpdr,Eatdef,Eatic3,Eatgpdr'],
+
 
     ## options used for cav'15 paper
     'cav15': ['--use-heavy-mev', '--keep-obligations',
