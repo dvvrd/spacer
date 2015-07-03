@@ -675,6 +675,10 @@ namespace spacer {
         }
         );
 
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "polling for messages from expand\n" ;);
+    Z3GASNET_CHECKCALL(gasnet_AMPoll());
+
     // check local reachability;
     // result is either sat (with some reach assumps) or
     // unsat (even with no reach assumps)
@@ -2093,6 +2097,9 @@ namespace spacer {
 
   void context::checkpoint() {
 #ifdef Z3GASNET
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "polling for messages from checkpoint\n" ;);
+    Z3GASNET_CHECKCALL(gasnet_AMPoll());
     if (get_params().pmuz_node_restarts()) {
       if (!(m_node_budget % 100))
       {

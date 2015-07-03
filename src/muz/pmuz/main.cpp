@@ -222,7 +222,8 @@ void parse_cmd_line_args(int argc, char ** argv) {
                     g_aux_input_file += " ";
             }
             if (g_input_file) {
-                warning_msg("input file was already specified.");
+                warning_msg("input file was already specified as:");
+                warning_msg(g_input_file);
             }
             else {
                 g_input_file = g_aux_input_file.c_str();
@@ -366,7 +367,8 @@ void parse_cmd_line_args(int argc, char ** argv) {
         }
         else {
             if (g_input_file) {
-                warning_msg("input file was already specified.");
+                warning_msg("input file was already specified as:");
+                warning_msg(g_input_file);
             }
             else {
                 g_input_file = arg;
@@ -737,6 +739,8 @@ void set_signal_handlers()
     // in the case of SIGQUIT, we could because it is designed to be set by
     // the user to do application shutdown in the case that some node in the
     // job has called gasnet_exit
+    // update, now not sure the exact circumstances when sigquit is called
+    // I see it called when the job is killed abnormally
     
     sigaction_t gasnet_handler;
     sigaction(SIGQUIT, NULL, &gasnet_handler);
@@ -794,8 +798,6 @@ int main(int argc, char ** argv) {
 
         z3gasnet::context::set_seginfo_table();
 
-
-
 #endif
 
 
@@ -836,9 +838,6 @@ int main(int argc, char ** argv) {
             << "Exiting after " << exittimer.get_seconds() << "\n";);
 
         */
-
-        //use a temporary string stream to assemble the message, this helps prevent
-        //interleaved stdout/stderr on forked processes
 
         print_exit_message("END_OF_MAIN",return_value);
 

@@ -68,7 +68,9 @@ DM-XXXXXXX
 #ifdef Z3GASNET_PROFILING
 #include"spacer_wall_stopwatch.h"
 #endif
+#ifndef _NO_OMP_
 #include<omp.h>
+#endif
 
 
 // gasnet documentation states that messages are sent best
@@ -85,7 +87,11 @@ DM-XXXXXXX
 
 #define Z3GASNET_INIT_VERBOSE_STREAM_NAME std::cout
 
+#ifndef _NO_OMP_
 #define Z3GASNET_TRACE_PREFIX tout << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << ":" << omp_get_thread_num() << "): " << __FILE__ << "(" << __LINE__ <<"): " 
+#else
+#define Z3GASNET_TRACE_PREFIX tout << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): " 
+#endif
 
 #define Z3GASNET_VERBOSE_STREAM( stream, code ) do {stream << "node " << gasnet_mynode() << "/" << gasnet_nodes() << " (" << ::getpid() << "): " << __FILE__ << "(" << __LINE__ <<"): "  code ; stream.flush();} while (false)
 
