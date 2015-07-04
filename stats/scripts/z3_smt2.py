@@ -91,9 +91,10 @@ profiles = {
 profile_base = [ "def","ic3","gpdr" ];
 
 profile_excl = {
-        'Lt' : ["Ltr","Ltl","Lto","Ltx","Ltn"],
+        'Lt' : ["Ltr","Ltl","Lto","Ltx","Ltn","Ltm"],
         'Oc' : ["Oc1"],
-        'Eat': ["Eat"]
+        'Eat': ["Eat"],
+        'Rdt': ["Rdt"]
         }
 
 def inodeprofiles():
@@ -123,6 +124,9 @@ def parseArgs (argv):
                     action='store_true', default=False)
     p.add_argument ('--inline', 
                     help='Enable inlining', 
+                    action='store_true', default=False)
+    p.add_argument ('--pve',
+                    help='Enable propagate_variable_equivalences in tail_simplifier',
                     action='store_true', default=False)
     p.add_argument ('--validate', help='Enable validation',
                     action='store_true', default=False)
@@ -180,6 +184,9 @@ def parseArgs (argv):
     p.add_argument ('--elim-aux', dest='elim_aux',
                     help='eliminate auxiliaries in reachability facts',
                     action='store_true')
+    p.add_argument ('--reach-dnf', dest='reach_dnf', 
+                    help='Keep reachability facts in DNF', 
+                    action='store_true', default=False)
     p.add_argument ('--no-z3', dest='no_z3',
                     help='stop before running z3', default=False,
                     action='store_true')
@@ -280,6 +287,11 @@ def compute_z3_args (args):
 
     print 'Engine: ', args.engine
 
+    if args.pve:
+        z3_args += ' fixedpoint.xform.tail_simplifier_pve=true'
+    else:
+        z3_args += ' fixedpoint.xform.tail_simplifier_pve=false'
+        
     if (args.validate):
         z3_args += ' fixedpoint.pdr.validate_result=true'
 
@@ -333,6 +345,11 @@ def compute_z3_args (args):
     else:
         z3_args += ' fixedpoint.spacer.elim_aux=false'
 
+    if args.reach_dnf:
+        z3_args += ' fixedpoint.spacer.reach_dnf=true'
+    else:
+        z3_args += ' fixedpoint.spacer.reach_dnf=false'
+        
     if args.distprofile:
         z3_args += ' -profile:%s' % args.distprofile
 

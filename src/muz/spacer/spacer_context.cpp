@@ -2481,8 +2481,14 @@ namespace spacer {
             }
         }
         else if (tstyle == "None") { dstnodes.clear(); }
+        else if (tstyle.size() >= 5 && tstyle.substr(0,4) == "Node") { 
+            std::string numstr = tstyle.substr(4,tstyle.size()-4);
+            gasnet_node_t node = (gasnet_node_t) atoi(numstr.c_str());
+            if(node >= gasnet_nodes()) throw default_exception("Can not transmit lemmas to node");
+            dstnodes.push_back((gasnet_node_t) node); 
+        }
         else { throw default_exception("Not an option"); }
-        // TODO, idea to check to see if we drop early messages if we could gfet searches to diverg
+        // TODO, idea to check to see if we drop early messages if we could get searches to diverg
 
 
         if (dstnodes.size())
@@ -2913,6 +2919,16 @@ namespace spacer {
         if (elim_aux) vars.append (aux_vars.size (), aux_vars.c_ptr ());
 
         res = m_pm.mk_and (path_cons);
+        
+        // -- pick an implicant from the path condition
+        if (get_params ().spacer_reach_dnf ())
+        {
+          expr_ref_vector u(m), lits(m);
+          u.push_back (res);
+          compute_implicant_literals (mev, u, lits);
+          res = m_pm.mk_and (lits);
+        }
+        
 
         TRACE ("spacer",
                 tout << "Reach fact, before QE:\n";

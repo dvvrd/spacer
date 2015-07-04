@@ -513,6 +513,8 @@ void set_profile_params(const std::string &profile)
   PMUZ_SET_PARAM("Lto","fixedpoint.spacer.lemma_transmit_style","OneRandom");
   PMUZ_SET_PARAM("Ltx","fixedpoint.spacer.lemma_transmit_style","XRandom");
   PMUZ_SET_PARAM("Ltn","fixedpoint.spacer.lemma_transmit_style","None");
+  PMUZ_SET_PARAM("Ltm","fixedpoint.spacer.lemma_transmit_style","Node0");
+  PMUZ_SET_PARAM("Rdt","fixedpoint.spacer.reach_dnf","true");
 
 
 }

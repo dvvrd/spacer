@@ -3,7 +3,7 @@ def_module_params('fixedpoint',
                   export=True,
                   params=(('timeout', UINT, UINT_MAX, 'set timeout'),
                           ('engine', SYMBOL, 'auto-config', 
-                           'Select: auto-config, datalog, duality, pdr, bmc'),
+                           'Select: auto-config, datalog, duality, pdr, bmc, spacer'),
 			  ('datalog.default_table', SYMBOL, 'sparse', 
                            'default table implementation: sparse, hashtable, bitvector, interval'),
                           ('datalog.default_relation', SYMBOL, 'pentagon', 
@@ -142,6 +142,8 @@ def_module_params('fixedpoint',
 	                  ('xform.instantiate_quantifiers', BOOL, False, 
                            "instantiate quantified Horn clauses using E-matching heuristic"),
                           ('xform.coalesce_rules', BOOL, False, "coalesce rules"),
+                          ('xform.tail_simplifier_pve', BOOL, True, "propagate_variable_equivalences"),
+                          ('xform.subsumption_checker', BOOL, True, "Enable subsumption checker (no support for model conversion)"),
 			  ('duality.enable_restarts', BOOL, False, 'DUALITY: enable restarts'),
                           ('order_children', UINT, 0, 'SPACER: order of enqueuing children in non-linear rules : 0 (original), 1 (reverse)'),
                           ('eager_reach_check', BOOL, True, 'SPACER: eagerly check if a query is reachable using reachability facts of predecessors'),
@@ -163,7 +165,8 @@ def_module_params('fixedpoint',
                           ('pmuz.node_restarts', BOOL, False, "Perform node restarts"),
                           ('pmuz.node_work_budget', UINT, 100, "The ammount of work a node can perform before being restarted"),
                           ('spacer.nondet_tie_break', BOOL, False, "Break ties in obligation queue non-deterministicly"),
-                          ('spacer.lemma_transmit_style', STRING, 'All', "The communication pattern for sharing lemmas: (All, Right, Left, OneRandom, SeveralRandom, None)")
+                          ('spacer.lemma_transmit_style', STRING, 'All', "The communication pattern for sharing lemmas: (All, Right, Left, OneRandom, SeveralRandom, None, Node{0...n})"),
+                          ('spacer.reach_dnf', BOOL, False, "Restrict reachability facts to DNF")
                           ))
 
 
