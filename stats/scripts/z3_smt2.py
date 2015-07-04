@@ -222,6 +222,12 @@ def parseArgs (argv):
             elif s.endswith(tuple(profiles)) and all([x.endswith(tuple(profiles)) for x in s.split(',')]):
                 stat('profile', s)
                 nargv.extend(['--jobsize',str(len(s.split(','))),'--distprofile',s])                
+            elif s.startswith("random"):
+                jobsize = int (s[len("random"):])
+                subset = list(iprofiles(jobsize))
+                rp = random.choice(subset)
+                stat('profile', rp)
+                nargv.extend(['--jobsize',str(jobsize),'--distprofile',rp])
             else:
                 print 'WARNING: not an known profile, or an unknown profile ending with:', profile_base
                 sys.exit(1)
