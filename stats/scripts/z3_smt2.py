@@ -219,8 +219,8 @@ def parseArgs (argv):
                 nargv.extend(['--jobsize',str(len(s.split(','))),'--distprofile',s])                
             elif s.startswith("random"):
                 jobsize = int (s[len("random"):])
-                subset = list(iprofiles(jobsize))
-                rp = random.choice(subset)
+                subset = list(iprofiles(1))
+                rp = ','.join([random.choice(subset) for x in range(jobsize)])
                 stat('profile', rp)
                 nargv.extend(['--jobsize',str(jobsize),'--distprofile',rp])
             else:
