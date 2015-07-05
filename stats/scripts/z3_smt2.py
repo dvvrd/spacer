@@ -25,11 +25,6 @@ profiles = {
     ## inspired by gpdr: no priority queue. 
     'gpdr': ['--use-heavy-mev', '--no-elim-aux'],
 
-    'Oc1def': ['--use-heavy-mev', '--keep-obligations', '--flexible-trace', '--no-elim-aux', '--order-childern','1'],
-    'Oc1ic3': ['--use-heavy-mev', '--flexible-trace', '--no-elim-aux', '--order-childern','1'],
-    'Oc1gpdr': ['--use-heavy-mev', '--no-elim-aux', '--order-childern','1'],
-
-
     
     ## use distributed mode CLI, but not running distributed, use just one node
     'solodistdef': ['--jobsize','1','--distprofile', 'def'],
