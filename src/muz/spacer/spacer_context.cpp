@@ -617,6 +617,7 @@ namespace spacer {
       bool& is_concrete, datalog::rule const*& r, 
       vector<bool>& reach_pred_used, 
       unsigned& num_reuse_reach) {
+      
     TRACE("spacer", 
         tout << "is-reachable: " << head()->get_name() << " level: " 
         << n.level() << " depth: " << n.depth () << "\n";
@@ -681,6 +682,8 @@ namespace spacer {
     // unsat (even with no reach assumps)
     expr *bg = m_extend_lit.get ();
     lbool is_sat = m_solver.check_assumptions (post, reach_assumps, 1, &bg);
+    get_context().checkpoint();
+
 
     TRACE ("spacer",
         if (!reach_assumps.empty ()) {
@@ -1096,6 +1099,9 @@ namespace spacer {
            tout << " for relation " << m_pt.head()->get_name() << "\n";);
                 
     for (unsigned i = 0; i < m_levels[src_level].size(); ) {
+
+      m_pt.get_context().checkpoint();
+
       expr_ref_vector &src= m_levels[src_level];
       expr * curr = src[i].get();                  
       unsigned stored_lvl;
@@ -2758,6 +2764,8 @@ namespace spacer {
                    << watch.get_seconds () << "\n";);
         return next ? l_undef : l_true;
       }
+
+      checkpoint();
       
       // create a child of n
       create_children (n, *r, mev, reach_pred_used);
@@ -2811,6 +2819,7 @@ namespace spacer {
                  << std::fixed << std::setprecision(2) 
                  << watch.get_seconds () << "\n";);
 
+      checkpoint();
       return l_false;
     }
       //something went wrong
@@ -3074,6 +3083,8 @@ namespace spacer {
           sum = pt.get_origin_summary (mev, prev_level (n.level ()),
                                        j, reach_pred_used [j], &aux);
           deriv->add_premise (pt, j, sum, reach_pred_used [j], aux);
+
+          checkpoint();
         }
         
         // create post for the first child and add to queue
