@@ -423,6 +423,8 @@ namespace spacer {
     pred_transformer&       m_pt;
     /// post-condition decided by this node
     expr_ref                m_post;
+    /// new post to be swapped in for m_post
+    expr_ref                m_new_post;
     /// level at which to decide the post 
     unsigned                m_level;       
       
@@ -442,7 +444,9 @@ namespace spacer {
     model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
       m_ref_count (0),
       m_parent (parent), m_pt (pt), 
-      m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth),
+      m_post (m_pt.get_ast_manager ()), 
+      m_new_post (m_pt.get_ast_manager ()),
+      m_level (level), m_depth (depth),
       m_open (true), m_use_farkas (true)
     {if (m_parent) m_parent->add_child (*this);}
     
@@ -473,9 +477,24 @@ namespace spacer {
     
     expr* post () const { return m_post.get (); }
     void set_post (expr* post) { m_post = post; }
-
+    
+    /// indicate that a new post should be set for the node
+    void new_post (expr *post) {m_new_post = post;}
+    /// true if the node needs to be updated outside of the priority queue
+    bool is_dirty () {return m_new_post;}
+    /// clean a dirty node
+    void clean ()
+    {
+      if (m_new_post) 
+      {
+        set_post (m_new_post);
+        m_new_post.reset ();
+      }
+    }
+    
     void reset () 
     {
+      clean ();
       m_derivation = NULL;
       m_open = true;
     }

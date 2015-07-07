@@ -2420,17 +2420,32 @@ namespace spacer {
           }
           
           SASSERT (m_search.top ());
-          while (m_search.top ()->is_closed ()) 
+          // -- remove all closed nodes and updated all dirty nodes
+          // -- this is necessary because there is no easy way to
+          // -- remove nodes from the priority queue.
+          while (m_search.top ()->is_closed () ||
+                 m_search.top ()->is_dirty ()) 
           { 
-            model_node *n = m_search.top ();
-            IF_VERBOSE (1,
-                        verbose_stream () << "Deleting closed node: " 
-                        << n->pt ().head ()->get_name ()
-                        << "(" << n->level () << ", " << n->depth () << ")"
-                        << " " << n->post ()->get_id () << "\n";);
+            model_node_ref n = m_search.top ();
             m_search.pop ();
-            if (m_search.is_root (*n)) return true;
-            SASSERT (m_search.top ());
+            if (n->is_closed ())
+            {
+              IF_VERBOSE (1,
+                          verbose_stream () << "Deleting closed node: " 
+                          << n->pt ().head ()->get_name ()
+                          << "(" << n->level () << ", " << n->depth () << ")"
+                          << " " << n->post ()->get_id () << "\n";);
+              if (m_search.is_root (*n)) return true;
+              SASSERT (m_search.top ());
+            }
+            else if (n->is_dirty ())
+            {
+              n->clean ();
+              // -- the node n might not be at the top after it is cleaned
+              m_search.push (*n);
+            }
+            else 
+              UNREACHABLE ();
           }
           
           SASSERT (m_search.top ());
@@ -2447,7 +2462,6 @@ namespace spacer {
             initial_size = m_search.size ();
           }
           
-          
           node = m_search.top ();
           SASSERT (node->level () <= m_search.max_level ());
           switch (expand_node (*node))
@@ -2462,6 +2476,8 @@ namespace spacer {
           case l_false:
             SASSERT (m_search.top () == node.get ());
             m_search.pop ();
+            
+            if (node->is_dirty ()) node->clean ();
             
             node->inc_level ();
             if (get_params ().pdr_flexible_trace ())
@@ -2636,7 +2652,7 @@ namespace spacer {
         // Optionally check reachability of lemmas
         if (get_params ().use_lemma_as_cti ())
         {
-          n.set_post (m_pm.mk_and (cores [0].first));
+          n.new_post (m_pm.mk_and (cores [0].first));
           n.set_farkas_generalizer (false);
         }
         
