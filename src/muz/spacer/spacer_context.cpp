@@ -410,6 +410,10 @@ namespace spacer {
 
   void pred_transformer::add_reach_fact (reach_fact &fact) 
     {
+      timeit _timer (is_trace_enabled("spacer_timeit"), 
+                     "spacer::pred_transformer::add_reach_fact", 
+                     verbose_stream ());
+
       TRACE ("spacer",
              tout << "add_reach_fact: " << head()->get_name() << " " 
              << (fact.is_init () ? "INIT " : "")
@@ -606,6 +610,9 @@ namespace spacer {
               tout << "is-reachable: " << head()->get_name() << " level: " 
               << n.level() << " depth: " << n.depth () << "\n";
               tout << mk_pp(n.post(), m) << "\n";);
+        timeit _timer (is_trace_enabled("spacer_timeit"), 
+                     "spacer::pred_transformer::is_reachable", 
+                     verbose_stream ());
 
         ensure_level(n.level());        
 
@@ -1387,7 +1394,10 @@ namespace spacer {
   
   model_node *derivation::create_next_child (model_evaluator &mev)
   {
-    
+    timeit _timer (is_trace_enabled("spacer_timeit"), 
+                   "spacer::derivation::create_next_child", 
+                   verbose_stream ());
+
     ast_manager &m = get_ast_manager ();
     expr_ref_vector summaries (m);
     app_ref_vector vars (m);
@@ -1408,6 +1418,9 @@ namespace spacer {
     
     if (!vars.empty ()) 
     {
+      timeit _timer1 (is_trace_enabled("spacer_timeit"), 
+                      "create_next_child::qproject1", 
+                      verbose_stream ());
       qe_project (m, vars, m_trans, mev.get_model (), true);
       //qe::reduce_array_selects (*mev.get_model (), m_trans);
     }
@@ -1430,6 +1443,9 @@ namespace spacer {
     summaries.reset ();
     if (!vars.empty ()) 
     {
+      timeit _timer2 (is_trace_enabled("spacer_timeit"),
+                      "create_next_child::qproject2", 
+                      verbose_stream ());
       qe_project (m, vars, post, mev.get_model (), true);
       //qe::reduce_array_selects (*mev.get_model (), post);
     }
@@ -2389,7 +2405,8 @@ namespace spacer {
     //
     bool context::check_reachability () 
     {
-      timeit _timer (get_verbosity_level () >= 1, "spacer::context::check_reachability", 
+      timeit _timer (is_trace_enabled("spacer_timeit"), 
+                     "spacer::context::check_reachability", 
                      verbose_stream ());
 
         model_node_ref last_reachable;
@@ -2617,6 +2634,10 @@ namespace spacer {
       }
         // n is unreachable, create new summary facts
       case l_false: {
+        timeit _timer (is_trace_enabled("spacer_timeit"), 
+                       "spacer::expand_node::false", 
+                       verbose_stream ());
+
         TRACE("spacer", tout << "cube:\n"; 
               for (unsigned j = 0; j < cube.size(); ++j) 
                 tout << mk_pp(cube[j].get(), m) << "\n";);
@@ -2691,7 +2712,8 @@ namespace spacer {
   bool context::propagate(unsigned min_prop_lvl, 
                           unsigned max_prop_lvl, unsigned full_prop_lvl) {    
     
-    timeit _timer (get_verbosity_level () >= 1, "spacer::context::propagate", 
+    timeit _timer (is_trace_enabled("spacer_timeit"), 
+                   "spacer::context::propagate", 
                    verbose_stream ());
     
     if (full_prop_lvl < max_prop_lvl) full_prop_lvl = max_prop_lvl;
@@ -2753,6 +2775,9 @@ namespace spacer {
 
   reach_fact *context::mk_reach_fact (model_node& n, model_evaluator &mev,
                                       const datalog::rule& r) {
+    timeit _timer1 (is_trace_enabled("spacer_timeit"), 
+                    "mk_reach_fact", 
+                    verbose_stream ());
         expr_ref res(m);
         reach_fact_ref_vector child_reach_facts;
         
@@ -2808,7 +2833,13 @@ namespace spacer {
                 }
               );
 
-        qe_project (m, vars, res, mev.get_model ());
+        {
+          timeit _timer1 (is_trace_enabled("spacer_timeit"), 
+                          "mk_reach_fact::qe_project", 
+                          verbose_stream ());
+          qe_project (m, vars, res, mev.get_model ());
+        }
+        
 
         TRACE ("spacer",
                 tout << "Reach fact, after QE project:\n";
