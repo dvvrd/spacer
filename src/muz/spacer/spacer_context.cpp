@@ -2403,11 +2403,12 @@ namespace spacer {
         
         while (m_search.top ())
         {
-          checkpoint ();
           model_node_ref node;
+          checkpoint ();
           
           while (last_reachable)
           {
+            checkpoint ();
             node = last_reachable;
             last_reachable = NULL;
             if (m_search.is_root (*node)) return true;
@@ -2539,6 +2540,8 @@ namespace spacer {
       
       lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
                          reach_pred_used, num_reuse_reach);
+      checkpoint ();
+      
       switch (res) 
       {
         //reachable but don't know if this is purely using UA
@@ -2554,7 +2557,9 @@ namespace spacer {
           if (r && r->get_uninterpreted_tail_size () > 0)
           {
             reach_fact* rf = mk_reach_fact (n, mev, *r);
+            checkpoint ();
             n.pt ().add_reach_fact (*rf);
+            checkpoint ();
           }
           
           // if n has a derivation, create a new child and report l_undef
@@ -2563,6 +2568,7 @@ namespace spacer {
           if (n.has_derivation ())
           {
             next = n.get_derivation ().create_next_child ();
+            checkpoint ();
             if (next) 
             { 
               // move derivation over to the next obligation
@@ -2603,10 +2609,13 @@ namespace spacer {
         cores.push_back (std::make_pair(cube, uses_level));
         
         // -- run all core generalizers
-        for (unsigned i = 0; !cores.empty() && i < m_core_generalizers.size(); ++i) {
+        for (unsigned i = 0; 
+             !cores.empty() && i < m_core_generalizers.size(); ++i) {
+          checkpoint ();
           core_generalizer::cores new_cores;                    
           for (unsigned j = 0; j < cores.size(); ++j) 
-            (*m_core_generalizers[i])(n, cores[j].first, cores[j].second, new_cores);
+            (*m_core_generalizers[i])(n, cores[j].first, 
+                                      cores[j].second, new_cores);
           cores.reset ();
           cores.append (new_cores);
         }
@@ -2640,7 +2649,8 @@ namespace spacer {
       }
         //something went wrong
       case l_undef: 
-        TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
+        TRACE("spacer", tout << "unknown state: " 
+              << mk_pp(m_pm.mk_and(cube), m) << "\n";);
         throw unknown_exception();
       }
       UNREACHABLE();
@@ -2698,6 +2708,7 @@ namespace spacer {
       {
         for (it = m_rels.begin (); it != end; ++it)
         {
+          checkpoint ();
           pred_transformer& r = *it->m_value;
           r.propagate_to_infinity (lvl);
         }
