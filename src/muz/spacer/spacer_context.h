@@ -479,7 +479,7 @@ namespace spacer {
     void set_post (expr* post) { m_post = post; }
     
     /// indicate that a new post should be set for the node
-    void new_post (expr *post) {m_new_post = post;}
+    void new_post (expr *post) {if (post != m_post) m_new_post = post;}
     /// true if the node needs to be updated outside of the priority queue
     bool is_dirty () {return m_new_post;}
     /// clean a dirty node
