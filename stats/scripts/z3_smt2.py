@@ -60,6 +60,7 @@ profiles = {
     'triLtofecta': ['--jobsize','3','--distprofile', 'Ltodef,Ltoic3,Ltogpdr'],
     'triLtxfecta': ['--jobsize','3','--distprofile', 'Ltxdef,Ltxic3,Ltxgpdr'],
     'triLtnfecta': ['--jobsize','3','--distprofile', 'Ltndef,Ltnic3,Ltngpdr'],
+    'triLtmfecta': ['--jobsize','3','--distprofile', 'Ltmdef,Ltmic3,Ltmgpdr'],
 
     ## distributed mode CLI, but running two copies of def
     'tridistdef': ['--jobsize','3','--distprofile', 'def,def,def'],
@@ -221,7 +222,7 @@ def parseArgs (argv):
                 jobsize = int (s[len("random"):])
                 subset = list(iprofiles(1))
                 rp = ','.join([random.choice(subset) for x in range(jobsize)])
-                stat('profile', rp)
+                stat('profile', s)
                 nargv.extend(['--jobsize',str(jobsize),'--distprofile',rp])
             else:
                 print 'WARNING: not an known profile, or an unknown profile ending with:', profile_base
