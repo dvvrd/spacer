@@ -367,12 +367,15 @@ namespace spacer {
       m_use [i]->add_lemma_from_child (*this, lemma, next_level (lvl));
   }
   
-  void pred_transformer::add_lemma (expr * lemma, unsigned lvl)
+  bool pred_transformer::add_lemma (expr * lemma, unsigned lvl)
   {
+    bool res = false;
+    
     expr_ref_vector lemmas (m);
     qe::flatten_and (lemma, lemmas);
     for (unsigned i = 0, sz = lemmas.size(); i < sz; ++i)
-      m_frames.add_lemma (lemmas.get (i), lvl);
+      res |= m_frames.add_lemma (lemmas.get (i), lvl);
+    return res;
   }
   
 
@@ -2666,15 +2669,14 @@ namespace spacer {
           TRACE("spacer", tout << "invariant state: " 
                 << (is_infty_level(uses_level)?"(inductive)":"") 
                 <<  mk_pp (lemma, m) << "\n";);
-          n.pt().add_lemma (lemma, uses_level);
-        }
-        CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
-        
-        // Optionally check reachability of lemmas
-        if (get_params ().use_lemma_as_cti ())
-        {
-          n.new_post (m_pm.mk_and (cores [0].first));
-          n.set_farkas_generalizer (false);
+          bool v = n.pt().add_lemma (lemma, uses_level);
+          // Optionally update the node to be the negation of the lemma
+          if (v && get_params ().use_lemma_as_cti ())
+          {
+            n.new_post (m_pm.mk_and (core));
+            n.set_farkas_generalizer (false);
+          }
+          CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
         }
         
         

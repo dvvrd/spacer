@@ -358,7 +358,7 @@ namespace spacer {
         bool propagate_to_next_level(unsigned level);
         void propagate_to_infinity(unsigned level);
         /// \brief  Add a lemma to the current context and all users
-        void add_lemma (expr * lemma, unsigned lvl);
+        bool add_lemma (expr * lemma, unsigned lvl);
         expr* get_reach_case_var (unsigned idx) const;
       bool has_reach_facts () const { return !m_reach_facts.empty () ;}
       
