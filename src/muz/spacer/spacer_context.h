@@ -712,6 +712,8 @@ namespace spacer {
 
         unsigned m_node_budget;
 
+        double m_last_poll_time;
+
 #endif
         
         // Functions used by search.
@@ -744,7 +746,9 @@ namespace spacer {
         bool check_invariant(unsigned lvl);
         bool check_invariant(unsigned lvl, func_decl* fn);
 
+        public:
         void checkpoint();
+        private:
 
         void init_rules(datalog::rule_set& rules, decl2rel& transformers);
 

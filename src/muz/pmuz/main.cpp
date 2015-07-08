@@ -33,11 +33,7 @@ Revision History:
 #include<sstream>
 #include<vector>
 
-#ifdef Z3GASNET
 #include"spacer_wall_stopwatch.h"
-#else
-#include"stopwatch.h"
-#endif
 
 #ifdef Z3GASNET
 //Have to include in main  here for access to message handlers
@@ -642,6 +638,13 @@ std::ostream &get_default_verbose_stream()
           << profile_vec[gasnet_mynode()] << ".verbose-"
           << (int) get_verbosity_level() << ".log";
 
+      //When launching from Mesos, we can get the stderr file, then 
+      //we can read the names of the individual profiles
+      std::stringstream nodemsg;
+      nodemsg << "BRUNCH_STAT verbosefile " << nodelogfilename.str() << "\n";
+      std::cerr << nodemsg.str();
+      std::cerr.flush();
+
       static std::ofstream verbose_file_stream(
               nodelogfilename.str().c_str());
       return verbose_file_stream;
@@ -666,14 +669,10 @@ std::ostream &get_default_verbose_stream()
 #endif
 }
 
-#ifdef Z3GASNET
-spacer::spacer_wall_stopwatch maintimer;
-#else
-stopwatch maintimer;
-#endif
 
 void print_exit_message(std::string exitcase, int exitcode)
 {
+    spacer::spacer_wall_stopwatch &maintimer = spacer::spacer_wall_stopwatch::get_global_stopwatch();
 
     std::stringstream exitmsg;
 #ifdef Z3GASNET
@@ -694,12 +693,14 @@ void print_exit_message(std::string exitcase, int exitcode)
 
 void stop_main_timer()
 {
+    spacer::spacer_wall_stopwatch &maintimer = spacer::spacer_wall_stopwatch::get_global_stopwatch();
     maintimer.stop();
     std::stringstream maintimerstat;
     maintimerstat << "BRUNCH_STAT main_time "
-        << maintimer.get_seconds() << "\n";
-    verbose_stream() << maintimerstat.str(); verbose_stream().flush();
-
+        << spacer::spacer_wall_stopwatch::get_global_stopwatch_seconds()
+        << "\n";
+    verbose_stream() << maintimerstat.str(); 
+    verbose_stream().flush();
 }
 
 #ifdef Z3GASNET
@@ -773,7 +774,7 @@ int main(int argc, char ** argv) {
     unsigned return_value = 19;
 
     try{
-        maintimer.start();
+        spacer::spacer_wall_stopwatch::start_global_stopwatch();
 
 
         //memory::initialize(0);
@@ -821,7 +822,20 @@ int main(int argc, char ** argv) {
 
         bool repeat = false;
         unsigned restarts = 0;
+        #pragma omp sections
+        {
+        #pragma omp section
+        {
         do { return_value = core_main(repeat,restarts++); } while (repeat);
+        }
+        #pragma omp section
+        {
+        do { 
+            std::cout << "polling\n"; 
+            gasnet_AMPoll(); 
+        } while (true);
+        }
+        }
 
 
 #ifdef Z3GASNET

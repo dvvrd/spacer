@@ -74,6 +74,7 @@ Notes:
 #include "spacer_timeit.h"
 #include "luby.h"
 
+#define VERBOSE_TIME "T+" << spacer_wall_stopwatch::get_global_stopwatch_seconds() << ": "
 
 namespace spacer {
     
@@ -616,6 +617,7 @@ namespace spacer {
       bool& is_concrete, datalog::rule const*& r, 
       vector<bool>& reach_pred_used, 
       unsigned& num_reuse_reach) {
+      
     TRACE("spacer", 
         tout << "is-reachable: " << head()->get_name() << " level: " 
         << n.level() << " depth: " << n.depth () << "\n";
@@ -675,15 +677,13 @@ namespace spacer {
         }
         );
 
-    STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "polling for messages from expand\n" ;);
-    Z3GASNET_CHECKCALL(gasnet_AMPoll());
-
     // check local reachability;
     // result is either sat (with some reach assumps) or
     // unsat (even with no reach assumps)
     expr *bg = m_extend_lit.get ();
     lbool is_sat = m_solver.check_assumptions (post, reach_assumps, 1, &bg);
+    get_context().checkpoint();
+
 
     TRACE ("spacer",
         if (!reach_assumps.empty ()) {
@@ -1099,6 +1099,9 @@ namespace spacer {
            tout << " for relation " << m_pt.head()->get_name() << "\n";);
                 
     for (unsigned i = 0; i < m_levels[src_level].size(); ) {
+
+      m_pt.get_context().checkpoint();
+
       expr_ref_vector &src= m_levels[src_level];
       expr * curr = src[i].get();                  
       unsigned stored_lvl;
@@ -1605,8 +1608,7 @@ namespace spacer {
     z3gasnet::context::set_params(
         (void*) const_cast<fixedpoint_params*>(&m_params));
 
-
-    
+    m_last_poll_time = -1;
 #endif
   }
 
@@ -1938,7 +1940,7 @@ namespace spacer {
                           if (res != l_false) {
                             msg << "rule validation failed when checking: " 
                               << mk_pp(tmp, m);
-                            IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
+                            IF_VERBOSE(0, verbose_stream() << VERBOSE_TIME << msg.str() << "\n";);
                             throw default_exception(msg.str());
                             return false;
                           }
@@ -1977,7 +1979,7 @@ namespace spacer {
           m_fparams.m_arith_mode = AS_DIFF_LOGIC;
           m_fparams.m_arith_expand_eqs = true;
         } else if (classify.is_utvpi()) {
-          IF_VERBOSE(1, verbose_stream() << "UTVPI\n";);
+          IF_VERBOSE(1, verbose_stream() << VERBOSE_TIME << "UTVPI\n";);
           m_fparams.m_arith_mode = AS_UTVPI;
           m_fparams.m_arith_expand_eqs = true;                
         }
@@ -2099,7 +2101,22 @@ namespace spacer {
 #ifdef Z3GASNET
     STRACE("gas", Z3GASNET_TRACE_PREFIX 
         << "polling for messages from checkpoint\n" ;);
+
+    double polltime = spacer_wall_stopwatch::get_global_stopwatch_seconds();
+    if (m_last_poll_time != -1)
+    {
+        double poll_period = polltime - m_last_poll_time;
+        if (poll_period > 1.0)
+        {
+          IF_VERBOSE(1, 
+              verbose_stream () << "\n" << VERBOSE_TIME 
+              << "WARNING: It has been " << poll_period << " seconds since the last poll\n";);
+        }
+    }
+    m_last_poll_time = polltime;
+
     Z3GASNET_CHECKCALL(gasnet_AMPoll());
+
     if (get_params().pmuz_node_restarts()) {
       if (!(m_node_budget % 100))
       {
@@ -2135,7 +2152,7 @@ namespace spacer {
   unsigned context::get_cex_depth () {
     if (m_last_result != l_true) {
       IF_VERBOSE(1, 
-          verbose_stream () 
+          verbose_stream () << VERBOSE_TIME 
           << "Trace unavailable when result is false\n";);
       return 0;
     }
@@ -2164,8 +2181,8 @@ namespace spacer {
     {
       // XXX AG: Escape if an assertion is about to fail
       IF_VERBOSE(1, 
-          verbose_stream () << 
-          "Warning: counterexample is trivial or non-existent\n";);
+          verbose_stream () << VERBOSE_TIME
+          << "Warning: counterexample is trivial or non-existent\n";);
       return cex_depth;
     }
     SASSERT (facts.size () == 1);
@@ -2210,7 +2227,7 @@ namespace spacer {
   void context::get_rules_along_trace (datalog::rule_ref_vector& rules) {
     if (m_last_result != l_true) {
       IF_VERBOSE(1, 
-          verbose_stream () 
+          verbose_stream () << VERBOSE_TIME
           << "Trace unavailable when result is false\n";);
       return;
     }
@@ -2237,8 +2254,8 @@ namespace spacer {
     {
       // XXX AG: Escape if an assertion is about to fail
       IF_VERBOSE(1, 
-          verbose_stream () << 
-          "Warning: counterexample is trivial or non-existent\n";);
+          verbose_stream () << VERBOSE_TIME
+          << "Warning: counterexample is trivial or non-existent\n";);
       return;
     }
     SASSERT (facts.size () == 1);
@@ -2528,7 +2545,7 @@ namespace spacer {
       m_search.inc_level ();
       lvl = m_search.max_level ();
       m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
-      IF_VERBOSE(1,verbose_stream() << "Entering level "<< lvl << "\n";);
+      IF_VERBOSE(1,verbose_stream() << VERBOSE_TIME << "Entering level "<< lvl << "\n";);
       IF_VERBOSE(1, 
           if (m_params.print_statistics ()) {
           statistics st;
@@ -2555,11 +2572,12 @@ namespace spacer {
 
       while (m_search.top ())
       {
-        checkpoint ();
         model_node_ref node;
+        checkpoint ();
 
         while (last_reachable)
         {
+          checkpoint ();
           node = last_reachable;
           last_reachable = NULL;
           if (m_search.is_root (*node)) return true;
@@ -2575,7 +2593,7 @@ namespace spacer {
         {
           model_node *n = m_search.top ();
           IF_VERBOSE (1,
-                      verbose_stream () << "Deleting closed node: "
+                      verbose_stream () << VERBOSE_TIME << "Deleting closed node: "
                       << n->pt ().head ()->get_name ()
                       << "(" << n->level () << ", " << n->depth () << ")"
                       << " " << n->post ()->get_id () << "\n";);
@@ -2590,7 +2608,7 @@ namespace spacer {
         {
           luby_idx++;
           threshold = static_cast<unsigned>(get_luby(luby_idx)) * restart_initial;
-          IF_VERBOSE (1, verbose_stream ()
+          IF_VERBOSE (1, verbose_stream () << VERBOSE_TIME
                       << "(restarting :obligations " << m_search.size ()
                       << " :restart_threshold " << threshold
                       << ")\n";);
@@ -2650,7 +2668,7 @@ namespace spacer {
            << mk_pp(n.post(), m) << "\n";);
     
     stopwatch watch;
-    IF_VERBOSE (1, verbose_stream () << "expand: " << n.pt ().head ()->get_name () 
+    IF_VERBOSE (1, verbose_stream () << VERBOSE_TIME << "expand: " << n.pt ().head ()->get_name () 
                 << " (" << n.level () << ", " 
                 << (n.depth () - m_search.min_depth ()) << ") "
                 << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
@@ -2683,7 +2701,7 @@ namespace spacer {
     if (get_params ().pdr_flexible_trace () && n.pt ().is_blocked (n, uses_level))
     {
       // if (!m_search.is_root (n)) n.close ();
-      IF_VERBOSE (1, verbose_stream () << " K "
+      IF_VERBOSE (1, verbose_stream () << VERBOSE_TIME << " K "
                   << std::fixed << std::setprecision(2) 
                   << watch.get_seconds () << "\n";);
 
@@ -2696,6 +2714,8 @@ namespace spacer {
 
     lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
                        reach_pred_used, num_reuse_reach);
+    checkpoint();
+
     switch (res) 
     {
       //reachable but don't know if this is purely using UA
@@ -2711,7 +2731,9 @@ namespace spacer {
         if (r && r->get_uninterpreted_tail_size () > 0)
         {
           reach_fact* rf = mk_reach_fact (n, mev, *r);
+          checkpoint();
           n.pt ().add_reach_fact (*rf);
+          checkpoint();
         }
         
         // if n has a derivation, create a new child and report l_undef
@@ -2720,6 +2742,7 @@ namespace spacer {
         if (n.has_derivation ())
         {
           next = n.get_derivation ().create_next_child ();
+          checkpoint();
           if (next) 
           { 
             // move derivation over to the next obligation
@@ -2736,15 +2759,17 @@ namespace spacer {
         // -- don't worry about remove n from the obligation queue
         n.close ();
         
-        IF_VERBOSE(1, verbose_stream () << (next ? " X " : " T ")
+        IF_VERBOSE(1, verbose_stream () << VERBOSE_TIME << (next ? " X " : " T ")
                    << std::fixed << std::setprecision(2) 
                    << watch.get_seconds () << "\n";);
         return next ? l_undef : l_true;
       }
+
+      checkpoint();
       
       // create a child of n
       create_children (n, *r, mev, reach_pred_used);
-      IF_VERBOSE(1, verbose_stream () << " U "
+      IF_VERBOSE(1, verbose_stream () << VERBOSE_TIME << " U "
                  << std::fixed << std::setprecision(2) 
                  << watch.get_seconds () << "\n";);
       return l_undef;
@@ -2761,6 +2786,7 @@ namespace spacer {
       
       // -- run all core generalizers
       for (unsigned i = 0; !cores.empty() && i < m_core_generalizers.size(); ++i) {
+        checkpoint();
         core_generalizer::cores new_cores;                    
         for (unsigned j = 0; j < cores.size(); ++j) 
           (*m_core_generalizers[i])(n, cores[j].first, cores[j].second, new_cores);
@@ -2789,15 +2815,17 @@ namespace spacer {
       }
       
       
-      IF_VERBOSE(1, verbose_stream () << " F "
+      IF_VERBOSE(1, verbose_stream () << VERBOSE_TIME << " F "
                  << std::fixed << std::setprecision(2) 
                  << watch.get_seconds () << "\n";);
 
+      checkpoint();
       return l_false;
     }
       //something went wrong
     case l_undef: 
-      TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
+      TRACE("spacer", tout << "unknown state: "
+              << mk_pp(m_pm.mk_and(cube), m) << "\n";);
       throw unknown_exception();
     }
     UNREACHABLE();
@@ -2831,7 +2859,7 @@ namespace spacer {
     if (m_params.pdr_simplify_formulas_pre()) {
       simplify_formulas();
     }
-    IF_VERBOSE (1, verbose_stream () << "Propagating: " << std::flush;);
+    IF_VERBOSE (1, verbose_stream () << VERBOSE_TIME << "Propagating: " << std::flush;);
     
     for (unsigned lvl = min_prop_lvl; lvl <= full_prop_lvl; lvl++) {
       IF_VERBOSE (1, 
@@ -2856,6 +2884,7 @@ namespace spacer {
       {
         for (it = m_rels.begin (); it != end; ++it)
         {
+          checkpoint ();
           pred_transformer& r = *it->m_value;
           r.propagate_to_infinity (lvl);
         }
@@ -3054,6 +3083,8 @@ namespace spacer {
           sum = pt.get_origin_summary (mev, prev_level (n.level ()),
                                        j, reach_pred_used [j], &aux);
           deriv->add_premise (pt, j, sum, reach_pred_used [j], aux);
+
+          checkpoint();
         }
         
         // create post for the first child and add to queue
@@ -3253,6 +3284,7 @@ namespace spacer {
   {
     std::string remote_node_invariants;
     unsigned ret = 0;
+    checkpoint();
     while (z3gasnet::context::pop_front_msg(remote_node_invariants))
     {
 

@@ -181,7 +181,21 @@ public:
     }
 
     double get_current_seconds() const { 
-    return get_seconds(); 
+        return get_seconds(); 
+    }
+
+    static spacer_wall_stopwatch & get_global_stopwatch()
+    {
+        static spacer_wall_stopwatch w;
+        return w;
+    }
+    static void start_global_stopwatch()
+    {
+        get_global_stopwatch().start();
+    }
+    static double get_global_stopwatch_seconds()
+    {
+        return get_global_stopwatch().get_seconds();
     }
 };
 } //namespace spacer

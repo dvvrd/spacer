@@ -30,6 +30,9 @@ profiles = {
     'solodistdef': ['--jobsize','1','--distprofile', 'def'],
     'solodistgpdr': ['--jobsize','1','--distprofile', 'gpdr'],
     'solodistic3': ['--jobsize','1','--distprofile', 'ic3'],
+    'origsolodistdef': ['--pve', '--jobsize','1','--distprofile', 'def'],
+    'origsolodistgpdr': ['--pve', '--jobsize','1','--distprofile', 'gpdr'],
+    'origsolodistic3': ['--pve', '--jobsize','1','--distprofile', 'ic3'],
 
     'solodistOc1def': ['--jobsize','1','--distprofile', 'Oc1def'],
     'solodistOc1gpdr': ['--jobsize','1','--distprofile', 'Oc1gpdr'],
