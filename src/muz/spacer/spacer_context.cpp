@@ -2408,7 +2408,7 @@ namespace spacer {
     //
     bool context::check_reachability () 
     {
-      timeit _timer (is_trace_enabled("spacer_timeit"), 
+      timeit _timer (get_verbosity_level () >= 1, 
                      "spacer::context::check_reachability", 
                      verbose_stream ());
 
@@ -2577,7 +2577,7 @@ namespace spacer {
       lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
                          reach_pred_used, num_reuse_reach);
       checkpoint ();
-      
+      IF_VERBOSE (1, verbose_stream () << "." << std::flush;);
       switch (res) 
       {
         //reachable but don't know if this is purely using UA
@@ -2717,7 +2717,7 @@ namespace spacer {
   bool context::propagate(unsigned min_prop_lvl, 
                           unsigned max_prop_lvl, unsigned full_prop_lvl) {    
     
-    timeit _timer (is_trace_enabled("spacer_timeit"), 
+    timeit _timer (get_verbosity_level() >= 1, 
                    "spacer::context::propagate", 
                    verbose_stream ());
     
