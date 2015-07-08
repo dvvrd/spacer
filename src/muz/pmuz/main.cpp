@@ -638,6 +638,13 @@ std::ostream &get_default_verbose_stream()
           << profile_vec[gasnet_mynode()] << ".verbose-"
           << (int) get_verbosity_level() << ".log";
 
+      //When launching from Mesos, we can get the stderr file, then 
+      //we can read the names of the individual profiles
+      std::stringstream nodemsg;
+      nodemsg << "BRUNCH_STAT verbosefile " << nodelogfilename.str() << "\n";
+      std::cerr << nodemsg.str();
+      std::cerr.flush();
+
       static std::ofstream verbose_file_stream(
               nodelogfilename.str().c_str());
       return verbose_file_stream;
