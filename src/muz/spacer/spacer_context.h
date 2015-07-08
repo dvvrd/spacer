@@ -843,12 +843,10 @@ namespace spacer {
     const model_node& n1 = *pn1; 
     const model_node& n2 = *pn2;
       
-    if (n1.level () < n2.level ()) return true;
-    if (n1.level () > n2.level ()) return false;
+    if (n1.level () != n2.level ()) return n1.level () < n2.level ();
       
-    if (n1.depth () < n2.depth ()) return true;
-    if (n1.depth () > n2.depth ()) return false;
-      
+    if (n1.depth () != n2.depth ()) return n1.depth () < n2.depth ();
+    
     // -- a more deterministic order of proof obligations in a queue
     if (!n1.get_context ().get_params ().spacer_nondet_tie_break ())
     {
@@ -865,8 +863,7 @@ namespace spacer {
       
       if (m.is_and (p1)) sz1 = to_app (p1)->get_num_args ();
       if (m.is_and (p2)) sz2 = to_app (p2)->get_num_args ();
-      if (sz1 < sz2) return true;
-      if (sz1 > sz2) return false;
+      if (sz1 != sz2) return sz1 < sz2;
       
       // -- when all else fails, order by identifiers of the
       // -- expressions.  This roughly means that expressions created
@@ -875,14 +872,11 @@ namespace spacer {
       // -- order over predicates as well. That is, two expressions
       // -- are equal if and only if they correspond to the same proof
       // -- obligation of the same predicate.
-      if (p1->get_id () < p2->get_id ()) return true;
-      if (p1->get_id () > p1->get_id ()) return false;
+      if (p1->get_id () != p2->get_id ()) return p1->get_id () < p2->get_id ();
       
+      SASSERT (n1.pt ().head ()->get_id () != n2.pt ().head ()->get_id ());
       // -- if expression comparison fails, compare by predicate id
       return n1.pt ().head ()->get_id () < n2.pt ().head ()->get_id ();
-      
-      ast_lt_proc ast_lt;
-      return ast_lt (p1, p2);
     }
     else
       return &n1 < &n2;
