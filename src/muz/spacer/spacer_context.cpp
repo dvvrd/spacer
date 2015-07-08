@@ -2650,12 +2650,15 @@ namespace spacer {
         
         // -- run all core generalizers
         for (unsigned i = 0; 
-             !cores.empty() && i < m_core_generalizers.size(); ++i) {
+             // -- only generalize if lemma was constructed using farkas
+             n.use_farkas_generalizer () && 
+             !cores.empty() && i < m_core_generalizers.size(); 
+             ++i) {
           checkpoint ();
           core_generalizer::cores new_cores;                    
           for (unsigned j = 0; j < cores.size(); ++j) 
-            (*m_core_generalizers[i])(n, cores[j].first, 
-                                      cores[j].second, new_cores);
+            (*m_core_generalizers[i])(n, cores[j].first, cores[j].second, 
+                                      new_cores);
           cores.reset ();
           cores.append (new_cores);
         }
