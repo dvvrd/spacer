@@ -822,21 +822,7 @@ int main(int argc, char ** argv) {
 
         bool repeat = false;
         unsigned restarts = 0;
-        #pragma omp sections
-        {
-        #pragma omp section
-        {
         do { return_value = core_main(repeat,restarts++); } while (repeat);
-        }
-        #pragma omp section
-        {
-        do { 
-            std::cout << "polling\n"; 
-            gasnet_AMPoll(); 
-        } while (true);
-        }
-        }
-
 
 #ifdef Z3GASNET
         STRACE("gas", Z3GASNET_TRACE_PREFIX 
