@@ -462,10 +462,10 @@ bool context::pop_front_msg(std::string &next_message)
     m_stats.pop_time.start();
 #endif
 
-  // Poll GASNet to assure any pending message handlers get called
-    STRACE("gas", Z3GASNET_TRACE_PREFIX 
-        << "polling for messages from pop_front_msg\n" ;);
-  Z3GASNET_CHECKCALL(gasnet_AMPoll());
+//// Poll GASNet to assure any pending message handlers get called
+//  STRACE("gas", Z3GASNET_TRACE_PREFIX 
+//      << "polling for messages from pop_front_msg\n" ;);
+//Z3GASNET_CHECKCALL(gasnet_AMPoll());
   // perform one read from work q
   process_work_queue_item();
 

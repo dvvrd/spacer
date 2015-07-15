@@ -757,11 +757,13 @@ static void pmuz_sigalrm_handler(int signum)
         gasnet_sigalrm_handler(signum);
     }
 
+    if (!polling_is_on) return;
+
     Z3GASNET_CHECKCALL(gasnet_AMPoll());
 
     maybe_set_poll_signal();
-    spacer::spacer_wall_stopwatch &maintimer = spacer::spacer_wall_stopwatch::get_global_stopwatch();
-    IF_VERBOSE (1, verbose_stream () << "\nPolling at  " << maintimer.get_seconds() << "\n"; verbose_stream().flush(); );
+//  spacer::spacer_wall_stopwatch &maintimer = spacer::spacer_wall_stopwatch::get_global_stopwatch();
+//  IF_VERBOSE (1, verbose_stream () << "\nPolling at  " << maintimer.get_seconds() << "\n"; verbose_stream().flush(); );
 }
 
 
