@@ -712,8 +712,6 @@ namespace spacer {
 
         unsigned m_node_budget;
 
-        double m_last_poll_time;
-
 #endif
         
         // Functions used by search.

@@ -726,6 +726,44 @@ static void pmuz_sigquit_handler(int signum)
     gasnet_exit(123);
 }
 
+
+
+
+static void (*gasnet_sigalrm_handler)(int) = NULL;
+
+static bool polling_is_on = false;
+static void maybe_set_poll_signal()
+{
+    if (!polling_is_on) return;
+    static struct itimerval tout_val = {};
+    tout_val.it_value.tv_sec = 1; /* 1 seconds timer */
+    setitimer(ITIMER_REAL, &tout_val,0);
+}
+static void start_polling()
+{
+    if (polling_is_on) return;
+    polling_is_on = true;
+    maybe_set_poll_signal();
+}
+static void stop_polling()
+{
+    polling_is_on = false;
+}
+
+static void pmuz_sigalrm_handler(int signum)
+{
+    if (gasnet_sigalrm_handler){
+        std::cerr << "There was a sigalrm handler!\n";
+        gasnet_sigalrm_handler(signum);
+    }
+
+    Z3GASNET_CHECKCALL(gasnet_AMPoll());
+
+    maybe_set_poll_signal();
+}
+
+
+
 //custom handler is for testing use kill -50 to trigger it
 static void (*gasnet_sigcustom_handler)(int) = NULL;
 
@@ -754,6 +792,15 @@ void set_signal_handlers()
     sigemptyset(&pmuz_handler.sa_mask);
     sigaction(SIGQUIT, &pmuz_handler, NULL);
 
+
+    // we use SIGALRM for a timer for when to poll for gasnet messages
+
+    sigaction(SIGALRM, NULL, &gasnet_handler);
+    gasnet_sigalrm_handler = gasnet_handler.sa_handler;
+    memset(&pmuz_handler, 0, sizeof(pmuz_handler));
+    pmuz_handler.sa_handler = pmuz_sigalrm_handler;
+    sigemptyset(&pmuz_handler.sa_mask);
+    sigaction(SIGALRM, &pmuz_handler, NULL);
 
     //randomly chose signal 50 for use for testing, this should be 
     //removed after constuction is complete
@@ -800,6 +847,8 @@ int main(int argc, char ** argv) {
         set_signal_handlers();
 
         z3gasnet::context::set_seginfo_table();
+
+        start_polling();
 
 #endif
 
@@ -866,6 +915,7 @@ int main(int argc, char ** argv) {
     stop_main_timer();
 
 #ifdef Z3GASNET
+    stop_polling();
     gasnet_exit(return_value);
     Z3GASNET_VERBOSE_STREAM( std::cout, << "Never shall you see this!!!!!!!!!!!!!!!\n");
 #endif
