@@ -687,7 +687,7 @@ void print_exit_message(std::string exitcase, int exitcode)
             << " at: " << maintimer.get_seconds() << "\n";
 #endif
 
-    IF_VERBOSE (1, verbose_stream () << exitmsg.str(); std::cerr.flush(););
+    IF_VERBOSE (1, verbose_stream () << exitmsg.str(); verbose_stream().flush(););
 }
 
 
@@ -699,8 +699,8 @@ void stop_main_timer()
     maintimerstat << "BRUNCH_STAT main_time "
         << spacer::spacer_wall_stopwatch::get_global_stopwatch_seconds()
         << "\n";
-    verbose_stream() << maintimerstat.str(); 
-    verbose_stream().flush();
+    std::cout << maintimerstat.str(); 
+    std::cout.flush();
 }
 
 #ifdef Z3GASNET
@@ -760,6 +760,8 @@ static void pmuz_sigalrm_handler(int signum)
     Z3GASNET_CHECKCALL(gasnet_AMPoll());
 
     maybe_set_poll_signal();
+    spacer::spacer_wall_stopwatch &maintimer = spacer::spacer_wall_stopwatch::get_global_stopwatch();
+    IF_VERBOSE (1, verbose_stream () << "\nPolling at  " << maintimer.get_seconds() << "\n"; verbose_stream().flush(); );
 }
 
 
@@ -848,7 +850,6 @@ int main(int argc, char ** argv) {
 
         z3gasnet::context::set_seginfo_table();
 
-        start_polling();
 
 #endif
 
@@ -871,6 +872,7 @@ int main(int argc, char ** argv) {
 
         bool repeat = false;
         unsigned restarts = 0;
+        start_polling();
         do { return_value = core_main(repeat,restarts++); } while (repeat);
 
 #ifdef Z3GASNET
@@ -912,10 +914,10 @@ int main(int argc, char ** argv) {
         }
     }
 
+    stop_polling();
     stop_main_timer();
 
 #ifdef Z3GASNET
-    stop_polling();
     gasnet_exit(return_value);
     Z3GASNET_VERBOSE_STREAM( std::cout, << "Never shall you see this!!!!!!!!!!!!!!!\n");
 #endif
