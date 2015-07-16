@@ -874,7 +874,9 @@ int main(int argc, char ** argv) {
 
         bool repeat = false;
         unsigned restarts = 0;
-        start_polling();
+
+        // if you were going to poll, you may like to start it here
+        // start_polling();
         do { return_value = core_main(repeat,restarts++); } while (repeat);
 
 #ifdef Z3GASNET
@@ -916,7 +918,9 @@ int main(int argc, char ** argv) {
         }
     }
 
-    stop_polling();
+    // if you were going to poll, you may like to stop it here
+    //stop_polling();
+
     stop_main_timer();
 
 #ifdef Z3GASNET

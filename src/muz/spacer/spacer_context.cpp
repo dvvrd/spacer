@@ -1608,6 +1608,7 @@ namespace spacer {
     z3gasnet::context::set_params(
         (void*) const_cast<fixedpoint_params*>(&m_params));
 
+    m_last_poll_time = -1;
 #endif
   }
 
@@ -2098,7 +2099,23 @@ namespace spacer {
 
   void context::checkpoint() {
 #ifdef Z3GASNET
+    STRACE("gas", Z3GASNET_TRACE_PREFIX 
+        << "polling for messages from checkpoint\n" ;);
 
+    double polltime = spacer_wall_stopwatch::get_global_stopwatch_seconds();
+    if (m_last_poll_time != -1)
+    {
+        double poll_period = polltime - m_last_poll_time;
+        if (poll_period > 1.0)
+        {
+          IF_VERBOSE(1, 
+              verbose_stream () << "\n" << VERBOSE_TIME 
+              << "WARNING: It has been " << poll_period << " seconds since the last poll\n";);
+        }
+    }
+    m_last_poll_time = polltime;
+
+    Z3GASNET_CHECKCALL(gasnet_AMPoll());
 
     if (get_params().pmuz_node_restarts()) {
       if (!(m_node_budget % 100))
