@@ -511,6 +511,7 @@ void set_profile_params(const std::string &profile)
   PMUZ_SET_PARAM("Ltn","fixedpoint.spacer.lemma_transmit_style","None");
   PMUZ_SET_PARAM("Ltm","fixedpoint.spacer.lemma_transmit_style","Node0");
   PMUZ_SET_PARAM("Rdt","fixedpoint.spacer.reach_dnf","true");
+  PMUZ_SET_PARAM("Pvt","fixedpoint.xform.tail_simplifier_pve","true");
 
 
 }
