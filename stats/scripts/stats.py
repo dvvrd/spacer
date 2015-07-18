@@ -22,7 +22,7 @@ class WallStopwatch:
   def elapsed (self): 
     """ Returns time (in seconds) since the stopwatch has been started. """
     if self._wall_finished < self._wall_started:
-        td = self._wall_elapsed + (datetime.now() - self._started)
+        td = self._wall_elapsed + (datetime.now() - self._wall_started)
     else:
         td = self._wall_elapsed + (self._wall_finished - self._wall_started)
     return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / float(10**6)
