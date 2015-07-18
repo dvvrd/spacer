@@ -93,8 +93,7 @@ profile_excl = {
         'Lt' : ["Ltr","Ltl","Lto","Ltx","Ltn","Ltm"],
         'Oc' : ["Oc1"],
         'Eat': ["Eat"],
-        'Rdt': ["Rdt"],
-        'Pvt': ["Pvt"]
+        'Rdt': ["Rdt"]
         }
 
 def inodeprofiles():
@@ -206,13 +205,6 @@ def parseArgs (argv):
                     action='store', help='restart z3 nodes after performing given ammount of work budget, or -1 to disable restarts')
     p.add_argument ('--print-profiles', dest='print_profiles', type=int, default=-1,
                     action='store', help='print avilable profiles for specified number of nodes, then exit')
-    p.add_argument ('--mesos-master', dest='mesos_master',
-                    action='store', help='The host and port of the mesos master, setting this indicates that psmcframework will be used'
-                    ' to launch the job on mesos, and the --gasnet-spawnfn then should not be specified', default=None)
-    p.add_argument ('--mesos-root', dest='mesos_root',
-                    action='store', help='The mesos installation root, needed when specifying --mesos-master', default=None)
-    p.add_argument ('--mesos-name', dest='mesos_name', default='z3_smt2.py_framework', action='store',
-            help='Name for the mesos framework, identifies the job in mesos, and controls output dir name')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -277,33 +269,12 @@ def which(program):
 def compute_z3_args (args):
     z3_args = which ('pmuz')
 
+    if args.jobsize != -1:
+        z3_args += ' %d' % int(args.jobsize)
+
     if z3_args is None:
         print 'No executable named "z3" found in current directory or PATH'
         return
-
-    if args.mesos_master is not None:
-        pmuz = os.path.realpath(z3_args)
-        psmcframework = which('psmcframework')
-        if psmcframework is None:
-            print 'No executable named "psmcframework" found in current directory or PATH'
-            return
-        psmcframework = os.path.realpath(psmcframework)
-
-        z3_args = psmcframework + " --mesos-master=" + args.mesos_master
-
-        if args.jobsize != -1:
-            z3_args += ' --cluster-size=%d' % int(args.jobsize)
-
-        if args.mesos_root is not None:
-            z3_args += ' --mesos-root=' + args.mesos_root
-
-        if args.mesos_name is not None:
-            z3_args += ' --name=' + args.mesos_name
-
-        z3_args += ' -- ' + pmuz
-
-    elif args.jobsize != -1:
-        z3_args += ' %d' % int(args.jobsize)
 
     z3_args += ' -v:' + str(args.verbose)
 
