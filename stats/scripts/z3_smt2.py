@@ -9,6 +9,7 @@ import itertools
 import hashlib
 import pprint
 import random
+import time
 
 profiles = {
     ## skip propagation but drive the search as deep as possible
@@ -95,6 +96,8 @@ profile_excl = {
         'Eat': ["Eat"],
         'Rdt': ["Rdt"]
         }
+
+slavecmdfile = None
 
 def inodeprofiles():
     for i in profile_base: yield i
@@ -205,6 +208,13 @@ def parseArgs (argv):
                     action='store', help='restart z3 nodes after performing given ammount of work budget, or -1 to disable restarts')
     p.add_argument ('--print-profiles', dest='print_profiles', type=int, default=-1,
                     action='store', help='print avilable profiles for specified number of nodes, then exit')
+    p.add_argument ('--mesos-master', dest='mesos_master',
+                    action='store', help='The host and port of the mesos master, setting this indicates that psmcframework will be used'
+                    ' to launch the job on mesos, and the --gasnet-spawnfn then should not be specified', default=None)
+    p.add_argument ('--mesos-root', dest='mesos_root',
+                    action='store', help='The mesos installation root, needed when specifying --mesos-master', default=None)
+    p.add_argument ('--mesos-name', dest='mesos_name', default='z3_smt2.py_framework', action='store',
+            help='Name for the mesos framework, identifies the job in mesos, and controls output dir name')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -269,12 +279,12 @@ def which(program):
 def compute_z3_args (args):
     z3_args = which ('pmuz')
 
-    if args.jobsize != -1:
-        z3_args += ' %d' % int(args.jobsize)
-
     if z3_args is None:
         print 'No executable named "z3" found in current directory or PATH'
         return
+
+    if args.jobsize != -1:
+        z3_args += ' %d' % int(args.jobsize)
 
     z3_args += ' -v:' + str(args.verbose)
 
@@ -361,6 +371,17 @@ def compute_z3_args (args):
     if args.gasnet_spawnfn:
         os.environ['GASNET_SPAWNFN'] = args.gasnet_spawnfn
         print 'GASNET_SPAWNFN is', os.environ['GASNET_SPAWNFN']
+        if args.gasnet_spawnfn == "C":
+            global slavecmdfile
+            if which('portfolio_framework') is None:
+                raise Exception("portfolio_framework is not in current dir or in PATH")
+            if args.mesos_master is None:
+                raise Exception("--mesos-master is not set, could be like --mesos-master=n001.etc.sei.cmu.edu:5050")
+            if args.mesos_root is None:
+                raise Exception("--mesos-root is not set, could be like --mesos-root=/opt/mesos")
+            slavecmdfile = os.path.join('/tmp',
+                    os.path.basename(args.file) + '.slave.' + str(int(time.time()*100)))
+            os.environ['GASNET_CSPAWN_CMD']="echo \"%%N\n%%C\n%%D\"> %s" % slavecmdfile
 
     if (args.verify_msgs):
         z3_args += ' fixedpoint.gasnet.verify_msgs=true'
@@ -383,17 +404,57 @@ def compute_z3_args (args):
 
     return z3_args
 
+def try_read_slavecmdfile(slavecmdfile):
+    content = []
+    try:
+        with open(slavecmdfile) as f:
+                content = f.readlines()
+        if len(content) == 3:
+            slot = content[1].find('/bin/sh -c')
+            if slot != -1:
+                content[1] = content[1][slot+len('/bin/sh -c'):]
+
+            slot = content[1].find('||')
+            if slot != -1:
+                content[1] = content[1][0:slot]
+        content = [x.strip() for x in content]
+    except IOError:
+        pass
+    return content
+
+def compute_portfolio_args(args,portfolio_size,command,output_path):
+    pfargs = []
+    portfolio_framework = which("portfolio_framework")
+    pfargs.append(portfolio_framework)
+    pfargs.append('--portfolio-size=%s' % portfolio_size)
+    pfargs.append('--mesos-master=%s' % args.mesos_master)
+    pfargs.append('--mesos-root=%s' % args.mesos_root)
+    pfargs.append('--cpus-per-cmd=1')
+    pfargs.append('--mb-mem-per-cmd=%s' % args.mem)
+    pfargs.append('--name=%s' % args.mesos_name)
+    pfargs.append('--output-path=%s' % output_path)
+    pfargs.append('--')
+    pfargs.append('timeout %d' % args.cpu)
+    pfargs.append(command)
+
+    return ' '.join(pfargs)
+
+
+
 
 # inspred from:
 # http://stackoverflow.com/questions/4158502/python-kill-or-terminate-subprocess-when-timeout
 class RunCmd(threading.Thread):
-    def __init__(self, cmd, cpu, mem):
+    def __init__(self, cmd, cpu, mem, args, slavecmdfile):
         threading.Thread.__init__(self)
         self.cmd = cmd 
         self.cpu = cpu
         self.mem = mem
+        self.args = args
         self.p = None
         self.stdout = None
+        self.portfolio = None
+        self.slavecmdfile = slavecmdfile
 
     def run(self):
         def set_limits ():
@@ -410,7 +471,30 @@ class RunCmd(threading.Thread):
         self.p = subprocess.Popen(self.cmd,
                 stdout=subprocess.PIPE,
                 preexec_fn=set_limits)
-        self.stdout, unused = self.p.communicate()
+        pfo = None
+        if self.slavecmdfile is not None:
+            scfcontent = []
+            while len(scfcontent) != 3:
+                scfcontent = try_read_slavecmdfile(self.slavecmdfile)
+
+            portfolio_args = compute_portfolio_args(
+                self.args,int(scfcontent[0]),scfcontent[1],scfcontent[2])
+
+            print 'portfolio command:'
+            print portfolio_args
+
+            self.portfolio_framework = subprocess.Popen(
+                    portfolio_args.split(),
+                    stdout=subprocess.PIPE)
+
+            pfo, pfe = self.portfolio_framework.communicate()
+        o,e = self.p.communicate()
+
+        if pfo is not None:
+            self.stdout = "BEGIN PORTFOLIO STDOUT\n%s\nEND PORTFOLIO STDOUT\n%s" % (pfo,o)
+        else:
+            self.stdout = o
+
 
     def Run(self):
         returncode=19
@@ -426,11 +510,15 @@ class RunCmd(threading.Thread):
             if self.is_alive():
                 print 'z3 has most likely timed out'
                 self.p.terminate()
+                if self.portfolio:
+                    self.portfolio.terminate()
                 self.join(5)
 
             if self.is_alive():
                 print 'z3 is still alive after attempt to terminate, sending kill'
                 self.p.kill()
+                if self.portfolio:
+                    self.portfolio.kill()
 
             returncode = self.p.returncode
 
@@ -466,7 +554,7 @@ def main (argv):
     stat ('File', args.file)
     stat ('base', os.path.basename (args.file))
 
-    cmd = RunCmd(z3_args.split(), args.cpu, args.mem)
+    cmd = RunCmd(z3_args.split(), args.cpu, args.mem, args, slavecmdfile)
     with stats.timer ('Query'):
         returncode = cmd.Run()
     res = cmd.stdout
@@ -503,5 +591,7 @@ if __name__ == '__main__':
         res = main (sys.argv)
     finally:
         stats.brunch_print ()
+    sys.stdout.flush()
+    sys.stderr.flush()
     sys.exit (res)
 
