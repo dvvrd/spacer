@@ -533,6 +533,8 @@ void set_profile(std::vector<std::string> profile_vec)
     throw z3_error(ERR_CMD_LINE);
   }
 
+  std::cout << "BRUNCH_STAT node_profile " << profile_vec[gasnet_mynode()] <<"\n"; std::cout.flush();
+
   set_profile_params(profile_vec[gasnet_mynode()]);
 
 #else
