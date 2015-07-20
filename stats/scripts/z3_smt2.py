@@ -219,6 +219,8 @@ def parseArgs (argv):
             help='copy outputs from mesos slaves to this directory')
     p.add_argument ('--mesos-verbose', dest='mesos_verbose', default=0, action='store',
             help='verbosity of the portfolio mesos framework')
+    p.add_argument ('--mesos-output-summary', dest='mesos_output_sumary', default=False, action='store_true',
+            help='Show a summary of all completed portfolio tasks')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -532,6 +534,34 @@ class RunCmd(threading.Thread):
         return returncode
 
 
+def process_task_stdout(ofilepath):
+    outdict = {}
+    maintimesearchstr = 'BRUNCH_STAT main_time '
+    nodeprofilesearchstr = 'BRUNCH_STAT node_profile '
+    statussearchstr = 'Command exited with status '
+
+    with open(ofilepath) as ofile:
+        for line in ofile:
+            # finishes will store a list of tuples of info about finished tasks
+            if 'VERIFICATION SUCCESSFUL' in line:
+                outdict['pmuz_result'] = 'VERIFICATION SUCCESSFUL'
+            elif 'VERIFICATION FAILED' in line:
+                outdict['pmuz_result'] = 'VERIFICATION FAILED'
+            elif 'VERIFICATION UNDEDFINED' in line:
+                outdict['pmuz_result'] = 'VERIFICATION UNDEDFINED'
+            elif maintimesearchstr in line:
+                maintimestr = line[len(maintimesearchstr):].strip()
+                outdict['main_time'] = float(maintimestr)
+            elif nodeprofilesearchstr in line:
+                outdict['node_profile'] = line[len(nodeprofilesearchstr):].strip()
+            elif statussearchstr in line:
+                statusstr = line[len(statussearchstr):].strip()
+                slot = statusstr.find(' ')
+                if slot != -1 and slot > 0:
+                    statusstr = statusstr[:slot].strip()
+                    outdict['status'] = int(statusstr)
+
+    return outdict
 
 def main (argv):
     ## add directory containing this file to the PATH
@@ -563,10 +593,12 @@ def main (argv):
     print 'BEGIN SUBPROCESS STDOUT'
     print res;
     print 'END SUBPROCESS STDOUT'
+    # begin special handling to ger mesos task
     # if this was a mesos portfolio framework run
     if slavecmdfile is not None:
         lines = res.split("\n")
-        finishes=[]
+        finished_tasks = {}
+        first_mentioned_task = None
         # determine all of the finished tasks that look like they acruallt
         # completed running a pmuz
         for line in lines:
@@ -577,67 +609,80 @@ def main (argv):
                 ofilepath = os.path.join(
                         args.mesos_outdir,
                         "%s.%d.stdout" % (args.mesos_name,taskid))
-                with open(ofilepath) as ofile:
-                    res = ofile.read()
+                taskdict = process_task_stdout(ofilepath)
+                if taskid in finished_tasks:
+                    print 'ERROR : Same task finished twice?'
+                    returncode = 1
+                    exit(returncode)
+                finished_tasks[taskid] = taskdict
+                if first_mentioned_task is None: first_mentioned_task = taskid
 
-                # finishes will store a list of tuples of info about finished tasks
-                if 'VERIFICATION SUCCESSFUL' in res:
-                    finishes.append(('VERIFICATION SUCCESSFUL', taskid, res))
-                elif 'VERIFICATION FAILED' in res:
-                    finishes.append(('VERIFICATION FAILED', taskid, res))
-                elif 'VERIFICATION UNDEDFINED' in res:
-                    finishes.append(('VERIFICATION UNDEDFINED', taskid, res))
-
-        #print 'FINISHES: ', [(x[0],x[1]) for x in finishes]
-
-        # check that all returned the same answer 
-        if len(set([x[0] for x in finishes])) != 1:
-            print 'ERROR: Tasks to not agree on answer: ', [(x[0],x[1]) for x in finishes]
-            exit(1)
-
-        # Pick the fastest one from all finishers
+        if args.mesos_output_sumary:
+            print 'Finished Task Summary:'
+            for k,v in finished_tasks.items():
+                print ' Task',k,':',v
+            
+        # determine the tasks that have all the expected information gleaned from        
+        # stdout, these should be tasks that didn't get a kill signal in time to
+        # finish on thier own, and pick which one is the fastest
         fastesttask = None
-        fastesttime = None
-        for finish in finishes:
-            lines = finish[2].split("\n")
-            for line in lines:            
-                searchstr = 'BRUNCH_STAT main_time '
-                if searchstr in line:                
-                    maintimestr = line[len(searchstr):].strip()
-                    maintime = float(maintimestr)
-                    if fastesttime is None or maintime < fastesttime:
-                        fastesttime = maintime
-                        fastesttask = finish
+        fully_finished_tasks = {}
+        for k,v in finished_tasks.items():
+            if 'pmuz_result' not in v: continue
+            if 'status' not in v: continue
+            if 'main_time' not in v: continue
+            fully_finished_tasks[k] = v
 
+            if fastesttask is None or v['main_time'] < finished_tasks[fastesttask]['main_time']:
+                fastesttask = k
 
-        # if fastest task could not be determined, choose the first one
-        if fastesttask is None and len(finishes) > 0:                
-            print 'Fastest completing task could not be derermined'
-            fastesttask = finishes[0]
+        # check that all returned the same answer as the fastest task
+        if fastesttask is not None:
+            for k,v in fully_finished_tasks.items():            
+                if v['pmuz_result'] != fully_finished_tasks[fastesttask]['pmuz_result']:
+                    print 'ERROR: Tasks to not agree on answer: ', fully_finished_tasks
+                    returncode = 1
+                    exit(returncode)
+        else:
+            # the fastest task could not be determined (by looking for the stat main_time
+            # in this case we will pick the best representative we can, the first one to print
+            fastesttask = first_mentioned_task
+            print 'Fastest completing task could not be reliably determined, chose to use task', fastesttask
+
 
         # display the stdout of the winner
-        if fastesttask is not None:
+        if fastesttask is None:
+            res = ""
+            print 'There were no finished portfolio tasks'
+            if returncode == 0: returncode = 5
+        else:
+            # adopt the return code of the fastest process
+            if 'status' not in finished_tasks[fastesttask]:
+                print 'WARNING: Task finished without Status'
+                if returncode == 0: returncode = 5
+            else:
+                returncode = finished_tasks[fastesttask]['status']
+
+            if 'main_time' not in finished_tasks[fastesttask]:
+                print 'WARNING: Task finished without main_time'
+            else: stat('main_time',finished_tasks[fastesttask]['main_time'])
+
+            if 'node_profile' not in finished_tasks[fastesttask]:
+                print 'WARNING: Task finished without node_profile'
+            else: stat('node_profile',finished_tasks[fastesttask]['node_profile'])
+            
+
             ofilepath = os.path.join(
                     args.mesos_outdir,
-                    "%s.%d.stdout" % (args.mesos_name,fastesttask[1]))
-            print 'Showing output from portfolio task', fastesttask[1], ":", ofilepath
-            print 'BEGIN PORTFOLIO TASK STDOUT'
+                    "%s.%d.stdout" % (args.mesos_name,fastesttask))
+            print 'Using output from portfolio task', fastesttask, ":", ofilepath
             with open(ofilepath) as ofile:
                 res = ofile.read()
-                print res
-            print 'END PORTFOLIO TASK STDOUT'
-        else:
-            print 'There were no finished portfolio tasks'
 
-
-    # if in portfolio mode, res should be reassigned to the winning task's stdout
-    lines = res.split("\n")
-    for line in lines:            
-        searchstr = 'BRUNCH_STAT main_time '
-        if searchstr in line:                
-            maintimestr = line[len(searchstr):].strip()
-            maintime = float(maintimestr)
-            stat('main_time',maintime)
+        print 'BEGIN PORTFOLIO TASK STDOUT'
+        print res
+        print 'END PORTFOLIO TASK STDOUT'
+        # end special handling to ger mesos task
 
     if res is None:
         res = 'unknown'
