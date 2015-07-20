@@ -588,7 +588,7 @@ def main (argv):
                 elif 'VERIFICATION UNDEDFINED' in res:
                     finishes.append(('VERIFICATION UNDEDFINED', taskid, res))
 
-        print 'FINISHES: ', [(x[0],x[1]) for x in finishes]
+        #print 'FINISHES: ', [(x[0],x[1]) for x in finishes]
 
         # check that all returned the same answer 
         if len(set([x[0] for x in finishes])) != 1:
@@ -612,14 +612,14 @@ def main (argv):
 
         # if fastest task could not be determined, choose the first one
         if fastesttask is None and len(finishes) > 0:                
-            print 'COULD NOT DETERMINE FASTEST TASK'
+            print 'Fastest completing task could not be derermined'
             fastesttask = finishes[0]
 
         # display the stdout of the winner
         if fastesttask is not None:
             ofilepath = os.path.join(
                     args.mesos_outdir,
-                    "%s.%d.stdout" % (args.mesos_name,taskid))
+                    "%s.%d.stdout" % (args.mesos_name,fastesttask[1]))
             print 'Showing output from portfolio task', fastesttask[1], ":", ofilepath
             print 'BEGIN PORTFOLIO TASK STDOUT'
             with open(ofilepath) as ofile:
