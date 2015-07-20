@@ -618,9 +618,13 @@ def main (argv):
                 if first_mentioned_task is None: first_mentioned_task = taskid
 
         if args.mesos_output_sumary:
-            print 'Finished Task Summary:'
-            for k,v in finished_tasks.items():
-                print ' Task',k,':',v
+            if len(finished_tasks) > 0:
+                print 'Finished Task Summary:'
+                for k,v in finished_tasks.items():
+                    print ' Task',k,':',v
+            else: 
+                print 'No finished tasks for summary, manually inspect outputs:'
+                print ' ',os.path.join( args.mesos_outdir, "%s.*" % (args.mesos_name))
             
         # determine the tasks that have all the expected information gleaned from        
         # stdout, these should be tasks that didn't get a kill signal in time to
