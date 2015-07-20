@@ -215,6 +215,10 @@ def parseArgs (argv):
                     action='store', help='The mesos installation root, needed when specifying --mesos-master', default=None)
     p.add_argument ('--mesos-name', dest='mesos_name', default='z3_smt2.py_framework', action='store',
             help='Name for the mesos framework, identifies the job in mesos, and controls output dir name')
+    p.add_argument ('--mesos-output-dir', dest='mesos_outdir', default='.', action='store',
+            help='copy outputs from mesos slaves to this directory')
+    p.add_argument ('--mesos-verbose', dest='mesos_verbose', default=0, action='store',
+            help='verbosity of the portfolio mesos framework')
 
     # HACK: profiles as a way to provide multiple options at once
     global profiles
@@ -422,7 +426,7 @@ def try_read_slavecmdfile(slavecmdfile):
         pass
     return content
 
-def compute_portfolio_args(args,portfolio_size,command,output_path):
+def compute_portfolio_args(args,portfolio_size,command):
     pfargs = []
     portfolio_framework = which("portfolio_framework")
     pfargs.append(portfolio_framework)
@@ -432,7 +436,9 @@ def compute_portfolio_args(args,portfolio_size,command,output_path):
     pfargs.append('--cpus-per-cmd=1')
     pfargs.append('--mb-mem-per-cmd=%s' % args.mem)
     pfargs.append('--name=%s' % args.mesos_name)
-    pfargs.append('--output-path=%s' % output_path)
+    pfargs.append('--output-path=%s' % args.mesos_outdir)
+    pfargs.append('--copy-outputs')
+    pfargs.append('--verbose=%d' % int(args.mesos_verbose))
     pfargs.append('--')
     pfargs.append('timeout %d' % args.cpu)
     pfargs.append(command)
@@ -478,7 +484,7 @@ class RunCmd(threading.Thread):
                 scfcontent = try_read_slavecmdfile(self.slavecmdfile)
 
             portfolio_args = compute_portfolio_args(
-                self.args,int(scfcontent[0]),scfcontent[1],scfcontent[2])
+                self.args,int(scfcontent[0]),scfcontent[1])
 
             print 'portfolio command:'
             print portfolio_args
@@ -490,11 +496,7 @@ class RunCmd(threading.Thread):
             pfo, pfe = self.portfolio_framework.communicate()
         o,e = self.p.communicate()
 
-        if pfo is not None:
-            self.stdout = "BEGIN PORTFOLIO STDOUT\n%s\nEND PORTFOLIO STDOUT\n%s" % (pfo,o)
-        else:
-            self.stdout = o
-
+        self.stdout = "\n".join([o,pfo]).strip()
 
     def Run(self):
         returncode=19
@@ -561,6 +563,81 @@ def main (argv):
     print 'BEGIN SUBPROCESS STDOUT'
     print res;
     print 'END SUBPROCESS STDOUT'
+    # if this was a mesos portfolio framework run
+    if slavecmdfile is not None:
+        lines = res.split("\n")
+        finishes=[]
+        # determine all of the finished tasks that look like they acruallt
+        # completed running a pmuz
+        for line in lines:
+            searchstr = "%s finished task: " % args.mesos_name
+            if searchstr in line:
+                taskidstr = line[len(searchstr):].strip()
+                taskid = int(taskidstr)
+                ofilepath = os.path.join(
+                        args.mesos_outdir,
+                        "%s.%d.stdout" % (args.mesos_name,taskid))
+                with open(ofilepath) as ofile:
+                    res = ofile.read()
+
+                # finishes will store a list of tuples of info about finished tasks
+                if 'VERIFICATION SUCCESSFUL' in res:
+                    finishes.append(('VERIFICATION SUCCESSFUL', taskid, res))
+                elif 'VERIFICATION FAILED' in res:
+                    finishes.append(('VERIFICATION FAILED', taskid, res))
+                elif 'VERIFICATION UNDEDFINED' in res:
+                    finishes.append(('VERIFICATION UNDEDFINED', taskid, res))
+
+        print 'FINISHES: ', [(x[0],x[1]) for x in finishes]
+
+        # check that all returned the same answer 
+        if len(set([x[0] for x in finishes])) != 1:
+            print 'ERROR: Tasks to not agree on answer: ', [(x[0],x[1]) for x in finishes]
+            exit(1)
+
+        # Pick the fastest one from all finishers
+        fastesttask = None
+        fastesttime = None
+        for finish in finishes:
+            lines = finish[2].split("\n")
+            for line in lines:            
+                searchstr = 'BRUNCH_STAT main_time '
+                if searchstr in line:                
+                    maintimestr = line[len(searchstr):].strip()
+                    maintime = float(maintimestr)
+                    if fastesttime is None or maintime < fastesttime:
+                        fastesttime = maintime
+                        fastesttask = finish
+
+
+        # if fastest task could not be determined, choose the first one
+        if fastesttask is None and len(finishes) > 0:                
+            print 'COULD NOT DETERMINE FASTEST TASK'
+            fastesttask = finishes[0]
+
+        # display the stdout of the winner
+        if fastesttask is not None:
+            ofilepath = os.path.join(
+                    args.mesos_outdir,
+                    "%s.%d.stdout" % (args.mesos_name,taskid))
+            print 'Showing output from portfolio task', fastesttask[1], ":", ofilepath
+            print 'BEGIN PORTFOLIO TASK STDOUT'
+            with open(ofilepath) as ofile:
+                res = ofile.read()
+                print res
+            print 'END PORTFOLIO TASK STDOUT'
+        else:
+            print 'There were no finished portfolio tasks'
+
+
+    # if in portfolio mode, res should be reassigned to the winning task's stdout
+    lines = res.split("\n")
+    for line in lines:            
+        searchstr = 'BRUNCH_STAT main_time '
+        if searchstr in line:                
+            maintimestr = line[len(searchstr):].strip()
+            maintime = float(maintimestr)
+            stat('main_time',maintime)
 
     if res is None:
         res = 'unknown'
