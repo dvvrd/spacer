@@ -502,6 +502,8 @@ class RunCmd(threading.Thread):
 
             pfo, pfe = self.portfolio_framework.communicate()
         o,e = self.p.communicate()
+        if o is None: o = '';
+        if pfo is None: pfo = '';
 
         self.stdout = "\n".join([o,pfo]).strip()
 
