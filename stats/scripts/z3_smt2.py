@@ -201,7 +201,7 @@ def parseArgs (argv):
     p.add_argument ('--distprofile', dest='distprofile',
                     action='store', help='distribution profile for spacer', default=None)
     p.add_argument ('--gasnet-spawnfn', dest='gasnet_spawnfn',
-                    action='store', help='GASNet spawning mode, used for launching job on UDP conduit', default='L')
+                    action='store', help='GASNet spawning mode, used for launching job on UDP conduit, "L" for local forking mode. "C" for custom mesos portfolio mode', default='L')
     p.add_argument ('--verify-msgs', dest='verify_msgs',
                     action='store_true', help='Compute hashes and send reciept confirmation for all messages', default=False)
     p.add_argument ('--restart', dest='restart', type=int, default=-1,
@@ -386,7 +386,7 @@ def compute_z3_args (args):
             if args.mesos_root is None:
                 raise Exception("--mesos-root is not set, could be like --mesos-root=/opt/mesos")
             slavecmdfile = os.path.join('/tmp',
-                    os.path.basename(args.file) + '.slave.' + str(int(time.time()*100)))
+                    os.path.basename(args.file) + '.slave.' + str(os.getpid()))
             os.environ['GASNET_CSPAWN_CMD']="echo \"%%N\n%%C\n%%D\"> %s" % slavecmdfile
 
     if (args.verify_msgs):
@@ -442,6 +442,11 @@ def compute_portfolio_args(args,portfolio_size,command):
     pfargs.append('--copy-outputs')
     pfargs.append('--verbose=%d' % int(args.mesos_verbose))
     pfargs.append('--')
+    # transfer environment variables of concern from the launcher process to the slaves
+    for k in os.environ.keys():
+        if not k.startswith("GASNET_"): continue
+        if k == "GASNET_SPAWNFN" or k == "GASNET_CSPAWN_CMD": continue
+        pfargs.append(' %s=%s ' % (k,os.environ[k]))
     pfargs.append('timeout %d' % args.cpu)
     pfargs.append(command)
 
@@ -708,6 +713,9 @@ def main (argv):
 
     # set returncode    
     stat ('Status', returncode)
+
+    if slavecmdfile and os.path.exists(slavecmdfile):
+        os.remove(slavecmdfile)
 
     return returncode
     
