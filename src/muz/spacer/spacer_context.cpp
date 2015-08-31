@@ -2500,8 +2500,12 @@ namespace spacer {
             if (node->is_dirty ()) node->clean ();
             
             node->inc_level ();
-            if (get_params ().pdr_flexible_trace ())
+            if (get_params ().pdr_flexible_trace () &&
+                (node->level () >= m_search.max_level () || 
+                 m_search.max_level () - node->level () 
+                 <= get_params ().pdr_flexible_trace_depth ()))
               m_search.push (*node);
+            
             if (m_search.is_root (*node)) return false;
             break;
           case l_undef:

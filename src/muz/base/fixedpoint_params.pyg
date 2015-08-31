@@ -74,6 +74,8 @@ def_module_params('fixedpoint',
                           ('pdr.flexible_trace', BOOL, False, 
                            "allow PDR generate long counter-examples " +
                            "by extending candidate trace within search area"),
+                          ('pdr.flexible_trace_depth', UINT, UINT_MAX, 
+                           'Controls the depth (below the current level) at which flexible trace can be applied'),
                           ('pdr.use_model_generalizer', BOOL, False, 
                            "use model for backwards propagation (instead of symbolic simulation)"),
                           ('pdr.validate_result', BOOL, False, 
