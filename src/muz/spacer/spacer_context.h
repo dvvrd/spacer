@@ -874,9 +874,28 @@ namespace spacer {
       // -- obligation of the same predicate.
       if (p1->get_id () != p2->get_id ()) return p1->get_id () < p2->get_id ();
       
-      SASSERT (n1.pt ().head ()->get_id () != n2.pt ().head ()->get_id ());
+      if (n1.pt ().head ()->get_id () == n2.pt ().head ()->get_id ())
+      {
+        IF_VERBOSE (1, 
+                    verbose_stream () 
+                    << "dup: " << n1.pt ().head ()->get_name () 
+                    << "(" << n1.level () << ", " << n1.depth () << ") " 
+                    << p1->get_id () << "\n";
+                    //<< " p1: " << mk_pp (const_cast<expr*>(p1), m) << "\n"
+                    );
+      }
+      
+      // XXX see comment below on identical nodes
+      // SASSERT (n1.pt ().head ()->get_id () != n2.pt ().head ()->get_id ());
       // -- if expression comparison fails, compare by predicate id
-      return n1.pt ().head ()->get_id () < n2.pt ().head ()->get_id ();
+      if (n1.pt().head ()->get_id () != n2.pt ().head ()->get_id ())
+        return n1.pt ().head ()->get_id () < n2.pt ().head ()->get_id ();
+      
+      /** XXX Identical nodes. This should not happen. However,
+       * currently, when propagating reachability, we might call
+       * expand_node() twice on the same node, causing it to generate
+       * the same proof obligation multiple times */
+      return &n1 < &n2;
     }
     else
       return &n1 < &n2;
