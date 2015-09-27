@@ -1178,6 +1178,7 @@ namespace datalog {
                     return res;
                 }
             }
+            return l_undef;
         }
 
     private:
