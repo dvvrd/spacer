@@ -1170,14 +1170,13 @@ namespace pdr {
         rules.reset ();
         datalog::context& dctx = ctx.get_context();
         datalog::rule_manager& rm = dctx.get_rule_manager();
-        ptr_vector<model_node> children;
         datalog::rule_ref rule(rm);
-        model_node* n = m_root;
-        children.append(n->children()); // discard the query rule
         update_models();
 
+        ptr_vector<model_node> children;
+        children.push_back(m_root); // start with query rule, walk backwards
         while (!children.empty()) {
-            n = children.back();
+            model_node* n = children.back();
             children.pop_back();
             TRACE("pdr", n->display(tout, 0););
             rule = n->get_rule();
