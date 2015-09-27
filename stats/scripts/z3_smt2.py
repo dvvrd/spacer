@@ -70,6 +70,9 @@ def parseArgs (argv):
     p.add_argument ('--inline', 
                     help='Enable inlining', 
                     action='store_true', default=False)
+    p.add_argument ('--pve',
+                    help='Enable propagate_variable_equivalences in tail_simplifier',
+                    action='store_true', default=False)
     p.add_argument ('--validate', help='Enable validation',
                     action='store_true', default=False)
     p.add_argument ('--trace', help='Trace levels to enable (spacer, pdr, dl,'
@@ -125,6 +128,9 @@ def parseArgs (argv):
     p.add_argument ('--elim-aux', dest='elim_aux',
                     help='eliminate auxiliaries in reachability facts',
                     action='store_true')
+    p.add_argument ('--reach-dnf', dest='reach_dnf', 
+                    help='Keep reachability facts in DNF', 
+                    action='store_true', default=False)
     p.add_argument ('--no-z3', dest='no_z3',
                     help='stop before running z3', default=False,
                     action='store_true')
@@ -203,6 +209,11 @@ def compute_z3_args (args):
 
     print 'Engine: ', args.engine
 
+    if args.pve:
+        z3_args += ' fixedpoint.xform.tail_simplifier_pve=true'
+    else:
+        z3_args += ' fixedpoint.xform.tail_simplifier_pve=false'
+        
     if (args.validate):
         z3_args += ' fixedpoint.pdr.validate_result=true'
 
@@ -256,6 +267,11 @@ def compute_z3_args (args):
     else:
         z3_args += ' fixedpoint.spacer.elim_aux=false'
 
+    if args.reach_dnf:
+        z3_args += ' fixedpoint.spacer.reach_dnf=true'
+    else:
+        z3_args += ' fixedpoint.spacer.reach_dnf=false'
+        
     if args.distprofile:
         z3_args += ' -profile:%s' % args.distprofile
 
@@ -310,23 +326,32 @@ class RunCmd(threading.Thread):
         self.stdout, unused = self.p.communicate()
 
     def Run(self):
-        self.start()
+        returncode=19
 
-        if self.cpu > 0:
-            self.join(self.cpu+5)
-        else:
-            self.join()
+        try:
+            self.start()
 
-        if self.is_alive():
-            print 'z3 is still alive, terminating'
-            self.p.terminate()      
-            self.join(5)
+            if self.cpu > 0:
+                self.join(self.cpu+5)
+            else:
+                self.join()
 
-        if self.is_alive():
-            print 'z3 is still alive after attempt to terminate, sending kill'
-            self.p.kill()
+            if self.is_alive():
+                print 'z3 is still alive, terminating'
+                self.p.terminate()
+                self.join(5)
 
-        return self.p.returncode
+            if self.is_alive():
+                print 'z3 is still alive after attempt to terminate, sending kill'
+                self.p.kill()
+            returncode = self.p.returncode
+
+        except Exception as e:
+            print 'Error wall watching cmd execution:', e.message
+            returncode = 20
+
+
+        return returncode
 
 
 def main (argv):

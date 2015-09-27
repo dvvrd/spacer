@@ -1,5 +1,26 @@
-/*++
-Copyright (c) 2011 Microsoft Corporation
+/** 
+Spacer
+Copyright (c) 2015 Carnegie Mellon University.
+All Rights Reserved.
+
+THIS SOFTWARE IS PROVIDED "AS IS," WITH NO WARRANTIES
+WHATSOEVER. CARNEGIE MELLON UNIVERSITY EXPRESSLY DISCLAIMS TO THE
+FULLEST EXTENT PERMITTEDBY LAW ALL EXPRESS, IMPLIED, AND STATUTORY
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NON-INFRINGEMENT OF PROPRIETARY RIGHTS.
+
+Released under a modified MIT license, please see SPACER_LICENSE.txt
+for full terms.  DM-0002483
+
+Spacer includes and/or makes use of the following Third-Party Software
+subject to its own license:
+
+Z3
+Copyright (c) Microsoft Corporation
+All rights reserved.
+
+Released under the MIT License (LICENSE.txt)
 
 Module Name:
 
@@ -11,15 +32,12 @@ Abstract:
 
 Author:
 
+    Arie Gurfinkel
     Anvesh Komuravelli
 
-Revision History:
-
-    Based on ../pdr/pdr_context.cpp by
-     Nikolaj Bjorner (nbjorner)
+    Based on muz/pdr/pdr_context.cpp by Nikolaj Bjorner (nbjorner)
 
 Notes:
-
    
 --*/
 
@@ -349,12 +367,15 @@ namespace spacer {
       m_use [i]->add_lemma_from_child (*this, lemma, next_level (lvl));
   }
   
-  void pred_transformer::add_lemma (expr * lemma, unsigned lvl)
+  bool pred_transformer::add_lemma (expr * lemma, unsigned lvl)
   {
+    bool res = false;
+    
     expr_ref_vector lemmas (m);
     qe::flatten_and (lemma, lemmas);
     for (unsigned i = 0, sz = lemmas.size(); i < sz; ++i)
-      m_frames.add_lemma (lemmas.get (i), lvl);
+      res |= m_frames.add_lemma (lemmas.get (i), lvl);
+    return res;
   }
   
 
@@ -392,6 +413,10 @@ namespace spacer {
 
   void pred_transformer::add_reach_fact (reach_fact &fact) 
     {
+      timeit _timer (is_trace_enabled("spacer_timeit"), 
+                     "spacer::pred_transformer::add_reach_fact", 
+                     verbose_stream ());
+
       TRACE ("spacer",
              tout << "add_reach_fact: " << head()->get_name() << " " 
              << (fact.is_init () ? "INIT " : "")
@@ -588,6 +613,9 @@ namespace spacer {
               tout << "is-reachable: " << head()->get_name() << " level: " 
               << n.level() << " depth: " << n.depth () << "\n";
               tout << mk_pp(n.post(), m) << "\n";);
+        timeit _timer (is_trace_enabled("spacer_timeit"), 
+                     "spacer::pred_transformer::is_reachable", 
+                     verbose_stream ());
 
         ensure_level(n.level());        
 
@@ -1369,7 +1397,10 @@ namespace spacer {
   
   model_node *derivation::create_next_child (model_evaluator &mev)
   {
-    
+    timeit _timer (is_trace_enabled("spacer_timeit"), 
+                   "spacer::derivation::create_next_child", 
+                   verbose_stream ());
+
     ast_manager &m = get_ast_manager ();
     expr_ref_vector summaries (m);
     app_ref_vector vars (m);
@@ -1390,6 +1421,9 @@ namespace spacer {
     
     if (!vars.empty ()) 
     {
+      timeit _timer1 (is_trace_enabled("spacer_timeit"), 
+                      "create_next_child::qproject1", 
+                      verbose_stream ());
       qe_project (m, vars, m_trans, mev.get_model (), true);
       //qe::reduce_array_selects (*mev.get_model (), m_trans);
     }
@@ -1412,6 +1446,9 @@ namespace spacer {
     summaries.reset ();
     if (!vars.empty ()) 
     {
+      timeit _timer2 (is_trace_enabled("spacer_timeit"),
+                      "create_next_child::qproject2", 
+                      verbose_stream ());
       qe_project (m, vars, post, mev.get_model (), true);
       //qe::reduce_array_selects (*mev.get_model (), post);
     }
@@ -2375,7 +2412,8 @@ namespace spacer {
     //
     bool context::check_reachability () 
     {
-      timeit _timer (get_verbosity_level () >= 1, "spacer::context::check_reachability", 
+      timeit _timer (get_verbosity_level () >= 1, 
+                     "spacer::context::check_reachability", 
                      verbose_stream ());
 
         model_node_ref last_reachable;
@@ -2389,11 +2427,12 @@ namespace spacer {
         
         while (m_search.top ())
         {
-          checkpoint ();
           model_node_ref node;
+          checkpoint ();
           
           while (last_reachable)
           {
+            checkpoint ();
             node = last_reachable;
             last_reachable = NULL;
             if (m_search.is_root (*node)) return true;
@@ -2405,17 +2444,32 @@ namespace spacer {
           }
           
           SASSERT (m_search.top ());
-          while (m_search.top ()->is_closed ()) 
+          // -- remove all closed nodes and updated all dirty nodes
+          // -- this is necessary because there is no easy way to
+          // -- remove nodes from the priority queue.
+          while (m_search.top ()->is_closed () ||
+                 m_search.top ()->is_dirty ()) 
           { 
-            model_node *n = m_search.top ();
-            IF_VERBOSE (1,
-                        verbose_stream () << "Deleting closed node: " 
-                        << n->pt ().head ()->get_name ()
-                        << "(" << n->level () << ", " << n->depth () << ")"
-                        << " " << n << "\n";);
+            model_node_ref n = m_search.top ();
             m_search.pop ();
-            if (m_search.is_root (*n)) return true;
-            SASSERT (m_search.top ());
+            if (n->is_closed ())
+            {
+              IF_VERBOSE (1,
+                          verbose_stream () << "Deleting closed node: " 
+                          << n->pt ().head ()->get_name ()
+                          << "(" << n->level () << ", " << n->depth () << ")"
+                          << " " << n->post ()->get_id () << "\n";);
+              if (m_search.is_root (*n)) return true;
+              SASSERT (m_search.top ());
+            }
+            else if (n->is_dirty ())
+            {
+              n->clean ();
+              // -- the node n might not be at the top after it is cleaned
+              m_search.push (*n);
+            }
+            else 
+              UNREACHABLE ();
           }
           
           SASSERT (m_search.top ());
@@ -2432,7 +2486,6 @@ namespace spacer {
             initial_size = m_search.size ();
           }
           
-          
           node = m_search.top ();
           SASSERT (node->level () <= m_search.max_level ());
           switch (expand_node (*node))
@@ -2448,9 +2501,15 @@ namespace spacer {
             SASSERT (m_search.top () == node.get ());
             m_search.pop ();
             
+            if (node->is_dirty ()) node->clean ();
+            
             node->inc_level ();
-            if (get_params ().pdr_flexible_trace ())
+            if (get_params ().pdr_flexible_trace () &&
+                (node->level () >= m_search.max_level () || 
+                 m_search.max_level () - node->level () 
+                 <= get_params ().pdr_flexible_trace_depth ()))
               m_search.push (*node);
+            
             if (m_search.is_root (*node)) return false;
             break;
           case l_undef:
@@ -2487,7 +2546,7 @@ namespace spacer {
                   << " (" << n.level () << ", " 
                   << (n.depth () - m_search.min_depth ()) << ") "
                   << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
-                  << &n;
+                  << n.post ()->get_id ();
                   verbose_stream().flush ();
                   watch.start (););
       
@@ -2525,6 +2584,8 @@ namespace spacer {
       
       lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
                          reach_pred_used, num_reuse_reach);
+      checkpoint ();
+      IF_VERBOSE (1, verbose_stream () << "." << std::flush;);
       switch (res) 
       {
         //reachable but don't know if this is purely using UA
@@ -2540,7 +2601,9 @@ namespace spacer {
           if (r && r->get_uninterpreted_tail_size () > 0)
           {
             reach_fact* rf = mk_reach_fact (n, mev, *r);
+            checkpoint ();
             n.pt ().add_reach_fact (*rf);
+            checkpoint ();
           }
           
           // if n has a derivation, create a new child and report l_undef
@@ -2549,6 +2612,7 @@ namespace spacer {
           if (n.has_derivation ())
           {
             next = n.get_derivation ().create_next_child ();
+            checkpoint ();
             if (next) 
             { 
               // move derivation over to the next obligation
@@ -2581,6 +2645,10 @@ namespace spacer {
       }
         // n is unreachable, create new summary facts
       case l_false: {
+        timeit _timer (is_trace_enabled("spacer_timeit"), 
+                       "spacer::expand_node::false", 
+                       verbose_stream ());
+
         TRACE("spacer", tout << "cube:\n"; 
               for (unsigned j = 0; j < cube.size(); ++j) 
                 tout << mk_pp(cube[j].get(), m) << "\n";);
@@ -2589,10 +2657,16 @@ namespace spacer {
         cores.push_back (std::make_pair(cube, uses_level));
         
         // -- run all core generalizers
-        for (unsigned i = 0; !cores.empty() && i < m_core_generalizers.size(); ++i) {
+        for (unsigned i = 0; 
+             // -- only generalize if lemma was constructed using farkas
+             n.use_farkas_generalizer () && 
+             !cores.empty() && i < m_core_generalizers.size(); 
+             ++i) {
+          checkpoint ();
           core_generalizer::cores new_cores;                    
           for (unsigned j = 0; j < cores.size(); ++j) 
-            (*m_core_generalizers[i])(n, cores[j].first, cores[j].second, new_cores);
+            (*m_core_generalizers[i])(n, cores[j].first, cores[j].second, 
+                                      new_cores);
           cores.reset ();
           cores.append (new_cores);
         }
@@ -2606,15 +2680,14 @@ namespace spacer {
           TRACE("spacer", tout << "invariant state: " 
                 << (is_infty_level(uses_level)?"(inductive)":"") 
                 <<  mk_pp (lemma, m) << "\n";);
-          n.pt().add_lemma (lemma, uses_level);
-        }
-        CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
-        
-        // Optionally check reachability of lemmas
-        if (get_params ().use_lemma_as_cti ())
-        {
-          n.set_post (m_pm.mk_and (cores [0].first));
-          n.set_farkas_generalizer (false);
+          bool v = n.pt().add_lemma (lemma, uses_level);
+          // Optionally update the node to be the negation of the lemma
+          if (v && get_params ().use_lemma_as_cti ())
+          {
+            n.new_post (m_pm.mk_and (core));
+            n.set_farkas_generalizer (false);
+          }
+          CASSERT("spacer", n.level() == 0 || check_invariant(n.level()-1));
         }
         
         
@@ -2626,7 +2699,8 @@ namespace spacer {
       }
         //something went wrong
       case l_undef: 
-        TRACE("spacer", tout << "unknown state: " << mk_pp(m_pm.mk_and(cube), m) << "\n";);
+        TRACE("spacer", tout << "unknown state: " 
+              << mk_pp(m_pm.mk_and(cube), m) << "\n";);
         throw unknown_exception();
       }
       UNREACHABLE();
@@ -2651,7 +2725,8 @@ namespace spacer {
   bool context::propagate(unsigned min_prop_lvl, 
                           unsigned max_prop_lvl, unsigned full_prop_lvl) {    
     
-    timeit _timer (get_verbosity_level () >= 1, "spacer::context::propagate", 
+    timeit _timer (get_verbosity_level() >= 1, 
+                   "spacer::context::propagate", 
                    verbose_stream ());
     
     if (full_prop_lvl < max_prop_lvl) full_prop_lvl = max_prop_lvl;
@@ -2684,6 +2759,7 @@ namespace spacer {
       {
         for (it = m_rels.begin (); it != end; ++it)
         {
+          checkpoint ();
           pred_transformer& r = *it->m_value;
           r.propagate_to_infinity (lvl);
         }
@@ -2712,6 +2788,9 @@ namespace spacer {
 
   reach_fact *context::mk_reach_fact (model_node& n, model_evaluator &mev,
                                       const datalog::rule& r) {
+    timeit _timer1 (is_trace_enabled("spacer_timeit"), 
+                    "mk_reach_fact", 
+                    verbose_stream ());
         expr_ref res(m);
         reach_fact_ref_vector child_reach_facts;
         
@@ -2747,6 +2826,16 @@ namespace spacer {
         if (elim_aux) vars.append (aux_vars.size (), aux_vars.c_ptr ());
 
         res = m_pm.mk_and (path_cons);
+        
+        // -- pick an implicant from the path condition
+        if (get_params ().spacer_reach_dnf ())
+        {
+          expr_ref_vector u(m), lits(m);
+          u.push_back (res);
+          compute_implicant_literals (mev, u, lits);
+          res = m_pm.mk_and (lits);
+        }
+        
 
         TRACE ("spacer",
                 tout << "Reach fact, before QE:\n";
@@ -2757,7 +2846,13 @@ namespace spacer {
                 }
               );
 
-        qe_project (m, vars, res, mev.get_model ());
+        {
+          timeit _timer1 (is_trace_enabled("spacer_timeit"), 
+                          "mk_reach_fact::qe_project", 
+                          verbose_stream ());
+          qe_project (m, vars, res, mev.get_model ());
+        }
+        
 
         TRACE ("spacer",
                 tout << "Reach fact, after QE project:\n";
@@ -2853,17 +2948,25 @@ namespace spacer {
         
         /// create a derivation and populate it with premises
         derivation *deriv = alloc (derivation, n, r, phi1);
-        for (unsigned i = 0; i < preds.size (); ++i)
+        for (unsigned i = 0, sz = preds.size (); i < sz; ++i)
         {
-          pred_transformer &pt = get_pred_transformer (preds [i]);
+          unsigned j; 
+          if (get_params ().order_children () == 1)
+            // -- reverse order
+            j = sz - i - 1;
+          else 
+            // -- default order
+            j = i;
+          
+          pred_transformer &pt = get_pred_transformer (preds [j]);
           
           const ptr_vector<app> *aux = NULL;
           expr_ref sum(m);
           // XXX This is a bit confusing. The summary is returned over
           // XXX o-variables. But it is simpler if it is returned over n-variables instead.
           sum = pt.get_origin_summary (mev, prev_level (n.level ()),
-                                       i, reach_pred_used [i], &aux);
-          deriv->add_premise (pt, i, sum, reach_pred_used [i], aux);
+                                       j, reach_pred_used [j], &aux);
+          deriv->add_premise (pt, j, sum, reach_pred_used [j], aux);
         }
         
         // create post for the first child and add to queue
@@ -3033,6 +3136,73 @@ namespace spacer {
       }
     }
   }
+  
+
+  inline bool model_node_lt::operator() (const model_node *pn1, const model_node *pn2) const
+  {
+    SASSERT (pn1);
+    SASSERT (pn2);
+    const model_node& n1 = *pn1; 
+    const model_node& n2 = *pn2;
+      
+    if (n1.level () != n2.level ()) return n1.level () < n2.level ();
+      
+    if (n1.depth () != n2.depth ()) return n1.depth () < n2.depth ();
+    
+    // -- a more deterministic order of proof obligations in a queue
+    if (!n1.get_context ().get_params ().spacer_nondet_tie_break ())
+    {
+      const expr* p1 = n1.post ();
+      const expr* p2 = n2.post ();
+      ast_manager &m = n1.get_ast_manager ();
+      
+      
+      // -- order by size. Less conjunctions is a proxy for
+      // -- generality.  Currently, this takes precedence over
+      // -- predicates which might not be the best choice
+      unsigned sz1 = 1;
+      unsigned sz2 = 1;
+      
+      if (m.is_and (p1)) sz1 = to_app (p1)->get_num_args ();
+      if (m.is_and (p2)) sz2 = to_app (p2)->get_num_args ();
+      if (sz1 != sz2) return sz1 < sz2;
+      
+      // -- when all else fails, order by identifiers of the
+      // -- expressions.  This roughly means that expressions created
+      // -- earlier are preferred.  Note that variables in post are
+      // -- based on names of the predicates. Hence this guarantees an
+      // -- order over predicates as well. That is, two expressions
+      // -- are equal if and only if they correspond to the same proof
+      // -- obligation of the same predicate.
+      if (p1->get_id () != p2->get_id ()) return p1->get_id () < p2->get_id ();
+      
+      if (n1.pt ().head ()->get_id () == n2.pt ().head ()->get_id ())
+      {
+        IF_VERBOSE (1, 
+                    verbose_stream () 
+                    << "dup: " << n1.pt ().head ()->get_name () 
+                    << "(" << n1.level () << ", " << n1.depth () << ") " 
+                    << p1->get_id () << "\n";
+                    //<< " p1: " << mk_pp (const_cast<expr*>(p1), m) << "\n"
+                    );
+      }
+      
+      // XXX see comment below on identical nodes
+      // SASSERT (n1.pt ().head ()->get_id () != n2.pt ().head ()->get_id ());
+      // -- if expression comparison fails, compare by predicate id
+      if (n1.pt().head ()->get_id () != n2.pt ().head ()->get_id ())
+        return n1.pt ().head ()->get_id () < n2.pt ().head ()->get_id ();
+      
+      /** XXX Identical nodes. This should not happen. However,
+       * currently, when propagating reachability, we might call
+       * expand_node() twice on the same node, causing it to generate
+       * the same proof obligation multiple times */
+      return &n1 < &n2;
+    }
+    else
+      return &n1 < &n2;
+  }
+
   
   
 }

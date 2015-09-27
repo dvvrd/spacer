@@ -358,7 +358,7 @@ namespace spacer {
         bool propagate_to_next_level(unsigned level);
         void propagate_to_infinity(unsigned level);
         /// \brief  Add a lemma to the current context and all users
-        void add_lemma (expr * lemma, unsigned lvl);
+        bool add_lemma (expr * lemma, unsigned lvl);
         expr* get_reach_case_var (unsigned idx) const;
       bool has_reach_facts () const { return !m_reach_facts.empty () ;}
       
@@ -423,6 +423,8 @@ namespace spacer {
     pred_transformer&       m_pt;
     /// post-condition decided by this node
     expr_ref                m_post;
+    /// new post to be swapped in for m_post
+    expr_ref                m_new_post;
     /// level at which to decide the post 
     unsigned                m_level;       
       
@@ -442,7 +444,9 @@ namespace spacer {
     model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
       m_ref_count (0),
       m_parent (parent), m_pt (pt), 
-      m_post (m_pt.get_ast_manager ()), m_level (level), m_depth (depth),
+      m_post (m_pt.get_ast_manager ()), 
+      m_new_post (m_pt.get_ast_manager ()),
+      m_level (level), m_depth (depth),
       m_open (true), m_use_farkas (true)
     {if (m_parent) m_parent->add_child (*this);}
     
@@ -473,9 +477,24 @@ namespace spacer {
     
     expr* post () const { return m_post.get (); }
     void set_post (expr* post) { m_post = post; }
-
+    
+    /// indicate that a new post should be set for the node
+    void new_post (expr *post) {if (post != m_post) m_new_post = post;}
+    /// true if the node needs to be updated outside of the priority queue
+    bool is_dirty () {return m_new_post;}
+    /// clean a dirty node
+    void clean ()
+    {
+      if (m_new_post) 
+      {
+        set_post (m_new_post);
+        m_new_post.reset ();
+      }
+    }
+    
     void reset () 
     {
+      clean ();
       m_derivation = NULL;
       m_open = true;
     }
@@ -512,23 +531,7 @@ namespace spacer {
 
   struct model_node_lt : 
     public std::binary_function<const model_node*, const model_node*, bool>
-  {
-    bool operator() (const model_node *pn1, const model_node *pn2) const
-    {
-      SASSERT (pn1);
-      SASSERT (pn2);
-      const model_node& n1 = *pn1; 
-      const model_node& n2 = *pn2;
-      
-      if (n1.level () < n2.level ()) return true;
-      if (n1.level () > n2.level ()) return false;
-      
-      if (n1.depth () < n2.depth ()) return true;
-      if (n1.depth () > n2.depth ()) return false;
-      
-      return &n1 < &n2;
-    }
-  };
+  {bool operator() (const model_node *pn1, const model_node *pn2) const;};
   
   struct model_node_gt : 
     public std::binary_function<const model_node*, const model_node*, bool>
@@ -830,7 +833,7 @@ namespace spacer {
       
         expr_ref get_constraints (unsigned lvl);
         void add_constraints (unsigned lvl, expr_ref c);
-    };
+    };    
 
 };
 
