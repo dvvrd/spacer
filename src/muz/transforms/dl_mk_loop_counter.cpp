@@ -111,7 +111,7 @@ namespace datalog {
                 head = m.mk_app(head->get_decl(), args.size(), args.c_ptr());
             }            
 
-            new_rule = rm.mk(head, tail.size(), tail.c_ptr(), r.get_names(), neg.c_ptr(), true);
+            new_rule = rm.mk(head, tail.size(), tail.c_ptr(), r.get_name(), neg.c_ptr(), true);
             result->add_rule(new_rule);
         }
 
@@ -145,7 +145,7 @@ namespace datalog {
                 neg.push_back(false);
             }
             head = del_arg(r.get_head());
-            new_rule = rm.mk(head, tail.size(), tail.c_ptr(), r.get_names(), neg.c_ptr(), true);
+            new_rule = rm.mk(head, tail.size(), tail.c_ptr(), r.get_name(), neg.c_ptr(), true);
             result->add_rule(new_rule);            
         }
 

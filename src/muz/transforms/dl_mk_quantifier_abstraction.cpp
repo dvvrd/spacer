@@ -342,7 +342,7 @@ namespace datalog {
             head = mk_head(source, *result, r.get_head(), cnt);
             fml = m.mk_implies(m.mk_and(tail.size(), tail.c_ptr()), head);
             proof_ref pr(m);
-            rm.mk_rule(fml, pr, *result, r.get_names());
+            rm.mk_rule(fml, pr, *result, r.get_name());
             TRACE("dl", result->last()->display(m_ctx, tout););
         }        
         

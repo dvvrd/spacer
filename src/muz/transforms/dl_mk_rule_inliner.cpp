@@ -114,15 +114,10 @@ namespace datalog {
         apply(src, false, UINT_MAX,   tail, tail_neg);
         mk_rule_inliner::remove_duplicate_tails(tail, tail_neg);
         SASSERT(tail.size()==tail_neg.size());
-        svector<symbol> combined_rule_names;
-        combined_rule_names = src.get_names();
-        svector<symbol> tgt_rule_names = tgt.get_names();
-        svector<symbol>::iterator tgt_names_it = tgt_rule_names.begin(),
-                                  tgt_names_end = tgt_rule_names.end();
-        for (; tgt_names_it != tgt_names_end; ++tgt_names_it) {
-            combined_rule_names.push_back(*tgt_names_it);
-        }
-        res = m_rm.mk(new_head, tail.size(), tail.c_ptr(), combined_rule_names, tail_neg.c_ptr(), m_normalize);
+        std::ostringstream comb_name;
+        comb_name << tgt.get_name().str() << ";" << src.get_name().str();
+        symbol combined_rule_name = symbol(comb_name.str().c_str());
+        res = m_rm.mk(new_head, tail.size(), tail.c_ptr(), combined_rule_name, tail_neg.c_ptr(), m_normalize);
         res->set_accounting_parent_object(m_context, const_cast<rule*>(&tgt));
         TRACE("dl",
               tgt.display(m_context,  tout << "tgt (" << tail_index << "): \n");

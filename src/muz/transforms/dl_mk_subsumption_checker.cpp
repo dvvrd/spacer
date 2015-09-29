@@ -161,7 +161,7 @@ namespace datalog {
         }
 
         SASSERT(tail.size()==tail_neg.size());
-        res = m_context.get_rule_manager().mk(head, tail.size(), tail.c_ptr(), r->get_names(), tail_neg.c_ptr());
+        res = m_context.get_rule_manager().mk(head, tail.size(), tail.c_ptr(), r->get_name(), tail_neg.c_ptr());
         res->set_accounting_parent_object(m_context, r);
         m_context.get_rule_manager().fix_unbound_vars(res, true);
         m_context.get_rule_manager().mk_rule_rewrite_proof(*r, *res.get());

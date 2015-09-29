@@ -405,7 +405,7 @@ namespace datalog {
 
             app * tail[] = {t1, t2};
 
-            rule * new_rule = m_context.get_rule_manager().mk(head, 2, tail, 0);
+            rule * new_rule = m_context.get_rule_manager().mk(head, 2, tail, symbol::null, 0);
 
             //TODO: update accounting so that it can handle multiple parents
             new_rule->set_accounting_parent_object(m_context, one_parent);
@@ -728,7 +728,7 @@ namespace datalog {
                 }
 
                 rule * new_rule = m_context.get_rule_manager().mk(orig_r->get_head(), tail.size(), tail.c_ptr(), 
-                                                                  orig_r->get_names(), negs.c_ptr());
+                                                                  orig_r->get_name(), negs.c_ptr());
 
                 new_rule->set_accounting_parent_object(m_context, orig_r);
                 m_context.get_rule_manager().mk_rule_rewrite_proof(*orig_r, *new_rule);

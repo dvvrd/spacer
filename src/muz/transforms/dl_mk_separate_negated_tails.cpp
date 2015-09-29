@@ -71,7 +71,7 @@ namespace datalog {
         m_ctx.register_predicate(fn, false);
         q = m.mk_app(fn, args.size(), args.c_ptr());
         bool is_neg = true;
-        rules.add_rule(rm.mk(q, 1, & p, svector<symbol>(), &is_neg));
+        rules.add_rule(rm.mk(q, 1, & p, symbol::null, &is_neg));
     }
 
     void mk_separate_negated_tails::create_rule(rule const&r, rule_set& rules) {
@@ -101,7 +101,7 @@ namespace datalog {
             tail.push_back(r.get_tail(i));
             neg.push_back(false);
         }
-        rules.add_rule(rm.mk(r.get_head(), tail.size(), tail.c_ptr(), r.get_names(), neg.c_ptr()));
+        rules.add_rule(rm.mk(r.get_head(), tail.size(), tail.c_ptr(), r.get_name(), neg.c_ptr()));
     }
     
     rule_set * mk_separate_negated_tails::operator()(rule_set const& src) {

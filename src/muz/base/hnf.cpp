@@ -77,7 +77,7 @@ class hnf::imp {
     expr_ref_vector       m_todo;
     proof_ref_vector      m_proofs;
     expr_ref_vector       m_refs;
-    svector<symbol>       m_names;
+    symbol                m_name;
     svector<symbol>       m_arg_names;
     ptr_vector<sort>      m_sorts;
     quantifier_hoister    m_qh;
@@ -99,7 +99,7 @@ public:
         m_todo(m),
         m_proofs(m),
         m_refs(m),
-        m_names(),
+        m_name("P"),
         m_qh(m),
         m_fresh_predicates(m),
         m_body(m),
@@ -172,8 +172,13 @@ public:
         m_cancel = f;
     }
 
-    void set_names(svector<symbol> const& ns) {
-        m_names = ns;
+    void set_name(symbol const& n) {
+        if (n == symbol::null) {
+            m_name = symbol("P");
+        }
+        else {
+            m_name = n;
+        }
     }
 
     func_decl_ref_vector const& get_fresh_predicates() {
@@ -387,15 +392,8 @@ private:
             }
         }
         func_decl_ref f(m);
-        std::stringstream name_string;
-        for (unsigned int name_idx = 0; name_idx < m_names.size(); ++name_idx) {
-            if (name_idx > 0) {
-                name_string << ";";
-            }
-            name_string << m_names[name_idx];
-        }
 
-        f = m.mk_fresh_func_decl(name_string.str().c_str(), "", sorts1.size(), sorts1.c_ptr(), m.mk_bool_sort());
+        f = m.mk_fresh_func_decl(m_name.str().c_str(), "", sorts1.size(), sorts1.c_ptr(), m.mk_bool_sort());
         m_fresh_predicates.push_back(f);
         return app_ref(m.mk_app(f, args.size(), args.c_ptr()), m);
     }
@@ -525,8 +523,8 @@ void hnf::set_cancel(bool f) {
     m_imp->set_cancel(f);
 }
 
-void hnf::set_names(svector<symbol> const& names) {
-    m_imp->set_names(names);
+void hnf::set_name(symbol const& n) {
+    m_imp->set_name(n);
 }
 
 void hnf::reset() {

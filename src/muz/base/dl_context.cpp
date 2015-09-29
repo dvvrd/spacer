@@ -17,7 +17,6 @@ Revision History:
 
 --*/
 
-#include<algorithm>
 #include<sstream>
 #include<limits>
 #include"arith_decl_plugin.h"
@@ -454,14 +453,8 @@ namespace datalog {
     }
 
     void context::add_rule(expr* rl, symbol const& name, unsigned bound) {
-        svector<symbol> names;
-        names.push_back(name);
-        add_rule(rl, names, bound);
-    }
-
-    void context::add_rule(expr* rl, svector<symbol> const& names, unsigned bound) {
         m_rule_fmls.push_back(rl);
-        m_rule_names.push_back(names);
+        m_rule_names.push_back(name);
         m_rule_bounds.push_back(bound);
     }
 
@@ -488,9 +481,7 @@ namespace datalog {
             p = m.mk_asserted(rl);
         }
         unsigned size_before = m_rule_set.get_num_rules();
-        svector<symbol> names;
-        names.push_back(name);
-        rm.mk_rule(rl, p, m_rule_set, names);
+        rm.mk_rule(rl, p, m_rule_set, name);
         unsigned size_after = m_rule_set.get_num_rules();
         if (size_before + 1 != size_after) {
             std::stringstream strm;
@@ -502,9 +493,7 @@ namespace datalog {
         rule_ref_vector const& rls = m_rule_set.get_rules();
         rule* old_rule = 0;
         for (unsigned i = 0; i < size_before; ++i) {
-            svector<symbol> const& rls_i_names = rls[i]->get_names();
-            if (rls_i_names.size() == names.size()
-              && std::equal(rls_i_names.begin(), rls_i_names.end(), names.begin())) {
+            if (rls[i]->get_name() == name) {
                 if (old_rule) {                    
                     std::stringstream strm;
                     strm << "Rule " << name << " occurs twice. It cannot be modified";
@@ -629,7 +618,7 @@ namespace datalog {
         }
         else {
             expr_ref rule(m.mk_app(pred, fact.size(), (expr*const*)fact.c_ptr()), m);
-            add_rule(rule, svector<symbol>());
+            add_rule(rule, symbol::null);
         }
     }
 
@@ -977,14 +966,12 @@ namespace datalog {
         for (; it != end; it++) {
             m_rule_manager.to_formula (**it, fml);
             rules.push_back (fml);
-            svector<symbol> const& rule_names = (*it)->get_names();
-            // Do this backwards, as the overall trace is last-first
-            for (unsigned rule_name_idx = rule_names.size(); rule_name_idx > 0; --rule_name_idx) {
-                names.push_back (rule_names[rule_name_idx - 1]);
-            }
+            // The concatenated names are already stored last-first, so do not need to be reversed here
+            const symbol& rule_name = (*it)->get_name();
+            names.push_back (rule_name);
 
             TRACE ("dl",
-                   if (rule_names.size() == 0) {
+                   if (rule_name == symbol::null) {
                        tout << "Encountered unnamed rule: ";
                        (*it)->display(*this, tout);
                        tout << "\n";
@@ -1067,7 +1054,7 @@ namespace datalog {
         }
     }
    
-    void context::get_raw_rule_formulas(expr_ref_vector& rules, svector<svector<symbol> >& names, vector<unsigned> &bounds){
+    void context::get_raw_rule_formulas(expr_ref_vector& rules, svector<symbol>& names, vector<unsigned> &bounds){
         for (unsigned i = 0; i < m_rule_fmls.size(); ++i) {
 	    expr_ref r = bind_vars(m_rule_fmls[i].get(), true);
 	    rules.push_back(r.get());
@@ -1076,7 +1063,7 @@ namespace datalog {
         }
     }
 
-    void context::get_rules_as_formulas(expr_ref_vector& rules, expr_ref_vector& queries, svector<svector<symbol> >& names) {
+    void context::get_rules_as_formulas(expr_ref_vector& rules, expr_ref_vector& queries, svector<symbol>& names) {
         expr_ref fml(m);
         rule_manager& rm = get_rule_manager();
         
@@ -1118,7 +1105,7 @@ namespace datalog {
             }
             else {
                 rules.push_back(fml);
-                names.push_back(r->get_names());
+                names.push_back(r->get_name());
             }
         }
         for (unsigned i = m_rule_fmls_head; i < m_rule_fmls.size(); ++i) {
@@ -1136,7 +1123,7 @@ namespace datalog {
         expr* const* axioms = m_background.c_ptr();
         expr_ref fml(m);
         expr_ref_vector rules(m), queries(m);
-        svector<svector<symbol> > names;
+        svector<symbol> names;
         bool use_fixedpoint_extensions = m_params->print_fixedpoint_extensions();
         bool print_low_level = m_params->print_low_level_smt2();
         bool do_declare_vars = m_params->print_with_variable_declarations();
@@ -1212,36 +1199,24 @@ namespace datalog {
         for (unsigned i = 0; i < rules.size(); ++i) {            
             out << (use_fixedpoint_extensions?"(rule ":"(assert ");
             expr* r = rules[i].get();
-            svector<symbol> r_names = names[i];
-            if (r_names.size() > 0) {
+            symbol nm = names[i];
+            if (symbol::null != nm) {
                 out << "(! ";
             }
             PP(r);
-            if (r_names.size() > 0) {
-                bool is_first_name = true;
-                for (unsigned int name_idx = 0; name_idx < names.size(); ++name_idx) {
-                    symbol nm = r_names[name_idx];
-                    if (symbol::null != nm) {
-                        if (is_first_name) {
-                            out << " :named ";
-                            is_first_name = false;
-                        }
-                        else {
-                            out << ";"; //Add in name separator
-                        }
-                        while (fresh_names.contains(nm)) {
-                            std::ostringstream s;
-                            s << nm << "!";
-                            nm = symbol(s.str().c_str());
-                        }
-                        fresh_names.add(nm);
-                        if (is_smt2_quoted_symbol(nm)) {
-                            out << mk_smt2_quoted_symbol(nm);
-                        }
-                        else {
-                            out << nm;
-                        }
-                    }
+            if (symbol::null != nm) {
+                out << " :named ";
+                while (fresh_names.contains(nm)) {
+                    std::ostringstream s;
+                    s << nm << "!";
+                    nm = symbol(s.str().c_str());
+                }
+                fresh_names.add(nm);
+                if (is_smt2_quoted_symbol(nm)) {
+                    out << mk_smt2_quoted_symbol(nm);
+                }
+                else {
+                    out << nm;
                 }
                 out << ")";
             }

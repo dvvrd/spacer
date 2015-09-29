@@ -132,7 +132,7 @@ namespace datalog {
         SASSERT(is_app(fml));
         tail.push_back(to_app(fml));
         is_neg.push_back(false);
-        res = rm.mk(head, tail.size(), tail.c_ptr(), tgt->get_names(), is_neg.c_ptr());
+        res = rm.mk(head, tail.size(), tail.c_ptr(), tgt->get_name(), is_neg.c_ptr());
         if (m_ctx.generate_proof_trace()) {
             rm.to_formula(src, fml1);
             rm.to_formula(*tgt.get(),fml2);

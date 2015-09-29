@@ -157,9 +157,9 @@ namespace datalog {
 
         void mk_negations(app_ref_vector& body, svector<bool>& is_negated);
 
-        void mk_rule_core(expr* fml, proof* p, rule_set& rules, svector<symbol> const& names);
+        void mk_rule_core(expr* fml, proof* p, rule_set& rules, symbol const& name);
 
-        void mk_horn_rule(expr* fml, proof* p, rule_set& rules, svector<symbol> const& names);
+        void mk_horn_rule(expr* fml, proof* p, rule_set& rules, symbol const& name);
 
         static expr_ref mk_implies(app_ref_vector const& body, expr* head);
 
@@ -205,7 +205,7 @@ namespace datalog {
            The formula is of the form (forall (...) (forall (...) (=> (and ...) head)))
 
         */
-        void mk_rule(expr* fml, proof* p, rule_set& rules, svector<symbol> const& names);
+        void mk_rule(expr* fml, proof* p, rule_set& rules, symbol const& name);
 
         /**
            \brief Create a Datalog query from an expression.
@@ -219,18 +219,18 @@ namespace datalog {
            
            \remark A tail may contain negation. tail[i] is assumed to be negated if is_neg != 0 && is_neg[i] == true
         */
-        rule * mk(app * head, unsigned n, app * const * tail, svector<symbol> const& names,
+        rule * mk(app * head, unsigned n, app * const * tail, symbol const& name,
                   bool const * is_neg = 0, bool normalize = true);
 
         /**
            \brief Create a rule with the same tail as \c source and with a specified head.
         */
-        rule * mk(rule const * source, app * new_head, svector<symbol> const& names);
+        rule * mk(rule const * source, app * new_head, symbol const& name);
 
         /**
            \brief Create a copy of the given rule.
         */
-        rule * mk(rule const * source, svector<symbol> const& names);
+        rule * mk(rule const * source, symbol const& name);
 
         /** make sure there are not non-quantified variables that occur only in interpreted predicates */
         void fix_unbound_vars(rule_ref& r, bool try_quantifier_elimination);
@@ -290,7 +290,7 @@ namespace datalog {
         unsigned          m_ref_cnt;
         unsigned          m_positive_cnt;
         unsigned          m_uninterp_cnt;
-        svector<symbol>   m_names;
+        symbol            m_name;
         /**
            The following field is an array of tagged pointers. 
            - Tag 0: the atom is not negated
@@ -308,7 +308,7 @@ namespace datalog {
         
         static unsigned get_obj_size(unsigned n) { return sizeof(rule) + n * sizeof(app *); }
 
-        rule() : m_ref_cnt(0), m_names() {}
+        rule() : m_ref_cnt(0), m_name(symbol::null) {}
         ~rule() {}
 
         void deallocate(ast_manager & m);
@@ -368,14 +368,9 @@ namespace datalog {
         /**
            \brief Return the name(s) associated with this rule. Plural for preprocessed (e.g. obtained by inlining) rules.
 
-           This returns the internal copy, so play nicely with it.
+           This possibly returns a ";"-separated list of names.
         */
-        svector<symbol> get_names() const { return m_names; } ;
-
-        /**
-           \brief Return the name(s) associated with this rule, as one symbol. Several names flattened by joining with ";".
-        */
-        symbol get_names_as_symbol() const;
+        symbol const& get_name() const { return m_name; } ;
 
         unsigned hash() const;
 
