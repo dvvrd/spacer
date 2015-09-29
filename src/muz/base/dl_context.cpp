@@ -461,8 +461,6 @@ namespace datalog {
 
     void context::add_rule(expr* rl, svector<symbol> const& names, unsigned bound) {
         m_rule_fmls.push_back(rl);
-        svector<symbol>* our_names = new svector<symbol>();
-        *our_names = names;
         m_rule_names.push_back(names);
         m_rule_bounds.push_back(bound);
     }
