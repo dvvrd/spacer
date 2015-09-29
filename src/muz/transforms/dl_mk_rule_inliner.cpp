@@ -117,7 +117,7 @@ namespace datalog {
         std::ostringstream comb_name;
         comb_name << tgt.name().str() << ";" << src.name().str();
         symbol combined_rule_name = symbol(comb_name.str().c_str());
-        res = m_rm.mk(new_head, tail.size(), tail.c_ptr(), combined_rule_name, tail_neg.c_ptr(), m_normalize);
+        res = m_rm.mk(new_head, tail.size(), tail.c_ptr(), tail_neg.c_ptr(), combined_rule_name, m_normalize);
         res->set_accounting_parent_object(m_context, const_cast<rule*>(&tgt));
         TRACE("dl",
               tgt.display(m_context,  tout << "tgt (" << tail_index << "): \n");

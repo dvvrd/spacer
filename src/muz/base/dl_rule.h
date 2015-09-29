@@ -219,8 +219,8 @@ namespace datalog {
            
            \remark A tail may contain negation. tail[i] is assumed to be negated if is_neg != 0 && is_neg[i] == true
         */
-        rule * mk(app * head, unsigned n, app * const * tail, symbol const& name = symbol::null,
-                  bool const * is_neg = 0, bool normalize = true);
+        rule * mk(app * head, unsigned n, app * const * tail, bool const * is_neg = 0, 
+                  symbol const& name = symbol::null, bool normalize = true);
 
         /**
            \brief Create a rule with the same tail as \c source and with a specified head.

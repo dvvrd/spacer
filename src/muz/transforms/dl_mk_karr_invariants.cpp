@@ -312,7 +312,7 @@ namespace datalog {
         }
         rule* new_rule = &r;
         if (tail.size() != tsz) {
-            new_rule = rm.mk(r.get_head(), tail.size(), tail.c_ptr(), r.name(), 0);
+            new_rule = rm.mk(r.get_head(), tail.size(), tail.c_ptr(), 0, r.name());
         }
         rules.add_rule(new_rule);
         rm.mk_rule_rewrite_proof(r, *new_rule); // should be weakening rule.        

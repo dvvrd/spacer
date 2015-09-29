@@ -750,7 +750,7 @@ namespace datalog {
         neg_flags.push_back(false);
         SASSERT(e_tail.size()==neg_flags.size());
 
-        return m_context.get_rule_manager().mk(e_head, e_tail.size(), e_tail.c_ptr(), symbol::null, neg_flags.c_ptr());
+        return m_context.get_rule_manager().mk(e_head, e_tail.size(), e_tail.c_ptr(), neg_flags.c_ptr());
     }
 
     void mk_explanations::transform_rules(const rule_set & src, rule_set & dst) {
@@ -777,7 +777,7 @@ namespace datalog {
             app_ref orig_lit(m_manager.mk_app(orig_decl, lit_args.c_ptr()), m_manager);
             app_ref e_lit(get_e_lit(orig_lit, arity), m_manager);
             app * tail[] = { e_lit.get() };
-            dst.add_rule(m_context.get_rule_manager().mk(orig_lit, 1, tail, symbol::null, 0));
+            dst.add_rule(m_context.get_rule_manager().mk(orig_lit, 1, tail, 0));
         }
     }
 

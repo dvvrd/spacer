@@ -198,7 +198,7 @@ namespace datalog {
                 continue;
             }
             app * mag_head = create_magic_literal(tail[i]);
-            rule * r = m_context.get_rule_manager().mk(mag_head, i+1, new_tail.c_ptr(), symbol::null, negations.c_ptr());
+            rule * r = m_context.get_rule_manager().mk(mag_head, i+1, new_tail.c_ptr(), negations.c_ptr());
             TRACE("dl", r->display(m_context,tout); );
             result.add_rule(r);
         }
@@ -280,7 +280,7 @@ namespace datalog {
         new_tail.push_back(create_magic_literal(new_head));
         negations.push_back(false);
 
-        rule * nr = m_context.get_rule_manager().mk(new_head, new_tail.size(), new_tail.c_ptr(), r->name(), negations.c_ptr());
+        rule * nr = m_context.get_rule_manager().mk(new_head, new_tail.size(), new_tail.c_ptr(), negations.c_ptr(), r->name());
         result.add_rule(nr);
         nr->set_accounting_parent_object(m_context, r);
     }
@@ -301,7 +301,7 @@ namespace datalog {
 
         app * tail[] = {lit, mag_lit};
 
-        rule * r = m_context.get_rule_manager().mk(adn_lit, 2, tail, symbol::null, 0);
+        rule * r = m_context.get_rule_manager().mk(adn_lit, 2, tail, 0);
         result.add_rule(r);
     }
 
@@ -372,10 +372,10 @@ namespace datalog {
         app * adn_goal_head = adorn_literal(goal_head, empty_var_idx_set);
         app * mag_goal_head = create_magic_literal(adn_goal_head);
         SASSERT(mag_goal_head->is_ground());
-        rule * mag_goal_rule = m_context.get_rule_manager().mk(mag_goal_head, 0, 0, symbol::null, 0);
+        rule * mag_goal_rule = m_context.get_rule_manager().mk(mag_goal_head, 0, 0, 0);
         result->add_rule(mag_goal_rule);
 
-        rule * back_to_goal_rule = m_context.get_rule_manager().mk(goal_head, 1, &adn_goal_head, symbol::null, 0);
+        rule * back_to_goal_rule = m_context.get_rule_manager().mk(goal_head, 1, &adn_goal_head, 0);
         result->add_rule(back_to_goal_rule);
         return result;
     }

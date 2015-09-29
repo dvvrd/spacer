@@ -1058,7 +1058,7 @@ protected:
             m_context.add_fact(head);
         }
         else {
-            rule * r = m.mk(head, sz, body, symbol::null, is_neg);
+            rule * r = m.mk(head, sz, body, is_neg);
             rule_ref rule(r, m);
             m_context.add_rule(rule);
 

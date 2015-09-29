@@ -219,7 +219,7 @@ namespace datalog {
         check_valid_rule(m_head, m_body.size(), m_body.c_ptr());
 
         rule_ref r(*this);
-        r = mk(m_head.get(), m_body.size(), m_body.c_ptr(), name, m_neg.c_ptr());
+        r = mk(m_head.get(), m_body.size(), m_body.c_ptr(), m_neg.c_ptr(), name);
 
         expr_ref fml1(m);
         if (p) {
@@ -480,7 +480,7 @@ namespace datalog {
         }
     }
 
-    rule * rule_manager::mk(app * head, unsigned n, app * const * tail, symbol const& name,bool const * is_negated, bool normalize) {
+    rule * rule_manager::mk(app * head, unsigned n, app * const * tail, bool const * is_negated, symbol const& name, bool normalize) {
         DEBUG_CODE(check_valid_rule(head, n, tail););
         unsigned sz     = rule::get_obj_size(n);
         void * mem      = m.get_allocator().allocate(sz);
@@ -656,7 +656,7 @@ namespace datalog {
                 tail.push_back(ensure_app(conjs[i].get()));
             }
             tail_neg.resize(tail.size(), false);
-            r = mk(r->get_head(), tail.size(), tail.c_ptr(), r->name(), tail_neg.c_ptr());
+            r = mk(r->get_head(), tail.size(), tail.c_ptr(), tail_neg.c_ptr(), r->name());
             TRACE("dl", r->display(m_ctx, tout << "reduced rule\n"););
         }
     }
@@ -801,7 +801,7 @@ namespace datalog {
 
         SASSERT(tail.size()==tail_neg.size());
         rule_ref old_r = r;
-        r = mk(head, tail.size(), tail.c_ptr(), old_r->name(), tail_neg.c_ptr());
+        r = mk(head, tail.size(), tail.c_ptr(), tail_neg.c_ptr(), old_r->name());
         r->set_accounting_parent_object(m_ctx, old_r);
     }
 
@@ -839,7 +839,7 @@ namespace datalog {
             new_tail.push_back(to_app(tmp));
             tail_neg.push_back(r->is_neg_tail(i));
         }
-        r = mk(new_head.get(), new_tail.size(), new_tail.c_ptr(), r->name(), tail_neg.c_ptr(), false);
+        r = mk(new_head.get(), new_tail.size(), new_tail.c_ptr(), tail_neg.c_ptr(), r->name(), false);
 
         // keep old variable indices around so we can compose with substitutions. 
         // r->norm_vars(*this);
