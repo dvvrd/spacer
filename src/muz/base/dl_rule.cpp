@@ -480,7 +480,7 @@ namespace datalog {
         }
     }
 
-    rule * rule_manager::mk(app * head, unsigned n, app * const * tail, bool const * is_negated, symbol const& name, bool normalize) {
+    rule * rule_manager::mk(app * head, unsigned n, app * const * tail, symbol const& name,bool const * is_negated, bool normalize) {
         DEBUG_CODE(check_valid_rule(head, n, tail););
         unsigned sz     = rule::get_obj_size(n);
         void * mem      = m.get_allocator().allocate(sz);

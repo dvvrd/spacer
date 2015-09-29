@@ -493,7 +493,7 @@ namespace datalog {
         rule_ref_vector const& rls = m_rule_set.get_rules();
         rule* old_rule = 0;
         for (unsigned i = 0; i < size_before; ++i) {
-            if (rls[i]->get_name() == name) {
+            if (rls[i]->name() == name) {
                 if (old_rule) {                    
                     std::stringstream strm;
                     strm << "Rule " << name << " occurs twice. It cannot be modified";
