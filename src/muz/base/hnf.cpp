@@ -78,7 +78,7 @@ class hnf::imp {
     proof_ref_vector      m_proofs;
     expr_ref_vector       m_refs;
     symbol                m_name;
-    svector<symbol>       m_arg_names;
+    svector<symbol>       m_names;
     ptr_vector<sort>      m_sorts;
     quantifier_hoister    m_qh;
     obj_map<expr, app*>   m_memoize_disj;
@@ -98,7 +98,7 @@ public:
         m_cancel(false),
         m_todo(m),
         m_proofs(m),
-        m_refs(m),
+        m_refs(m), 
         m_name("P"),
         m_qh(m),
         m_fresh_predicates(m),
@@ -230,11 +230,11 @@ private:
         expr_ref fml0(m), fml1(m), fml2(m), head(m);
         proof_ref p(m);
         fml0 = fml;
-        m_arg_names.reset();
+        m_names.reset();
         m_sorts.reset();
         m_body.reset();
         m_defs.reset();
-        m_qh.pull_quantifier(true, fml0, &m_sorts, &m_arg_names);
+        m_qh.pull_quantifier(true, fml0, &m_sorts, &m_names);
         if (premise){
             fml1 = bind_variables(fml0);
             if (!m_sorts.empty()) {
@@ -392,7 +392,6 @@ private:
             }
         }
         func_decl_ref f(m);
-
         f = m.mk_fresh_func_decl(m_name.str().c_str(), "", sorts1.size(), sorts1.c_ptr(), m.mk_bool_sort());
         m_fresh_predicates.push_back(f);
         return app_ref(m.mk_app(f, args.size(), args.c_ptr()), m);
@@ -491,11 +490,11 @@ private:
     }
 
     expr_ref bind_variables(expr* e) {
-        SASSERT(m_sorts.size() == m_arg_names.size());
+        SASSERT(m_sorts.size() == m_names.size());
         if (m_sorts.empty()) {
             return expr_ref(e, m);
         }
-        return expr_ref(m.mk_forall(m_sorts.size(), m_sorts.c_ptr(), m_arg_names.c_ptr(), e), m);
+        return expr_ref(m.mk_forall(m_sorts.size(), m_sorts.c_ptr(), m_names.c_ptr(), e), m);
     }
 
 };

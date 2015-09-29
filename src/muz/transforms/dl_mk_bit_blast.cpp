@@ -283,7 +283,7 @@ namespace datalog {
                     // TODO add logic for pc:
                     // 1. replace fresh predicates by non-bit-blasted predicates
                     // 2. replace pr by the proof of r.
-                    rm.mk_rule(fml, pr, *result, r->get_name());
+                    rm.mk_rule(fml, pr, *result, r->name());
                 }
                 else {
                     result->add_rule(r);

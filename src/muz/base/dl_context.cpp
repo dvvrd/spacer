@@ -452,7 +452,7 @@ namespace datalog {
         return new_pred;
     }
 
-    void context::add_rule(expr* rl, symbol const& name, unsigned bound) {
+  void context::add_rule(expr* rl, symbol const& name, unsigned bound) {
         m_rule_fmls.push_back(rl);
         m_rule_names.push_back(name);
         m_rule_bounds.push_back(bound);
@@ -967,7 +967,7 @@ namespace datalog {
             m_rule_manager.to_formula (**it, fml);
             rules.push_back (fml);
             // The concatenated names are already stored last-first, so do not need to be reversed here
-            const symbol& rule_name = (*it)->get_name();
+            const symbol& rule_name = (*it)->name();
             names.push_back (rule_name);
 
             TRACE ("dl",
@@ -1054,7 +1054,7 @@ namespace datalog {
         }
     }
    
-    void context::get_raw_rule_formulas(expr_ref_vector& rules, svector<symbol>& names, vector<unsigned> &bounds){
+  void context::get_raw_rule_formulas(expr_ref_vector& rules, svector<symbol>& names, vector<unsigned> &bounds){
         for (unsigned i = 0; i < m_rule_fmls.size(); ++i) {
 	    expr_ref r = bind_vars(m_rule_fmls[i].get(), true);
 	    rules.push_back(r.get());
@@ -1105,7 +1105,7 @@ namespace datalog {
             }
             else {
                 rules.push_back(fml);
-                names.push_back(r->get_name());
+                names.push_back(r->name());
             }
         }
         for (unsigned i = m_rule_fmls_head; i < m_rule_fmls.size(); ++i) {
@@ -1209,7 +1209,7 @@ namespace datalog {
                 while (fresh_names.contains(nm)) {
                     std::ostringstream s;
                     s << nm << "!";
-                    nm = symbol(s.str().c_str());
+                    nm = symbol(s.str().c_str());                    
                 }
                 fresh_names.add(nm);
                 if (is_smt2_quoted_symbol(nm)) {

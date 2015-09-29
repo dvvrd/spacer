@@ -101,7 +101,7 @@ namespace datalog {
             tail.push_back(r.get_tail(i));
             neg.push_back(false);
         }
-        rules.add_rule(rm.mk(r.get_head(), tail.size(), tail.c_ptr(), r.get_name(), neg.c_ptr()));
+        rules.add_rule(rm.mk(r.get_head(), tail.size(), tail.c_ptr(), r.name(), neg.c_ptr()));
     }
     
     rule_set * mk_separate_negated_tails::operator()(rule_set const& src) {

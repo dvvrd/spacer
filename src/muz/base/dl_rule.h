@@ -203,9 +203,9 @@ namespace datalog {
         /**
            \brief Create a Datalog rule from a Horn formula.
            The formula is of the form (forall (...) (forall (...) (=> (and ...) head)))
-
+           
         */
-        void mk_rule(expr* fml, proof* p, rule_set& rules, symbol const& name);
+        void mk_rule(expr* fml, proof* p, rule_set& rules, symbol const& name = symbol::null);
 
         /**
            \brief Create a Datalog query from an expression.
@@ -219,18 +219,18 @@ namespace datalog {
            
            \remark A tail may contain negation. tail[i] is assumed to be negated if is_neg != 0 && is_neg[i] == true
         */
-        rule * mk(app * head, unsigned n, app * const * tail, symbol const& name,
+        rule * mk(app * head, unsigned n, app * const * tail, symbol const& name = symbol::null,
                   bool const * is_neg = 0, bool normalize = true);
 
         /**
            \brief Create a rule with the same tail as \c source and with a specified head.
         */
-        rule * mk(rule const * source, app * new_head, symbol const& name);
+        rule * mk(rule const * source, app * new_head, symbol const& name = symbol::null);
 
         /**
            \brief Create a copy of the given rule.
         */
-        rule * mk(rule const * source, symbol const& name);
+        rule * mk(rule const * source, symbol const& name = symbol::null);
 
         /** make sure there are not non-quantified variables that occur only in interpreted predicates */
         void fix_unbound_vars(rule_ref& r, bool try_quantifier_elimination);
@@ -283,14 +283,14 @@ namespace datalog {
     class rule : public accounted_object {
         friend class rule_manager;
 
-        app *             m_head;
-        proof*            m_proof;
-        unsigned          m_tail_size:20;
+        app *    m_head;
+        proof*   m_proof;
+        unsigned m_tail_size:20;
         // unsigned m_reserve:12;
-        unsigned          m_ref_cnt;
-        unsigned          m_positive_cnt;
-        unsigned          m_uninterp_cnt;
-        symbol            m_name;
+        unsigned m_ref_cnt;
+        unsigned m_positive_cnt;
+        unsigned m_uninterp_cnt;
+        symbol   m_name;
         /**
            The following field is an array of tagged pointers. 
            - Tag 0: the atom is not negated
@@ -370,7 +370,7 @@ namespace datalog {
 
            This possibly returns a ";"-separated list of names.
         */
-        symbol const& get_name() const { return m_name; } ;
+        symbol const& name() const { return m_name; } ;
 
         unsigned hash() const;
 

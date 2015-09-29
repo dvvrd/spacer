@@ -426,7 +426,7 @@ namespace datalog {
         new_negs.push_back(false);
 
         rule * new_rule = m_context.get_rule_manager().mk(new_head, new_tail.size(), new_tail.c_ptr(), 
-                                                          r->get_name(), new_negs.c_ptr());
+                                                          r->name(), new_negs.c_ptr());
         m_result_rules.push_back(new_rule);
 
         //TODO: allow for a rule to have multiple parent objects

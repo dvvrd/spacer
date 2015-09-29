@@ -159,7 +159,8 @@ namespace datalog {
         m_free_vars.accumulate(e);
     }
 
-    void rule_manager::mk_rule(expr* fml, proof* p, rule_set& rules, symbol const& name) {
+
+    void rule_manager::mk_rule(expr* fml, proof* p, rule_set& rules, symbol const& name) {              
         scoped_proof_mode _sc(m, m_ctx.generate_proof_trace()?PGM_FINE:PGM_DISABLED);
         proof_ref pr(p, m);
         expr_ref fml1(m);
@@ -167,7 +168,7 @@ namespace datalog {
         if (fml1 != fml && pr) {
             pr = m.mk_asserted(fml1);
         }
-        remove_labels(fml1, pr);
+        remove_labels(fml1, pr);        
         mk_rule_core(fml1, pr, rules, name);
     }
 
@@ -282,7 +283,7 @@ namespace datalog {
 
     func_decl* rule_manager::mk_query(expr* query, rule_set& rules) {
         ptr_vector<sort> vars;
-        svector<symbol> arg_names;
+        svector<symbol> names;
         app_ref_vector body(m);
         expr_ref q(m);
         
@@ -290,7 +291,7 @@ namespace datalog {
         // Remove existential prefix.
         bind_variables(query, false, q);
         quantifier_hoister qh(m);
-        qh.pull_quantifier(false, q, 0, &arg_names);
+        qh.pull_quantifier(false, q, 0, &names);
         // retrieve free variables.
         m_free_vars(q);
         vars.append(m_free_vars.size(), m_free_vars.c_ptr());
@@ -332,11 +333,11 @@ namespace datalog {
 
         // we want outermost declared variable first to 
         // follow order of quantified variables so we reverse vars.
-        while (vars.size() > arg_names.size()) {
-            arg_names.push_back(symbol(arg_names.size()));
+        while (vars.size() > names.size()) {
+            names.push_back(symbol(names.size()));
         }
         vars.reverse();
-        arg_names.reverse();
+        names.reverse();
         func_decl* qpred = m_ctx.mk_fresh_head_predicate(symbol("query"), symbol(), vars.size(), vars.c_ptr(), body_pred);
         m_ctx.register_predicate(qpred, false);        
         rules.set_output_predicate(qpred);
@@ -355,7 +356,7 @@ namespace datalog {
         app_ref impl(m.mk_implies(q, qhead), m);
         expr_ref rule_expr(impl.get(), m);
         if (!vars.empty()) {
-            rule_expr = m.mk_forall(vars.size(), vars.c_ptr(), arg_names.c_ptr(), impl);
+            rule_expr = m.mk_forall(vars.size(), vars.c_ptr(), names.c_ptr(), impl);
         }
 
         scoped_proof_mode _sc(m, m_ctx.generate_proof_trace()?PGM_FINE:PGM_DISABLED);
@@ -363,7 +364,7 @@ namespace datalog {
         if (m_ctx.generate_proof_trace()) {
             pr = m.mk_asserted(rule_expr);
         }
-        mk_rule(rule_expr, pr, rules, symbol("__query"));
+        mk_rule(rule_expr, pr, rules);
         return qpred;
     }
 
@@ -479,7 +480,7 @@ namespace datalog {
         }
     }
 
-    rule * rule_manager::mk(app * head, unsigned n, app * const * tail, symbol const& name, bool const * is_negated, bool normalize) {
+    rule * rule_manager::mk(app * head, unsigned n, app * const * tail, bool const * is_negated, symbol const& name, bool normalize) {
         DEBUG_CODE(check_valid_rule(head, n, tail););
         unsigned sz     = rule::get_obj_size(n);
         void * mem      = m.get_allocator().allocate(sz);
@@ -592,7 +593,7 @@ namespace datalog {
         if (m_free_vars.empty()) {
             return;
         }
-        svector<symbol> arg_names;
+        svector<symbol> names;
         used_symbols<> us;
         m_free_vars.set_default_sort(m.mk_bool_sort());
                
@@ -606,12 +607,12 @@ namespace datalog {
                 if (j > 0) _name << j;
                 symbol name(_name.str().c_str());
                 if (!us.contains(name)) {
-                    arg_names.push_back(name);
+                    names.push_back(name);
                     ++i;
                 }
             }
         }        
-        fml = m.mk_forall(m_free_vars.size(), m_free_vars.c_ptr(), arg_names.c_ptr(), fml);
+        fml = m.mk_forall(m_free_vars.size(), m_free_vars.c_ptr(), names.c_ptr(), fml); 
     }
 
     std::ostream& rule_manager::display_smt2(rule const& r, std::ostream & out) {
@@ -655,7 +656,7 @@ namespace datalog {
                 tail.push_back(ensure_app(conjs[i].get()));
             }
             tail_neg.resize(tail.size(), false);
-            r = mk(r->get_head(), tail.size(), tail.c_ptr(), r->get_name(), tail_neg.c_ptr());
+            r = mk(r->get_head(), tail.size(), tail.c_ptr(), r->name(), tail_neg.c_ptr());
             TRACE("dl", r->display(m_ctx, tout << "reduced rule\n"););
         }
     }
@@ -800,7 +801,7 @@ namespace datalog {
 
         SASSERT(tail.size()==tail_neg.size());
         rule_ref old_r = r;
-        r = mk(head, tail.size(), tail.c_ptr(), old_r->get_name(), tail_neg.c_ptr());
+        r = mk(head, tail.size(), tail.c_ptr(), old_r->name(), tail_neg.c_ptr());
         r->set_accounting_parent_object(m_ctx, old_r);
     }
 
@@ -838,7 +839,7 @@ namespace datalog {
             new_tail.push_back(to_app(tmp));
             tail_neg.push_back(r->is_neg_tail(i));
         }
-        r = mk(new_head.get(), new_tail.size(), new_tail.c_ptr(), r->get_name(), tail_neg.c_ptr(), false);
+        r = mk(new_head.get(), new_tail.size(), new_tail.c_ptr(), r->name(), tail_neg.c_ptr(), false);
 
         // keep old variable indices around so we can compose with substitutions. 
         // r->norm_vars(*this);
@@ -1019,8 +1020,7 @@ namespace datalog {
   
     void rule::display(context & ctx, std::ostream & out) const {
         ast_manager & m = ctx.get_manager();
-        out << m_name.str() << ":\n";
-
+        out << m_name.str () << ":\n";
         //out << mk_pp(m_head, m);
         output_predicate(ctx, m_head, out);
         if (m_tail_size == 0) {
@@ -1084,6 +1084,9 @@ namespace datalog {
     unsigned rule_hash_proc::operator()(const rule * r) const {
         return r->hash();
     }
+
+
+    
 };
 
 template class rewriter_tpl<datalog::rule_manager::remove_label_cfg>;

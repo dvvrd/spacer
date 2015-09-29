@@ -167,38 +167,38 @@ namespace datalog {
         typedef obj_map<const sort, sort_domain*> sort_domain_map;
 
 
-        ast_manager &            m;
-        register_engine_base&    m_register_engine;
-        smt_params &             m_fparams;
-        params_ref               m_params_ref;
-        fixedpoint_params*       m_params;
-        bool                     m_generate_proof_trace;      // cached configuration parameter
-        bool                     m_unbound_compressor;        // cached configuration parameter
-        symbol                   m_default_relation;          // cached configuration parameter
-        dl_decl_util             m_decl_util;
-        th_rewriter              m_rewriter;
-        var_subst                m_var_subst;
-        rule_manager             m_rule_manager;
-        contains_pred            m_contains_p;
-        rule_properties          m_rule_properties;
-        rule_transformer         m_transf;
-        trail_stack<context>     m_trail;
-        ast_ref_vector           m_pinned;
-        bind_variables           m_bind_variables;
-        sort_domain_map          m_sorts;
-        func_decl_set            m_preds;
-        sym2decl                 m_preds_by_name;
-        pred2syms                m_argument_var_names;
-        rule_set                 m_rule_set;
-        rule_set                 m_transformed_rule_set;
-        expr_free_vars           m_free_vars;
-        unsigned                 m_rule_fmls_head;
-        expr_ref_vector          m_rule_fmls;
-        svector<symbol>          m_rule_names;
-        vector<unsigned>         m_rule_bounds;
-        expr_ref_vector          m_background;
-        model_converter_ref      m_mc;
-        proof_converter_ref      m_pc;
+        ast_manager &      m;
+        register_engine_base& m_register_engine;
+        smt_params &       m_fparams;
+        params_ref         m_params_ref;
+        fixedpoint_params*  m_params;
+        bool               m_generate_proof_trace;      // cached configuration parameter
+        bool               m_unbound_compressor;        // cached configuration parameter
+        symbol             m_default_relation;          // cached configuration parameter
+        dl_decl_util       m_decl_util;
+        th_rewriter        m_rewriter;
+        var_subst          m_var_subst;
+        rule_manager       m_rule_manager;
+        contains_pred      m_contains_p;
+        rule_properties    m_rule_properties;
+        rule_transformer   m_transf;
+        trail_stack<context> m_trail;
+        ast_ref_vector     m_pinned;
+        bind_variables     m_bind_variables;
+        sort_domain_map    m_sorts;
+        func_decl_set      m_preds;
+        sym2decl           m_preds_by_name;
+        pred2syms          m_argument_var_names;
+        rule_set           m_rule_set;
+        rule_set           m_transformed_rule_set;
+        expr_free_vars     m_free_vars;
+        unsigned           m_rule_fmls_head;
+        expr_ref_vector    m_rule_fmls;
+        svector<symbol>    m_rule_names;
+        vector<unsigned>   m_rule_bounds;
+        expr_ref_vector    m_background;
+        model_converter_ref m_mc;
+        proof_converter_ref m_pc;
 
         rel_context_base*               m_rel;
         scoped_ptr<engine_base>         m_engine;
@@ -397,7 +397,7 @@ namespace datalog {
            Method exposed from API for adding rules.
         */
         void add_rule(expr* rl, symbol const& name, unsigned bound = UINT_MAX);
-
+        
 
         /**
            Update a named rule.

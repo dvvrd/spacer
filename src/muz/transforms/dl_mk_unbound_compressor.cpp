@@ -174,7 +174,7 @@ namespace datalog {
             }
         }
         else {
-            rule_ref new_rule(m_context.get_rule_manager().mk(r, chead, r->get_name()), m_context.get_rule_manager());
+            rule_ref new_rule(m_context.get_rule_manager().mk(r, chead, r->name()), m_context.get_rule_manager());
             new_rule->set_accounting_parent_object(m_context, r);
 
             m_head_occurrence_ctr.dec(m_rules.get(rule_index)->get_decl());
@@ -223,7 +223,7 @@ namespace datalog {
             tails.push_back(dtail);
         }
 
-        res = m_context.get_rule_manager().mk( r->get_head(), tails.size(), tails.c_ptr(), r->get_name(), tails_negated.c_ptr());
+        res = m_context.get_rule_manager().mk( r->get_head(), tails.size(), tails.c_ptr(), r->name(), tails_negated.c_ptr());
         res->set_accounting_parent_object(m_context, r);
         m_context.get_rule_manager().fix_unbound_vars(res, true);        
     }

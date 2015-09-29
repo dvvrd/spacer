@@ -40,7 +40,7 @@ class hnf {
     void cancel() { set_cancel(true); }
     void reset_cancel() { set_cancel(false); }
     void set_cancel(bool f);
-    void set_name(symbol const& name);
+    void set_name(symbol const& name);    
     void reset();
     func_decl_ref_vector const& get_fresh_predicates();
 };
