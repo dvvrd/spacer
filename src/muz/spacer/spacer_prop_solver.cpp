@@ -64,7 +64,6 @@ namespace spacer {
                 name << "spacer_proxy_" << s.m_proxies.size();
                 res = m.mk_const(symbol(name.str().c_str()), m.mk_bool_sort());
                 s.m_proxies.push_back(res);
-                s.m_aux_symbols.insert(res->get_decl());
             }
             else {
                 res = s.m_proxies[m_num_proxies].get();
@@ -261,7 +260,6 @@ namespace spacer {
         std::stringstream name;
         name << m_name << "#level_" << idx;
         func_decl * lev_pred = m.mk_fresh_func_decl(name.str().c_str(), 0, 0,m.mk_bool_sort());
-        m_aux_symbols.insert(lev_pred);
         m_level_preds.push_back(lev_pred);
 
         app_ref pos_la(m.mk_const(lev_pred), m);
@@ -509,7 +507,7 @@ namespace spacer {
             if (m_level_atoms_set.contains(core_expr)) {
                 continue;
             }
-            if (m_ctx->is_aux_predicate(core_expr)) {
+            if (is_aux_predicate(core_expr)) {
                 continue;
             }
             m_core->push_back(to_app(core_expr));
