@@ -719,6 +719,7 @@ namespace spacer {
       expr_ref_vector conj(m), aux(m);
         
         conj.push_back(m.mk_not(states));
+        qe::flatten_and (conj);
 
         prop_solver::scoped_level _sl(m_solver, level);
         m_solver.set_core(core);
