@@ -966,7 +966,16 @@ namespace datalog {
         for (; it != end; it++) {
             m_rule_manager.to_formula (**it, fml);
             rules.push_back (fml);
-            names.push_back ((*it)->name ());
+            // The concatenated names are already stored last-first, so do not need to be reversed here
+            const symbol& rule_name = (*it)->name();
+            names.push_back (rule_name);
+
+            TRACE ("dl",
+                   if (rule_name == symbol::null) {
+                       tout << "Encountered unnamed rule: ";
+                       (*it)->display(*this, tout);
+                       tout << "\n";
+                   });
         }
     }
 

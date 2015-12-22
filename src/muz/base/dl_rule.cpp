@@ -656,7 +656,7 @@ namespace datalog {
                 tail.push_back(ensure_app(conjs[i].get()));
             }
             tail_neg.resize(tail.size(), false);
-            r = mk(r->get_head(), tail.size(), tail.c_ptr(), tail_neg.c_ptr());
+            r = mk(r->get_head(), tail.size(), tail.c_ptr(), tail_neg.c_ptr(), r->name());
             TRACE("dl", r->display(m_ctx, tout << "reduced rule\n"););
         }
     }
@@ -801,7 +801,7 @@ namespace datalog {
 
         SASSERT(tail.size()==tail_neg.size());
         rule_ref old_r = r;
-        r = mk(head, tail.size(), tail.c_ptr(), tail_neg.c_ptr());
+        r = mk(head, tail.size(), tail.c_ptr(), tail_neg.c_ptr(), old_r->name());
         r->set_accounting_parent_object(m_ctx, old_r);
     }
 

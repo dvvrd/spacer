@@ -691,7 +691,8 @@ namespace datalog {
     }
 
     symbol mk_explanations::get_rule_symbol(rule * r) {
-        if (r->name() == symbol::null) {
+        const symbol& r_name = r->name();
+        if (r_name == symbol::null) {
             std::stringstream sstm;
             r->display(m_context, sstm);
             std::string res = sstm.str();
@@ -699,7 +700,7 @@ namespace datalog {
             return symbol(res.c_str());
         }
         else {
-            return r->name();
+            return r_name;
         }
     }
 

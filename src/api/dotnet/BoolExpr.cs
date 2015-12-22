@@ -34,5 +34,21 @@ namespace Microsoft.Z3
         /// <summary> Constructor for BoolExpr </summary>
         internal BoolExpr(Context ctx, IntPtr obj) : base(ctx, obj) { Contract.Requires(ctx != null); }
         #endregion
+
+        /// <summary>
+        /// Translates (copies) the boolean term to the Context <paramref name="ctx"/>.
+        /// </summary>
+        /// <param name="ctx">A context</param>
+        /// <returns>A copy of the boolean term which is associated with <paramref name="ctx"/></returns>
+        new public BoolExpr Translate(Context ctx)
+        {
+            Contract.Requires(ctx != null);
+            Contract.Ensures(Contract.Result<BoolExpr>() != null);
+
+            if (ReferenceEquals(Context, ctx))
+                return this;
+            else
+                return new BoolExpr(ctx, Native.Z3_translate(Context.nCtx, NativeObject, ctx.nCtx));
+        }
     }
 }
