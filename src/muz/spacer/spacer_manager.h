@@ -34,7 +34,7 @@ Revision History:
 #include "spacer_farkas_learner.h"
 #include "spacer_smt_context_manager.h"
 #include "dl_rule.h"
-
+#include <vector>
 
 namespace smt {
     class context;
@@ -90,7 +90,7 @@ namespace spacer {
         unsigned m_next_unique_num;
         
         
-        static vector<std::string> get_state_suffixes();
+        static std::vector<std::string> get_state_suffixes();
         
         unsigned n_index() const { return 0; }
         unsigned o_index(unsigned i) const { return i+1; }

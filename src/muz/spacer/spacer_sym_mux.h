@@ -23,6 +23,7 @@ Revision History:
 #include "ast.h"
 #include "map.h"
 #include "vector.h"
+#include <vector>
 
 class model_core;
 
@@ -46,7 +47,7 @@ private:
     mutable unsigned       m_next_sym_suffix_idx;
     mutable symbols        m_used_suffixes;
     /** Here we have default suffixes for each of the variants */
-    mutable vector<std::string> m_suffixes;
+    mutable std::vector<std::string> m_suffixes;
 
 
     /**
@@ -94,7 +95,7 @@ private:
 
     expr_ref isolate_o_idx(expr* e, unsigned idx) const;
 public:
-    sym_mux(ast_manager & m, const vector<std::string> & suffixes);
+    sym_mux(ast_manager & m, const std::vector<std::string> & suffixes);
 
     ast_manager & get_manager() const { return m; }
 

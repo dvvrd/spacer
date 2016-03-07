@@ -28,7 +28,7 @@ Revision History:
 
 using namespace spacer;
 
-sym_mux::sym_mux(ast_manager & m, const vector<std::string> & suffixes)
+sym_mux::sym_mux(ast_manager & m, const std::vector<std::string> & suffixes)
     : m(m), m_ref_holder(m), m_next_sym_suffix_idx(0), m_suffixes(suffixes)
 {
     unsigned suf_sz = m_suffixes.size();

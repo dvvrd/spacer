@@ -160,8 +160,8 @@ namespace spacer {
         }
     }
 
-    vector<std::string> manager::get_state_suffixes() {
-        vector<std::string> res;
+    std::vector<std::string> manager::get_state_suffixes() {
+        std::vector<std::string> res;
         res.push_back("_n");
         return res;
     }
