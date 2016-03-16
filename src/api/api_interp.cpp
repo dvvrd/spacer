@@ -257,9 +257,9 @@ extern "C" {
 
 
         // some boilerplate stolen from Z3_solver_check
-        unsigned timeout     =  to_params(p)->m_params.get_uint("timeout", mk_c(c)->get_timeout());
-        unsigned rlimit      =  to_params(p)->m_params.get_uint("rlimit", mk_c(c)->get_rlimit());
-        bool     use_ctrl_c  =  to_params(p)->m_params.get_bool("ctrl_c", false);
+        unsigned timeout     =  p?to_params(p)->m_params.get_uint("timeout", mk_c(c)->get_timeout()):UINT_MAX;
+        unsigned rlimit      =  p?to_params(p)->m_params.get_uint("rlimit", mk_c(c)->get_rlimit()):0;
+        bool     use_ctrl_c  =  p?to_params(p)->m_params.get_bool("ctrl_c", false): false;
         cancel_eh<reslimit> eh(mk_c(c)->m().limit());
         api::context::set_interruptable si(*(mk_c(c)), eh);
 
@@ -289,7 +289,7 @@ extern "C" {
             }
             catch (z3_exception & ex) {
                 mk_c(c)->handle_exception(ex);
-                return Z3_L_UNDEF;
+                RETURN_Z3_compute_interpolant Z3_L_UNDEF;
             }
         }
 
@@ -323,7 +323,7 @@ extern "C" {
 
         *out_interp = of_ast_vector(v);
 
-        return status;
+        RETURN_Z3_compute_interpolant status;
         Z3_CATCH_RETURN(Z3_L_UNDEF);
     }
 

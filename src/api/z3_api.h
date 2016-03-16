@@ -60,7 +60,9 @@ DEFINE_TYPE(Z3_rcf_num);
    - \c Z3_app: kind of AST used to represent function applications.
    - \c Z3_pattern: kind of AST used to represent pattern and multi-patterns used to guide quantifier instantiation.
    - \c Z3_constructor: type constructor for a (recursive) datatype.
+   - \c Z3_constructor_list: list of constructors for a (recursive) datatype.
    - \c Z3_params: parameter set used to configure many components such as: simplifiers, tactics, solvers, etc.
+   - \c Z3_param_descrs: provides a collection of parameter names, their types, default values and documentation strings. Solvers, tactics, and other objects accept different collection of parameters. 
    - \c Z3_model: model for the constraints asserted into the logical context.
    - \c Z3_func_interp: interpretation of a function in a model.
    - \c Z3_func_entry: representation of the value of a \c Z3_func_interp at a particular point.
@@ -1663,6 +1665,13 @@ extern "C" {
        def_API('Z3_param_descrs_get_name', SYMBOL, (_in(CONTEXT), _in(PARAM_DESCRS), _in(UINT)))
     */
     Z3_symbol Z3_API Z3_param_descrs_get_name(Z3_context c, Z3_param_descrs p, unsigned i);
+
+    /**
+       \brief Retrieve documentation string corresponding to parameter name \c s.
+
+       def_API('Z3_param_descrs_get_documentation', STRING, (_in(CONTEXT), _in(PARAM_DESCRS), _in(SYMBOL)))
+     */
+    Z3_string Z3_API Z3_param_descrs_get_documentation(Z3_context c, Z3_param_descrs p, Z3_symbol s);
 
     /**
        \brief Convert a parameter description set into a string. This function is mainly used for printing the
@@ -5642,6 +5651,9 @@ extern "C" {
        if the result is \c Z3_L_UNDEF, but the returned model
        is not guaranteed to satisfy quantified assertions.
 
+       \remark User must use #Z3_solver_inc_ref and #Z3_solver_dec_ref to manage solver objects.
+       Even if the context was created using #Z3_mk_context instead of #Z3_mk_context_rc.
+
        def_API('Z3_mk_simple_solver', SOLVER, (_in(CONTEXT),))
     */
     Z3_solver Z3_API Z3_mk_simple_solver(Z3_context c);
@@ -5661,6 +5673,9 @@ extern "C" {
        \brief Create a new solver that is implemented using the given tactic.
        The solver supports the commands #Z3_solver_push and #Z3_solver_pop, but it
        will always solve each #Z3_solver_check from scratch.
+
+       \remark User must use #Z3_solver_inc_ref and #Z3_solver_dec_ref to manage solver objects.
+       Even if the context was created using #Z3_mk_context instead of #Z3_mk_context_rc.
 
        def_API('Z3_mk_solver_from_tactic', SOLVER, (_in(CONTEXT), _in(TACTIC)))
     */
