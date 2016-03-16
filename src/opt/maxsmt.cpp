@@ -94,19 +94,12 @@ namespace opt {
     void maxsmt_solver_base::set_mus(bool f) {
         params_ref p;
         p.set_bool("minimize_core", f);
+        // p.set_bool("minimize_core_partial", f);
         s().updt_params(p);
     }
 
-    void maxsmt_solver_base::enable_sls(expr_ref_vector const& soft, vector<rational> const& ws) {
-        m_c.enable_sls(soft, ws);
-    }
-
-    void maxsmt_solver_base::set_enable_sls(bool f) {
-        m_c.set_enable_sls(f);
-    }
-
-    void maxsmt_solver_base::set_soft_assumptions() {
-        m_c.set_soft_assumptions();
+    void maxsmt_solver_base::enable_sls(bool force) {
+        m_c.enable_sls(force);
     }
 
     app* maxsmt_solver_base::mk_fresh_bool(char const* name) {

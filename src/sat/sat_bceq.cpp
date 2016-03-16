@@ -26,6 +26,29 @@ Revision History:
 
 namespace sat {
     
+    void bceq::use_list::init(unsigned num_vars) {
+        m_clauses.reset();
+        m_clauses.resize(2*num_vars);
+    }
+
+    void bceq::use_list::insert(clause& c) {
+        unsigned sz = c.size();
+        for (unsigned i = 0; i < sz; i++) {
+            m_clauses[c[i].index()].push_back(&c);
+        }        
+    }
+
+    void bceq::use_list::erase(clause& c) {
+        unsigned sz = c.size();
+        for (unsigned i = 0; i < sz; i++) {
+            m_clauses[c[i].index()].erase(&c);
+        }
+    }
+
+    ptr_vector<clause>& bceq::use_list::get(literal lit) {
+        return m_clauses[lit.index()];
+    }
+
     bceq::bceq(solver & s):
         m_solver(s) {
     }
@@ -45,6 +68,7 @@ namespace sat {
         m_R.reset();
         m_L_blits.reset();
         m_R_blits.reset();
+        m_bce_use_list.reset();
         clause * const* it = m_solver.begin_clauses();
         clause * const* end = m_solver.end_clauses();
         for (; it != end; ++it) {
@@ -119,14 +143,13 @@ namespace sat {
     }
     
     void bceq::pure_decompose(clause_use_list& uses, svector<clause*>& clauses) {
-        clause_use_list::iterator it = uses.mk_iterator();
-        while (!it.at_end()) {
-            clause& cls = it.curr();
+        unsigned sz = uses.size();
+        for (unsigned i = 0; i < sz; ++i) {
+            clause& cls = *uses[i];
             if (!cls.was_removed() && m_clauses[cls.id()]) {
                 clauses.push_back(&cls);
                 m_clauses[cls.id()] = 0;
             }
-            it.next();
         }
     }
 
@@ -140,7 +163,6 @@ namespace sat {
         for (unsigned i = 0; i < m_L.size(); ++i) {
             ul.insert(*m_L[i]);
         }
-#define MOVE_R_TO_L                             \
 
         // cheap pass: add clauses from R in order
         // such that they are blocked with respect to
@@ -161,6 +183,10 @@ namespace sat {
         }
         // expensive pass: add clauses from R as long
         // as BCE produces the empty set of clauses.
+        m_bce_use_list.init(m_solver.num_vars());
+        for (unsigned i = 0; i < m_L.size(); ++i) {
+            m_bce_use_list.insert(*m_L[i]);
+        }
         for (unsigned i = 0; i < m_R.size(); ++i) {
             if (bce(*m_R[i])) {
                 m_R[i] = m_R.back();
@@ -173,50 +199,59 @@ namespace sat {
         m_use_list = save;
     }
 
-    bool bceq::bce(clause& cls) {
-        svector<bool> live_clauses;
-        use_list ul;
-        m_use_list = &ul;
-        ul.init(m_solver.num_vars());
-        for (unsigned i = 0; i < m_L.size(); ++i) {
-            ul.insert(*m_L[i]);
-        }
-        ul.insert(cls);
-        svector<clause*> clauses(m_L), new_clauses;
-        literal_vector blits(m_L_blits), new_blits;
-        clauses.push_back(&cls);
+
+    // Note: replay blocked clause elimination:
+    // Suppose C u { c1 } is blocked. 
+    // annotate each clause by blocking literal.
+    // for new clause c2, check if C u { c2 } is blocked.
+    // For each c in C record which literal it is blocked.
+    // (Order the clauses in C by block ordering)
+    // l | c is blocked, 
+    //  -> c2 contains ~l => check if c c2 is blocked
+    //  
+    bool bceq::bce(clause& cls0) {
+        IF_VERBOSE(1, verbose_stream() << "bce " << m_L.size() << " " << m_R.size() << " " << cls0 << "\n";);
+        unsigned_vector& live_clauses = m_live_clauses;
+        live_clauses.reset();
+        m_use_list = &m_bce_use_list;
+        m_bce_use_list.insert(cls0);
+        svector<clause*>& clauses = m_L;
+        literal_vector& blits = m_L_blits;
+        clauses.push_back(&cls0);
         blits.push_back(null_literal);
         bool removed = false;
         m_removed.reset();
-        do {
+        for (unsigned i = 0; i < clauses.size(); ++i) {
+            clause& cls1 = *clauses[i];
+            literal lit = find_blocked(cls1);
+            if (lit == null_literal) {
+                live_clauses.push_back(i);
+            }
+            else {
+                m_removed.setx(cls1.id(), true, false);
+                removed = true;
+            }
+        }
+        while (removed) {
             removed = false;
-            for (unsigned i = 0; i < clauses.size(); ++i) {
-                clause& cls = *clauses[i];
-                literal lit = find_blocked(cls);
+            //std::cout << live_clauses.size() << " ";
+            for (unsigned i = 0; i < live_clauses.size(); ++i) {
+                clause& cls1 = *clauses[live_clauses[i]];
+                literal lit = find_blocked(cls1);
                 if (lit != null_literal) {
-                    m_removed.setx(cls.id(), true, false);
-                    new_clauses.push_back(&cls);
-                    new_blits.push_back(lit);
+                    m_removed.setx(cls1.id(), true, false);
                     removed = true;
-                    clauses[i] = clauses.back();
-                    blits[i] = blits.back();
-                    clauses.pop_back();
-                    blits.pop_back();                    
+                    live_clauses[i] = live_clauses.back();
+                    live_clauses.pop_back();
                     --i;
                 }
             }
         }
-        while (removed);
-        if (clauses.empty()) {
-            m_L.reset();
-            m_L_blits.reset();
-            new_clauses.reverse();
-            new_blits.reverse();
-            m_L.append(new_clauses);
-            m_L_blits.append(new_blits);
-        }
-        if (!clauses.empty()) std::cout << "Number left after BCE: " << clauses.size() << "\n";
-        return clauses.empty();
+        //std::cout << "\n";
+        m_bce_use_list.erase(cls0);
+        clauses.pop_back();
+        blits.pop_back();
+        return live_clauses.empty();
     }
 
     literal bceq::find_blocked(clause const& cls) {
@@ -243,9 +278,9 @@ namespace sat {
 
     bool bceq::is_blocked(literal lit) const {
         clause_use_list& uses = m_use_list->get(~lit);
-        clause_use_list::iterator it = uses.mk_iterator();
-        while (!it.at_end()) {
-            clause const& cls = it.curr();
+        unsigned sz = uses.size();
+        for (unsigned i = 0; i < sz; ++i) {
+            clause const& cls = *uses[i];
             unsigned sz = cls.size();
             bool is_axiom = m_removed.get(cls.id(), false);
             for (unsigned i = 0; !is_axiom && i < sz; ++i) {
@@ -256,7 +291,6 @@ namespace sat {
             if (!is_axiom) {
                 return false;
             }
-            it.next();
         }
         return true;
     }
@@ -442,9 +476,10 @@ namespace sat {
         roots[l2.var()] = l1;
         vars.push_back(l2.var());
         elim_eqs elim(m_solver);
-        for (unsigned i = 0; i < vars.size(); ++i) {
-            std::cout << "var: " << vars[i] << " root: " << roots[vars[i]] << "\n";
-        }
+        IF_VERBOSE(1, 
+                   for (unsigned i = 0; i < vars.size(); ++i) {
+                       verbose_stream() << "var: " << vars[i] << " root: " << roots[vars[i]] << "\n";
+                   });
         elim(roots, vars);
     }
 
@@ -462,7 +497,7 @@ namespace sat {
         flet<unsigned> _bound_maxc(m_solver.m_config.m_max_conflicts, 1500);
 
         use_list     ul;        
-        solver       s(m_solver.m_params, 0);
+        solver       s(m_solver.m_params, m_solver.rlimit(), 0);
         s.m_config.m_bcd            = false;
         s.m_config.m_minimize_core  = false;
         s.m_config.m_optimize_model = false;
@@ -473,7 +508,7 @@ namespace sat {
         init();
         pure_decompose();
         post_decompose();
-        std::cout << "Decomposed set " << m_L.size() << " rest: " << m_R.size() << "\n";
+        IF_VERBOSE(1, verbose_stream() << "Decomposed set " << m_L.size() << " rest: " << m_R.size() << "\n";);
 
         TRACE("sat",
               tout << "Decomposed set " << m_L.size() << "\n";

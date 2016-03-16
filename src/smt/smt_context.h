@@ -157,7 +157,7 @@ namespace smt {
         u_map<bool_var>             m_expr2bool_var;
 #endif
         ptr_vector<expr>            m_bool_var2expr;         // bool_var -> expr
-        char_vector                 m_assignment;  //!< mapping literal id -> assignment lbool
+        signed_char_vector          m_assignment;  //!< mapping literal id -> assignment lbool
         vector<watch_list>          m_watches;     //!< per literal
         vector<clause_set>          m_lit_occs;    //!< index for backward subsumption
         svector<bool_var_data>      m_bdata;       //!< mapping bool_var -> data
@@ -235,7 +235,7 @@ namespace smt {
 
         virtual void set_cancel_flag(bool f = true);
 
-        bool get_cancel_flag() { return m_cancel_flag; }
+        bool get_cancel_flag() { return m_cancel_flag || !m_manager.limit().inc(); }
 
         region & get_region() {
             return m_region;
@@ -1046,6 +1046,8 @@ namespace smt {
 
         void mk_unsat_core();
 
+        void validate_unsat_core();
+
         void init_search();
 
         void end_search();
@@ -1313,7 +1315,7 @@ namespace smt {
         bool already_internalized_theory_core(theory * th, expr_ref_vector const & s) const;
 #endif
         bool check_preamble(bool reset_cancel);
-        void check_finalize(lbool r);
+        lbool check_finalize(lbool r);
 
         // -----------------------------------
         //

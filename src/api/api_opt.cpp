@@ -126,9 +126,11 @@ extern "C" {
         lbool r = l_undef;
         cancel_eh<opt::context> eh(*to_optimize_ptr(o));
         unsigned timeout = to_optimize_ptr(o)->get_params().get_uint("timeout", mk_c(c)->get_timeout());
+        unsigned rlimit = mk_c(c)->get_rlimit();
         api::context::set_interruptable si(*(mk_c(c)), eh);        
         {
             scoped_timer timer(timeout, &eh);
+            scoped_rlimit _rlimit(mk_c(c)->m().limit(), rlimit);
             try {
                 r = to_optimize_ptr(o)->optimize();
             }
@@ -140,6 +142,14 @@ extern "C" {
         }
         return of_lbool(r);
         Z3_CATCH_RETURN(Z3_L_UNDEF);
+    }
+
+    Z3_string Z3_API Z3_optimize_get_reason_unknown(Z3_context c, Z3_optimize o) {
+        Z3_TRY;
+        LOG_Z3_optimize_to_string(c, o);
+        RESET_ERROR_CODE();
+        return mk_c(c)->mk_external_string(to_optimize_ptr(o)->reason_unknown());
+        Z3_CATCH_RETURN("");
     }
 
     Z3_model Z3_API Z3_optimize_get_model(Z3_context c, Z3_optimize o) {

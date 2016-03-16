@@ -16,6 +16,8 @@ def_module_params(module_name='smt',
                           ('pull_nested_quantifiers', BOOL, False, 'pull nested quantifiers'),
                           ('refine_inj_axioms', BOOL, True, 'refine injectivity axioms'),
                           ('timeout', UINT, 0, 'timeout (0 means no timeout)'),
+	                  ('rlimit', UINT, 0, 'resource limit (0 means no limit)'),
+                          ('max_conflicts', UINT, UINT_MAX, 'maximum number of conflicts before giving up.'),
                           ('mbqi', BOOL, True, 'model based quantifier instantiation (MBQI)'),
                           ('mbqi.max_cexs', UINT, 1, 'initial maximal number of counterexamples used in MBQI, each counterexample generates a quantifier instantiation'),
                           ('mbqi.max_cexs_incr', UINT, 0, 'increment for MBQI_MAX_CEXS, the increment is performed after each round of MBQI'),
@@ -57,5 +59,6 @@ def_module_params(module_name='smt',
                           ('dack.factor', DOUBLE, 0.1, 'number of instance per conflict'),
                           ('dack.gc', UINT, 2000, 'Dynamic ackermannization garbage collection frequency (per conflict)'),
                           ('dack.gc_inv_decay', DOUBLE, 0.8, 'Dynamic ackermannization garbage collection decay'),
-                          ('dack.threshold', UINT, 10, ' number of times the congruence rule must be used before Leibniz\'s axiom is expanded')
+                          ('dack.threshold', UINT, 10, ' number of times the congruence rule must be used before Leibniz\'s axiom is expanded'),
+                          ('core.validate', BOOL, False, 'validate unsat core produced by SMT context')
                           ))

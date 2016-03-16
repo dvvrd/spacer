@@ -638,7 +638,11 @@ void mpf_manager::mul(mpf_rounding_mode rm, mpf const & x, mpf const & y, mpf & 
 
         // Remove the extra bits, keeping a sticky bit.
         scoped_mpz sticky_rem(m_mpz_manager);
-        m_mpz_manager.machine_div_rem(o.significand, m_powers2(x.sbits-4), o.significand, sticky_rem);
+        if (o.sbits >= 4)
+            m_mpz_manager.machine_div_rem(o.significand, m_powers2(o.sbits - 4), o.significand, sticky_rem);
+        else
+            m_mpz_manager.mul2k(o.significand, 4-o.sbits, o.significand);
+
         if (!m_mpz_manager.is_zero(sticky_rem) && m_mpz_manager.is_even(o.significand))
             m_mpz_manager.inc(o.significand);
 
@@ -728,7 +732,7 @@ void mpf_manager::div(mpf_rounding_mode rm, mpf const & x, mpf const & y, mpf & 
     }
 }
 
-void mpf_manager::fused_mul_add(mpf_rounding_mode rm, mpf const & x, mpf const & y, mpf const &z, mpf & o) {
+void mpf_manager::fma(mpf_rounding_mode rm, mpf const & x, mpf const & y, mpf const &z, mpf & o) {
     SASSERT(x.sbits == y.sbits && x.ebits == y.ebits &&
             x.sbits == y.sbits && z.ebits == z.ebits);
 
@@ -861,7 +865,7 @@ void mpf_manager::fused_mul_add(mpf_rounding_mode rm, mpf const & x, mpf const &
        
         o.exponent = mul_res.exponent();
         
-        unsigned extra = x.sbits-4;
+        unsigned extra = 0;
         // Result could overflow into 4.xxx ...
         SASSERT(m_mpz_manager.lt(o.significand, m_powers2(2 * x.sbits + 2)));
         if(m_mpz_manager.ge(o.significand, m_powers2(2 * x.sbits + 1))) 
@@ -871,8 +875,14 @@ void mpf_manager::fused_mul_add(mpf_rounding_mode rm, mpf const & x, mpf const &
             TRACE("mpf_dbg", tout << "Addition overflew!" << std::endl;);
         }        
 
-        // Get rid of the extra bits.
-        m_mpz_manager.machine_div_rem(o.significand, m_powers2(extra), o.significand, sticky_rem);
+        // Remove the extra bits, keeping a sticky bit. 
+        m_mpz_manager.set(sticky_rem, 0);
+        unsigned minbits = (4 + extra);
+        if (o.sbits >= minbits)
+            m_mpz_manager.machine_div_rem(o.significand, m_powers2(o.sbits - minbits), o.significand, sticky_rem);
+        else
+            m_mpz_manager.mul2k(o.significand, minbits - o.sbits, o.significand);
+        
         if (!m_mpz_manager.is_zero(sticky_rem) && m_mpz_manager.is_even(o.significand))
             m_mpz_manager.inc(o.significand);
             
@@ -951,20 +961,14 @@ void mpf_manager::sqrt(mpf_rounding_mode rm, mpf const & x, mpf & o) {
 
     TRACE("mpf_dbg", tout << "X = " << to_string(x) << std::endl;);
 
-    if (is_nan(x) || is_ninf(x))
+    if (is_nan(x))
         mk_nan(x.ebits, x.sbits, o);
     else if (is_pinf(x))
         set(o, x);
-    else if (x.sign) {
-        if (!m_mpz_manager.is_zero(x.significand))
-            mk_nan(x.ebits, x.sbits, o);
-        else
-            mk_nzero(x.ebits, x.sbits, o);
-    }
-    else if (is_pzero(x))
-        mk_pzero(x.ebits, x.sbits, o);
-    else if (is_nzero(x))
-        mk_nzero(x.ebits, x.sbits, o);
+    else if (is_zero(x))
+        set(o, x);
+    else if (x.sign)
+        mk_nan(x.ebits, x.sbits, o);
     else {
         o.ebits = x.ebits;
         o.sbits = x.sbits;
@@ -976,8 +980,7 @@ void mpf_manager::sqrt(mpf_rounding_mode rm, mpf const & x, mpf & o) {
 
         TRACE("mpf_dbg", tout << "A = " << to_string(a) << std::endl;);
 
-        m_mpz_manager.mul2k(a.significand(), x.sbits + ((a.exponent() % 2)?6:5));        
-        // my_mpz_sqrt(m_mpz_manager, x.sbits, a.exponent % 2 ? true : false, a.significand, o.significand);
+        m_mpz_manager.mul2k(a.significand(), x.sbits + ((a.exponent() % 2)?6:7)); 
         if (!m_mpz_manager.root(a.significand(), 2, o.significand))
         {
             // If the result is inexact, it is 1 too large.
@@ -987,8 +990,9 @@ void mpf_manager::sqrt(mpf_rounding_mode rm, mpf const & x, mpf & o) {
             TRACE("mpf_dbg", tout << "dec'ed " << m_mpz_manager.to_string(o.significand) << std::endl;);
         }
         o.exponent = a.exponent() >> 1;
+        if (a.exponent() % 2 == 0) o.exponent--;
 
-        round_sqrt(rm, o);        
+        round(rm, o);
     }
 
     TRACE("mpf_dbg", tout << "SQRT = " << to_string(o) << std::endl;);
@@ -1167,6 +1171,19 @@ void mpf_manager::to_sbv_mpq(mpf_rounding_mode rm, const mpf & x, scoped_mpq & o
 
     m_mpq_manager.set(o, z);
     if (x.sign) m_mpq_manager.neg(o);
+}
+
+void mpf_manager::to_ieee_bv_mpz(const mpf & x, scoped_mpz & o) {
+    SASSERT(!is_nan(x) && !is_inf(x));
+    SASSERT(exp(x) < INT_MAX);
+
+    unsigned sbits = x.get_sbits();
+    unsigned ebits = x.get_ebits();
+    m_mpz_manager.set(o, sgn(x));
+    m_mpz_manager.mul2k(o, ebits);
+    m_mpz_manager.add(o, (int)exp(x), o);
+    m_mpz_manager.mul2k(o, sbits - 1);
+    m_mpz_manager.add(o, sig(x), o);
 }
 
 void mpf_manager::rem(mpf const & x, mpf const & y, mpf & o) {
@@ -1572,6 +1589,13 @@ void mpf_manager::mk_ninf(unsigned ebits, unsigned sbits, mpf & o) {
 }
 
 void mpf_manager::unpack(mpf & o, bool normalize) {
+    TRACE("mpf_dbg", tout << "unpack " << to_string(o) << ": ebits=" << 
+                             o.ebits << " sbits=" << o.sbits << 
+                             " normalize=" << normalize << 
+                             " has_top_exp=" << has_top_exp(o) << " (" << mk_top_exp(o.ebits) << ")" << 
+                             " has_bot_exp=" << has_bot_exp(o) << " (" << mk_bot_exp(o.ebits) << ")" <<
+                             " is_zero=" << is_zero(o) << std::endl;);
+
     // Insert the hidden bit or adjust the exponent of denormal numbers.    
     if (is_zero(o))
         return;

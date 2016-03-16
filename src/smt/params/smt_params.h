@@ -195,6 +195,7 @@ struct smt_params : public preprocessor_params,
     //
     // -----------------------------------
     bool             m_display_installed_theories;
+    bool             m_core_validate;
 
     // -----------------------------------
     //
@@ -205,6 +206,7 @@ struct smt_params : public preprocessor_params,
     bool                m_user_theory_preprocess_axioms;
     bool                m_user_theory_persist_axioms;
     unsigned            m_timeout;
+    unsigned            m_rlimit;
     bool                m_at_labels_cex; // only use labels which contains the @ symbol when building multiple counterexamples.
     bool                m_check_at_labels; // check that @ labels are inserted to generate unique counter-examples.    
     bool                m_dump_goal_as_smt;
@@ -269,10 +271,12 @@ struct smt_params : public preprocessor_params,
         m_model_on_final_check(false),
         m_progress_sampling_freq(0),
         m_display_installed_theories(false),
+        m_core_validate(false),
         m_preprocess(true), // temporary hack for disabling all preprocessing..
         m_user_theory_preprocess_axioms(false),
         m_user_theory_persist_axioms(false),
         m_timeout(0),
+        m_rlimit(0),
         m_at_labels_cex(false),
         m_check_at_labels(false),
         m_dump_goal_as_smt(false),

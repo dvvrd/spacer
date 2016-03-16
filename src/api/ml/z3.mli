@@ -195,7 +195,7 @@ sig
     val get_size : ast_map -> int
 
     (** The keys stored in the map. *)
-    val get_keys : ast_map -> Expr.expr list
+    val get_keys : ast_map -> ast list
 
     (** Retrieves a string representation of the map.*)
     val to_string : ast_map -> string
@@ -3136,7 +3136,7 @@ sig
   val get_help : fixedpoint -> string
 
   (** Sets the fixedpoint solver parameters. *)
-  val set_params : fixedpoint -> Params.params -> unit
+  val set_parameters : fixedpoint -> Params.params -> unit
 
   (** Retrieves parameter descriptions for Fixedpoint solver. *)
   val get_param_descrs : fixedpoint -> Params.ParamDescrs.param_descrs
@@ -3226,6 +3226,89 @@ sig
       Return the set of queries in the file. *)
   val parse_file : fixedpoint -> string -> Expr.expr list
 end
+
+(** Optimization *) 
+module Optimize : 
+sig 
+  type optimize  
+  type handle 
+ 
+ 
+  (** Create a Optimize context. *) 
+  val mk_opt : context -> optimize 
+      
+  (** A string that describes all available optimize solver parameters. *) 
+  val get_help : optimize -> string 
+ 
+ 
+  (** Sets the optimize solver parameters. *) 
+  val set_parameters : optimize -> Params.params -> unit 
+ 
+ 
+  (** Retrieves parameter descriptions for Optimize solver. *) 
+  val get_param_descrs : optimize -> Params.ParamDescrs.param_descrs 
+ 
+ 
+  (** Assert a constraints into the optimize solver. *)         
+  val add : optimize -> Expr.expr list -> unit 
+ 
+ 
+  (** Asssert a soft constraint.  
+     Supply integer weight and string that identifies a group 
+      of soft constraints.  
+   *) 
+  val add_soft : optimize -> Expr.expr -> string -> Symbol.symbol -> handle 
+ 
+ 
+  (** Add maximization objective. 
+   *)  
+  val maximize : optimize -> Expr.expr -> handle 
+ 
+ 
+  (** Add minimization objective. 
+   *)  
+  val minimize : optimize -> Expr.expr -> handle 
+    
+  (** Checks whether the assertions in the context are satisfiable and solves objectives. 
+   *)         
+  val check : optimize -> Solver.status 
+ 
+ 
+  (** Retrieve model from satisfiable context *) 
+  val get_model : optimize -> Model.model option
+ 
+ 
+  (** Retrieve lower bound in current model for handle *) 
+  val get_lower : handle -> int -> Expr.expr 
+ 
+ 
+  (** Retrieve upper bound in current model for handle *) 
+  val get_upper : handle -> int -> Expr.expr 
+
+ 
+  (** Creates a backtracking point. 
+      {!pop} *) 
+  val push : optimize -> unit 
+
+
+  (** Backtrack one backtracking point. 
+      Note that an exception is thrown if Pop is called without a corresponding [Push] 
+      {!push} *) 
+  val pop : optimize -> unit 
+
+ 
+  (** Retrieve explanation why optimize engine returned status Unknown. *)                 
+  val get_reason_unknown : optimize -> string 
+
+ 
+  (** Retrieve SMT-LIB string representation of optimize object. *) 
+  val to_string : optimize -> string 
+ 
+ 
+  (** Retrieve statistics information from the last call to check *) 
+  val get_statistics : optimize -> Statistics.statistics 
+end 
+
 
 (** Functions for handling SMT and SMT2 expressions and files *)
 module SMT :

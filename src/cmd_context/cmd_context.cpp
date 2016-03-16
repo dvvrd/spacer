@@ -41,6 +41,8 @@ Notes:
 #include"scoped_timer.h"
 #include"interpolant_cmds.h"
 #include"model_smt2_pp.h"
+#include"model_v2_pp.h"
+#include"model_params.hpp"
 
 func_decls::func_decls(ast_manager & m, func_decl * f):
     m_decls(TAG(func_decl*, f, 0)) {
@@ -1388,6 +1390,7 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
     TRACE("before_check_sat", dump_assertions(tout););
     init_manager();
     unsigned timeout = m_params.m_timeout;
+    unsigned rlimit  = m_params.m_rlimit;
     scoped_watch sw(*this);
     lbool r;
 
@@ -1397,6 +1400,7 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
         cancel_eh<opt_wrapper> eh(*get_opt());
         scoped_ctrl_c ctrlc(eh);
         scoped_timer timer(timeout, &eh);
+        scoped_rlimit _rlimit(m().limit(), rlimit);
         ptr_vector<expr> cnstr(m_assertions);
         cnstr.append(num_assumptions, assumptions);
         get_opt()->set_hard_constraints(cnstr);
@@ -1409,11 +1413,7 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
                 if (get_opt()->print_model()) {
                     model_ref mdl;
                     get_opt()->get_model(mdl);
-                    if (mdl) {
-                        regular_stream() << "(model " << std::endl;
-                        model_smt2_pp(regular_stream(), *this, *(mdl.get()), 2);
-                        regular_stream() << ")" << std::endl;                    
-                    }
+                    display_model(mdl);
                 }
                 r = get_opt()->optimize();
             }
@@ -1438,6 +1438,7 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
         cancel_eh<solver> eh(*m_solver);
         scoped_ctrl_c ctrlc(eh);
         scoped_timer timer(timeout, &eh);
+        scoped_rlimit _rlimit(m().limit(), rlimit);
         try {
             r = m_solver->check_sat(num_assumptions, assumptions);
         }
@@ -1456,9 +1457,29 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
     }
     display_sat_result(r);
     validate_check_sat_result(r);
-    if (r == l_true)
+    if (r == l_true) {
         validate_model();
+        if (m_params.m_dump_models) {
+            model_ref md;
+            get_check_sat_result()->get_model(md);
+            display_model(md);
+        }
+    }
+}
 
+void cmd_context::display_model(model_ref& mdl) {
+    if (mdl) {
+        model_params p;
+        if (p.v1() || p.v2()) {
+            std::ostringstream buffer;
+            model_v2_pp(buffer, *mdl, p.partial());
+            regular_stream() << "\"" << escaped(buffer.str().c_str(), true) << "\"" << std::endl;
+        } else {
+            regular_stream() << "(model " << std::endl;
+            model_smt2_pp(regular_stream(), *this, *mdl, 2);
+            regular_stream() << ")" << std::endl;
+        }
+    }
 }
 
 void cmd_context::display_sat_result(lbool r) {
@@ -1628,6 +1649,7 @@ void cmd_context::display_statistics(bool show_total_time, double total_time) {
         st.update("total time", total_time);
     st.update("time", get_seconds());
     get_memory_statistics(st);
+    get_rlimit_statistics(m().limit(), st);
     if (m_check_sat_result) {
         m_check_sat_result->collect_statistics(st);
     }

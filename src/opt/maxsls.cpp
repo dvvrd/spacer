@@ -20,6 +20,8 @@ Notes:
 #include "maxsls.h"
 #include "ast_pp.h"
 #include "model_smt2_pp.h"
+#include "opt_context.h"
+#include "inc_sat_solver.h"
 
 
 namespace opt {
@@ -33,9 +35,8 @@ namespace opt {
         lbool operator()() {
             IF_VERBOSE(1, verbose_stream() << "(opt.sls)\n";);
             init();
-            set_enable_sls(true);
-            enable_sls(m_soft, m_weights);
-            lbool is_sat = s().check_sat(0, 0);
+            enable_sls(true);
+            lbool is_sat = check();
             if (is_sat == l_true) {
                 s().get_model(m_model);
                 m_upper.reset();
@@ -49,6 +50,16 @@ namespace opt {
                 }
             }
             return is_sat;
+        }
+        
+        lbool check() {
+            if (m_c.sat_enabled()) {
+                return inc_sat_check_sat(
+                    s(), m_soft.size(), m_soft.c_ptr(), m_weights.c_ptr(), m_upper);
+            }
+            else {
+                return s().check_sat(0, 0);
+            }
         }
 
     };

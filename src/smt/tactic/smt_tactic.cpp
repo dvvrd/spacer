@@ -161,9 +161,11 @@ public:
     
     struct scoped_init_ctx {
         smt_tactic & m_owner;
+        smt_params   m_params; // smt-setup overwrites parameters depending on the current assertions.
 
         scoped_init_ctx(smt_tactic & o, ast_manager & m):m_owner(o) {
-            smt::kernel * new_ctx = alloc(smt::kernel, m, o.fparams());
+            m_params = o.fparams();
+            smt::kernel * new_ctx = alloc(smt::kernel, m, m_params);
             TRACE("smt_tactic", tout << "logic: " << o.m_logic << "\n";);
             new_ctx->set_logic(o.m_logic);
             if (o.m_callback) {
@@ -199,7 +201,8 @@ public:
                   << " PREPROCESS: " << fparams().m_preprocess << "\n";
                   tout << "RELEVANCY: " << fparams().m_relevancy_lvl << "\n";
                   tout << "fail-if-inconclusive: " << m_fail_if_inconclusive << "\n";
-                  tout << "params_ref: " << m_params_ref << "\n";);
+                  tout << "params_ref: " << m_params_ref << "\n";
+                  tout << "nnf: " << fparams().m_nnf_cnf << "\n";);
             TRACE("smt_tactic_detail", in->display(tout););
             TRACE("smt_tactic_memory", tout << "wasted_size: " << m.get_allocator().get_wasted_size() << "\n";);        
             scoped_init_ctx  init(*this, m);
@@ -210,9 +213,9 @@ public:
             ptr_vector<expr>            assumptions;       
             ref<filter_model_converter> fmc;
             if (in->unsat_core_enabled()) {
-                if (in->proofs_enabled())
-                    throw tactic_exception("smt tactic does not support simultaneous generation of proofs and unsat cores");
                 extract_clauses_and_dependencies(in, clauses, assumptions, bool2dep, fmc);
+                if (in->proofs_enabled() && !assumptions.empty())
+                    throw tactic_exception("smt tactic does not support simultaneous generation of proofs and unsat cores");
                 for (unsigned i = 0; i < clauses.size(); ++i) {
                     m_ctx->assert_expr(clauses[i].get());
                 }
@@ -229,6 +232,9 @@ public:
                     m_ctx->assert_expr(in->form(i));
                 }
             }
+            if (m_ctx->canceled()) {
+                throw tactic_exception("smt_tactic canceled");
+            }
             
             lbool r;
             if (assumptions.empty())
@@ -236,7 +242,6 @@ public:
             else
                 r = m_ctx->check(assumptions.size(), assumptions.c_ptr());
             m_ctx->collect_statistics(m_stats);
-            
             switch (r) {
             case l_true: {
                 if (m_fail_if_inconclusive && !in->sat_preserved())

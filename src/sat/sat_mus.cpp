@@ -33,7 +33,7 @@ namespace sat {
         m_mus.reset();
         m_model.reset();
         m_best_value = 0;
-        m_max_restarts = 10;
+        m_max_restarts = (s.m_stats.m_restart - m_restart) + 10;
         m_restart = s.m_stats.m_restart;
     }
 
@@ -41,6 +41,7 @@ namespace sat {
         m_mus.append(m_core);
         s.m_core.reset();
         s.m_core.append(m_mus);
+        TRACE("sat", tout << "new core: " << s.m_core << "\n";);
     }
 
     void mus::update_model() {
@@ -58,12 +59,13 @@ namespace sat {
 
     lbool mus::operator()() {
         flet<bool> _disable_min(s.m_config.m_minimize_core, false);
-        flet<bool> _disable_min_partial(s.m_config.m_minimize_core_partial, false);
         flet<bool> _disable_opt(s.m_config.m_optimize_model, false);
         flet<bool> _is_active(m_is_active, true);
-        IF_VERBOSE(2, verbose_stream() << "(sat.mus " << s.get_core() << ")\n";);
+        IF_VERBOSE(3, verbose_stream() << "(sat.mus " << s.get_core() << ")\n";);
         reset();
-        return mus1();
+        lbool r = mus1();
+        m_restart = s.m_stats.m_restart;
+        return r;
     }
 
     lbool mus::mus1() {
@@ -77,7 +79,7 @@ namespace sat {
         unsigned delta_time  = 0;
         unsigned core_miss = 0;
         while (!core.empty()) {
-            IF_VERBOSE(2, verbose_stream() << "(opt.mus reducing core: " << core.size() << " new core: " << mus.size() << ")\n";);
+            IF_VERBOSE(3, verbose_stream() << "(opt.mus reducing core: " << core.size() << " mus: " << mus.size() << ")\n";);
             TRACE("sat", 
                   tout << "core: " << core << "\n";
                   tout << "mus:  " << mus  << "\n";);
@@ -93,6 +95,11 @@ namespace sat {
             if (num_literals <= 2) {
                 // IF_VERBOSE(0, verbose_stream() << "num literals: " << core << " " << mus << "\n";);
                 break;
+            }
+            if (s.m_config.m_minimize_core_partial && s.m_stats.m_restart - m_restart > m_max_restarts) {
+                IF_VERBOSE(1, verbose_stream() << "restart budget exceeded\n";);
+                set_core();
+                return l_true;
             }
 
             literal lit = core.back();
@@ -121,12 +128,12 @@ namespace sat {
             case l_false:
                 literal_vector const& new_core = s.get_core();
                 if (new_core.contains(~lit)) {
-                    IF_VERBOSE(2, verbose_stream() << "miss core " << lit << "\n";);
+                    IF_VERBOSE(3, verbose_stream() << "miss core " << lit << "\n";);
                     ++core_miss;
                 }
                 else {
                     core_miss = 0;
-                    TRACE("sat", tout << "new core: " << new_core << "\n";);
+                    TRACE("sat", tout << "core: " << new_core << " mus: " << mus << "\n";);
                     core.reset();
                     for (unsigned i = 0; i < new_core.size(); ++i) {
                         literal lit = new_core[i];
@@ -146,9 +153,8 @@ namespace sat {
                 delta_time = 0;
             }
         }
-        TRACE("sat", tout << "new core: " << mus << "\n";);
         set_core();
-        IF_VERBOSE(2, verbose_stream() << "(sat.mus.new " << s.m_core << ")\n";);
+        IF_VERBOSE(3, verbose_stream() << "(sat.mus.new " << s.m_core << ")\n";);
         return l_true;
     }
     
@@ -160,13 +166,13 @@ namespace sat {
         lbool is_sat = qx(core, support, false);
         s.m_core.reset();
         s.m_core.append(core.to_vector());
-        IF_VERBOSE(2, verbose_stream() << "(sat.mus.new " << s.m_core << ")\n";);
+        IF_VERBOSE(3, verbose_stream() << "(sat.mus.new " << s.m_core << ")\n";);
         return is_sat;
     }
 
     lbool mus::qx(literal_set& assignment, literal_set& support, bool has_support) {
         lbool is_sat = l_true;
-        if (s.m_stats.m_restart - m_restart > m_max_restarts) {
+        if (s.m_config.m_minimize_core_partial && s.m_stats.m_restart - m_restart > m_max_restarts) {
             IF_VERBOSE(1, verbose_stream() << "restart budget exceeded\n";);
             return l_true;
         }
@@ -269,11 +275,11 @@ namespace sat {
             if (is_sat == l_true) {
                 m_mus.push_back(tabu[i]);
                 m_core.erase(tabu[i]);
-                IF_VERBOSE(2, verbose_stream() << "in core " << tabu[i] << "\n";);
+                IF_VERBOSE(3, verbose_stream() << "in core " << tabu[i] << "\n";);
                 reuse_model = true;
             }
             else {
-                IF_VERBOSE(2, verbose_stream() << "NOT in core " << tabu[i] << "\n";);
+                IF_VERBOSE(3, verbose_stream() << "NOT in core " << tabu[i] << "\n";);
                 reuse_model = false;
             }
         }

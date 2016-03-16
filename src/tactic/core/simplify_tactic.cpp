@@ -18,7 +18,7 @@ Notes:
 --*/
 #include"simplify_tactic.h"
 #include"th_rewriter.h"
-#include"ast_smt2_pp.h"
+#include"ast_pp.h"
 
 struct simplify_tactic::imp {
     ast_manager &   m_manager;

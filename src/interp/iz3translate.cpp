@@ -1407,6 +1407,7 @@ public:
 
         hash_map<ast,ast> dual_map;
         std::vector<ast> cvec, vars_seen;
+        m().enable_int_real_coercions(true);
         ast rhs = make_real(rational(0));
         for(unsigned i = 0; i < npcons.size(); i++){
             ast c= mk_fresh_constant("@c",real_type());
@@ -2005,6 +2006,7 @@ public:
                 res = make(commute,pf,comm_equiv);
                 break;
             }
+            case PR_NOT_OR_ELIM:
             case PR_AND_ELIM: {
                 std::vector<ast> rule_ax, res_conc;
                 ast piv = conc(prem(proof,0));
@@ -2041,11 +2043,23 @@ public:
             locality.clear();
 #endif
             iproof = iz3proof_itp::create(this,range_downward(i),weak_mode());
-            Iproof::node ipf = translate_main(proof);
-            ast itp = iproof->interpolate(ipf);
-            itps.push_back(itp);
-            delete iproof;
-            clear_translation();
+            try {
+                Iproof::node ipf = translate_main(proof);
+                ast itp = iproof->interpolate(ipf);
+                itps.push_back(itp);
+                delete iproof;
+                clear_translation();
+            }
+            catch (const iz3proof_itp::proof_error &) {
+                delete iproof;
+                clear_translation();
+                throw iz3proof::proof_error();
+            }
+            catch (const unsupported &exc) {
+                delete iproof;
+                clear_translation();
+                throw exc;
+            }
         }
         // Very simple proof -- lemma of the empty clause with computed interpolation
         iz3proof::node Ipf = dst.make_lemma(std::vector<ast>(),itps);  // builds result in dst
