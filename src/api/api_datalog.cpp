@@ -304,10 +304,12 @@ extern "C" {
         LOG_Z3_fixedpoint_query_from_lvl (c, d, q, lvl);
         RESET_ERROR_CODE();
         lbool r = l_undef;
-        cancel_eh<api::fixedpoint_context> eh(*to_fixedpoint_ref(d));
         unsigned timeout = to_fixedpoint(d)->m_params.get_uint("timeout", mk_c(c)->get_timeout());
-        api::context::set_interruptable si(*(mk_c(c)), eh);        
+        unsigned rlimit  = to_fixedpoint(d)->m_params.get_uint("rlimit", mk_c(c)->get_rlimit());
         {
+            scoped_rlimit _rlimit(mk_c(c)->m().limit(), rlimit);
+            cancel_eh<reslimit> eh(mk_c(c)->m().limit());
+            api::context::set_interruptable si(*(mk_c(c)), eh);        
             scoped_timer timer(timeout, &eh);
             try {
                 r = to_fixedpoint_ref(d)->ctx().query_from_lvl (to_expr(q), lvl);

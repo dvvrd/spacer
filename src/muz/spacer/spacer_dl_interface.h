@@ -52,10 +52,6 @@ namespace spacer {
 
         lbool query_from_lvl (expr* query, unsigned lvl);
 
-        void cancel();
-
-        void cleanup();
-
         void display_certificate(std::ostream& out) const;
 
         void collect_statistics(statistics& st) const;

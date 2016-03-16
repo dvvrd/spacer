@@ -1600,8 +1600,7 @@ namespace spacer {
           m_search(),
           m_last_result(l_undef),
           m_inductive_lvl(0),
-          m_expanded_lvl(0),
-          m_cancel(false)
+          m_expanded_lvl(0)
     {
     }
 
@@ -1612,7 +1611,6 @@ namespace spacer {
 
     void context::reset() {
         TRACE("spacer", tout << "\n";);
-        cleanup();
         decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
         for (; it != end; ++it) {
             dealloc(it->m_value);
@@ -2060,16 +2058,8 @@ namespace spacer {
   }
 
 
-    void context::cancel() {
-        m_cancel = true;
-    }
-
-    void context::cleanup() {
-        m_cancel = false;
-    }
-
     void context::checkpoint() {
-        if (m_cancel) {
+        if (m.canceled ()) {
             throw default_exception("spacer canceled");
         }
     }

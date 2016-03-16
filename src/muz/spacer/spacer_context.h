@@ -708,7 +708,6 @@ namespace spacer {
         unsigned             m_expanded_lvl;
         ptr_vector<core_generalizer>  m_core_generalizers;
         stats                m_stats;
-        volatile bool        m_cancel;
         model_converter_ref  m_mc;
         proof_converter_ref  m_pc;
         
@@ -796,10 +795,6 @@ namespace spacer {
         lbool solve(unsigned from_lvl = 0);
 
         lbool solve_from_lvl (unsigned from_lvl);
-
-        void cancel();
-
-        void cleanup();
 
         void reset();
 
