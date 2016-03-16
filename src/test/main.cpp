@@ -225,6 +225,7 @@ int main(int argc, char ** argv) {
     TST(sat_user_scope);
     TST(pdr);
     TST_ARGV(ddnf);
+    TST(model_evaluator);
     //TST_ARGV(hs);
     TST(qe_array);
     TST(qe_project_arith);

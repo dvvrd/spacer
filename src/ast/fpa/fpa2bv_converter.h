@@ -26,19 +26,6 @@ Notes:
 #include"bv_decl_plugin.h"
 #include"basic_simplifier_plugin.h"
 
-struct func_decl_triple {
-        func_decl_triple () { f_sgn = 0; f_sig = 0; f_exp = 0; }
-        func_decl_triple (func_decl * sgn, func_decl * sig, func_decl * exp)
-        {
-            f_sgn = sgn;
-            f_sig = sig;
-            f_exp = exp;
-        }
-        func_decl * f_sgn;
-        func_decl * f_sig;
-        func_decl * f_exp;
-    };
-
 class fpa2bv_converter {
 protected:
     ast_manager              & m;
@@ -149,6 +136,7 @@ public:
 
     expr_ref mk_to_ubv_unspecified(unsigned width);
     expr_ref mk_to_sbv_unspecified(unsigned width);
+    expr_ref mk_to_ieee_bv_unspecified(unsigned width);
     expr_ref mk_to_real_unspecified();
 
     void reset(void);
