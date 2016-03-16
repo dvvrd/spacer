@@ -73,6 +73,12 @@ namespace datalog {
             vars.get_cols2(), removed_cols.size(), removed_cols.c_ptr(), result));
     }
 
+    void compiler::make_min(reg_idx source, reg_idx & target, const unsigned_vector & group_by_cols,
+        const unsigned min_col, instruction_block & acc) {
+        target = get_register(m_reg_signatures[source], true, source);
+        acc.push_back(instruction::mk_min(source, target, group_by_cols, min_col));
+    }
+
     void compiler::make_filter_interpreted_and_project(reg_idx src, app_ref & cond,
             const unsigned_vector & removed_cols, reg_idx & result, bool reuse, instruction_block & acc) {
         SASSERT(!removed_cols.empty());
@@ -85,7 +91,7 @@ namespace datalog {
             removed_cols.size(), removed_cols.c_ptr(), result));
     }
 
-    void compiler::make_select_equal_and_project(reg_idx src, const relation_element & val, unsigned col,
+    void compiler::make_select_equal_and_project(reg_idx src, const relation_element val, unsigned col,
             reg_idx & result, bool reuse, instruction_block & acc) {
         relation_signature res_sig;
         relation_signature::from_project(m_reg_signatures[src], 1, &col, res_sig);
@@ -139,7 +145,7 @@ namespace datalog {
         return r;
     }
 
-    compiler::reg_idx compiler::get_single_column_register(const relation_sort & s) {
+    compiler::reg_idx compiler::get_single_column_register(const relation_sort s) {
         relation_signature singl_sig;
         singl_sig.push_back(s);
         return get_fresh_register(singl_sig);
@@ -165,7 +171,7 @@ namespace datalog {
         }
     }
 
-    void compiler::make_add_constant_column(func_decl* head_pred, reg_idx src, const relation_sort & s, const relation_element & val,
+    void compiler::make_add_constant_column(func_decl* head_pred, reg_idx src, const relation_sort s, const relation_element val,
             reg_idx & result, bool & dealloc, instruction_block & acc) {
         reg_idx singleton_table;
         if(!m_constant_registers.find(s, val, singleton_table)) {
@@ -185,7 +191,7 @@ namespace datalog {
         }
     }
 
-    void compiler::make_add_unbound_column(rule* compiled_rule, unsigned col_idx, func_decl* pred, reg_idx src, const relation_sort & s, reg_idx & result, 
+    void compiler::make_add_unbound_column(rule* compiled_rule, unsigned col_idx, func_decl* pred, reg_idx src, const relation_sort s, reg_idx & result,
             bool & dealloc, instruction_block & acc) {
         
         TRACE("dl", tout << "Adding unbound column " << mk_pp(pred, m_context.get_manager()) << "\n";);
@@ -411,17 +417,16 @@ namespace datalog {
 
     void compiler::get_local_indexes_for_projection(rule * r, unsigned_vector & res) {
         SASSERT(r->get_positive_tail_size()==2);
-        ast_manager & m = m_context.get_manager();
         rule_counter counter;
         // leave one column copy per var in the head (avoids later duplication)
-        counter.count_vars(m, r->get_head(), -1);
+        counter.count_vars(r->get_head(), -1);
 
         // take interp & neg preds into account (at least 1 column copy if referenced)
         unsigned n = r->get_tail_size();
         if (n > 2) {
           rule_counter counter_tail;
           for (unsigned i = 2; i < n; ++i) {
-            counter_tail.count_vars(m, r->get_tail(i));
+            counter_tail.count_vars(r->get_tail(i));
           }
 
           rule_counter::iterator I = counter_tail.begin(), E = counter_tail.end();
@@ -434,11 +439,35 @@ namespace datalog {
 
         app * t1 = r->get_tail(0);
         app * t2 = r->get_tail(1);
-        counter.count_vars(m, t1);
-        counter.count_vars(m, t2);
+        counter.count_vars(t1);
+        counter.count_vars(t2);
 
         get_local_indexes_for_projection(t1, counter, 0, res);
         get_local_indexes_for_projection(t2, counter, t1->get_num_args(), res);
+    }
+
+    void compiler::find_min_aggregates(const rule * r, ptr_vector<func_decl>& min_aggregates) {
+        unsigned ut_len = r->get_uninterpreted_tail_size();
+        unsigned ft_len = r->get_tail_size(); // full tail
+        func_decl * aggregate;
+        for (unsigned tail_index = ut_len; tail_index < ft_len; ++tail_index) {
+            aggregate = r->get_tail(tail_index)->get_decl();
+            if (dl_decl_plugin::is_aggregate(aggregate)) {
+                min_aggregates.push_back(aggregate);
+            }
+        }
+    }
+
+    bool compiler::prepare_min_aggregate(const func_decl * decl, const ptr_vector<func_decl>& min_aggregates,
+        unsigned_vector & group_by_cols, unsigned & min_col) {
+        for (unsigned i = 0; i < min_aggregates.size(); ++i) {
+            if (dl_decl_plugin::min_func_decl(min_aggregates[i]) == decl) {
+                group_by_cols = dl_decl_plugin::group_by_cols(min_aggregates[i]);
+                min_col = dl_decl_plugin::min_col(min_aggregates[i]);
+                return true;
+            }
+        }
+        return false;
     }
 
     void compiler::compile_rule_evaluation_run(rule * r, reg_idx head_reg, const reg_idx * tail_regs, 
@@ -466,6 +495,12 @@ namespace datalog {
         // whether to dealloc the previous result
         bool dealloc = true;
 
+        // setup information for min aggregation
+        ptr_vector<func_decl> min_aggregates;
+        find_min_aggregates(r, min_aggregates);
+        unsigned_vector group_by_cols;
+        unsigned min_col;
+
         if(pt_len == 2) {
             reg_idx t1_reg=tail_regs[0];
             reg_idx t2_reg=tail_regs[1];
@@ -473,6 +508,14 @@ namespace datalog {
             app * a2 = r->get_tail(1);
             SASSERT(m_reg_signatures[t1_reg].size()==a1->get_num_args());
             SASSERT(m_reg_signatures[t2_reg].size()==a2->get_num_args());
+
+            if (prepare_min_aggregate(a1->get_decl(), min_aggregates, group_by_cols, min_col)) {
+                make_min(t1_reg, single_res, group_by_cols, min_col, acc);
+            }
+
+            if (prepare_min_aggregate(a2->get_decl(), min_aggregates, group_by_cols, min_col)) {
+                make_min(t2_reg, single_res, group_by_cols, min_col, acc);
+            }
 
             variable_intersection a1a2(m_context.get_manager());
             a1a2.populate(a1,a2);
@@ -514,6 +557,10 @@ namespace datalog {
             app * a = r->get_tail(0);
             single_res = tail_regs[0];
             dealloc = false;
+
+            if (prepare_min_aggregate(a->get_decl(), min_aggregates, group_by_cols, min_col)) {
+                make_min(single_res, single_res, group_by_cols, min_col, acc);
+            }
 
             SASSERT(m_reg_signatures[single_res].size() == a->get_num_args());
 
@@ -598,7 +645,8 @@ namespace datalog {
         unsigned ft_len = r->get_tail_size(); // full tail
         ptr_vector<expr> tail;
         for (unsigned tail_index = ut_len; tail_index < ft_len; ++tail_index) {
-            tail.push_back(r->get_tail(tail_index));
+            if (!r->is_min_tail(tail_index))
+                tail.push_back(r->get_tail(tail_index));
         }
 
         expr_ref_vector binding(m);
@@ -863,9 +911,11 @@ namespace datalog {
         ast_manager& m = m_context.get_manager();
         unsigned pt_len = r->get_positive_tail_size();
         unsigned ut_len = r->get_uninterpreted_tail_size();
-        if (pt_len == ut_len) {
+
+        // no negated predicates
+        if (pt_len == ut_len)
             return;
-        }
+
         // populate negative variables:
         for (unsigned i = pt_len; i < ut_len; ++i) {
             app * neg_tail = r->get_tail(i);

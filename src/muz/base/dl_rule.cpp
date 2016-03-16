@@ -259,7 +259,7 @@ namespace datalog {
         if (m.is_implies(fml, e1, e2)) {
             m_args.reset();
             head = ensure_app(e2);
-            qe::flatten_and(e1, m_args);
+            flatten_and(e1, m_args);
             for (unsigned i = 0; i < m_args.size(); ++i) {
                 body.push_back(ensure_app(m_args[i].get()));
             }
@@ -378,7 +378,7 @@ namespace datalog {
         for (unsigned i = 0; i < body.size(); ++i) {
             r.push_back(body[i].get());
         }
-        qe::flatten_and(r);
+        flatten_and(r);
         body.reset();
         for (unsigned i = 0; i < r.size(); ++i) {
             body.push_back(ensure_app(r[i].get()));
@@ -682,11 +682,11 @@ namespace datalog {
         svector<bool> tail_neg;
         app_ref head(r->get_head(), m);
 
-        vctr.count_vars(m, head);
+        vctr.count_vars(head);
 
         for (unsigned i = 0; i < ut_len; i++) {
             app * t = r->get_tail(i);
-            vctr.count_vars(m, t);
+            vctr.count_vars(t);
             tail.push_back(t);
             tail_neg.push_back(r->is_neg_tail(i));
         }

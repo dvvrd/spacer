@@ -23,16 +23,6 @@ Revision History:
 #include "uint_set.h"
 
 namespace qe {
-    /**
-       \brief Collect top-level conjunctions and disjunctions.
-    */
-    void flatten_and(expr_ref_vector& result);
-
-    void flatten_and(expr* fml, expr_ref_vector& result);
-
-    void flatten_or(expr_ref_vector& result);
-
-    void flatten_or(expr* fml, expr_ref_vector& result);
 
     expr_ref mk_and(expr_ref_vector const& fmls);
 

@@ -124,6 +124,7 @@ public:
     virtual void display_assignment(std::ostream& out) = 0;
     virtual bool is_pareto() = 0;
     virtual void set_logic(symbol const& s) = 0;
+    virtual bool print_model() const = 0;
 };
 
 class cmd_context : public progress_callback, public tactic_manager, public ast_printer_context {
@@ -250,6 +251,7 @@ protected:
     bool logic_has_bv_core(symbol const & s) const;
     bool logic_has_array_core(symbol const & s) const;
     bool logic_has_seq_core(symbol const & s) const;
+    bool logic_has_fpa_core(symbol const & s) const;
     bool logic_has_horn(symbol const& s) const;
     bool logic_has_arith() const;
     bool logic_has_bv() const;

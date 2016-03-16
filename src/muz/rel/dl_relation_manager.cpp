@@ -108,7 +108,7 @@ namespace datalog {
 
     void relation_manager::store_relation(func_decl * pred, relation_base * rel) {
         SASSERT(rel);
-        relation_map::entry * e = m_relations.insert_if_not_there2(pred, 0);
+        relation_map::obj_map_entry * e = m_relations.insert_if_not_there2(pred, 0);
         if (e->get_data().m_value) {
             e->get_data().m_value->deallocate();
         }
@@ -350,10 +350,13 @@ namespace datalog {
 
         //If there is no plugin to handle the signature, we just create an empty product relation and
         //stuff will be added to it by later operations.
+        TRACE("dl", s.output(get_context().get_manager(), tout << "empty product relation"); tout << "\n";);
         return product_relation_plugin::get_plugin(*this).mk_empty(s);
     }
 
-
+    /**
+      The newly created object takes ownership of the \c table object.
+    */
     relation_base * relation_manager::mk_table_relation(const relation_signature & s, table_base * table) {
         SASSERT(s.size()==table->get_signature().size());
         return get_table_relation_plugin(table->get_plugin()).mk_from_table(s, table);
@@ -756,7 +759,6 @@ namespace datalog {
 
     relation_union_fn * relation_manager::mk_union_fn(const relation_base & tgt, const relation_base & src, 
             const relation_base * delta) {         
-        TRACE("dl", tout << src.get_plugin().get_name() << " " << tgt.get_plugin().get_name() << "\n";); 
         relation_union_fn * res = tgt.get_plugin().mk_union_fn(tgt, src, delta);
         if(!res && &tgt.get_plugin()!=&src.get_plugin()) {
             res = src.get_plugin().mk_union_fn(tgt, src, delta);
@@ -764,6 +766,7 @@ namespace datalog {
         if(!res && delta && &tgt.get_plugin()!=&delta->get_plugin() && &src.get_plugin()!=&delta->get_plugin()) {
             res = delta->get_plugin().mk_union_fn(tgt, src, delta);
         }
+        // TRACE("dl", tout << src.get_plugin().get_name() << " " << tgt.get_plugin().get_name() << " " << (res?"created":"not created") << "\n";); 
         return res;
     }
 
@@ -1020,6 +1023,11 @@ namespace datalog {
         return res;
     }
 
+    table_min_fn * relation_manager::mk_min_fn(const table_base & t,
+        unsigned_vector & group_by_cols, const unsigned col)
+    {
+        return t.get_plugin().mk_min_fn(t, group_by_cols, col);
+    }
 
     class relation_manager::auxiliary_table_transformer_fn {
         table_fact m_row;

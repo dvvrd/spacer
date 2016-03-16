@@ -34,8 +34,10 @@ Notes:
 #include"default_tactic.h"
 #include"ufbv_tactic.h"
 #include"qffp_tactic.h"
+#include"qfufnra_tactic.h"
 #include"horn_tactic.h"
 #include"smt_solver.h"
+#include"inc_sat_solver.h"
 
 tactic * mk_tactic_for_logic(ast_manager & m, params_ref const & p, symbol const & logic) {
     if (logic=="QF_UF")
@@ -80,12 +82,20 @@ tactic * mk_tactic_for_logic(ast_manager & m, params_ref const & p, symbol const
         return mk_ufbv_tactic(m, p);
     else if (logic=="QF_FP")
         return mk_qffp_tactic(m, p);
-    else if (logic == "QF_FPBV")
+    else if (logic == "QF_FPBV" || logic == "QF_BVFP")
         return mk_qffpbv_tactic(m, p);
     else if (logic=="HORN")
         return mk_horn_tactic(m, p);
+    //else if (logic=="QF_UFNRA")
+    //    return mk_qfufnra_tactic(m, p);
     else 
         return mk_default_tactic(m, p);
+}
+
+solver* mk_solver_for_logic(ast_manager & m, params_ref const & p, symbol const& logic) {
+    if (logic == "QF_BV") 
+        return mk_inc_sat_solver(m, p);
+    return mk_smt_solver(m, p, logic);
 }
 
 class smt_strategic_solver_factory : public solver_factory {
@@ -102,6 +112,7 @@ public:
             l = logic;
         tactic * t = mk_tactic_for_logic(m, p, l);
         return mk_combined_solver(mk_tactic2solver(m, t, p, proofs_enabled, models_enabled, unsat_core_enabled, l),
+                                  //mk_solver_for_logic(m, p, l), 
                                   mk_smt_solver(m, p, l),
                                   p);
     }

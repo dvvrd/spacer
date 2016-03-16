@@ -273,7 +273,7 @@ namespace sat {
             clause const& c = *m_clauses[i];
             bool is_sat = c.satisfied_by(m_model);
             SASSERT(is_sat != m_false.contains(i));
-            SASSERT(is_sat == m_num_true[i] > 0);
+            SASSERT(is_sat == (m_num_true[i] > 0));
         }        
     }
 
@@ -365,7 +365,6 @@ namespace sat {
         m_clause_weights.resize(m_clauses.size(), 1);
         m_sscore.resize(s.num_vars(), 0.0);
         m_hscore.resize(s.num_vars(), 0);
-        unsigned num_violated = 0;
         for (unsigned i = 0; i < m_soft.size(); ++i) {
             literal lit = m_soft[i];
             m_sscore[lit.var()] = m_weights[i];

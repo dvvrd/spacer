@@ -163,6 +163,9 @@ void parse_cmd_line_args(int argc, char ** argv) {
             else if (strcmp(opt_name, "smt2") == 0) {
                 g_input_kind = IN_SMTLIB_2;
             }
+            else if (strcmp(opt_name, "dl") == 0) {
+                g_input_kind = IN_DATALOG;
+            }
             else if (strcmp(opt_name, "in") == 0) {
                 g_standard_input = true;
             }
@@ -329,7 +332,7 @@ int main(int argc, char ** argv) {
                     g_input_kind = IN_SMTLIB;
                 }
             }
-	}
+    }
         switch (g_input_kind) {
         case IN_SMTLIB:
             return_value = read_smtlib_file(g_input_file);

@@ -48,7 +48,7 @@ namespace simplex {
             }
         };
 
-        static const int dead_id = -1;
+        static const unsigned dead_id = UINT_MAX;
 
         /**
            \brief A row_entry is:  m_var*m_coeff
@@ -79,7 +79,7 @@ namespace simplex {
             };
             col_entry(int r, int i): m_row_id(r), m_row_idx(i) {}
             col_entry(): m_row_id(0), m_row_idx(0) {}            
-            bool is_dead() const { return m_row_id == dead_id; }
+            bool is_dead() const { return (unsigned) m_row_id == dead_id; }
         };
      
         struct column;

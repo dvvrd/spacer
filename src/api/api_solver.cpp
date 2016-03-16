@@ -355,6 +355,7 @@ extern "C" {
         init_solver(c, s);
         Z3_stats_ref * st = alloc(Z3_stats_ref);
         to_solver_ref(s)->collect_statistics(st->m_stats);
+        get_memory_statistics(st->m_stats);
         mk_c(c)->save_object(st);
         Z3_stats r = of_stats(st);
         RETURN_Z3(r);

@@ -305,14 +305,6 @@ namespace Microsoft.Z3
                              AST.ArrayLength(queries), AST.ArrayToNative(queries));
         }
 
-        BoolExpr[] ToBoolExprs(ASTVector v) {
-            uint n = v.Size;
-            BoolExpr[] res = new BoolExpr[n];
-            for (uint i = 0; i < n; i++)
-                res[i] = new BoolExpr(Context, v[i].NativeObject);
-            return res;
-        }
-
         /// <summary>
         /// Retrieve set of rules added to fixedpoint context.
         /// </summary>                
@@ -322,7 +314,8 @@ namespace Microsoft.Z3
             {
                 Contract.Ensures(Contract.Result<BoolExpr[]>() != null);
 
-                return ToBoolExprs(new ASTVector(Context, Native.Z3_fixedpoint_get_rules(Context.nCtx, NativeObject)));
+                ASTVector av = new ASTVector(Context, Native.Z3_fixedpoint_get_rules(Context.nCtx, NativeObject));
+                return av.ToBoolExprArray();
             }
         }
 
@@ -335,7 +328,8 @@ namespace Microsoft.Z3
             {
                 Contract.Ensures(Contract.Result<BoolExpr[]>() != null);
 
-                return ToBoolExprs(new ASTVector(Context, Native.Z3_fixedpoint_get_assertions(Context.nCtx, NativeObject)));
+                ASTVector av = new ASTVector(Context, Native.Z3_fixedpoint_get_assertions(Context.nCtx, NativeObject));
+                return av.ToBoolExprArray();
             }
         }
 
@@ -352,21 +346,24 @@ namespace Microsoft.Z3
             }
         }
 
-	/// <summary>
+        /// <summary>
         /// Parse an SMT-LIB2 file with fixedpoint rules. 
         /// Add the rules to the current fixedpoint context. 
         /// Return the set of queries in the file.
         /// </summary>                
-	public BoolExpr[] ParseFile(string file) {
-            return ToBoolExprs(new ASTVector(Context, Native.Z3_fixedpoint_from_file(Context.nCtx, NativeObject, file)));
+        public BoolExpr[] ParseFile(string file)
+        {
+            ASTVector av = new ASTVector(Context, Native.Z3_fixedpoint_from_file(Context.nCtx, NativeObject, file));
+            return av.ToBoolExprArray();
         }
 
         /// <summary>
         /// Similar to ParseFile. Instead it takes as argument a string.
-        /// </summary>                
-
-	public BoolExpr[] ParseString(string s) {
-            return ToBoolExprs(new ASTVector(Context, Native.Z3_fixedpoint_from_string(Context.nCtx, NativeObject, s)));
+        /// </summary>
+        public BoolExpr[] ParseString(string s)
+        {
+            ASTVector av = new ASTVector(Context, Native.Z3_fixedpoint_from_string(Context.nCtx, NativeObject, s));
+            return av.ToBoolExprArray();
         }
 
 

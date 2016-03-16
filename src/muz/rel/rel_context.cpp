@@ -32,7 +32,6 @@ Revision History:
 #include"dl_interval_relation.h"
 #include"karr_relation.h"
 #include"dl_finite_product_relation.h"
-#include"product_set.h"
 #include"udoc_relation.h"
 #include"check_relation.h"
 #include"dl_lazy_table.h"
@@ -117,7 +116,6 @@ namespace datalog {
         rm.register_plugin(alloc(bound_relation_plugin, rm));
         rm.register_plugin(alloc(interval_relation_plugin, rm));
         if (m_context.karr()) rm.register_plugin(alloc(karr_relation_plugin, rm));
-        rm.register_plugin(alloc(product_set_plugin, rm));
         rm.register_plugin(alloc(udoc_plugin, rm));
         rm.register_plugin(alloc(check_relation_plugin, rm));
     }
@@ -292,19 +290,27 @@ namespace datalog {
         return res;
     }
 
+#define _MIN_DONE_ 1
+
     void rel_context::transform_rules() {
         rule_transformer transf(m_context);
+#ifdef _MIN_DONE_
         transf.register_plugin(alloc(mk_coi_filter, m_context));
+#endif
         transf.register_plugin(alloc(mk_filter_rules, m_context));        
         transf.register_plugin(alloc(mk_simple_joins, m_context));
         if (m_context.unbound_compressor()) {
             transf.register_plugin(alloc(mk_unbound_compressor, m_context));
         }
+#ifdef _MIN_DONE_
         if (m_context.similarity_compressor()) {
             transf.register_plugin(alloc(mk_similarity_compressor, m_context)); 
         }
+#endif
         transf.register_plugin(alloc(mk_partial_equivalence_transformer, m_context));
+#ifdef _MIN_DONE_
         transf.register_plugin(alloc(mk_rule_inliner, m_context));
+#endif
         transf.register_plugin(alloc(mk_interp_tail_simplifier, m_context));
         transf.register_plugin(alloc(mk_separate_negated_tails, m_context));
 
@@ -488,7 +494,7 @@ namespace datalog {
             target_kind = get_ordinary_relation_plugin(relation_names[0]).get_kind();
             break;
         default: {
-            svector<family_id> rel_kinds; // kinds of plugins that are not table plugins
+            rel_spec rel_kinds; // kinds of plugins that are not table plugins
             family_id rel_kind;           // the aggregate kind of non-table plugins
             for (unsigned i = 0; i < relation_name_cnt; i++) {
                 relation_plugin & p = get_ordinary_relation_plugin(relation_names[i]);

@@ -89,7 +89,7 @@ namespace api {
         m_bv_util(m()),
         m_datalog_util(m()),
         m_fpa_util(m()),
-	m_dtutil(m()),
+        m_dtutil(m()),
         m_last_result(m()),
         m_ast_trail(m()),
         m_replay_stack() {
@@ -514,6 +514,11 @@ extern "C" {
         LOG_Z3_reset_memory();
         memory::finalize();
         memory::initialize(0);
+    }
+
+    void Z3_API Z3_finalize_memory(void) {
+        LOG_Z3_finalize_memory();
+        memory::finalize();
     }
 
     Z3_error_code Z3_API Z3_get_error_code(Z3_context c) {

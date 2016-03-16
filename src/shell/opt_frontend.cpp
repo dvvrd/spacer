@@ -1,3 +1,9 @@
+
+/*++
+Copyright (c) 2015 Microsoft Corporation
+
+--*/
+
 #include<fstream>
 #include<signal.h>
 #include<time.h>
@@ -89,11 +95,11 @@ class wcnf {
     ast_manager&   m;
     stream_buffer& in;
 
-    app_ref read_clause(unsigned& weight) {
+    app_ref read_clause(int& weight) {
         int     parsed_lit;
         int     var;    
         parsed_lit = in.parse_int();
-        weight = static_cast<unsigned>(parsed_lit);
+        weight = parsed_lit;
         app_ref result(m), p(m);
         expr_ref_vector ors(m);
         while (true) { 
@@ -137,7 +143,7 @@ public:
                 parse_spec(num_vars, num_clauses, max_weight);
             }
             else {
-                unsigned weight = 0;
+                int weight = 0;
                 app_ref cls = read_clause(weight);
                 if (weight == max_weight) {
                     opt.add_hard_constraint(cls);
@@ -340,7 +346,6 @@ unsigned parse_opt(char const* file_name, bool is_wcnf) {
     g_start_time = static_cast<double>(clock());
     register_on_timeout_proc(on_timeout);
     signal(SIGINT, on_ctrl_c);
-    unsigned result = 0;
     if (file_name) {
         std::ifstream in(file_name);
         if (in.bad() || in.fail()) {

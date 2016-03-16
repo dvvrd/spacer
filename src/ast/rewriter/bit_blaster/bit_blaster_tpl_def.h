@@ -464,18 +464,18 @@ void bit_blaster_tpl<Cfg>::mk_udiv_urem(unsigned sz, expr * const * a_bits, expr
         // update p
         if (i < sz - 1) {
             for (unsigned j = sz - 1; j > 0; j--) {
-                expr_ref i(m());
-                mk_ite(q, t.get(j-1), p.get(j-1), i); 
-                p.set(j, i);
+                expr_ref ie(m());
+                mk_ite(q, t.get(j-1), p.get(j-1), ie); 
+                p.set(j, ie);
             }
             p.set(0, a_bits[sz - i - 2]);
         }
         else {
             // last step: p contains the remainder
             for (unsigned j = 0; j < sz; j++) {
-                expr_ref i(m());
-                mk_ite(q, t.get(j), p.get(j), i);
-                p.set(j, i);
+                expr_ref ie(m());
+                mk_ite(q, t.get(j), p.get(j), ie);
+                p.set(j, ie);
             }
         }
     }
@@ -902,6 +902,7 @@ template<typename Cfg>
 void bit_blaster_tpl<Cfg>::mk_shl(unsigned sz, expr * const * a_bits, expr * const * b_bits, expr_ref_vector & out_bits) {
     numeral k;
     if (is_numeral(sz, b_bits, k)) {
+        if (k > numeral(sz)) k = numeral(sz);
         unsigned n = static_cast<unsigned>(k.get_int64());
         if (n >= sz) n = sz;
         unsigned pos; 
@@ -947,6 +948,7 @@ template<typename Cfg>
 void bit_blaster_tpl<Cfg>::mk_lshr(unsigned sz, expr * const * a_bits, expr * const * b_bits, expr_ref_vector & out_bits) {
     numeral k;
     if (is_numeral(sz, b_bits, k)) {
+        if (k > numeral(sz)) k = numeral(sz);
         unsigned n   = static_cast<unsigned>(k.get_int64()); 
         unsigned pos = 0;
         for (unsigned i = n; i < sz; pos++, i++)
@@ -989,6 +991,7 @@ template<typename Cfg>
 void bit_blaster_tpl<Cfg>::mk_ashr(unsigned sz, expr * const * a_bits, expr * const * b_bits, expr_ref_vector & out_bits) {
     numeral k;
     if (is_numeral(sz, b_bits, k)) {
+        if (k > numeral(sz)) k = numeral(sz);
         unsigned n   = static_cast<unsigned>(k.get_int64()); 
         unsigned pos = 0;
         for (unsigned i = n; i < sz; pos++, i++)

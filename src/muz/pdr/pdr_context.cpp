@@ -151,9 +151,9 @@ namespace pdr {
     }
 
     datalog::rule const& pred_transformer::find_rule(model_core const& model) const {
-        datalog::rule_manager& rm = ctx.get_context().get_rule_manager();
         obj_map<expr, datalog::rule const*>::iterator it = m_tag2rule.begin(), end = m_tag2rule.end();
         TRACE("pdr_verbose",
+              datalog::rule_manager& rm = ctx.get_context().get_rule_manager();
               for (; it != end; ++it) {
                   expr* pred = it->m_key;
                   tout << mk_pp(pred, m) << ":\n";
@@ -350,7 +350,7 @@ namespace pdr {
 
     void pred_transformer::add_property(expr* lemma, unsigned lvl) {
         expr_ref_vector lemmas(m);
-        qe::flatten_and(lemma, lemmas);
+        flatten_and(lemma, lemmas);
         for (unsigned i = 0; i < lemmas.size(); ++i) {
             expr* lemma_i = lemmas[i].get();
             if (add_property1(lemma_i, lvl)) {
@@ -595,7 +595,7 @@ namespace pdr {
         for (unsigned i = ut_size; i < t_size; ++i) {
             tail.push_back(rule.get_tail(i));
         }        
-        qe::flatten_and(tail);
+        flatten_and(tail);
         for (unsigned i = 0; i < tail.size(); ++i) {
             expr_ref tmp(m);
             var_subst(m, false)(tail[i].get(), var_reprs.size(), (expr*const*)var_reprs.c_ptr(), tmp);
@@ -810,7 +810,7 @@ namespace pdr {
         ast_manager& m = pt().get_manager();
         expr_ref_vector conjs(m);
         obj_map<expr,expr*> model;
-        qe::flatten_and(state(), conjs);
+        flatten_and(state(), conjs);
         for (unsigned i = 0; i < conjs.size(); ++i) {
             expr* e = conjs[i].get(), *e1, *e2;
             if (m.is_eq(e, e1, e2) || m.is_iff(e, e1, e2)) {
@@ -2458,7 +2458,7 @@ namespace pdr {
         expr_ref_vector mdl(m), forms(m), Phi(m);
         forms.push_back(T);
         forms.push_back(phi);
-        qe::flatten_and(forms);        
+        flatten_and(forms);        
         ptr_vector<expr> forms1(forms.size(), forms.c_ptr());
         if (use_model_generalizer) {
             Phi.append(mev.minimize_model(forms1, M));
@@ -2514,7 +2514,7 @@ namespace pdr {
             TRACE("pdr", tout << "Projected:\n" << mk_pp(phi1, m) << "\n";);
         }
         Phi.reset();
-        qe::flatten_and (phi1, Phi);
+        flatten_and (phi1, Phi);
         if (!Phi.empty ())
         {
           // expand equality and other terms for better generalization
@@ -2530,7 +2530,7 @@ namespace pdr {
         }
         
         Phi.reset ();
-        qe::flatten_and(phi1, Phi);
+        flatten_and(phi1, Phi);
         
         unsigned_vector indices;
         vector<expr_ref_vector> child_states;

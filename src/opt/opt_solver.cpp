@@ -41,12 +41,14 @@ namespace opt {
         m_params(p),
         m_context(mgr, m_params),
         m(mgr),
-        m_dump_benchmarks(false),
         m_fm(fm),
-        m_objective_sorts(m),
+        m_objective_terms(m),
+        m_dump_benchmarks(false),
         m_first(true) {
         m_params.updt_params(p);
-        m_params.m_relevancy_lvl = 0;
+        if (m_params.m_case_split_strategy == CS_ACTIVITY_DELAY_NEW) {
+            m_params.m_relevancy_lvl = 0;
+        }
     }
 
     unsigned opt_solver::m_dump_count = 0;
@@ -204,38 +206,54 @@ namespace opt {
         m_valid_objectives[i] = true;
         TRACE("opt", tout << (has_shared?"has shared":"non-shared") << "\n";);
         if (m_context.get_context().update_model(has_shared)) {
-            if (has_shared) {
-                val2 = current_objective_value(i);                
-                if (val2 != val) {
-                    decrement_value(i, val);
-                }
+            if (has_shared && val != current_objective_value(i)) {
+                decrement_value(i, val);
+            }
+            else {
+                set_model(i);
             }
         }
         else {
             SASSERT(has_shared);
-            // model is not final. We set the current objective to
-            // close to the optimal (ignoring types).
             decrement_value(i, val);
         }
         m_objective_values[i] = val;
+        TRACE("opt", { 
+                tout << "objective:     " << mk_pp(m_objective_terms[i].get(), m) << "\n";
+                tout << "maximal value: " << val << "\n"; 
+                tout << "new condition: " << blocker << "\n";
+                model_smt2_pp(tout << "update model:\n", m, *m_models[i], 0); });
+    }
 
+    void opt_solver::set_model(unsigned i) {
         model_ref mdl;
         get_model(mdl);
         m_models.set(i, mdl.get());
-
-        TRACE("opt", { tout << m_objective_values[i] << "\n"; 
-                  tout << blocker << "\n";
-                   model_smt2_pp(tout << "update model:\n", m, *mdl, 0); });
     }
 
-    void opt_solver::decrement_value(unsigned i, inf_eps& val) {
-        if (arith_util(m).is_real(m_objective_sorts[i].get())) {
-            val -= inf_eps(inf_rational(rational(0),true));
+    lbool opt_solver::decrement_value(unsigned i, inf_eps& val) {
+        push_core();
+        expr_ref ge = mk_ge(i, val);
+        TRACE("opt", tout << ge << "\n";);
+        assert_expr(ge);
+        lbool is_sat = m_context.check(0, 0);
+        if (is_sat == l_true) {
+            set_model(i);
         }
-        else {
-            val -= inf_eps(inf_rational(rational(1)));
+        pop_core(1);
+        TRACE("opt", tout << is_sat << "\n";);
+        if (is_sat != l_true) {
+            // cop-out approximation
+            if (arith_util(m).is_real(m_objective_terms[i].get())) {
+                val -= inf_eps(inf_rational(rational(0), true));
+            }
+            else {
+                val -= inf_eps(inf_rational(rational(1)));
+            }
+            m_valid_objectives[i] = false;
         }
-        m_valid_objectives[i] = false;
+        return is_sat;
+
     }
 
     
@@ -290,7 +308,7 @@ namespace opt {
         smt::theory_var v = get_optimizer().add_objective(term);
         m_objective_vars.push_back(v);
         m_objective_values.push_back(inf_eps(rational(-1), inf_rational()));
-        m_objective_sorts.push_back(m.get_sort(term));
+        m_objective_terms.push_back(term);
         m_valid_objectives.push_back(true);
         m_models.push_back(0);
         return v;
@@ -308,8 +326,7 @@ namespace opt {
         smt::theory_var v = m_objective_vars[i];
         return get_optimizer().value(v);
     }
-
-
+    
     expr_ref opt_solver::mk_ge(unsigned var, inf_eps const& val) {
         smt::theory_opt& opt = get_optimizer();
         smt::theory_var v = m_objective_vars[var];
@@ -350,7 +367,7 @@ namespace opt {
     void opt_solver::reset_objectives() {
         m_objective_vars.reset();
         m_objective_values.reset();
-        m_objective_sorts.reset();
+        m_objective_terms.reset();
         m_valid_objectives.reset();
     }
 

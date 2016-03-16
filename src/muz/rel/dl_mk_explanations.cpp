@@ -654,7 +654,7 @@ namespace datalog {
         family_id expl_kind = m_er_plugin->get_kind();
         family_id expl_sieve_kind = sieve_plugin.get_relation_kind(sig, expl_sieve, expl_kind);
 
-        product_relation_plugin::rel_spec product_spec;
+        rel_spec product_spec;
         product_spec.push_back(inner_sieve_kind);
         product_spec.push_back(expl_sieve_kind);
 
@@ -706,7 +706,7 @@ namespace datalog {
 
     rule * mk_explanations::get_e_rule(rule * r) {
         rule_counter ctr;
-        ctr.count_rule_vars(m_manager, r);
+        ctr.count_rule_vars(r);
         unsigned max_var;
         unsigned next_var = ctr.get_max_positive(max_var) ? (max_var+1) : 0;
         unsigned head_var = next_var++;

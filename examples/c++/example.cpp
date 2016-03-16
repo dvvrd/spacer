@@ -1,3 +1,9 @@
+
+/*++
+Copyright (c) 2015 Microsoft Corporation
+
+--*/
+
 #include<vector>
 #include"z3++.h"
 
@@ -205,6 +211,9 @@ void bitvector_example1() {
 
     // using unsigned <=
     prove(ule(x - 10, 0) == ule(x, 10));
+
+    expr y = c.bv_const("y", 32);
+    prove(implies(concat(x, y) == concat(y, x), x == y));
 }
 
 /**

@@ -32,7 +32,7 @@ sat
 Z3 exceptions:
 
 >>> try:
-...   x = Int('x')
+...   x = BitVec('x', 32)
 ...   y = Bool('y')
 ...   # the expression x + y is type incorrect
 ...   n = x + y
@@ -554,7 +554,7 @@ def _to_sort_ref(s, ctx):
     elif k == Z3_DATATYPE_SORT:
         return DatatypeSortRef(s, ctx)
     elif k == Z3_FINITE_DOMAIN_SORT:
-	return FiniteDomainSortRef(s, ctx)
+        return FiniteDomainSortRef(s, ctx)
     elif k == Z3_FLOATING_POINT_SORT:
         return FPSortRef(s, ctx)
     elif k == Z3_ROUNDING_MODE_SORT:
@@ -1228,6 +1228,16 @@ class BoolSortRef(SortRef):
             _z3_assert(self.eq(val.sort()), "Value cannot be converted into a Z3 Boolean value")
         return val
 
+    def subsort(self, other):
+        return isinstance(other, ArithSortRef)
+
+    def is_int(self):
+        return True
+
+    def is_bool(self):
+        return True
+
+
 class BoolRef(ExprRef):
     """All Boolean expressions are instances of this class."""
     def sort(self):
@@ -1900,6 +1910,10 @@ class ArithSortRef(SortRef):
                 return val
             if val_s.is_int() and self.is_real():
                 return ToReal(val)
+            if val_s.is_bool() and self.is_int():
+                return If(val, 1, 0)
+            if val_s.is_bool() and self.is_real():
+                return ToReal(If(val, 1, 0))
             if __debug__:
                 _z3_assert(False, "Z3 Integer/Real expression expected" )
         else:
@@ -5603,7 +5617,7 @@ class Statistics:
         sat
         >>> st = s.statistics()
         >>> len(st)
-        2
+        5
         """
         return int(Z3_stats_size(self.ctx.ref(), self.stats))
 
@@ -5617,7 +5631,7 @@ class Statistics:
         sat
         >>> st = s.statistics()
         >>> len(st)
-        2
+        5
         >>> st[0]
         ('nlsat propagations', 2)
         >>> st[1]
@@ -5641,7 +5655,7 @@ class Statistics:
         sat
         >>> st = s.statistics()
         >>> st.keys()
-        ['nlsat propagations', 'nlsat stages']
+        ['nlsat propagations', 'nlsat stages', 'max memory', 'memory', 'num allocs']
         """
         return [Z3_stats_get_key(self.ctx.ref(), self.stats, idx) for idx in range(len(self))]
 
@@ -5678,7 +5692,7 @@ class Statistics:
         sat
         >>> st = s.statistics()
         >>> st.keys()
-        ['nlsat propagations', 'nlsat stages']
+        ['nlsat propagations', 'nlsat stages', 'max memory', 'memory', 'num allocs']
         >>> st.nlsat_propagations
         2
         >>> st.nlsat_stages
@@ -6375,12 +6389,12 @@ class FiniteDomainSortRef(SortRef):
     """Finite domain sort."""
 
     def size(self):
-	"""Return the size of the finite domain sort"""
-	r = (ctype.c_ulonglong * 1)()
-	if Z3_get_finite_domain_sort_size(self.ctx_ref(), self.ast(), r):
-	    return r[0]
-	else:
-	    raise Z3Exception("Failed to retrieve finite domain sort size")
+        """Return the size of the finite domain sort"""
+        r = (ctype.c_ulonglong * 1)()
+        if Z3_get_finite_domain_sort_size(self.ctx_ref(), self.ast(), r):
+            return r[0]
+        else:
+            raise Z3Exception("Failed to retrieve finite domain sort size")
 
 def FiniteDomainSort(name, sz, ctx=None):
     """Create a named finite domain sort of a given size sz"""
@@ -6395,30 +6409,30 @@ def FiniteDomainSort(name, sz, ctx=None):
 
 class OptimizeObjective:
     def __init__(self, opt, value, is_max):
-	self._opt = opt
-	self._value = value
-	self._is_max = is_max
+        self._opt = opt
+        self._value = value
+        self._is_max = is_max
 
     def lower(self):
-	opt = self._opt
-	return _to_expr_ref(Z3_optimize_get_lower(opt.ctx.ref(), opt.optimize, self._value), opt.ctx)
+        opt = self._opt
+        return _to_expr_ref(Z3_optimize_get_lower(opt.ctx.ref(), opt.optimize, self._value), opt.ctx)
     
     def upper(self):
-	opt = self._opt
-	return _to_expr_ref(Z3_optimize_get_upper(opt.ctx.ref(), opt.optimize, self._value), opt.ctx)
+        opt = self._opt
+        return _to_expr_ref(Z3_optimize_get_upper(opt.ctx.ref(), opt.optimize, self._value), opt.ctx)
 
     def value(self):
-	if self._is_max:
-	    return self.upper()
-	else:
-	    return self.lower()
+        if self._is_max:
+            return self.upper()
+        else:
+            return self.lower()
 
 class Optimize(Z3PPObject):
     """Optimize API provides methods for solving using objective functions and weighted soft constraints"""
      
     def __init__(self, ctx=None):
         self.ctx    = _get_ctx(ctx)
-	self.optimize = Z3_mk_optimize(self.ctx.ref())
+        self.optimize = Z3_mk_optimize(self.ctx.ref())
         Z3_optimize_inc_ref(self.ctx.ref(), self.optimize)
 
     def __del__(self):
@@ -6454,29 +6468,29 @@ class Optimize(Z3PPObject):
         self.assert_exprs(*args)
 
     def add_soft(self, arg, weight = "1", id = None):
-	"""Add soft constraint with optional weight and optional identifier.
-	   If no weight is supplied, then the penalty for violating the soft constraint
-	   is 1.
-	   Soft constraints are grouped by identifiers. Soft constraints that are
-	   added without identifiers are grouped by default.
-	"""
-	if _is_int(weight):
-	    weight = "%d" % weight
-	if not isinstance(weight, str):
-	    raise Z3Exception("weight should be a string or an integer")
-	if id == None:
-	    id = ""
-	id = to_symbol(id, self.ctx)
-	v = Z3_optimize_assert_soft(self.ctx.ref(), self.optimize, arg.as_ast(), weight, id)
-	return OptimizeObjective(self, v, False)
+        """Add soft constraint with optional weight and optional identifier.
+           If no weight is supplied, then the penalty for violating the soft constraint
+           is 1.
+           Soft constraints are grouped by identifiers. Soft constraints that are
+           added without identifiers are grouped by default.
+        """
+        if _is_int(weight):
+            weight = "%d" % weight
+        if not isinstance(weight, str):
+            raise Z3Exception("weight should be a string or an integer")
+        if id == None:
+            id = ""
+        id = to_symbol(id, self.ctx)
+        v = Z3_optimize_assert_soft(self.ctx.ref(), self.optimize, arg.as_ast(), weight, id)
+        return OptimizeObjective(self, v, False)
 
     def maximize(self, arg):
-	"""Add objective function to maximize."""
-	return OptimizeObjective(self, Z3_optimize_maximize(self.ctx.ref(), self.optimize, arg.as_ast()), True)
+        """Add objective function to maximize."""
+        return OptimizeObjective(self, Z3_optimize_maximize(self.ctx.ref(), self.optimize, arg.as_ast()), True)
 
     def minimize(self, arg):
-	"""Add objective function to minimize."""
-	return OptimizeObjective(self, Z3_optimize_minimize(self.ctx.ref(), self.optimize, arg.as_ast()), False)
+        """Add objective function to minimize."""
+        return OptimizeObjective(self, Z3_optimize_minimize(self.ctx.ref(), self.optimize, arg.as_ast()), False)
 
     def push(self):
         """create a backtracking point for added rules, facts and assertions"""
@@ -6487,25 +6501,25 @@ class Optimize(Z3PPObject):
         Z3_optimize_pop(self.ctx.ref(), self.optimize)
 
     def check(self):
-	"""Check satisfiability while optimizing objective functions."""
-	return CheckSatResult(Z3_optimize_check(self.ctx.ref(), self.optimize))
+        """Check satisfiability while optimizing objective functions."""
+        return CheckSatResult(Z3_optimize_check(self.ctx.ref(), self.optimize))
 
     def model(self):
-	"""Return a model for the last check()."""
-	try:
-	    return ModelRef(Z3_optimize_get_model(self.ctx.ref(), self.optimize), self.ctx)
-	except Z3Exception:
-	    raise Z3Exception("model is not available")
+        """Return a model for the last check()."""
+        try:
+            return ModelRef(Z3_optimize_get_model(self.ctx.ref(), self.optimize), self.ctx)
+        except Z3Exception:
+            raise Z3Exception("model is not available")
 
     def lower(self, obj):
-	if not isinstance(obj, OptimizeObjective):
-	    raise Z3Exception("Expecting objective handle returned by maximize/minimize")
-	return obj.lower()
+        if not isinstance(obj, OptimizeObjective):
+            raise Z3Exception("Expecting objective handle returned by maximize/minimize")
+        return obj.lower()
 
     def upper(self, obj):
-	if not isinstance(obj, OptimizeObjective):
-	    raise Z3Exception("Expecting objective handle returned by maximize/minimize")
-	return obj.upper()
+        if not isinstance(obj, OptimizeObjective):
+            raise Z3Exception("Expecting objective handle returned by maximize/minimize")
+        return obj.upper()
     
     def __repr__(self):
         """Return a formatted string with all added rules and constraints."""
@@ -8212,23 +8226,24 @@ def FP(name, fpsort, ctx=None):
     >>> eq(x, x2)
     True
     """ 
-    ctx = fpsort.ctx
+    if isinstance(fpsort, FPSortRef):
+        ctx = fpsort.ctx
+    else:
+        ctx = _get_ctx(ctx)
     return FPRef(Z3_mk_const(ctx.ref(), to_symbol(name, ctx), fpsort.ast), ctx)
 
 def FPs(names, fpsort, ctx=None):
     """Return an array of floating-point constants.
     
-    >>> x, y, z = BitVecs('x y z', 16)
-    >>> x.size()
-    16
+    >>> x, y, z = FPs('x y z', FPSort(8, 24))
     >>> x.sort()
-    BitVec(16)
-    >>> Sum(x, y, z)
-    0 + x + y + z
-    >>> Product(x, y, z)
-    1*x*y*z
-    >>> simplify(Product(x, y, z))
-    x*y*z
+    FPSort(8, 24)
+    >>> x.sbits()
+    24
+    >>> x.ebits()
+    8
+    >>> fpMul(RNE(), fpAdd(RNE(), x, y), z)
+    fpMul(RNE(), fpAdd(RNE(), x, y), z)
     """
     ctx = z3._get_ctx(ctx)
     if isinstance(names, str):
@@ -8612,29 +8627,83 @@ def fpToFPUnsigned(rm, x, s):
     return FPRef(Z3_mk_fpa_to_fp_unsigned(rm.ctx_ref(), rm.ast, x.ast, s.ast), rm.ctx)
 
 def fpToSBV(rm, x, s):
-    """Create a Z3 floating-point conversion expression, from floating-point expression to signed bit-vector."""
+    """Create a Z3 floating-point conversion expression, from floating-point expression to signed bit-vector.
+
+    >>> x = FP('x', FPSort(8, 24))
+    >>> y = fpToSBV(RTZ(), x, BitVecSort(32))
+    >>> print is_fp(x)
+    True
+    >>> print is_bv(y)
+    True
+    >>> print is_fp(y)
+    False
+    >>> print is_bv(x)
+    False
+    """
     if __debug__:
         _z3_assert(is_fprm(rm), "First argument must be a Z3 floating-point rounding mode expression")
         _z3_assert(is_fp(x), "Second argument must be a Z3 floating-point expression")
         _z3_assert(is_bv_sort(s), "Third argument must be Z3 bit-vector sort")
-    return FPRef(Z3_mk_fpa_to_sbv(rm.ctx_ref(), rm.ast, x.ast, s.size()), rm.ctx)
+    return BitVecRef(Z3_mk_fpa_to_sbv(rm.ctx_ref(), rm.ast, x.ast, s.size()), rm.ctx)
 
 def fpToUBV(rm, x, s):
-    """Create a Z3 floating-point conversion expression, from floating-point expression to unsigned bit-vector."""
+    """Create a Z3 floating-point conversion expression, from floating-point expression to unsigned bit-vector.
+
+    >>> x = FP('x', FPSort(8, 24))
+    >>> y = fpToUBV(RTZ(), x, BitVecSort(32))
+    >>> print is_fp(x)
+    True
+    >>> print is_bv(y)
+    True
+    >>> print is_fp(y)
+    False
+    >>> print is_bv(x)
+    False
+    """
     if __debug__:
         _z3_assert(is_fprm(rm), "First argument must be a Z3 floating-point rounding mode expression")
         _z3_assert(is_fp(x), "Second argument must be a Z3 floating-point expression")
         _z3_assert(is_bv_sort(s), "Third argument must be Z3 bit-vector sort")
-    return FPRef(Z3_mk_fpa_to_ubv(rm.ctx_ref(), rm.ast, x.ast, s.size()), rm.ctx)
+    return BitVecRef(Z3_mk_fpa_to_ubv(rm.ctx_ref(), rm.ast, x.ast, s.size()), rm.ctx)
 
 def fpToReal(x):
-    """Create a Z3 floating-point conversion expression, from floating-point expression to real."""
+    """Create a Z3 floating-point conversion expression, from floating-point expression to real.
+
+    >>> x = FP('x', FPSort(8, 24))
+    >>> y = fpToReal(x)
+    >>> print is_fp(x)
+    True
+    >>> print is_real(y)
+    True
+    >>> print is_fp(y)
+    False
+    >>> print is_real(x)
+    False
+    """
     if __debug__:
         _z3_assert(is_fp(x), "First argument must be a Z3 floating-point expression")
-    return FPRef(Z3_mk_fpa_to_real(x.ctx_ref(), x.ast), x.ctx)
+    return ArithRef(Z3_mk_fpa_to_real(x.ctx_ref(), x.ast), x.ctx)
 
 def fpToIEEEBV(x):
-    """Create a Z3 floating-point conversion expression, from floating-point expression to IEEE bit-vector."""
+    """\brief Conversion of a floating-point term into a bit-vector term in IEEE 754-2008 format.
+    
+    The size of the resulting bit-vector is automatically determined. 
+    
+    Note that IEEE 754-2008 allows multiple different representations of NaN. This conversion 
+    knows only one NaN and it will always produce the same bit-vector represenatation of 
+    that NaN.
+
+    >>> x = FP('x', FPSort(8, 24))
+    >>> y = fpToIEEEBV(x)
+    >>> print is_fp(x)
+    True
+    >>> print is_bv(y)
+    True
+    >>> print is_fp(y)
+    False
+    >>> print is_bv(x)
+    False
+    """
     if __debug__:
         _z3_assert(is_fp(x), "First argument must be a Z3 floating-point expression")
-    return FPRef(Z3_mk_fpa_to_ieee_bv(x.ctx_ref(), x.ast), x.ctx)
+    return BitVecRef(Z3_mk_fpa_to_ieee_bv(x.ctx_ref(), x.ast), x.ctx)

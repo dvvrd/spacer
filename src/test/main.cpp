@@ -224,6 +224,7 @@ int main(int argc, char ** argv) {
     TST(simplex);
     TST(sat_user_scope);
     TST(pdr);
+    TST_ARGV(ddnf);
     //TST_ARGV(hs);
     TST(qe_array);
     TST(qe_project_arith);

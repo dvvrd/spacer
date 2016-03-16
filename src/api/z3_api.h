@@ -1,3 +1,9 @@
+
+/*++
+Copyright (c) 2015 Microsoft Corporation
+
+--*/
+
 #ifndef _Z3_API_H_
 #define _Z3_API_H_
 
@@ -594,7 +600,10 @@ typedef enum
           }
           This proof object has one antecedent: a hypothetical proof for false.
           It converts the proof in a proof for (or (not l_1) ... (not l_n)),
-          when T1 contains the hypotheses: l_1, ..., l_n.
+          when T1 contains the open hypotheses: l_1, ..., l_n.
+          The hypotheses are closed after an application of a lemma.
+          Furthermore, there are no other open hypotheses in the subtree covered by
+          the lemma.
 
    - Z3_OP_PR_UNIT_RESOLUTION: 
        \nicebox{
@@ -5362,7 +5371,19 @@ END_MLAPI_EXCLUDE
     */
     void Z3_API Z3_reset_memory(void);
 #endif
-    
+
+#ifdef CorML3
+    /**
+       \brief Destroy all allocated resources.
+
+       Any pointers previously returned by the API become invalid.
+       Can be used for memory leak detection.
+
+       def_API('Z3_finalize_memory', VOID, ())
+    */
+    void Z3_API Z3_finalize_memory(void);
+#endif
+
     /*@}*/
 
 #ifdef CorML3
@@ -6059,7 +6080,7 @@ END_MLAPI_EXCLUDE
     /**
        \brief Parse an SMT-LIB2 string with fixedpoint rules. 
        Add the rules to the current fixedpoint context. 
-       Return the set of queries in the file.
+       Return the set of queries in the string.
 
        \param c - context.
        \param f - fixedpoint context.
@@ -6970,7 +6991,7 @@ END_MLAPI_EXCLUDE
 
        def_API('Z3_tactic_apply_ex', APPLY_RESULT, (_in(CONTEXT), _in(TACTIC), _in(GOAL), _in(PARAMS)))
     */
-    Z3_apply_result Z3_API Z3_tactic_apply_ex(Z3_context c, Z3_tactic t, Z3_goal g, Z3_params p);
+    Z3_apply_result Z3_API Z3_tactic_apply_ex(__in Z3_context c, __in Z3_tactic t, __in Z3_goal g, __in Z3_params p);
 
 #ifdef CorML3
     /**

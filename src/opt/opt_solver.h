@@ -73,11 +73,10 @@ namespace opt {
         filter_model_converter& m_fm;
         progress_callback * m_callback;
         symbol              m_logic;
-        bool                m_objective_enabled;
         svector<smt::theory_var>  m_objective_vars;
         vector<inf_eps>     m_objective_values;
         sref_vector<model>  m_models;
-        sort_ref_vector     m_objective_sorts;
+        expr_ref_vector     m_objective_terms;
         svector<bool>       m_valid_objectives;
         bool                m_dump_benchmarks;
         static unsigned     m_dump_count;
@@ -134,7 +133,8 @@ namespace opt {
                                char const * logic = "", char const * status = "unknown", char const * attributes = "");
 
     private:
-        void decrement_value(unsigned i, inf_eps& val);
+        lbool decrement_value(unsigned i, inf_eps& val);
+        void set_model(unsigned i);
     };
 }
 

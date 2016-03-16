@@ -121,6 +121,22 @@ namespace datalog {
         expr_free_vars                    m_free_vars;
 
         /**
+        \brief Finds all the min aggregation functions in the premise of a given rule.
+        */
+        static void find_min_aggregates(const rule * r, ptr_vector<func_decl>& min_aggregates);
+
+        /**
+        \brief Decides whether a predicate is subject to a min aggregation function.
+
+        If \c decl is subject to a min aggregation function, the output parameters are written
+        with the neccessary information.
+
+        \returns true if the output paramaters have been written
+        */
+        static bool prepare_min_aggregate(const func_decl * decl, const ptr_vector<func_decl>& min_aggregates,
+            unsigned_vector & group_by_cols, unsigned & min_col);
+
+        /**
            If true, the union operation on the underlying structure only provides the information
            whether the updated relation has changed or not. In this case we do not get anything
            from using delta relations at position of input relations in the saturation loop, so we
@@ -135,7 +151,7 @@ namespace datalog {
 
         reg_idx get_fresh_register(const relation_signature & sig);
         reg_idx get_register(const relation_signature & sig, bool reuse, reg_idx r);
-        reg_idx get_single_column_register(const relation_sort & s);
+        reg_idx get_single_column_register(const relation_sort s);
 
         /**
            \brief Allocate registers for predicates in \c pred and add them into the \c regs map.
@@ -146,11 +162,13 @@ namespace datalog {
 
         void make_join(reg_idx t1, reg_idx t2, const variable_intersection & vars, reg_idx & result, 
             bool reuse_t1, instruction_block & acc);
+        void make_min(reg_idx source, reg_idx & target, const unsigned_vector & group_by_cols,
+            const unsigned min_col, instruction_block & acc);
         void make_join_project(reg_idx t1, reg_idx t2, const variable_intersection & vars, 
             const unsigned_vector & removed_cols, reg_idx & result, bool reuse_t1, instruction_block & acc);
         void make_filter_interpreted_and_project(reg_idx src, app_ref & cond,
             const unsigned_vector & removed_cols, reg_idx & result, bool reuse, instruction_block & acc);
-        void make_select_equal_and_project(reg_idx src, const relation_element & val, unsigned col,
+        void make_select_equal_and_project(reg_idx src, const relation_element val, unsigned col,
             reg_idx & result, bool reuse, instruction_block & acc);
         /**
            \brief Create add an union or widen operation and put it into \c acc.
@@ -174,10 +192,10 @@ namespace datalog {
 
         void make_dealloc_non_void(reg_idx r, instruction_block & acc);
 
-        void make_add_constant_column(func_decl* pred, reg_idx src, const relation_sort & s, const relation_element & val,
+        void make_add_constant_column(func_decl* pred, reg_idx src, const relation_sort s, const relation_element val,
             reg_idx & result, bool & dealloc, instruction_block & acc);
 
-        void make_add_unbound_column(rule* compiled_rule, unsigned col_idx, func_decl* pred, reg_idx src, const relation_sort & s, reg_idx & result, 
+        void make_add_unbound_column(rule* compiled_rule, unsigned col_idx, func_decl* pred, reg_idx src, const relation_sort s, reg_idx & result,
             bool & dealloc, instruction_block & acc);
         void make_full_relation(func_decl* pred, const relation_signature & sig, reg_idx & result, 
             instruction_block & acc);
