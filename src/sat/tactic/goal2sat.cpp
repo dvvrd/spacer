@@ -333,7 +333,7 @@ struct goal2sat::imp {
         loop:
             cooperate("goal2sat");
             if (m.canceled())
-                throw tactic_exception(TACTIC_CANCELED_MSG);
+                throw tactic_exception(m.limit().get_cancel_msg());
             if (memory::get_allocation_size() > m_max_memory)
                 throw tactic_exception(TACTIC_MAX_MEMORY_MSG);
             frame & fr = m_frame_stack.back();
@@ -485,16 +485,10 @@ void goal2sat::collect_param_descrs(param_descrs & r) {
 struct goal2sat::scoped_set_imp {
     goal2sat * m_owner; 
     scoped_set_imp(goal2sat * o, goal2sat::imp * i):m_owner(o) {
-        #pragma omp critical (goal2sat)
-        {
-            m_owner->m_imp = i;
-        }
+        m_owner->m_imp = i;        
     }
     ~scoped_set_imp() {
-        #pragma omp critical (goal2sat)
-        {
-            m_owner->m_imp = 0;
-        }
+        m_owner->m_imp = 0;        
     }
 };
 
@@ -632,7 +626,7 @@ struct sat2goal::imp {
 
     void checkpoint() {
         if (m.canceled())
-            throw tactic_exception(TACTIC_CANCELED_MSG);
+            throw tactic_exception(m.limit().get_cancel_msg());
         if (memory::get_allocation_size() > m_max_memory)
             throw tactic_exception(TACTIC_MAX_MEMORY_MSG);
     }
@@ -732,16 +726,10 @@ void sat2goal::collect_param_descrs(param_descrs & r) {
 struct sat2goal::scoped_set_imp {
     sat2goal * m_owner; 
     scoped_set_imp(sat2goal * o, sat2goal::imp * i):m_owner(o) {
-        #pragma omp critical (sat2goal)
-        {
-            m_owner->m_imp = i;
-        }
+        m_owner->m_imp = i;        
     }
     ~scoped_set_imp() {
-        #pragma omp critical (sat2goal)
-        {
-            m_owner->m_imp = 0;
-        }
+        m_owner->m_imp = 0;        
     }
 };
 

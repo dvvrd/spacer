@@ -77,8 +77,8 @@ class quasi_macros_tactic : public tactic {
         
             while (more) { // CMW: use repeat(...) ?
                 if (m().canceled())
-                  throw tactic_exception(TACTIC_CANCELED_MSG);
-
+                    throw tactic_exception(m().limit().get_cancel_msg());
+            
                 new_forms.reset();
                 new_proofs.reset();
                 more = qm(forms.size(), forms.c_ptr(), proofs.c_ptr(), new_forms, new_proofs);            
@@ -148,10 +148,7 @@ public:
     virtual void cleanup() {
         ast_manager & m = m_imp->m();
         imp * d = alloc(imp, m, m_params);
-        #pragma omp critical (tactic_cancel)
-        {
-            std::swap(d, m_imp);
-        }
+        std::swap(d, m_imp);        
         dealloc(d);
     }
 

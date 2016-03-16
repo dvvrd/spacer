@@ -182,17 +182,8 @@ public:
     
     virtual void cleanup() {
         ast_manager & m = m_imp->m;
-        imp * d = m_imp;
-        #pragma omp critical (tactic_cancel)
-        {
-            m_imp = 0;
-        }
-        dealloc(d);
-        d = alloc(imp, m, m_params);
-        #pragma omp critical (tactic_cancel)
-        {
-            m_imp = d;
-        }
+        dealloc(m_imp);
+        m_imp = alloc(imp, m, m_params);
     }
 
     static void blast_term_ite(expr_ref& fml) {

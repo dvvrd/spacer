@@ -36,7 +36,7 @@ struct cofactor_elim_term_ite::imp {
         if (memory::get_allocation_size() > m_max_memory)
             throw tactic_exception(TACTIC_MAX_MEMORY_MSG);
         if (m.canceled())
-            throw tactic_exception(TACTIC_CANCELED_MSG);
+            throw tactic_exception(m.limit().get_cancel_msg());
     }
 
     // Collect atoms that contain term if-then-else
@@ -697,10 +697,7 @@ void cofactor_elim_term_ite::operator()(expr * t, expr_ref & r) {
 void cofactor_elim_term_ite::cleanup() {
     ast_manager & m = m_imp->m;    
     imp * d = alloc(imp, m, m_params);
-    #pragma omp critical (tactic_cancel)
-    {
-        std::swap(d, m_imp);
-    }
+    std::swap(d, m_imp);    
     dealloc(d);
 }
 

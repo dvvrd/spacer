@@ -96,7 +96,7 @@ struct ctx_simplify_tactic::imp {
         if (memory::get_allocation_size() > m_max_memory)
             throw tactic_exception(TACTIC_MAX_MEMORY_MSG);
         if (m.canceled())
-            throw tactic_exception(TACTIC_CANCELED_MSG);
+            throw tactic_exception(m.limit().get_cancel_msg());
     }
 
     bool shared(expr * t) const { 
@@ -540,10 +540,7 @@ void ctx_simplify_tactic::operator()(goal_ref const & in,
 void ctx_simplify_tactic::cleanup() {
     ast_manager & m   = m_imp->m;
     imp * d = alloc(imp, m, m_params);
-    #pragma omp critical (tactic_cancel)
-    {
-        std::swap(d, m_imp);
-    }
+    std::swap(d, m_imp);    
     dealloc(d);
 }
 

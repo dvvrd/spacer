@@ -71,6 +71,7 @@ namespace smt {
 
         std::ostream& display_last_failure(std::ostream& out) const;
         std::string last_failure_as_string() const;
+        void set_reason_unknown(char const* msg) { m_unknown = msg; }
         void set_progress_callback(progress_callback *callback);
 
 
@@ -197,6 +198,7 @@ namespace smt {
         // -----------------------------------
         proto_model_ref            m_proto_model;
         model_ref                  m_model;
+        std::string                m_unknown;
         void                       mk_proto_model(lbool r);
         struct scoped_mk_model;
 
@@ -1415,6 +1417,8 @@ namespace smt {
         bool update_model(bool refinalize);
 
         void get_proto_model(proto_model_ref & m) const;
+
+        bool validate_model();
         
         unsigned get_num_asserted_formulas() const { return m_asserted_formulas.get_num_formulas(); }
 

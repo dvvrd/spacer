@@ -176,7 +176,7 @@ struct bv_size_reduction_tactic::imp {
     
     void checkpoint() {
         if (m.canceled())
-            throw tactic_exception(TACTIC_CANCELED_MSG);
+            throw tactic_exception(m.limit().get_cancel_msg());
     }
     
     void operator()(goal & g, model_converter_ref & mc) {
@@ -400,10 +400,7 @@ void bv_size_reduction_tactic::operator()(goal_ref const & g,
  
 void bv_size_reduction_tactic::cleanup() {
     imp * d = alloc(imp, m_imp->m);
-    #pragma omp critical (tactic_cancel)
-    {
-        std::swap(d, m_imp);
-    }
+    std::swap(d, m_imp);    
     dealloc(d);
 }
 

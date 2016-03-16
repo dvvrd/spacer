@@ -838,8 +838,9 @@ namespace smt {
     
     template<typename Ext>
     typename theory_arith<Ext>::inf_numeral theory_arith<Ext>::normalize_bound(theory_var v, inf_numeral const & k, bound_kind kind) {
-        if (is_real(v))
+        if (is_real(v)) {
             return k;
+        }
         if (kind == B_LOWER)
             return inf_numeral(ceil(k));
         SASSERT(kind == B_UPPER);
@@ -2153,10 +2154,14 @@ namespace smt {
     */
     template<typename Ext>
     bool theory_arith<Ext>::is_shared(theory_var v) const {
+        if (!m_found_underspecified_op) {
+            return false;
+        }
         enode * n      = get_enode(v);
         enode * r      = n->get_root();
         enode_vector::const_iterator it  = r->begin_parents();
         enode_vector::const_iterator end = r->end_parents();
+        TRACE("shared", tout << get_context().get_scope_level() << " " <<  v << " " << r->get_num_parents() << "\n";);
         for (; it != end; ++it) {
             enode * parent = *it;
             app *   o = parent->get_owner();

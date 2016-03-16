@@ -100,7 +100,7 @@ class degree_shift_tactic : public tactic {
 
         void checkpoint() {
             if (m.canceled())
-                throw tactic_exception(TACTIC_CANCELED_MSG);
+                throw tactic_exception(m.limit().get_cancel_msg());
             cooperate("degree_shift");
         }
 
@@ -315,10 +315,7 @@ public:
     
     virtual void cleanup() {
         imp * d = alloc(imp, m_imp->m);
-        #pragma omp critical (tactic_cancel)
-        {
-            std::swap(d, m_imp);
-        }
+        std::swap(d, m_imp);        
         dealloc(d);
     }
 

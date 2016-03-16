@@ -43,6 +43,8 @@ Notes:
 #include"model_smt2_pp.h"
 #include"model_v2_pp.h"
 #include"model_params.hpp"
+#include"th_rewriter.h"
+#include"tactic_exception.h"
 
 func_decls::func_decls(ast_manager & m, func_decl * f):
     m_decls(TAG(func_decl*, f, 0)) {
@@ -1462,7 +1464,8 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
             throw ex;
         }
         catch (z3_exception & ex) {
-            throw cmd_exception(ex.msg());
+            m_solver->set_reason_unknown(ex.msg());
+            r = l_undef;
         }
         m_solver->set_status(r);
     }
@@ -1610,6 +1613,7 @@ void cmd_context::validate_model() {
     model_evaluator evaluator(*(md.get()), p);
     contains_array_op_proc contains_array(m());
     {
+        scoped_rlimit _rlimit(m().limit(), 0);
         cancel_eh<reslimit> eh(m().limit());
         expr_ref r(m());
         scoped_ctrl_c ctrlc(eh);
@@ -1623,6 +1627,7 @@ void cmd_context::validate_model() {
                 TRACE("model_validate", tout << "checking\n" << mk_ismt2_pp(a, m()) << "\nresult:\n" << mk_ismt2_pp(r, m()) << "\n";);
                 if (m().is_true(r))
                     continue;
+
                 // The evaluator for array expressions is not complete
                 // If r contains as_array/store/map/const expressions, then we do not generate the error.
                 // TODO: improve evaluator for model expressions.
@@ -1633,6 +1638,7 @@ void cmd_context::validate_model() {
                 catch (contains_array_op_proc::found) {
                     continue;
                 }
+                TRACE("model_validate", model_smt2_pp(tout, *this, *(md.get()), 0););
                 throw cmd_exception("an invalid model was generated");
             }
         }

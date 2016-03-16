@@ -289,7 +289,7 @@ class diff_neq_tactic : public tactic {
             unsigned nvars = num_vars();
             while (m_stack.size() < nvars) {
                 if (m.canceled())
-                    throw tactic_exception(TACTIC_CANCELED_MSG);
+                    throw tactic_exception(m.limit().get_cancel_msg());
                 TRACE("diff_neq_tactic", display_model(tout););
                 var x = m_stack.size();
                 if (extend_model(x))
@@ -394,10 +394,7 @@ public:
     virtual void cleanup() {
         imp * d = alloc(imp, m_imp->m, m_params);
         d->m_num_conflicts = m_imp->m_num_conflicts;
-        #pragma omp critical (tactic_cancel)
-        {
-            std::swap(d, m_imp);
-        }
+        std::swap(d, m_imp);        
         dealloc(d);
     }
 

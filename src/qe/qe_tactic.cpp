@@ -45,7 +45,7 @@ class qe_tactic : public tactic {
 
         void checkpoint() {
             if (m.canceled()) 
-                throw tactic_exception(TACTIC_CANCELED_MSG);
+                throw tactic_exception(m.limit().get_cancel_msg());
             cooperate("qe");
         }
 
@@ -121,17 +121,8 @@ public:
     
     virtual void cleanup() {
         ast_manager & m = m_imp->m;
-        imp * d = m_imp;
-        #pragma omp critical (tactic_cancel)
-        {
-            m_imp = 0;
-        }
-        dealloc(d);
-        d = alloc(imp, m, m_params);
-        #pragma omp critical (tactic_cancel)
-        {
-            m_imp = d;
-        }
+        dealloc(m_imp);
+        m_imp = alloc(imp, m, m_params);
     }
     
 };

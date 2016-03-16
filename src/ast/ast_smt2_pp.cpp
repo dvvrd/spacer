@@ -364,16 +364,18 @@ format * smt2_pp_environment::pp_arith_literal(app * t, bool decimal, unsigned d
 }
 
 format * smt2_pp_environment::pp_string_literal(app * t) {
-    std::string s;
+    zstring s;
+    std::string encs;
     VERIFY (get_sutil().str.is_string(t, s));
+    encs = s.encode();
     std::ostringstream buffer;
     buffer << "\"";
-    for (unsigned i = 0; i < s.length(); ++i) {
-        if (s[i] == '\"') {
+    for (unsigned i = 0; i < encs.length(); ++i) {
+        if (encs[i] == '\"') {
             buffer << "\"\"";
         }
         else {
-            buffer << s[i];
+            buffer << encs[i];
         }
     }
     buffer << "\"";  
@@ -1209,14 +1211,18 @@ std::ostream& operator<<(std::ostream& out, app_ref const&  e) {
 }
 
 std::ostream& operator<<(std::ostream& out, expr_ref_vector const&  e) {
-    for (unsigned i = 0; i < e.size(); ++i) 
-        out << mk_ismt2_pp(e[i], e.get_manager()) << "\n";
+    for (unsigned i = 0; i < e.size(); ++i) {
+        out << mk_ismt2_pp(e[i], e.get_manager());
+        if (i + 1 < e.size()) out << "; ";
+    }
     return out;
 }
 
 std::ostream& operator<<(std::ostream& out, app_ref_vector const&  e) {
-    for (unsigned i = 0; i < e.size(); ++i) 
-        out << mk_ismt2_pp(e[i], e.get_manager()) << "\n";
+    for (unsigned i = 0; i < e.size(); ++i) {
+        out << mk_ismt2_pp(e[i], e.get_manager());
+        if (i + 1 < e.size()) out << "; ";
+    }
     return out;
 }
 

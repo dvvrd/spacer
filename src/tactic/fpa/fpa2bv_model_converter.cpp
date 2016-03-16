@@ -132,7 +132,7 @@ expr_ref fpa2bv_model_converter::convert_bv2fp(sort * s, expr * sgn, expr * exp,
     mpzm.set(sig_z, sig_q.to_mpq().numerator());
     exp_z = mpzm.get_int64(exp_unbiased_q.to_mpq().numerator());
 
-    fu.fm().set(fp_val, ebits, sbits, !mpqm.is_zero(sgn_q.to_mpq()), sig_z, exp_z);
+    fu.fm().set(fp_val, ebits, sbits, !mpqm.is_zero(sgn_q.to_mpq()), exp_z, sig_z);
 
     mpzm.del(sig_z);
 
@@ -384,7 +384,7 @@ void fpa2bv_model_converter::convert(model * bv_mdl, model * float_mdl) {
         if (!seen.contains(f))
         {
             TRACE("fpa2bv_mc", tout << "Keeping: " << mk_ismt2_pp(f, m) << std::endl;);
-            func_interp * val = bv_mdl->get_func_interp(f);
+            func_interp * val = bv_mdl->get_func_interp(f)->copy();
             float_mdl->register_decl(f, val);
         }
     }

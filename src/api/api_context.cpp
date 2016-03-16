@@ -73,9 +73,9 @@ namespace api {
         m_datalog_util(m()),
         m_fpa_util(m()),
         m_dtutil(m()),
+        m_sutil(m()),
         m_last_result(m()),
         m_ast_trail(m()),
-        m_replay_stack(),
         m_pmanager(m_limit) {
 
         m_error_code = Z3_OK;
@@ -97,24 +97,14 @@ namespace api {
         m_dt_fid    = m().mk_family_id("datatype");
         m_datalog_fid = m().mk_family_id("datalog_relation");
         m_fpa_fid   = m().mk_family_id("fpa");
+        m_seq_fid   = m().mk_family_id("seq");
         m_dt_plugin = static_cast<datatype_decl_plugin*>(m().get_plugin(m_dt_fid));
-
-        if (!m_user_ref_count) {
-            m_replay_stack.push_back(0);
-        }
     
         install_tactics(*this);
     }
 
 
     context::~context() {
-        m_last_obj = 0;
-        if (!m_user_ref_count) {
-            for (unsigned i = 0; i < m_replay_stack.size(); ++i) {
-                dealloc(m_replay_stack[i]);
-            }
-            m_ast_trail.reset();
-        }
         reset_parser();
     }
 

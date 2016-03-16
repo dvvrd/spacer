@@ -40,15 +40,8 @@ public:
     }
     
     virtual ~binary_tactical() {
-        tactic * t1 = m_t1;
-        tactic * t2 = m_t2;
-        #pragma omp critical (tactic_cancel)
-        {
-            m_t1 = 0;
-            m_t2 = 0;
-        }
-        t1->dec_ref();
-        t2->dec_ref();
+        m_t1->dec_ref();
+        m_t2->dec_ref();
     }
     
     virtual void updt_params(params_ref const & p) {
@@ -291,17 +284,9 @@ public:
     }
 
     virtual ~nary_tactical() {
-        ptr_buffer<tactic> old_ts;
         unsigned sz = m_ts.size();
-        old_ts.append(sz, m_ts.c_ptr());
-        #pragma omp critical (tactic_cancel)
-        {
-            for (unsigned i = 0; i < sz; i++) {
-                m_ts[i] = 0;
-            }
-        }
         for (unsigned i = 0; i < sz; i++) {
-            old_ts[i]->dec_ref();
+            m_ts[i]->dec_ref();
         }
     }
 
@@ -476,9 +461,20 @@ enum par_exception_kind {
 };
 
 class par_tactical : public or_else_tactical {
+
+    struct scoped_limits {
+        reslimit&  m_limit;
+        unsigned   m_sz;
+        scoped_limits(reslimit& lim): m_limit(lim), m_sz(0) {}
+        ~scoped_limits() { for (unsigned i = 0; i < m_sz; ++i) m_limit.pop_child(); }
+        void push_child(reslimit* lim) { m_limit.push_child(lim); ++m_sz; }
+    };
+
 public:
     par_tactical(unsigned num, tactic * const * ts):or_else_tactical(num, ts) {}
     virtual ~par_tactical() {}
+
+    
 
     virtual void operator()(goal_ref const & in, 
                             goal_ref_buffer & result, 
@@ -500,6 +496,7 @@ public:
         ast_manager & m = in->m();
         
         scoped_ptr_vector<ast_manager> managers;
+        scoped_limits scl(m.limit());
         goal_ref_vector                in_copies;
         tactic_ref_vector              ts;
         unsigned sz = m_ts.size();
@@ -509,6 +506,7 @@ public:
             ast_translation translator(m, *new_m);
             in_copies.push_back(in->translate(translator));
             ts.push_back(m_ts.get(i)->translate(*new_m));
+            scl.push_child(&new_m->limit());
         }
 
         unsigned finished_id       = UINT_MAX;
@@ -906,12 +904,7 @@ public:
     }    
 
     virtual ~unary_tactical() { 
-        tactic * t = m_t;
-        #pragma omp critical (tactic_cancel)
-        {
-            m_t = 0;
-        }
-        t->dec_ref();
+        m_t->dec_ref();
     }
 
     virtual void operator()(goal_ref const & in, 
