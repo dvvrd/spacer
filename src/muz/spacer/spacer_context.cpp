@@ -372,7 +372,7 @@ namespace spacer {
     bool res = false;
     
     expr_ref_vector lemmas (m);
-    qe::flatten_and (lemma, lemmas);
+    flatten_and (lemma, lemmas);
     for (unsigned i = 0, sz = lemmas.size(); i < sz; ++i)
       res |= m_frames.add_lemma (lemmas.get (i), lvl);
     return res;
@@ -719,7 +719,7 @@ namespace spacer {
       expr_ref_vector conj(m), aux(m);
         
         conj.push_back(m.mk_not(states));
-        qe::flatten_and (conj);
+        flatten_and (conj);
 
         prop_solver::scoped_level _sl(m_solver, level);
         m_solver.set_core(core);
@@ -905,7 +905,7 @@ namespace spacer {
         for (unsigned i = ut_size; i < t_size; ++i) {
             tail.push_back(rule.get_tail(i));
         }        
-        qe::flatten_and(tail);
+        flatten_and(tail);
         for (unsigned i = 0; i < tail.size(); ++i) {
             expr_ref tmp(m);
             var_subst(m, false)(tail[i].get(), var_reprs.size(), (expr*const*)var_reprs.c_ptr(), tmp);
@@ -2939,7 +2939,7 @@ namespace spacer {
         // that yet.
         // XXX This mixes up with derivation. Needs more thought.
         // Phi.reset ();
-        // qe::flatten_and (phi1, Phi);
+        // flatten_and (phi1, Phi);
         // if (!Phi.empty ())
         // {
         //   expand_literals (m, Phi);
@@ -3122,7 +3122,7 @@ namespace spacer {
     
     expr_ref_vector constraints (m);
     constraints.push_back (c);
-    qe::flatten_and (constraints);
+    flatten_and (constraints);
     
     for (unsigned i = 0, sz = constraints.size (); i < sz; ++i)
     {

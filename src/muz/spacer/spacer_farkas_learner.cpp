@@ -319,7 +319,7 @@ namespace spacer {
 
         expr_set bs;
         expr_ref_vector blist(m_pr);
-        qe::flatten_and(B, blist);
+        flatten_and(B, blist);
         for (unsigned i = 0; i < blist.size(); ++i) {
             bs.insert(blist[i].get());
         }

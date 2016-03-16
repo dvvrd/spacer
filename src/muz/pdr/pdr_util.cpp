@@ -111,7 +111,7 @@ namespace pdr {
   void select_reducer::operator() (expr_ref &fml)
   {
     expr_ref_vector conjs (m);
-    qe::flatten_and (fml, conjs);
+    flatten_and (fml, conjs);
     for (unsigned i = 0; i < conjs.size (); ++i)
       conjs[i] = reduce_expr (conjs [i].get ());
     

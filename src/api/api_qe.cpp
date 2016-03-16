@@ -102,7 +102,7 @@ extern "C"
     model_ref model (to_model_ref (m));
     expr_ref_vector facts (mk_c(c)->m ());
     facts.push_back (to_expr (fml));
-    qe::flatten_and (facts);
+    flatten_and (facts);
     
     spacer::model_evaluator mev (mk_c(c)->m());
     mev.reset (model);

@@ -115,7 +115,7 @@ namespace datalog {
 
         // new body
         new_conjs.push_back (it_tail);
-        qe::flatten_and (new_conjs);
+        flatten_and (new_conjs);
         body = m.mk_and(new_conjs.size(), new_conjs.c_ptr());
         m_rewriter(body);
 

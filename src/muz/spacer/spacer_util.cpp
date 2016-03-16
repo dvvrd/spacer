@@ -765,7 +765,7 @@ namespace spacer {
     void reduce_disequalities(model& model, unsigned threshold, expr_ref& fml) {
         ast_manager& m = fml.get_manager();
         expr_ref_vector conjs(m);
-        qe::flatten_and(fml, conjs);
+        flatten_and(fml, conjs);
         obj_map<expr, unsigned> diseqs;
         expr* n, *lhs, *rhs;
         for (unsigned i = 0; i < conjs.size(); ++i) {
@@ -1191,7 +1191,7 @@ namespace spacer {
         {
           // Ensure that top-level AND of fml is flat
           expr_ref_vector flat(m);
-          qe::flatten_and (fml, flat);
+          flatten_and (fml, flat);
           if (flat.size () == 1)
             fml = flat.get (0);
           else if (flat.size () > 1)
@@ -1614,7 +1614,7 @@ namespace spacer {
   void compute_implicant_literals (model_evaluator &mev, expr_ref_vector &formula, 
                                    expr_ref_vector &res)
   {
-    qe::flatten_and (formula);
+    flatten_and (formula);
     if (formula.empty ()) return;
     
     implicant_picker p (mev);
