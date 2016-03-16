@@ -59,6 +59,7 @@ COMPILE_TIME_ASSERT(sizeof(int64) == 8);
 #define SPRINTF sprintf
 #endif
 
+#define VEC2PTR(_x_) ((_x_).size() ? &(_x_)[0] : 0)
 
 #ifdef _WINDOWS
 // Disable thread local declspec as it seems to not work downlevel.
@@ -400,7 +401,6 @@ inline size_t megabytes_to_bytes(unsigned mb) {
     return r;
 }
 
-void z3_bound_num_procs();
 
 #endif /* UTIL_H_ */
 

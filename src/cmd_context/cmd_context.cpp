@@ -245,6 +245,7 @@ protected:
     bv_util       m_bvutil;
     array_util    m_arutil;
     fpa_util      m_futil;
+    seq_util      m_sutil;
     datalog::dl_decl_util m_dlutil;
 
     format_ns::format * pp_fdecl_name(symbol const & s, func_decls const & fs, func_decl * f, unsigned & len) {
@@ -265,13 +266,14 @@ protected:
     }
 
 public:
-    pp_env(cmd_context & o):m_owner(o), m_autil(o.m()), m_bvutil(o.m()), m_arutil(o.m()), m_futil(o.m()), m_dlutil(o.m()) {}
+    pp_env(cmd_context & o):m_owner(o), m_autil(o.m()), m_bvutil(o.m()), m_arutil(o.m()), m_futil(o.m()), m_sutil(o.m()), m_dlutil(o.m()) {}
     virtual ~pp_env() {}
     virtual ast_manager & get_manager() const { return m_owner.m(); }
     virtual arith_util & get_autil() { return m_autil; }
     virtual bv_util & get_bvutil() { return m_bvutil; }
     virtual array_util & get_arutil() { return m_arutil; }
     virtual fpa_util & get_futil() { return m_futil; }
+    virtual seq_util & get_sutil() { return m_sutil; }
     virtual datalog::dl_decl_util& get_dlutil() { return m_dlutil; }
     virtual bool uses(symbol const & s) const {
         return
@@ -313,6 +315,7 @@ cmd_context::cmd_context(bool main_ctx, ast_manager * m, symbol const & l):
     m_print_success(m_params.m_smtlib2_compliant),
     m_random_seed(0),
     m_produce_unsat_cores(false),
+    m_produce_unsat_assumptions(false),
     m_produce_assignments(false),
     m_status(UNKNOWN),
     m_numeral_as_real(false),
@@ -349,16 +352,14 @@ cmd_context::~cmd_context() {
 }
 
 void cmd_context::set_cancel(bool f) {
-    if (m_solver) {
+    if (has_manager()) {
         if (f) {
-            m_solver->cancel();
+            m().limit().cancel();
         }
         else {
-            m_solver->reset_cancel();
+            m().limit().reset_cancel();
         }
     }
-    if (has_manager())
-        m().set_cancel(f);
 }
 
 opt_wrapper* cmd_context::get_opt() {
@@ -382,6 +383,9 @@ void cmd_context::global_params_updated() {
         if (!m_params.m_auto_config)
             p.set_bool("auto_config", false);
         m_solver->updt_params(p);
+    }
+    if (m_opt) {
+        get_opt()->updt_params(gparams::get_module("opt"));
     }
 }
 
@@ -538,6 +542,7 @@ bool cmd_context::logic_has_arith_core(symbol const & s) const {
         s == "QF_FP" ||
         s == "QF_FPBV" ||
         s == "QF_BVFP" ||
+        s == "QF_S" ||
         s == "HORN";
 }
 
@@ -570,7 +575,7 @@ bool cmd_context::logic_has_bv() const {
 }
 
 bool cmd_context::logic_has_seq_core(symbol const& s) const {
-    return s == "QF_BVRE";
+    return s == "QF_BVRE" || s == "QF_S";
 }
 
 bool cmd_context::logic_has_seq() const {
@@ -706,13 +711,7 @@ bool cmd_context::set_logic(symbol const & s) {
     if (has_manager() && m_main_ctx)
         throw cmd_exception("logic must be set before initialization");
     if (!supported_logic(s)) {
-        if (m_params.m_smtlib2_compliant) {
-            return false;
-        }
-        else {
-            warning_msg("unknown logic, ignoring set-logic command");
-            return true;
-        }
+        return false;
     }
     m_logic = s;
     if (is_logic("QF_RDL") ||
@@ -828,6 +827,17 @@ void cmd_context::insert(symbol const & s, object_ref * r) {
     m_object_refs.insert(s, r);
 }
 
+void cmd_context::insert_rec_fun(func_decl* f, expr_ref_vector const& binding, svector<symbol> const& ids, expr* e) {
+    expr_ref eq(m()), lhs(m());
+    lhs = m().mk_app(f, binding.size(), binding.c_ptr());
+    eq  = m().mk_eq(lhs, e);
+    if (!ids.empty()) {
+        eq  = m().mk_forall(ids.size(), f->get_domain(), ids.c_ptr(), eq);
+    }
+    warning_msg("recursive functions are currently only partially supported: they are translated into recursive equations without special handling");
+    // TBD: basic implementation asserts axiom. Life-time of recursive equation follows scopes (unlikely to be what SMT-LIB 2.5 wants).
+    assert_expr(eq);
+}
 
 func_decl * cmd_context::find_func_decl(symbol const & s) const {
     builtin_decl d;
@@ -1401,11 +1411,12 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
     unsigned rlimit  = m_params.m_rlimit;
     scoped_watch sw(*this);
     lbool r;
+    bool was_pareto = false, was_opt = false;
 
     if (m_opt && !m_opt->empty()) {
-        bool was_pareto = false;
+        was_opt = true;
         m_check_sat_result = get_opt();
-        cancel_eh<opt_wrapper> eh(*get_opt());
+        cancel_eh<reslimit> eh(m().limit());
         scoped_ctrl_c ctrlc(eh);
         scoped_timer timer(timeout, &eh);
         scoped_rlimit _rlimit(m().limit(), rlimit);
@@ -1436,14 +1447,11 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
             r = l_true;
         }
         get_opt()->set_status(r);
-        if (r != l_false && !was_pareto) {
-            get_opt()->display_assignment(regular_stream());
-        }
     }
     else if (m_solver) {
         m_check_sat_result = m_solver.get(); // solver itself stores the result.
         m_solver->set_progress_callback(this);
-        cancel_eh<solver> eh(*m_solver);
+        cancel_eh<reslimit> eh(m().limit());
         scoped_ctrl_c ctrlc(eh);
         scoped_timer timer(timeout, &eh);
         scoped_rlimit _rlimit(m().limit(), rlimit);
@@ -1465,6 +1473,10 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
     }
     display_sat_result(r);
     validate_check_sat_result(r);
+    if (was_opt && r != l_false && !was_pareto) {
+        get_opt()->display_assignment(regular_stream());
+    }
+
     if (r == l_true) {
         validate_model();
         if (m_params.m_dump_models) {
@@ -1474,6 +1486,29 @@ void cmd_context::check_sat(unsigned num_assumptions, expr * const * assumptions
         }
     }
 }
+
+void cmd_context::reset_assertions() {
+    if (!m_global_decls) {
+        reset(false);
+        return;
+    }
+
+    if (m_opt) {
+        m_opt = 0;
+    }
+    if (m_solver) {
+        m_solver = 0;
+        mk_solver();
+    }
+    restore_assertions(0);
+    svector<scope>::iterator it  = m_scopes.begin();
+    svector<scope>::iterator end = m_scopes.end();
+    for (; it != end; ++it) {
+        it->m_assertions_lim = 0;
+        if (m_solver) m_solver->push();
+    }
+}
+    
 
 void cmd_context::display_model(model_ref& mdl) {
     if (mdl) {
@@ -1575,7 +1610,7 @@ void cmd_context::validate_model() {
     model_evaluator evaluator(*(md.get()), p);
     contains_array_op_proc contains_array(m());
     {
-        cancel_eh<model_evaluator> eh(evaluator);
+        cancel_eh<reslimit> eh(m().limit());
         expr_ref r(m());
         scoped_ctrl_c ctrlc(eh);
         ptr_vector<expr>::const_iterator it  = begin_assertions();
@@ -1666,6 +1701,7 @@ void cmd_context::display_statistics(bool show_total_time, double total_time) {
     }
     st.display_smt2(regular_stream());
 }
+
 
 void cmd_context::display_assertions() {
     if (!m_interactive_mode)

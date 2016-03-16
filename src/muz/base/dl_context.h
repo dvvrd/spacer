@@ -210,7 +210,6 @@ namespace datalog {
         expr_ref           m_last_answer;
         expr_ref           m_last_ground_answer;
         DL_ENGINE          m_engine_type;
-        volatile bool      m_cancel;
 
 
 
@@ -380,7 +379,7 @@ namespace datalog {
         rule_set & get_rules() { flush_add_rules(); return m_rule_set; }
 
         void get_rules_as_formulas(expr_ref_vector& fmls, expr_ref_vector& qs, svector<symbol>& names);
-        void get_raw_rule_formulas(expr_ref_vector& fmls, svector<symbol>& names, vector<unsigned> &bounds);
+        void get_raw_rule_formulas(expr_ref_vector& fmls, svector<symbol>& names, unsigned_vector &bounds);
 
         void add_fact(app * head);
         void add_fact(func_decl * pred, const relation_fact & fact);
@@ -490,11 +489,13 @@ namespace datalog {
         //
         // -----------------------------------
 
-        void cancel();
-        bool canceled() const { return m_cancel; }
+        bool canceled() {
+            if (m.limit().inc()) return true;
+            m_last_status = CANCELED;
+            return false;
+        }
 
         void cleanup();
-        void reset_cancel() { cleanup(); }
 
         /**
            \brief check if query 'q' is satisfied under asserted rules and background.

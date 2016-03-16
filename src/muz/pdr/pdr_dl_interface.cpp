@@ -315,13 +315,7 @@ void dl_interface::get_rules_along_trace (datalog::rule_ref_vector& rules) {
     m_context->get_rules_along_trace (rules);
 }
 
-void dl_interface::cancel() {
-    m_context->cancel();
-}
 
-void dl_interface::cleanup() {
-    m_context->cleanup();
-}
 
 void dl_interface::updt_params() {
     dealloc(m_context);

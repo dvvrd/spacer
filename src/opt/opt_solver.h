@@ -82,6 +82,7 @@ namespace opt {
         static unsigned     m_dump_count;
         statistics          m_stats;
         bool                m_first;
+        bool                m_was_unknown;
     public:
         opt_solver(ast_manager & m, params_ref const & p, filter_model_converter& fm);
         virtual ~opt_solver();
@@ -99,11 +100,11 @@ namespace opt {
         virtual proof * get_proof();
         virtual std::string reason_unknown() const;
         virtual void get_labels(svector<symbol> & r);
-        virtual void set_cancel(bool f);
         virtual void set_progress_callback(progress_callback * callback);
         virtual unsigned get_num_assertions() const;
         virtual expr * get_assertion(unsigned idx) const;
         virtual void display(std::ostream & out) const;
+        virtual ast_manager& get_manager() { return m; } 
         void set_logic(symbol const& logic);
 
         smt::theory_var add_objective(app* term);
@@ -116,6 +117,8 @@ namespace opt {
         bool objective_is_model_valid(unsigned obj_index) const {
             return m_valid_objectives[obj_index];
         }
+
+        bool was_unknown() const { return m_was_unknown; }
 
         vector<inf_eps> const& get_objective_values();
         expr_ref mk_ge(unsigned obj_index, inf_eps const& val);
@@ -136,6 +139,7 @@ namespace opt {
     private:
         lbool decrement_value(unsigned i, inf_eps& val);
         void set_model(unsigned i);
+        lbool adjust_result(lbool r);
     };
 }
 

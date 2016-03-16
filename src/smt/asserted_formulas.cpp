@@ -54,8 +54,7 @@ asserted_formulas::asserted_formulas(ast_manager & m, smt_params & p):
     m_macro_manager(m, m_simplifier),
     m_bit2int(m),
     m_bv_sharing(m),
-    m_inconsistent(false),
-    m_cancel_flag(false) {
+    m_inconsistent(false){
 
     m_bsimp = 0;
     m_bvsimp = 0;
@@ -223,9 +222,6 @@ void asserted_formulas::reset() {
     m_inconsistent = false;
 }
 
-void asserted_formulas::set_cancel_flag(bool f) {
-    m_cancel_flag = f; 
-}
 
 #ifdef Z3DEBUG
 bool asserted_formulas::check_well_sorted() const {
@@ -606,8 +602,8 @@ void asserted_formulas::propagate_values() {
     proof_ref_vector new_prs2(m_manager);
     unsigned sz = m_asserted_formulas.size();
     for (unsigned i = 0; i < sz; i++) {
-        expr * n    = m_asserted_formulas.get(i);
-        proof * pr  = m_asserted_formula_prs.get(i, 0);
+        expr_ref   n(m_asserted_formulas.get(i), m_manager);
+        proof_ref pr(m_asserted_formula_prs.get(i, 0), m_manager);
         TRACE("simplifier", tout << mk_pp(n, m_manager) << "\n";);
         if (m_manager.is_eq(n)) {
             expr * lhs = to_app(n)->get_arg(0);

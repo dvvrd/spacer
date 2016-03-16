@@ -30,6 +30,7 @@ Revision History:
 #include"theory_dummy.h"
 #include"theory_dl.h"
 #include"theory_seq_empty.h"
+#include"theory_seq.h"
 #include"theory_pb.h"
 #include"theory_fpa.h"
 
@@ -200,7 +201,7 @@ namespace smt {
     void setup::setup_QF_BVRE() {
         setup_QF_BV();
         setup_QF_LIA();
-        m_context.register_plugin(alloc(smt::theory_seq_empty, m_manager));
+        setup_seq();
     }
 
     void setup::setup_QF_UF(static_features const & st) {
@@ -721,8 +722,8 @@ namespace smt {
         IF_VERBOSE(100, verbose_stream() << "(smt.collecting-features)\n";);
         st.collect(m_context.get_num_asserted_formulas(), m_context.get_asserted_formulas());
         IF_VERBOSE(1000, st.display_primitive(verbose_stream()););
-        bool fixnum = st.arith_k_sum_is_small();
-        bool int_only = !st.m_has_rational && !st.m_has_real;
+        bool fixnum = st.arith_k_sum_is_small() && m_params.m_arith_fixnum;
+        bool int_only = !st.m_has_rational && !st.m_has_real && m_params.m_arith_int_only;
         switch(m_params.m_arith_mode) {
         case AS_NO_ARITH:
             m_context.register_plugin(alloc(smt::theory_dummy, m_manager.mk_family_id("arith"), "no arithmetic"));

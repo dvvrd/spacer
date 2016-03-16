@@ -231,8 +231,7 @@ namespace datalog {
         m_last_status(OK),
         m_last_answer(m),
         m_last_ground_answer(m),
-        m_engine_type(LAST_ENGINE),
-        m_cancel(false) {
+        m_engine_type(LAST_ENGINE) {
         re.set_context(this);
         updt_params(pa);
     }
@@ -754,16 +753,7 @@ namespace datalog {
         m_background.push_back(e); 
     }
 
-
-    void context::cancel() {
-        m_cancel = true;
-        m_last_status = CANCELED;
-        m_transf.cancel();
-        if (m_engine) m_engine->cancel();
-    }
-
     void context::cleanup() {
-        m_cancel = false;
         m_last_status = OK;
         if (m_engine) m_engine->cleanup();
     }
@@ -1041,7 +1031,7 @@ namespace datalog {
         }
     }
    
-    void context::get_raw_rule_formulas(expr_ref_vector& rules, svector<symbol>& names, vector<unsigned> &bounds) {
+    void context::get_raw_rule_formulas(expr_ref_vector& rules, svector<symbol>& names, unsigned_vector &bounds) {
         for (unsigned i = 0; i < m_rule_fmls.size(); ++i) {
             expr_ref r = bind_vars(m_rule_fmls[i].get(), true);
             rules.push_back(r.get());
@@ -1056,7 +1046,6 @@ namespace datalog {
         
         // ensure that rules are all using bound variables.
         for (unsigned i = m_rule_fmls_head; i < m_rule_fmls.size(); ++i) {
-            ptr_vector<sort> sorts;
             m_free_vars(m_rule_fmls[i].get());
             if (!m_free_vars.empty()) {
                 rm.mk_rule(m_rule_fmls[i].get(), 0, m_rule_set, m_rule_names[i]);

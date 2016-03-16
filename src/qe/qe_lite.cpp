@@ -56,7 +56,6 @@ namespace eq {
         expr_ref_vector  m_subst_map;
         expr_ref_buffer  m_new_args;
         th_rewriter      m_rewriter;
-        volatile bool    m_cancel;
         
         void der_sort_vars(ptr_vector<var> & vars, ptr_vector<expr> & definitions, unsigned_vector & order) {
             order.reset();
@@ -744,7 +743,7 @@ namespace eq {
 
         void checkpoint() {
             cooperate("der");
-            if (m_cancel)
+            if (m.canceled()) 
                 throw tactic_exception(TACTIC_CANCELED_MSG);
         }
 
@@ -758,8 +757,7 @@ namespace eq {
             m_new_exprs(m), 
             m_subst_map(m), 
             m_new_args(m), 
-            m_rewriter(m), 
-            m_cancel(false) {}
+            m_rewriter(m) {}
         
         void set_is_variable_proc(is_variable_proc& proc) { m_is_variable = &proc;}
         
@@ -796,10 +794,6 @@ namespace eq {
         
         ast_manager& get_manager() const { return m; }
 
-        void set_cancel(bool f) {
-            m_rewriter.set_cancel(f);
-            m_cancel = f;
-        }
 
     };
 }; // namespace eq
@@ -814,7 +808,6 @@ namespace ar {
         is_variable_proc*        m_is_variable;
         ptr_vector<expr>         m_todo;
         expr_mark                m_visited;
-        volatile bool            m_cancel;
         
         bool is_variable(expr * e) const {
             return (*m_is_variable)(e);
@@ -929,13 +922,13 @@ namespace ar {
 
         void checkpoint() {
             cooperate("der");
-            if (m_cancel)
+            if (m.canceled())
                 throw tactic_exception(TACTIC_CANCELED_MSG);
         }
 
     public:
 
-        der(ast_manager& m): m(m), a(m), m_is_variable(0), m_cancel(false) {}
+        der(ast_manager& m): m(m), a(m), m_is_variable(0) {}
 
         void operator()(expr_ref_vector& fmls) {
             for (unsigned i = 0; i < fmls.size(); ++i) {
@@ -948,10 +941,6 @@ namespace ar {
         void operator()(expr* e) {}
 
         void set_is_variable_proc(is_variable_proc& proc) { m_is_variable = &proc;}
-
-        void set_cancel(bool f) {
-            m_cancel = f;
-        }
         
     };
 }; // namespace ar
@@ -1072,7 +1061,6 @@ namespace fm {
         vector<constraints>      m_uppers;
         uint_set                 m_forbidden_set; // variables that cannot be eliminated because occur in non OCC ineq part
         expr_ref_vector          m_new_fmls;
-        volatile bool            m_cancel;
         id_gen                   m_id_gen;
         bool                     m_fm_real_only;
         unsigned                 m_fm_limit;
@@ -1465,7 +1453,6 @@ namespace fm {
             m_var2expr(m),
             m_new_fmls(m),
             m_inconsistent_core(m) {
-            m_cancel = false;
             updt_params();
             m_counter = 0;
             m_inconsistent = false;
@@ -1484,9 +1471,6 @@ namespace fm {
             m_fm_occ         = true;
         }
         
-        void set_cancel(bool f) {
-            m_cancel = f;
-        }
     private:
         
         struct forbidden_proc {
@@ -2228,7 +2212,7 @@ namespace fm {
         
         void checkpoint() {
             cooperate("fm");
-            if (m_cancel)
+            if (m.canceled())
                 throw tactic_exception(TACTIC_CANCELED_MSG);
         }
     public:
@@ -2459,14 +2443,6 @@ public:
         TRACE("qe_lite", for (unsigned i = 0; i < fmls.size(); ++i) tout << mk_pp(fmls[i].get(), m) << "\n";);
     }
 
-    void set_cancel(bool f) {
-        m_der.set_cancel(f);
-        m_array_der.set_cancel(f);
-        m_fm.set_cancel(f);
-        m_elim_star.set_cancel(f);
-        m_rewriter.set_cancel(f);
-    }
-
 };
 
 qe_lite::qe_lite(ast_manager& m) {
@@ -2481,9 +2457,6 @@ void qe_lite::operator()(app_ref_vector& vars, expr_ref& fml) {
     (*m_impl)(vars, fml);
 }
 
-void qe_lite::set_cancel(bool f) {
-    m_impl->set_cancel(f);
-}
 
 void qe_lite::operator()(expr_ref& fml, proof_ref& pr) {
     (*m_impl)(fml, pr);
@@ -2502,21 +2475,14 @@ class qe_lite_tactic : public tactic {
     struct imp {
         ast_manager&             m;
         qe_lite                  m_qe;
-        volatile bool            m_cancel;
 
         imp(ast_manager& m, params_ref const& p): 
             m(m),
-            m_qe(m),
-            m_cancel(false)
+            m_qe(m)
         {}
 
-        void set_cancel(bool f) {
-            m_cancel = f;
-            m_qe.set_cancel(f);
-        }
-
         void checkpoint() {
-            if (m_cancel)
+            if (m.canceled())
                 throw tactic_exception(TACTIC_CANCELED_MSG);
             cooperate("qe-lite");
         }

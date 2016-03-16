@@ -932,7 +932,6 @@ public:
     virtual ~decl_plugin() {}
     virtual void finalize() {}
 
-    virtual void set_cancel(bool f) {}
 
     virtual decl_plugin * mk_fresh() = 0;
 
@@ -1472,9 +1471,6 @@ public:
     ~ast_manager();
 
     // propagate cancellation signal to decl_plugins
-    void set_cancel(bool f);
-    void cancel() { set_cancel(true); }
-    void reset_cancel() { set_cancel(false); }
 
     bool has_trace_stream() const { return m_trace_stream != 0; }
     std::ostream & trace_stream() { SASSERT(has_trace_stream()); return *m_trace_stream; }
@@ -1522,6 +1518,7 @@ public:
     }
 
     reslimit& limit() { return m_limit; }
+    bool canceled() { return !limit().inc(); }
 
     void register_plugin(symbol const & s, decl_plugin * plugin);
     
@@ -2013,6 +2010,7 @@ public:
     app * mk_distinct_expanded(unsigned num_args, expr * const * args);
     app * mk_true() const { return m_true; }
     app * mk_false() const { return m_false; }
+    app * mk_bool_val(bool b) { return b?m_true:m_false; }
     app * mk_interp(expr * arg) { return mk_app(m_basic_family_id, OP_INTERP, arg); }
 
 

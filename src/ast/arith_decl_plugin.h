@@ -211,7 +211,6 @@ public:
 
     virtual expr * get_some_value(sort * s);
 
-    virtual void set_cancel(bool f);
 };
 
 /**
@@ -281,6 +280,7 @@ public:
     MATCH_BINARY(is_rem);
     MATCH_BINARY(is_div);
     MATCH_BINARY(is_idiv);
+    MATCH_BINARY(is_power);
 
     bool is_pi(expr * arg) { return is_app_of(arg, m_afid, OP_PI); }
     bool is_e(expr * arg) { return is_app_of(arg, m_afid, OP_E); }
@@ -326,6 +326,9 @@ public:
     }
     app * mk_numeral(sexpr const * p, unsigned i) {
         return plugin().mk_numeral(p, i);
+    }
+    app * mk_int(int i) {
+        return mk_numeral(rational(i), true);
     }
     app * mk_le(expr * arg1, expr * arg2) const { return m_manager.mk_app(m_afid, OP_LE, arg1, arg2); }
     app * mk_ge(expr * arg1, expr * arg2) const { return m_manager.mk_app(m_afid, OP_GE, arg1, arg2); }
@@ -394,9 +397,6 @@ public:
         return m_manager.mk_eq(lhs, rhs);
     }
 
-    void set_cancel(bool f) {
-        plugin().set_cancel(f);
-    }
 };
 
 #endif /* ARITH_DECL_PLUGIN_H_ */

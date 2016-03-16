@@ -29,6 +29,7 @@ Revision History:
 #include"dl_transforms.h"
 #include"fixedpoint_params.hpp"
 #include"ast_util.h"
+#include"var_subst.h"
 
 class horn_tactic : public tactic {
     struct imp {
@@ -37,6 +38,7 @@ class horn_tactic : public tactic {
         datalog::register_engine m_register_engine;
         datalog::context         m_ctx;
         smt_params               m_fparams;
+        expr_free_vars           m_free_vars;
 
         imp(bool t, ast_manager & m, params_ref const & p):
             m(m),
@@ -59,12 +61,6 @@ class horn_tactic : public tactic {
 
         void collect_statistics(statistics & st) const {
             m_ctx.collect_statistics(st);
-        }
-
-        void set_cancel(bool f) {
-            if (f) {
-                m_ctx.cancel();
-            }
         }
 
         void normalize(expr_ref& f) {
@@ -228,6 +224,7 @@ class horn_tactic : public tactic {
                 register_predicate(q);
                 for (unsigned i = 0; i < queries.size(); ++i) {
                     f = mk_rule(queries[i].get(), q);
+                    bind_variables(f);
                     m_ctx.add_rule(f, symbol::null);
                 }
                 queries.reset();
@@ -301,6 +298,20 @@ class horn_tactic : public tactic {
             }
             TRACE("horn", g->display(tout););
             SASSERT(g->is_well_sorted());
+        }
+
+        void bind_variables(expr_ref& f) {
+            m_free_vars.reset();
+            m_free_vars(f);
+            m_free_vars.set_default_sort(m.mk_bool_sort());
+            if (!m_free_vars.empty()) {
+                m_free_vars.reverse();
+                svector<symbol> names;
+                for (unsigned i = 0; i < m_free_vars.size(); ++i) {
+                    names.push_back(symbol(m_free_vars.size() - i - 1));
+                }
+                f = m.mk_forall(m_free_vars.size(), m_free_vars.c_ptr(), names.c_ptr(), f);
+            }
         }
 
         void simplify(expr* q, 
@@ -406,11 +417,7 @@ public:
         }
     }
     
-protected:
-    virtual void set_cancel(bool f) {
-        if (m_imp)
-            m_imp->set_cancel(f);
-    }
+
 };
 
 tactic * mk_horn_tactic(ast_manager & m, params_ref const & p) {

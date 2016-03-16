@@ -53,10 +53,6 @@ namespace pdr {
 
         virtual lbool query_from_lvl (expr* query, unsigned lvl);
 
-        virtual void cancel();
-
-        virtual void cleanup();
-
         virtual void display_certificate(std::ostream& out) const;
 
         virtual void collect_statistics(statistics& st) const;
