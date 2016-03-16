@@ -69,6 +69,12 @@ static void throw_out_of_memory() {
 }
 
 static void throw_alloc_counts_exceeded() {
+    #pragma omp critical (z3_memory_manager) 
+    {
+        // reset the count to avoid re-throwing while
+        // the exception is being thrown.
+        g_memory_alloc_count = 0;
+    }
     throw exceeded_memory_allocations();
 }
 
@@ -273,8 +279,6 @@ void memory::deallocate(void * p) {
 }
 
 void * memory::allocate(size_t s) {
-    if (s == 0) 
-        return 0;
     s = s + sizeof(size_t); // we allocate an extra field!
     void * r = malloc(s);
     if (r == 0) 
@@ -327,8 +331,6 @@ void memory::deallocate(void * p) {
 }
 
 void * memory::allocate(size_t s) {
-    if (s == 0) 
-        return 0;
     s = s + sizeof(size_t); // we allocate an extra field!
     bool out_of_mem = false, counts_exceeded = false;
     #pragma omp critical (z3_memory_manager) 

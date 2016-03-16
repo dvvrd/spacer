@@ -278,6 +278,7 @@ namespace datalog {
         bool instantiate_quantifiers() const;
         bool xform_bit_blast() const;        
         bool xform_slice() const;
+        bool xform_coi() const;
         bool array_blast() const;
         bool array_blast_full() const;
 
