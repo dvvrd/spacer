@@ -451,7 +451,7 @@ namespace spacer {
                 }
             }
             else if (a->get_family_id () == m_au.get_family_id () &&
-                     a->is_app_of (a->get_family_id (), OP_ARRAY_EXT_SKOLEM)) {
+                     a->is_app_of (a->get_family_id (), OP_ARRAY_EXT)) {
                 throw non_pure();
             }
         }
