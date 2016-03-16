@@ -746,6 +746,7 @@ namespace spacer {
         prop_solver::scoped_level _sl(m_solver, level);
         prop_solver::scoped_subset_core _sc (m_solver, true);
         m_solver.set_core(&core);
+        m_solver.set_model (0);
         expr_ref_vector aux (m);
         conj.push_back (m_extend_lit);
         lbool res = m_solver.check_assumptions (lits, aux, conj.size (), conj.c_ptr ());
