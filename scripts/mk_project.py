@@ -68,7 +68,7 @@ def init_project_def():
     add_lib('bmc', ['muz', 'transforms'], 'muz/bmc')
     add_lib('ddnf', ['muz', 'transforms', 'rel'], 'muz/ddnf')
     add_lib('duality_intf', ['muz', 'transforms', 'duality'], 'muz/duality')
-    add_lib('fp',  ['muz', 'pdr', 'clp', 'tab', 'rel', 'bmc', 'duality_intf', 'ddnf'], 'muz/fp')
+    add_lib('fp',  ['muz', 'pdr', 'clp', 'tab', 'rel', 'bmc', 'duality_intf', 'ddnf', 'spacer'], 'muz/fp')
     add_lib('nlsat_smt_tactic', ['nlsat_tactic', 'smt_tactic'], 'tactic/nlsat_smt')
     add_lib('smtlogic_tactics', ['arith_tactics', 'bv_tactics', 'nlsat_tactic', 'smt_tactic', 'aig_tactic', 'fp', 'muz','qe','nlsat_smt_tactic'], 'tactic/smtlogics')
     add_lib('fpa_tactics', ['fpa', 'core_tactics', 'bv_tactics', 'sat_tactic', 'smt_tactic', 'arith_tactics', 'smtlogic_tactics'], 'tactic/fpa')
