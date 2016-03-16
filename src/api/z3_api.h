@@ -5880,7 +5880,7 @@ END_MLAPI_EXCLUDE
 
         def_API('Z3_fixedpoint_query_from_lvl', INT, (_in(CONTEXT), _in(FIXEDPOINT), _in(AST), _in(UINT)))
     */
-    Z3_lbool Z3_API Z3_fixedpoint_query_from_lvl (__in Z3_context c,__in Z3_fixedpoint d, __in Z3_ast query, unsigned lvl);
+    Z3_lbool Z3_API Z3_fixedpoint_query_from_lvl (Z3_context c,Z3_fixedpoint d, Z3_ast query, unsigned lvl);
 
     /**
         \brief Pose multiple queries against the asserted rules.
@@ -5920,21 +5920,21 @@ END_MLAPI_EXCLUDE
 
        def_API('Z3_fixedpoint_get_ground_sat_answer', AST, (_in(CONTEXT), _in(FIXEDPOINT)))
     */    
-    Z3_ast Z3_API Z3_fixedpoint_get_ground_sat_answer(__in Z3_context c,__in Z3_fixedpoint d);
+    Z3_ast Z3_API Z3_fixedpoint_get_ground_sat_answer(Z3_context c,Z3_fixedpoint d);
 
     /**
        \brief Obtain the list of rules along the counterexample trace.
 
        def_API('Z3_fixedpoint_get_rules_along_trace', AST_VECTOR, (_in(CONTEXT), _in(FIXEDPOINT)))
     */
-    Z3_ast_vector Z3_API Z3_fixedpoint_get_rules_along_trace(__in Z3_context c,__in Z3_fixedpoint d);
+    Z3_ast_vector Z3_API Z3_fixedpoint_get_rules_along_trace(Z3_context c,Z3_fixedpoint d);
 
     /**
        \brief Obtain the list of rules along the counterexample trace.
 
        def_API('Z3_fixedpoint_get_rule_names_along_trace', SYMBOL, (_in(CONTEXT), _in(FIXEDPOINT)))
     */
-    Z3_symbol Z3_API Z3_fixedpoint_get_rule_names_along_trace(__in Z3_context c,__in Z3_fixedpoint d);
+    Z3_symbol Z3_API Z3_fixedpoint_get_rule_names_along_trace(Z3_context c,Z3_fixedpoint d);
 
     /**
        \brief Retrieve a string that describes the last status returned by #Z3_fixedpoint_query.
@@ -8157,11 +8157,11 @@ END_MLAPI_EXCLUDE
        def_API('Z3_qe_model_project', AST, (_in(CONTEXT), _in(MODEL), _in(UINT), _in_array(2, APP), _in(AST)))
     */
     Z3_ast Z3_API Z3_qe_model_project 
-      (__in Z3_context c,
-       __in Z3_model m,
+      (Z3_context c,
+       Z3_model m,
        unsigned num_bounds,
-       __in_ecount (num_bounds) Z3_app const bound[],
-       __in Z3_ast body);
+       Z3_app const bound[],
+       Z3_ast body);
 
 
     /**
@@ -8170,12 +8170,12 @@ END_MLAPI_EXCLUDE
        def_API('Z3_qe_model_project_skolem', AST, (_in(CONTEXT), _in(MODEL), _in(UINT), _in_array(2, APP), _in(AST), _in(AST_MAP)))
     */
     Z3_ast Z3_API Z3_qe_model_project_skolem
-      (__in Z3_context c,
-       __in Z3_model m,
+      (Z3_context c,
+       Z3_model m,
        unsigned num_bounds,
-       __in_ecount (num_bounds) Z3_app const bound[],
-       __in Z3_ast body,
-       __inout Z3_ast_map map);
+       Z3_app const bound[],
+       Z3_ast body,
+       Z3_ast_map map);
 
     /**
        \brief Extrapolates a model of a formula
@@ -8183,9 +8183,9 @@ END_MLAPI_EXCLUDE
        def_API('Z3_model_extrapolate', AST, (_in(CONTEXT), _in(MODEL), _in(AST)))
     */
     Z3_ast Z3_API Z3_model_extrapolate 
-      (__in Z3_context c,
-       __in Z3_model m,
-       __in Z3_ast fml);
+      (Z3_context c,
+       Z3_model m,
+       Z3_ast fml);
 
     /**
        \brief Best-effort quantifier elimination
@@ -8193,9 +8193,9 @@ END_MLAPI_EXCLUDE
        def_API ('Z3_qe_lite', AST, (_in(CONTEXT), _in(AST_VECTOR), _in(AST)))
     */
     Z3_ast Z3_qe_lite 
-      (__in Z3_context c,
-       __inout Z3_ast_vector vars,
-       __in Z3_ast body);
+      (Z3_context c,
+       Z3_ast_vector vars,
+       Z3_ast body);
 #endif
 
 
