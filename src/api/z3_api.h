@@ -184,7 +184,7 @@ typedef enum
     Z3_PARAMETER_SYMBOL,
     Z3_PARAMETER_SORT,
     Z3_PARAMETER_AST,
-    Z3_PARAMETER_FUNC_DECL,
+    Z3_PARAMETER_FUNC_DECL
 } Z3_parameter_kind;
 
 /**
@@ -321,6 +321,9 @@ typedef enum
 
    - Z3_OP_AS_ARRAY An array value that behaves as the function graph of the
                     function passed as parameter.
+
+   - Z3_OP_ARRAY_EXT Array extensionality function. It takes two arrays as arguments and produces an index, such that the arrays
+                    are different if they are different on the index.
 
    - Z3_OP_BNUM Bit-vector numeral.
 
@@ -1033,6 +1036,7 @@ typedef enum {
     Z3_OP_SET_COMPLEMENT,
     Z3_OP_SET_SUBSET,
     Z3_OP_AS_ARRAY,
+    Z3_OP_ARRAY_EXT,
 
     // Bit-vectors
     Z3_OP_BNUM = 0x400,
@@ -3261,6 +3265,17 @@ END_MLAPI_EXCLUDE
     /*@}*/
 
     /**
+       \brief Create array extensionality index given two arrays with the same sort. 
+              The meaning is given by the axiom:
+              (=> (= (select A (array-ext A B)) (select B (array-ext A B))) (= A B))
+
+       def_API('Z3_mk_array_ext', AST, (_in(CONTEXT), _in(AST), _in(AST)))
+    */
+
+    Z3_ast Z3_API Z3_mk_array_ext(Z3_context c, Z3_ast arg1, Z3_ast arg2);
+    /*@}*/
+
+    /**
        @name Numerals
     */
     /*@{*/
@@ -4237,7 +4252,7 @@ END_MLAPI_EXCLUDE
     /**
        \brief Return Z3_L_TRUE if \c a is true, Z3_L_FALSE if it is false, and Z3_L_UNDEF otherwise.
 
-       def_API('Z3_get_bool_value', UINT, (_in(CONTEXT), _in(AST)))
+       def_API('Z3_get_bool_value', INT, (_in(CONTEXT), _in(AST)))
     */
     Z3_lbool Z3_API Z3_get_bool_value(Z3_context c, Z3_ast a);
 
@@ -6690,7 +6705,7 @@ END_MLAPI_EXCLUDE
     /**
        \brief Return a tactic associated with the given name.
        The complete list of tactics may be obtained using the procedures #Z3_get_num_tactics and #Z3_get_tactic_name.
-       It may also be obtained using the command <tt>(help-tactics)</tt> in the SMT 2.0 front-end.
+       It may also be obtained using the command <tt>(help-tactic)</tt> in the SMT 2.0 front-end.
     
        Tactics are the basic building block for creating custom solvers for specific problem domains.
 
@@ -6717,7 +6732,7 @@ END_MLAPI_EXCLUDE
     /**
        \brief Return a probe associated with the given name.
        The complete list of probes may be obtained using the procedures #Z3_get_num_probes and #Z3_get_probe_name.
-       It may also be obtained using the command <tt>(help-tactics)</tt> in the SMT 2.0 front-end.
+       It may also be obtained using the command <tt>(help-tactic)</tt> in the SMT 2.0 front-end.
 
        Probes are used to inspect a goal (aka problem) and collect information that may be used to decide
        which solver and/or preprocessing step will be used.
@@ -7101,6 +7116,14 @@ END_MLAPI_EXCLUDE
        def_API('Z3_mk_solver_from_tactic', SOLVER, (_in(CONTEXT), _in(TACTIC)))
     */
     Z3_solver Z3_API Z3_mk_solver_from_tactic(Z3_context c, Z3_tactic t);
+
+    /**
+       \brief Copy a solver \c s from the context \c source to a the context \c target.
+
+       def_API('Z3_solver_translate', SOLVER, (_in(CONTEXT), _in(SOLVER), _in(CONTEXT)))
+    */
+    Z3_solver Z3_API Z3_solver_translate(Z3_context source, Z3_solver s, Z3_context target);
+    
 
     /**
        \brief Return a string describing all solver available parameters.
@@ -7627,7 +7650,7 @@ END_MLAPI_EXCLUDE
     
        \deprecated To be moved outside of API.
 
-       def_API('Z3_get_implied_equalities', UINT, (_in(CONTEXT), _in(SOLVER), _in(UINT), _in_array(2, AST), _out_array(2, UINT)))
+       def_API('Z3_get_implied_equalities', INT, (_in(CONTEXT), _in(SOLVER), _in(UINT), _in_array(2, AST), _out_array(2, UINT)))
     */
     Z3_lbool Z3_API Z3_get_implied_equalities(
         Z3_context c, 
@@ -8201,7 +8224,7 @@ END_MLAPI_EXCLUDE
 
 #ifndef CAMLIDL
 #ifdef __cplusplus
-};
+}
 #endif // __cplusplus
 #else
 }

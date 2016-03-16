@@ -236,6 +236,7 @@ namespace smt {
         virtual void pop_scope_eh(unsigned num_scopes);
         virtual final_check_status final_check_eh();
         virtual void reset_eh();
+        virtual bool include_func_interp(func_decl* f);
         svector<theory_var>   m_merge_aux[2]; //!< auxiliary vector used in merge_zero_one_bits
         bool merge_zero_one_bits(theory_var r1, theory_var r2);
 
@@ -252,7 +253,7 @@ namespace smt {
         theory_bv(ast_manager & m, theory_bv_params const & params, bit_blaster_params const & bb_params);
         virtual ~theory_bv();
         
-        virtual theory * mk_fresh(context * new_ctx) { return alloc(theory_bv, get_manager(), m_params, m_bb.get_params()); }
+        virtual theory * mk_fresh(context * new_ctx);
 
         virtual char const * get_name() const { return "bit-vector"; }
 

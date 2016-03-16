@@ -154,17 +154,12 @@ namespace opt {
         m_soft_constraints(m), m_answer(m) {}
 
     lbool maxsmt::operator()() {
-        lbool is_sat;
+        lbool is_sat = l_undef;
         m_msolver = 0;
         symbol const& maxsat_engine = m_c.maxsat_engine();
         IF_VERBOSE(1, verbose_stream() << "(maxsmt)\n";);
         TRACE("opt", tout << "maxsmt\n";);
-        if (m_soft_constraints.empty()) {
-            TRACE("opt", tout << "no constraints\n";);
-            m_msolver = 0;
-            is_sat = s().check_sat(0, 0);
-        }
-        else if (maxsat_engine == symbol("maxres")) {            
+        if (m_soft_constraints.empty() || maxsat_engine == symbol("maxres")) {            
             m_msolver = mk_maxres(m_c, m_weights, m_soft_constraints);
         }
         else if (maxsat_engine == symbol("pd-maxres")) {            

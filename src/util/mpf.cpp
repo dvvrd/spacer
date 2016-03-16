@@ -1176,12 +1176,14 @@ void mpf_manager::to_sbv_mpq(mpf_rounding_mode rm, const mpf & x, scoped_mpq & o
 void mpf_manager::to_ieee_bv_mpz(const mpf & x, scoped_mpz & o) {
     SASSERT(!is_nan(x) && !is_inf(x));
     SASSERT(exp(x) < INT_MAX);
-
+       
     unsigned sbits = x.get_sbits();
     unsigned ebits = x.get_ebits();
+    scoped_mpz biased_exp(m_mpz_manager);
+    m_mpz_manager.set(biased_exp, bias_exp(ebits, exp(x)));
     m_mpz_manager.set(o, sgn(x));
     m_mpz_manager.mul2k(o, ebits);
-    m_mpz_manager.add(o, (int)exp(x), o);
+    m_mpz_manager.add(o, biased_exp, o);
     m_mpz_manager.mul2k(o, sbits - 1);
     m_mpz_manager.add(o, sig(x), o);
 }
@@ -1248,12 +1250,13 @@ void mpf_manager::rem(mpf const & x, mpf const & y, mpf & o) {
 void mpf_manager::maximum(mpf const & x, mpf const & y, mpf & o) {
     if (is_nan(x))
         set(o, y);
-    else if (is_zero(x) && is_zero(y) && sgn(x) != sgn(y))
-        mk_pzero(x.ebits, x.sbits, o);
-    else if (is_zero(x) && is_zero(y))
-        set(o, y);
     else if (is_nan(y))
         set(o, x);
+    else if (is_zero(x) && is_zero(y) && sgn(x) != sgn(y)) {                
+        UNREACHABLE(); // max(+0, -0) and max(-0, +0) are unspecified. 
+    }
+    else if (is_zero(x) && is_zero(y))
+        set(o, y);    
     else if (gt(x, y))
         set(o, x);
     else
@@ -1263,12 +1266,13 @@ void mpf_manager::maximum(mpf const & x, mpf const & y, mpf & o) {
 void mpf_manager::minimum(mpf const & x, mpf const & y, mpf & o) {
     if (is_nan(x))
         set(o, y);
-    else if (is_zero(x) && is_zero(y) && sgn(x) != sgn(y))
-        mk_pzero(x.ebits, x.sbits, o);
-    else if (is_zero(x) && is_zero(y))
-        set(o, y);
     else if (is_nan(y))
         set(o, x);
+    else if (is_zero(x) && is_zero(y) && sgn(x) != sgn(y)) {
+        UNREACHABLE(); // min(+0, -0) and min(-0, +0) are unspecified. 
+    } 
+    else if (is_zero(x) && is_zero(y))
+        set(o, y);    
     else if (lt(x, y))
         set(o, x);
     else
@@ -1519,6 +1523,9 @@ mpf_exp_t mpf_manager::mk_max_exp(unsigned ebits) {
     return m_mpz_manager.get_int64(m_powers2.m1(ebits-1, false));
 }
 
+mpf_exp_t mpf_manager::bias_exp(unsigned ebits, mpf_exp_t unbiased_exponent) {
+    return unbiased_exponent + m_mpz_manager.get_int64(m_powers2.m1(ebits - 1, false));
+}
 mpf_exp_t mpf_manager::unbias_exp(unsigned ebits, mpf_exp_t biased_exponent) {
     return biased_exponent - m_mpz_manager.get_int64(m_powers2.m1(ebits - 1, false));
 }
