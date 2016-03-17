@@ -409,8 +409,9 @@ namespace qe {
                 // find lcm of scaled-up divs
                 for (unsigned i = 0; i < m_lits.size (); i++) {
                     rational factor (lcm_coeffs / abs(m_coeffs[i]));
-                    m_terms[i] = a.mk_mul (a.mk_numeral (factor, a.mk_int ()),
-                                           m_terms.get (i));
+                    if (!factor.is_one () && !a.is_zero (m_terms.get (i)))
+                      m_terms[i] = a.mk_mul (a.mk_numeral (factor, a.mk_int ()),
+                                             m_terms.get (i));
                     m_coeffs[i] = (m_coeffs[i].is_pos () ? lcm_coeffs : -lcm_coeffs);
                     if (!m_divs[i].is_zero ()) {
                         m_divs[i] *= factor;
