@@ -500,17 +500,25 @@ namespace qe {
                     x_term_val = a.mk_numeral (mod (lcm_coeffs * var_val_num, lcm_divs),
                                                a.mk_int ());
                     TRACE ("qe",
-                            tout << "Substitution for (lcm_coeffs * x):" << "\n";
-                            tout << mk_pp (x_term_val, m) << "\n";
+                            tout << "Substitution for (lcm_coeffs * x): "  
+                                 << mk_pp (x_term_val, m) << "\n";
                           );
                 }
                 for (unsigned i = 0; i < m_lits.size (); i++) {
                     if (!m_divs[i].is_zero ()) {
                         // m_divs[i] | (x_term_val + m_terms[i])
-                        new_lit = m.mk_eq (a.mk_mod (a.mk_add (m_terms.get (i), x_term_val),
-                                                     a.mk_numeral (m_divs[i], a.mk_int ())),
-                                           z);
-                        m_rw (new_lit);
+
+                      // -- x_term_val is the absolute value, negate it if needed
+                      if (m_coeffs.get (i).is_pos ())
+                        new_lit = a.mk_add (m_terms.get (i), x_term_val);
+                      else
+                        new_lit = a.mk_add (m_terms.get (i), a.mk_uminus (x_term_val));
+                      
+                      // XXX Our handling of divisibility constraints is very fragile.
+                      // XXX Rewrite before applying divisibility to preserve syntactic structure
+                      m_rw(new_lit);
+                      new_lit = m.mk_eq (a.mk_mod (new_lit,
+                                                   a.mk_numeral (m_divs[i], a.mk_int ())), z);
                     } else if (m_eq[i] ||
                                (num_pos == 0 && m_coeffs[i].is_pos ()) ||
                                (num_neg == 0 && m_coeffs[i].is_neg ())) {
