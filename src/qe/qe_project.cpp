@@ -172,6 +172,9 @@ namespace qe {
             if (ts.empty()) {
                 t = a.mk_numeral(rational(0), s);
             }
+            else if (ts.size () == 1) {
+                t = ts.get (0);
+            }
             else {
                 t = a.mk_add(ts.size(), ts.c_ptr());
             }
