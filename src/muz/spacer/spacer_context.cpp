@@ -3154,7 +3154,7 @@ namespace spacer {
     if (n1.depth () != n2.depth ()) return n1.depth () < n2.depth ();
     
     // -- a more deterministic order of proof obligations in a queue
-    if (!n1.get_context ().get_params ().spacer_nondet_tie_break ())
+    // if (!n1.get_context ().get_params ().spacer_nondet_tie_break ())
     {
       const expr* p1 = n1.post ();
       const expr* p2 = n2.post ();
@@ -3203,8 +3203,8 @@ namespace spacer {
        * the same proof obligation multiple times */
       return &n1 < &n2;
     }
-    else
-      return &n1 < &n2;
+    // else
+    //   return &n1 < &n2;
   }
 
   
