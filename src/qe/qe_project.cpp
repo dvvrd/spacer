@@ -973,8 +973,11 @@ namespace qe {
                         } else {
                             new_lit = a.mk_le (cxt, z);
                         }
+                        m_rw(new_lit);
                     } else {
                         // div term
+                        // XXX rewrite before applying mod to ensure mod is the top-level operator
+                        m_rw(cxt);
                         new_lit = m.mk_eq (a.mk_mod (cxt,
                                                      a.mk_numeral (m_divs[i], a.mk_int ())),
                                            z);
