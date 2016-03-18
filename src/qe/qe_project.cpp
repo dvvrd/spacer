@@ -172,6 +172,9 @@ namespace qe {
             if (ts.empty()) {
                 t = a.mk_numeral(rational(0), s);
             }
+            else if (ts.size () == 1) {
+                t = ts.get (0);
+            }
             else {
                 t = a.mk_add(ts.size(), ts.c_ptr());
             }
@@ -409,8 +412,9 @@ namespace qe {
                 // find lcm of scaled-up divs
                 for (unsigned i = 0; i < m_lits.size (); i++) {
                     rational factor (lcm_coeffs / abs(m_coeffs[i]));
-                    m_terms[i] = a.mk_mul (a.mk_numeral (factor, a.mk_int ()),
-                                           m_terms.get (i));
+                    if (!factor.is_one () && !a.is_zero (m_terms.get (i)))
+                      m_terms[i] = a.mk_mul (a.mk_numeral (factor, a.mk_int ()),
+                                             m_terms.get (i));
                     m_coeffs[i] = (m_coeffs[i].is_pos () ? lcm_coeffs : -lcm_coeffs);
                     if (!m_divs[i].is_zero ()) {
                         m_divs[i] *= factor;
@@ -500,17 +504,25 @@ namespace qe {
                     x_term_val = a.mk_numeral (mod (lcm_coeffs * var_val_num, lcm_divs),
                                                a.mk_int ());
                     TRACE ("qe",
-                            tout << "Substitution for (lcm_coeffs * x):" << "\n";
-                            tout << mk_pp (x_term_val, m) << "\n";
+                            tout << "Substitution for (lcm_coeffs * x): "  
+                                 << mk_pp (x_term_val, m) << "\n";
                           );
                 }
                 for (unsigned i = 0; i < m_lits.size (); i++) {
                     if (!m_divs[i].is_zero ()) {
                         // m_divs[i] | (x_term_val + m_terms[i])
-                        new_lit = m.mk_eq (a.mk_mod (a.mk_add (m_terms.get (i), x_term_val),
-                                                     a.mk_numeral (m_divs[i], a.mk_int ())),
-                                           z);
-                        m_rw (new_lit);
+
+                      // -- x_term_val is the absolute value, negate it if needed
+                      if (m_coeffs.get (i).is_pos ())
+                        new_lit = a.mk_add (m_terms.get (i), x_term_val);
+                      else
+                        new_lit = a.mk_add (m_terms.get (i), a.mk_uminus (x_term_val));
+                      
+                      // XXX Our handling of divisibility constraints is very fragile.
+                      // XXX Rewrite before applying divisibility to preserve syntactic structure
+                      m_rw(new_lit);
+                      new_lit = m.mk_eq (a.mk_mod (new_lit,
+                                                   a.mk_numeral (m_divs[i], a.mk_int ())), z);
                     } else if (m_eq[i] ||
                                (num_pos == 0 && m_coeffs[i].is_pos ()) ||
                                (num_neg == 0 && m_coeffs[i].is_neg ())) {
@@ -961,8 +973,11 @@ namespace qe {
                         } else {
                             new_lit = a.mk_le (cxt, z);
                         }
+                        m_rw(new_lit);
                     } else {
                         // div term
+                        // XXX rewrite before applying mod to ensure mod is the top-level operator
+                        m_rw(cxt);
                         new_lit = m.mk_eq (a.mk_mod (cxt,
                                                      a.mk_numeral (m_divs[i], a.mk_int ())),
                                            z);

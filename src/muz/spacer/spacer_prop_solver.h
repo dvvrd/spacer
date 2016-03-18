@@ -47,12 +47,12 @@ namespace spacer {
         app_ref_vector      m_pos_level_atoms;  // atoms used to identify level
         app_ref_vector      m_neg_level_atoms;  // 
         obj_hashtable<expr> m_level_atoms_set;
+        obj_hashtable<expr> m_aux_pred_set;
         app_ref_vector      m_proxies;          // predicates for assumptions
         expr_ref_vector*    m_core; 
         model_ref*          m_model;
         bool                m_subset_based_core;
         unsigned            m_uses_level;
-        func_decl_set       m_aux_symbols;
         /// if true sets the solver into a delta level, enabling only
         /// atoms explicitly asserted in m_current_level
         bool                m_delta_level;
@@ -84,12 +84,16 @@ namespace spacer {
     public:
         prop_solver(spacer::manager& pm, fixedpoint_params const& p, symbol const& name, bool validate_theory_core);
         
-        /** return true is s is a symbol introduced by prop_solver */
-        bool is_aux_symbol(func_decl * s) const { 
-            return 
-                m_aux_symbols.contains(s) ||
-                m_ctx->is_aux_predicate(s); 
-        }
+        
+
+      void add_aux_predicate (expr *p)
+      {if (!is_aux_predicate (p)) m_aux_pred_set.insert (p);}
+      
+      void reset_aux_predicates () {m_aux_pred_set.reset ();}
+      
+      bool is_aux_predicate (expr *p)
+      {return m_ctx->is_aux_predicate (p) || m_aux_pred_set.contains (p);}
+      
 
         void set_core(expr_ref_vector* core) { m_core = core; }
         void set_model(model_ref* mdl) { m_model = mdl; }

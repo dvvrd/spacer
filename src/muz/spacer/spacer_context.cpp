@@ -2378,7 +2378,7 @@ namespace spacer {
       
       for (unsigned i = 0; i < max_level; ++i) {
         checkpoint();
-        m_expanded_lvl = lvl;
+        m_expanded_lvl = infty_level ();
         m_stats.m_max_query_lvl = lvl;
 
         if (check_reachability()) return l_true;
@@ -2519,8 +2519,6 @@ namespace spacer {
     {
       SASSERT(n.is_open());
       
-      if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
-
       TRACE ("spacer", 
              tout << "expand-node: " << n.pt().head()->get_name() 
              << " level: " << n.level() 
@@ -2641,6 +2639,9 @@ namespace spacer {
                        "spacer::expand_node::false", 
                        verbose_stream ());
 
+        // -- only update expanded level when new lemmas are generated at it.
+        if (n.level() < m_expanded_lvl) m_expanded_lvl = n.level();
+
         TRACE("spacer", tout << "cube:\n"; 
               for (unsigned j = 0; j < cube.size(); ++j) 
                 tout << mk_pp(cube[j].get(), m) << "\n";);
@@ -2716,6 +2717,8 @@ namespace spacer {
 
   bool context::propagate(unsigned min_prop_lvl, 
                           unsigned max_prop_lvl, unsigned full_prop_lvl) {    
+    
+    if (min_prop_lvl == infty_level ()) return false;
     
     timeit _timer (get_verbosity_level() >= 1, 
                    "spacer::context::propagate", 
@@ -3142,7 +3145,7 @@ namespace spacer {
     if (n1.depth () != n2.depth ()) return n1.depth () < n2.depth ();
     
     // -- a more deterministic order of proof obligations in a queue
-    if (!n1.get_context ().get_params ().spacer_nondet_tie_break ())
+    // if (!n1.get_context ().get_params ().spacer_nondet_tie_break ())
     {
       const expr* p1 = n1.post ();
       const expr* p2 = n2.post ();
@@ -3191,8 +3194,8 @@ namespace spacer {
        * the same proof obligation multiple times */
       return &n1 < &n2;
     }
-    else
-      return &n1 < &n2;
+    // else
+    //   return &n1 < &n2;
   }
 
   
