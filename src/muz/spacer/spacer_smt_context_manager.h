@@ -44,11 +44,13 @@ namespace spacer {
       
     void internalize_assertions ();
       
+    void reset (void);
       
   public:
     smt_context(smt::kernel & ctx, smt_context_manager& p, app* pred); 
     ~smt_context();
     void assert_expr(expr* e);
+    void assert_lemma (expr *t);
     lbool check(expr_ref_vector& assumptions);
     void get_model(model_ref& model);
     proof* get_proof();

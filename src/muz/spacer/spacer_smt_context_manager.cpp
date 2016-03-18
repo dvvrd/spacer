@@ -40,7 +40,7 @@ namespace spacer {
 
 
     smt_context::smt_context(smt::kernel & ctx, smt_context_manager& p, app* pred):
-      m_pred(pred, m),
+      m_pred(pred, ctx.m()),
       m_parent(p),
       m_in_delay_scope(false),
       m_pushed(false),
@@ -90,15 +90,30 @@ namespace spacer {
     if (m.is_true(e)) return;
     if (m_in_delay_scope && !m_pushed) push ();
         
-    if (m_pushed || !m_virtual)
+    if (m_pushed)
       m_context.assert_expr (e);
     else
       m_assertions.push_back (e);
   }
 
+  void smt_context::assert_lemma (expr *t)
+  {
+    if (!m_pushed) internalize_assertions ();
+    m_context.assert_expr (t);
+  }
+
+  void smt_context::reset (void)
+  {
+    SASSERT (!m_pushed);
+    SASSERT (!m_virtual);
+    m_context.reset ();
+    m_head = 0;
+  }
+  
+    
     lbool smt_context::check (expr_ref_vector& assumptions)
     {
-      internalize_assertions ();
+      if (!m_pushed) internalize_assertions ();
       if (m_virtual) assumptions.push_back(m_pred);
       lbool result = m_context.check (assumptions.size(), assumptions.c_ptr());
       if (m_virtual) assumptions.pop_back();
