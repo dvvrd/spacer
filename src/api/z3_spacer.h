@@ -89,6 +89,16 @@ extern "C" {
     */
     Z3_symbol Z3_API Z3_fixedpoint_get_rule_names_along_trace(Z3_context c,Z3_fixedpoint d);
 
+    /**
+       \brief Add an invariant for the predicate \c pred.
+       Add an assumed invariant of predicate \c pred.
+
+       Note: this functionality is Spacer specific.
+
+       def_API('Z3_fixedpoint_add_invariant', VOID, (_in(CONTEXT), _in(FIXEDPOINT), _in(FUNC_DECL), _in(AST)))
+    */
+    void Z3_API Z3_fixedpoint_add_invariant(Z3_context c, Z3_fixedpoint d, Z3_func_decl pred, Z3_ast property);
+  
   
     /**
        \brief Project variables given a model

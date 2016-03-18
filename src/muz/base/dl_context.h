@@ -425,6 +425,11 @@ namespace datalog {
         void add_cover(int level, func_decl* pred, expr* property);
 
         /**
+          Add an invariant of predicate 'pred'.
+         */
+        void add_invariant (func_decl *pred, expr *property);
+      
+        /**
            \brief Check rule subsumption.
         */
         bool check_subsumes(rule const& stronger_rule, rule const& weaker_rule);

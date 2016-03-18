@@ -69,7 +69,9 @@ namespace spacer {
         expr_ref get_cover_delta(int level, func_decl* pred);
        
         void add_cover(int level, func_decl* pred, expr* property);
-               
+      
+        void add_invariant(func_decl* pred, expr* property);
+      
         void updt_params();
 
         model_ref get_model();

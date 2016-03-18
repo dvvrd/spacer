@@ -553,6 +553,12 @@ namespace datalog {
         ensure_engine();
         m_engine->add_cover(level, pred, property);
     }
+  
+    void context::add_invariant(func_decl* pred, expr *property)
+    {
+        ensure_engine();
+        m_engine->add_invariant(pred, property);
+    }
 
     void context::check_rules(rule_set& r) {
         m_rule_properties.set_generate_proof(generate_proof_trace());

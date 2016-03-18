@@ -820,6 +820,8 @@ namespace spacer {
 
         void add_cover(int level, func_decl* pred, expr* property);
 
+        void add_invariant (func_decl *pred, expr* property);
+
         model_ref get_model();
 
         proof_ref get_proof() const;

@@ -1729,6 +1729,12 @@ namespace spacer {
         unsigned lvl = (level == -1)?infty_level():((unsigned)level);
         pt->add_cover(lvl, property);
     }
+  
+    void context::add_invariant (func_decl *p, expr *property)
+    {
+      add_cover (infty_level(), p, property);
+    }
+  
 
     class context::classifier_proc {
         ast_manager& m;

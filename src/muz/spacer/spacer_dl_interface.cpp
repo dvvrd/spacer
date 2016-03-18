@@ -276,6 +276,13 @@ void dl_interface::add_cover(int level, func_decl* pred, expr* property) {
     m_context->add_cover(level, pred, property);
 }
 
+void dl_interface::add_invariant(func_decl* pred, expr* property) {
+    if (m_ctx.get_params().xform_slice()) {
+        throw default_exception("Invariants are incompatible with slicing. Disable slicing before using invariants");
+    }
+    m_context->add_invariant(pred, property);
+}
+
 unsigned dl_interface::get_num_levels(func_decl* pred) {
     m_pred2slice.find(pred, pred);
     SASSERT(pred);

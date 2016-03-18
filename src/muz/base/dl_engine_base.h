@@ -85,6 +85,10 @@ namespace datalog {
         virtual void add_cover(int level, func_decl* pred, expr* property) {
             throw default_exception(std::string("operation is not supported for ") + m_name);
         }
+        virtual void add_invariant (func_decl *pred, expr *property) {
+            throw default_exception(std::string("operation is not supported for ") + m_name);
+        }
+          
         virtual void display_certificate(std::ostream& out) const {
             throw default_exception(std::string("certificates are not supported for ") + m_name);
         }
