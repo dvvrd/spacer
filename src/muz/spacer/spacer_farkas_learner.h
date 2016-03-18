@@ -35,14 +35,15 @@ class farkas_learner {
     class farkas_collector;
     class constant_replacer_cfg;
     class equality_expander_cfg;
-    class constr;
 
     typedef obj_hashtable<expr> expr_set;
 
     smt_params               m_proof_params;
     ast_manager              m_pr;
+    bool m_split_literals;
     scoped_ptr<smt::kernel>  m_ctx;
 
+  
 
     static smt_params get_proof_params(smt_params& orig_params);
 
@@ -98,6 +99,9 @@ public:
     void simplify_lemmas(expr_ref_vector& lemmas);
 
     void collect_statistics(statistics& st) const;
+
+    /** \brief see smt::farkas_util::set_split_literals */
+    void set_split_literals (bool v) {m_split_literals = v;}
 
 };
 

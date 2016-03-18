@@ -33,222 +33,14 @@ Revision History:
 #include "arith_bounds_tactic.h"
 #include "proof_utils.h"
 #include "reg_decl_plugins.h"
-
-#define PROOF_MODE PGM_FINE
-//#define PROOF_MODE PGM_COARSE
+#include "smt_farkas_util.h"
 
 namespace spacer {
 
-    class farkas_learner::constr {
-
-        ast_manager&     m;
-        arith_util       a;
-        app_ref_vector   m_ineqs;
-        vector<rational> m_coeffs;
-
-        void mk_coerce(expr*& e1, expr*& e2) {
-            if (a.is_int(e1) && a.is_real(e2)) {
-                e1 = a.mk_to_real(e1);
-            }
-            else if (a.is_int(e2) && a.is_real(e1)) {
-                e2 = a.mk_to_real(e2);
-            }
-        }
-
-        app* mk_add(expr* e1, expr* e2) {
-            mk_coerce(e1, e2);
-            return a.mk_add(e1, e2);
-        }
-
-        app* mk_mul(expr* e1, expr* e2) {
-            mk_coerce(e1, e2);
-            return a.mk_mul(e1, e2);
-        }
-
-        app* mk_le(expr* e1, expr* e2) {
-            mk_coerce(e1, e2);
-            return a.mk_le(e1, e2);
-        }
-
-        app* mk_ge(expr* e1, expr* e2) {
-            mk_coerce(e1, e2);
-            return a.mk_ge(e1, e2);
-        }
-
-        app* mk_gt(expr* e1, expr* e2) {
-            mk_coerce(e1, e2);
-            return a.mk_gt(e1, e2);
-        }
-
-        app* mk_lt(expr* e1, expr* e2) {
-            mk_coerce(e1, e2);
-            return a.mk_lt(e1, e2);
-        }
-
-        void mul(rational const& c, expr* e, expr_ref& res) {
-            expr_ref tmp(m);
-            if (c.is_one()) {
-                tmp = e;
-            }
-            else {
-                tmp = mk_mul(a.mk_numeral(c, c.is_int() && a.is_int(e)), e);
-            }
-            res = mk_add(res, tmp);
-        }
-
-        bool is_int_sort(app* c) {
-            SASSERT(m.is_eq(c) || a.is_le(c) || a.is_lt(c) || a.is_gt(c) || a.is_ge(c));
-            SASSERT(a.is_int(c->get_arg(0)) || a.is_real(c->get_arg(0)));
-            return a.is_int(c->get_arg(0));
-        }
-
-        bool is_int_sort() {
-            SASSERT(!m_ineqs.empty());
-            return is_int_sort(m_ineqs[0].get());
-        }
-
-        void normalize_coeffs() {
-            rational l(1);
-            for (unsigned i = 0; i < m_coeffs.size(); ++i) {
-                l = lcm(l, denominator(m_coeffs[i]));
-            }
-            if (!l.is_one()) {
-                for (unsigned i = 0; i < m_coeffs.size(); ++i) {
-                    m_coeffs[i] *= l;
-                }
-            }
-        }
-
-        app* mk_one() {
-            return a.mk_numeral(rational(1), true);
-        }
-
-        app* fix_sign(bool is_pos, app* c) {
-            expr* x, *y;
-            SASSERT(m.is_eq(c) || a.is_le(c) || a.is_lt(c) || a.is_gt(c) || a.is_ge(c));
-            bool is_int = is_int_sort(c);
-            if (is_int && is_pos && (a.is_lt(c, x, y) || a.is_gt(c, y, x))) {
-                return mk_le(mk_add(x, mk_one()), y);
-            }
-            if (is_int && !is_pos && (a.is_le(c, x, y) || a.is_ge(c, y, x))) {
-                // !(x <= y) <=> x > y <=> x >= y + 1
-                return mk_ge(x, mk_add(y, mk_one()));
-            }
-            if (is_pos) {
-                return c;
-            }
-            if (a.is_le(c, x, y)) return mk_gt(x, y);
-            if (a.is_lt(c, x, y)) return mk_ge(x, y);
-            if (a.is_ge(c, x, y)) return mk_lt(x, y);
-            if (a.is_gt(c, x, y)) return mk_le(x, y);
-            UNREACHABLE();
-            return c;
-        }
-        
-    public:
-        constr(ast_manager& m) : m(m), a(m), m_ineqs(m) {}
-
-        /** add a multiple of constraint c to the current constr */
-        void add(rational const & coef, app * c) {
-            bool is_pos = true;
-            expr* e;
-            while (m.is_not(c, e)) {
-                is_pos = !is_pos;
-                c = to_app(e);
-            }
-
-            if (!coef.is_zero() && !m.is_true(c)) {
-                m_coeffs.push_back(coef);                
-                m_ineqs.push_back(fix_sign(is_pos, c));                
-            }
-        }
-
-        //
-        // Extract the complement of premises multiplied by Farkas coefficients.
-        //
-        void get(expr_ref& res) {
-            if (m_coeffs.empty()) {
-                res = m.mk_false();
-                return;
-            }
-            bool is_int = is_int_sort();
-            if (is_int) {                
-                normalize_coeffs();
-            }
-            TRACE("spacer", 
-                  for (unsigned i = 0; i < m_coeffs.size(); ++i) {
-                      tout << m_coeffs[i] << ": " << mk_pp(m_ineqs[i].get(), m) << "\n";
-                  }
-                  );
-            app_ref zero(a.mk_numeral(rational::zero(), is_int), m);
-            res = zero;
-            bool is_strict = false;
-            bool is_eq     = true;
-            expr* x, *y;
-            for (unsigned i = 0; i < m_coeffs.size(); ++i) {
-                app* c = m_ineqs[i].get();
-                if (m.is_eq(c, x, y)) {
-                    mul(m_coeffs[i],  x, res);
-                    mul(-m_coeffs[i], y, res);
-                }
-                if (a.is_lt(c, x, y) || a.is_gt(c, y, x)) {
-                    mul(m_coeffs[i],  x, res);
-                    mul(-m_coeffs[i], y, res);
-                    is_strict = true;
-                    is_eq = false;
-                }
-                if (a.is_le(c, x, y) || a.is_ge(c, y, x)) {
-                    mul(m_coeffs[i],  x, res);
-                    mul(-m_coeffs[i], y, res);
-                    is_eq = false;
-                }
-            }
-
-            zero = a.mk_numeral(rational::zero(), a.is_int(res));
-            if (is_eq) {
-                res = m.mk_eq(res, zero);
-            }
-            else if (is_strict) {
-                res = mk_lt(res, zero);
-            }
-            else {
-                res = mk_le(res, zero);
-            }            
-            res = m.mk_not(res);
-            th_rewriter rw(m);
-            params_ref params;
-            params.set_bool("gcd_rounding", true);
-            rw.updt_params(params);
-            proof_ref pr(m);
-            expr_ref tmp(m);
-            rw(res, tmp, pr);
-            fix_dl(tmp);
-            res = tmp;
-        }
-
-        // patch: swap addends to make static 
-        // features recognize difference constraint.
-        void fix_dl(expr_ref& r) {
-            expr* e;
-            if (m.is_not(r, e)) {
-                r = e;
-                fix_dl(r);
-                r = m.mk_not(r);
-                return;
-            }
-            expr* e1, *e2, *e3, *e4;
-            if ((m.is_eq(r, e1, e2) || a.is_lt(r, e1, e2) || a.is_gt(r, e1, e2) || 
-                 a.is_le(r, e1, e2) || a.is_ge(r, e1, e2))) {
-                if (a.is_add(e1, e3, e4) && a.is_mul(e3)) {
-                    r = m.mk_app(to_app(r)->get_decl(), a.mk_add(e4,e3), e2);
-                }
-            }
-        }
-    };
-    
     farkas_learner::farkas_learner(smt_params& params, ast_manager& outer_mgr) 
         : m_proof_params(get_proof_params(params)), 
-          m_pr(PROOF_MODE),
+          m_pr(PGM_FINE),
+          m_split_literals (false),
           p2o(m_pr, outer_mgr),
           o2p(outer_mgr, m_pr)
     {
@@ -412,11 +204,12 @@ namespace spacer {
     void farkas_learner::combine_constraints(unsigned n, app * const * lits, rational const * coeffs, expr_ref& res)
     {
         ast_manager& m = res.get_manager();
-        constr res_c(m);
+        smt::farkas_util res_c (m);
+        res_c.set_split_literals (m_split_literals);
         for(unsigned i = 0; i < n; ++i) {
             res_c.add(coeffs[i], lits[i]);
         }
-        res_c.get(res);
+        res = res_c.get();
     }
 
     class farkas_learner::constant_replacer_cfg : public default_rewriter_cfg
