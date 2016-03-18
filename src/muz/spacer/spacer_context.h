@@ -398,8 +398,6 @@ namespace spacer {
       void ground_free_vars(expr* e, app_ref_vector& vars, ptr_vector<app>& aux_vars, 
                             bool is_init);
 
-        prop_solver& get_solver() { return m_solver; }
-
       /// \brief Adds a given expression to the set of initial rules
       app* extend_initial (expr *e);
       
