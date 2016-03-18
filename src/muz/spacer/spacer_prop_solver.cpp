@@ -508,7 +508,7 @@ namespace spacer {
             if (m_level_atoms_set.contains(core_expr)) {
                 continue;
             }
-            if (is_aux_predicate(core_expr)) {
+            if (m_ctx->is_aux_predicate(core_expr)) {
                 continue;
             }
             m_core->push_back(to_app(core_expr));

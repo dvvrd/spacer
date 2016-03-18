@@ -33,10 +33,6 @@ namespace spacer {
         m_pushed(false)
     {}
 
-    bool smt_context::is_aux_predicate(func_decl* p) {
-        return m_parent.is_aux_predicate(p);
-    }
-    
     smt_context::scoped::scoped(smt_context& ctx): m_ctx(ctx) {
         SASSERT(!m_ctx.m_in_delay_scope);
         SASSERT(!m_ctx.m_pushed);
@@ -117,9 +113,7 @@ namespace spacer {
         m_fparams(fp), 
         m(m), 
         m_max_num_contexts(max_num_contexts),
-        m_num_contexts(0), 
-        m_predicate_list(m) {
-    }
+        m_num_contexts(0) {}
     
     
     smt_context_manager::~smt_context_manager() {
@@ -143,8 +137,6 @@ namespace spacer {
             std::stringstream name;
             name << "#context" << m_num_contexts;
             pred = m.mk_const(symbol(name.str().c_str()), m.mk_bool_sort());    
-            m_predicate_list.push_back(pred);
-            m_predicate_set.insert(pred->get_decl());
             ctx = m_contexts[(m_num_contexts-1)%m_max_num_contexts];
         }        
         return  alloc(_smt_context, *ctx, *this, pred);   

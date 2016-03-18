@@ -46,8 +46,9 @@ namespace spacer {
         virtual expr* get_unsat_core_expr(unsigned i) = 0;
         virtual void push() = 0;
         virtual void pop() = 0;
-        bool is_aux_predicate(func_decl* p);
-        bool is_aux_predicate(expr* p) { return is_app(p) && is_aux_predicate(to_app(p)->get_decl()); }
+        bool is_aux_predicate (expr *p) 
+        {return is_app(p) && to_app (p) == m_pred.get ();}
+      
         class scoped {
             smt_context& m_ctx;
         public:
@@ -77,15 +78,12 @@ namespace spacer {
         unsigned                 m_max_num_contexts;
         ptr_vector<smt::kernel>  m_contexts;
         unsigned                 m_num_contexts;
-        app_ref_vector           m_predicate_list;
-        func_decl_set            m_predicate_set;        
     public:
         smt_context_manager(smt_params& fp, unsigned max_num_contexts, ast_manager& m);
         ~smt_context_manager();
         smt_context* mk_fresh();                
         void collect_statistics(statistics& st) const;
         void reset_statistics();
-        bool is_aux_predicate(func_decl* p) const { return m_predicate_set.contains(p); }
     };
 
 };
