@@ -47,15 +47,15 @@ namespace spacer {
 
 
     _smt_context::_smt_context(smt::kernel & ctx, smt_context_manager& p, app* pred):
-        smt_context(p, ctx.m(), pred),
-        m_context(ctx)
+      smt_context(p, ctx.m(), pred),  m (ctx.m ()), m_context(ctx),
+      m_virtual (!m.is_true (pred)), m_assertions(m), m_head(0)
     {}
 
     _smt_context::~_smt_context ()
     {
       ast_manager &m = m_context.m();
       /// turn off any constraints that dependent on this context
-      if (!m.is_true (m_pred))
+      if (m_virtual)
       {
         /// it should be safe to assert under a scope, but I would
         /// like to know if this ever happens.  Remove this assertion
@@ -65,23 +65,44 @@ namespace spacer {
       }
     }
   
-
-    void _smt_context::assert_expr(expr* e) {
-        ast_manager& m = m_context.m();
-        if (m.is_true(e)) return;
-        if (m_in_delay_scope && !m_pushed) push();
-        
-        expr_ref fml(m);
-        fml = m_pushed ? e : m.mk_implies(m_pred, e);
-        m_context.assert_expr (fml);
+  void _smt_context::internalize_assertions ()
+  {
+    SASSERT (!m_pushed);
+    for (unsigned sz = m_assertions.size (); m_head < sz; ++m_head)
+    {
+      expr_ref f(m);
+      f = m.mk_implies (m_pred, m_assertions.get (m_head));
+      m_context.assert_expr (f);
     }
+    
+  }
+  
+  void _smt_context::push()
+  {
+    SASSERT (!m_pushed);
+    internalize_assertions ();
+    m_context.push();
+    m_pushed = true;
+  }
 
-    lbool _smt_context::check(expr_ref_vector& assumptions) {
-        ast_manager& m = m_pred.get_manager();
-        if (!m.is_true(m_pred)) assumptions.push_back(m_pred);
-        lbool result = m_context.check (assumptions.size(), assumptions.c_ptr());
-        if (!m.is_true(m_pred)) assumptions.pop_back();
-        return result;
+  void _smt_context::assert_expr (expr* e)
+  {
+    if (m.is_true(e)) return;
+    if (m_in_delay_scope && !m_pushed) push ();
+        
+    if (m_pushed || !m_virtual)
+      m_context.assert_expr (e);
+    else
+      m_assertions.push_back (e);
+  }
+
+    lbool _smt_context::check (expr_ref_vector& assumptions)
+    {
+      internalize_assertions ();
+      if (m_virtual) assumptions.push_back(m_pred);
+      lbool result = m_context.check (assumptions.size(), assumptions.c_ptr());
+      if (m_virtual) assumptions.pop_back();
+      return result;
     }
 
     void _smt_context::get_model(model_ref& model) {

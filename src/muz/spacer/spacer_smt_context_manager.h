@@ -58,7 +58,15 @@ namespace spacer {
     };
 
     class _smt_context : public smt_context {
-        smt::kernel & m_context;
+      ast_manager &m;
+      smt::kernel & m_context;
+      bool m_virtual;
+      expr_ref_vector m_assertions;
+      unsigned m_head;
+      
+      void internalize_assertions ();
+      
+      
     public:
         _smt_context(smt::kernel & ctx, smt_context_manager& p, app* pred); 
         virtual ~_smt_context();
@@ -66,7 +74,7 @@ namespace spacer {
         virtual lbool check(expr_ref_vector& assumptions);
         virtual void get_model(model_ref& model);
         virtual proof* get_proof();
-        virtual void push() { m_context.push(); m_pushed = true; }
+        virtual void push() ;
         virtual void pop() { m_context.pop(1); m_pushed = false; }
         virtual unsigned get_unsat_core_size() { return m_context.get_unsat_core_size(); }
         virtual expr* get_unsat_core_expr(unsigned i) { return m_context.get_unsat_core_expr(i); }
