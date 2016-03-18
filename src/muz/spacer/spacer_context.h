@@ -30,7 +30,6 @@ Revision History:
 #include <queue>
 #include "spacer_manager.h"
 #include "spacer_prop_solver.h"
-#include "spacer_reachable_cache.h"
 #include "fixedpoint_params.hpp"
 
 
@@ -252,7 +251,7 @@ namespace spacer {
         ptr_vector<pred_transformer> m_use;     // places where 'this' is referenced.
         ptr_vector<datalog::rule>    m_rules;   // rules used to derive transformer
         prop_solver                  m_solver;  // solver context
-        scoped_ptr<smt_context>      m_reach_ctx; // context for reachability facts
+        scoped_ptr<spacer::smt_context>      m_reach_ctx; // context for reachability facts
         legacy_frames                m_frames;
       
         reach_fact_ref_vector        m_reach_facts; // reach facts
@@ -267,7 +266,6 @@ namespace spacer {
         expr_ref                     m_initial_state;   // initial state.
         app_ref                      m_extend_lit;      // literal to extend initial state
         bool                         m_all_init;        // true if the pt has no uninterpreted body in any rule
-        //reachable_cache              m_reachable; 
         ptr_vector<func_decl>        m_predicates;
         stats                        m_stats;
       
