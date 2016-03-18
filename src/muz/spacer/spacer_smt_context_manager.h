@@ -66,8 +66,8 @@ namespace spacer {
         virtual lbool check(expr_ref_vector& assumptions);
         virtual void get_model(model_ref& model);
         virtual proof* get_proof();
-        virtual void push() { m_context.push(); }
-        virtual void pop() { m_context.pop(1); }
+        virtual void push() { m_context.push(); m_pushed = true; }
+        virtual void pop() { m_context.pop(1); m_pushed = false; }
         virtual unsigned get_unsat_core_size() { return m_context.get_unsat_core_size(); }
         virtual expr* get_unsat_core_expr(unsigned i) { return m_context.get_unsat_core_expr(i); }
     };

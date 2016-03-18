@@ -41,10 +41,7 @@ namespace spacer {
 
     smt_context::scoped::~scoped() {
         SASSERT(m_ctx.m_in_delay_scope);
-        if (m_ctx.m_pushed) {
-            m_ctx.pop(); 
-            m_ctx.m_pushed = false;
-        }
+        if (m_ctx.m_pushed) m_ctx.pop(); 
         m_ctx.m_in_delay_scope = false;        
     }
 
@@ -71,48 +68,19 @@ namespace spacer {
 
     void _smt_context::assert_expr(expr* e) {
         ast_manager& m = m_context.m();
-        if (m.is_true(e)) {
-            return;
-        }
-        CTRACE("spacer", has_free_vars(e), tout << mk_pp(e, m) << "\n";);
-        SASSERT(!has_free_vars(e));
-        if (m_in_delay_scope && !m_pushed) {
-            m_context.push();
-            m_pushed = true;
-        }
+        if (m.is_true(e)) return;
+        if (m_in_delay_scope && !m_pushed) push();
+        
         expr_ref fml(m);
-        fml = m_pushed?e:m.mk_implies(m_pred, e);
-        m_context.assert_expr(fml);
+        fml = m_pushed ? e : m.mk_implies(m_pred, e);
+        m_context.assert_expr (fml);
     }
 
     lbool _smt_context::check(expr_ref_vector& assumptions) {
         ast_manager& m = m_pred.get_manager();
-        if (!m.is_true(m_pred)) {
-            assumptions.push_back(m_pred);
-        }
-        TRACE("spacer_check", 
-              {
-                  ast_smt_pp pp(m);
-                  for (unsigned i = 0; i < m_context.size(); ++i) {
-                      pp.add_assumption(m_context.get_formulas()[i]);
-                  }
-                  for (unsigned i = 0; i < assumptions.size(); ++i) {
-                      pp.add_assumption(assumptions[i].get());
-                  }
-
-                  static unsigned lemma_id = 0;
-                  std::ostringstream strm;
-                  strm << "spacer-lemma-" << lemma_id << ".smt2";
-                  std::ofstream out(strm.str().c_str());
-                  pp.display_smt2(out, m.mk_true());
-                  out.close();
-                  lemma_id++;
-                  tout << "spacer_check: " << strm.str() << "\n";
-              });
-        lbool result = m_context.check(assumptions.size(), assumptions.c_ptr());
-        if (!m.is_true(m_pred)) {
-            assumptions.pop_back();
-        }
+        if (!m.is_true(m_pred)) assumptions.push_back(m_pred);
+        lbool result = m_context.check (assumptions.size(), assumptions.c_ptr());
+        if (!m.is_true(m_pred)) assumptions.pop_back();
         return result;
     }
 
