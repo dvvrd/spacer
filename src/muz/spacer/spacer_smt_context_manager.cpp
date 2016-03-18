@@ -54,6 +54,21 @@ namespace spacer {
         m_context(ctx)
     {}
 
+    _smt_context::~_smt_context ()
+    {
+      ast_manager &m = m_context.m();
+      /// turn off any constraints that dependent on this context
+      if (!m.is_true (m_pred))
+      {
+        /// it should be safe to assert under a scope, but I would
+        /// like to know if this ever happens.  Remove this assertion
+        /// if it is causing issues.
+        SASSERT (m_context.get_scope_level () == 0);
+        m_context.assert_expr (m.mk_not (m_pred));
+      }
+    }
+  
+
     void _smt_context::assert_expr(expr* e) {
         ast_manager& m = m_context.m();
         if (m.is_true(e)) {

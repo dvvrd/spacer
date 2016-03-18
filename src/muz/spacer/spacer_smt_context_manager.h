@@ -61,7 +61,7 @@ namespace spacer {
         smt::kernel & m_context;
     public:
         _smt_context(smt::kernel & ctx, smt_context_manager& p, app* pred); 
-        virtual ~_smt_context() {}
+        virtual ~_smt_context();
         virtual void assert_expr(expr* e);
         virtual lbool check(expr_ref_vector& assumptions);
         virtual void get_model(model_ref& model);
