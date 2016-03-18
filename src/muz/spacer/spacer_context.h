@@ -372,7 +372,7 @@ namespace spacer {
                            datalog::rule const*& r, 
                            vector<bool>& reach_pred_used, 
                            unsigned& num_reuse_reach);
-        bool is_invariant(unsigned level, expr* co_state, 
+        bool is_invariant(unsigned level, expr* lemma, 
                           unsigned& solver_level, expr_ref_vector* core = 0);
         bool check_inductive(unsigned level, expr_ref_vector& state, 
                              unsigned& assumes_level);

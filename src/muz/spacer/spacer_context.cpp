@@ -714,11 +714,11 @@ namespace spacer {
         return l_undef;
     }
 
-    bool pred_transformer::is_invariant(unsigned level, expr* states,
+  bool pred_transformer::is_invariant(unsigned level, expr* lemma,
                                         unsigned& solver_level, expr_ref_vector* core) {
       expr_ref_vector conj(m), aux(m);
         
-        conj.push_back(m.mk_not(states));
+        conj.push_back(m.mk_not(lemma));
         flatten_and (conj);
 
         prop_solver::scoped_level _sl(m_solver, level);
@@ -736,12 +736,12 @@ namespace spacer {
         return r == l_false;
     }
 
-    bool pred_transformer::check_inductive(unsigned level, expr_ref_vector& lits, 
+    bool pred_transformer::check_inductive(unsigned level, expr_ref_vector& state, 
                                            unsigned& uses_level) {
         manager& pm = get_manager();
         expr_ref_vector conj(m), core(m);
         expr_ref states(m);
-        states = m.mk_not(pm.mk_and(lits));
+        states = m.mk_not(pm.mk_and(state));
         mk_assumptions(head(), states, conj);
         prop_solver::scoped_level _sl(m_solver, level);
         prop_solver::scoped_subset_core _sc (m_solver, true);
@@ -749,10 +749,10 @@ namespace spacer {
         m_solver.set_model (0);
         expr_ref_vector aux (m);
         conj.push_back (m_extend_lit);
-        lbool res = m_solver.check_assumptions (lits, aux, conj.size (), conj.c_ptr ());
+        lbool res = m_solver.check_assumptions (state, aux, conj.size (), conj.c_ptr ());
         if (res == l_false) {
-            lits.reset();
-            lits.append(core);
+            state.reset();
+            state.append(core);
             uses_level = m_solver.uses_level();
         }
         TRACE ("core_array_eq", 
