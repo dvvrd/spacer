@@ -38,6 +38,7 @@ namespace spacer {
     
     private:
         smt_params&         m_fparams;        
+        bool                m_split_literals;
         ast_manager&        m;
         manager&            m_pm;
         symbol              m_name;

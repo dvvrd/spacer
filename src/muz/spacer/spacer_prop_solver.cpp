@@ -237,6 +237,7 @@ namespace spacer {
 
     prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name, bool validate_theory_core) :
         m_fparams(pm.get_fparams()),
+        m_split_literals(p.spacer_split_farkas_literals ()),
         m(pm.get_manager()),
         m_pm(pm),
         m_name(name),
@@ -531,6 +532,7 @@ namespace spacer {
         pr = m_ctx->get_proof();
         IF_VERBOSE(21, verbose_stream() << mk_ismt2_pp(pr, m) << "\n";);
         farkas_learner fl(m_fparams, m);
+        fl.set_split_literals (m_split_literals);
         expr_ref_vector lemmas(m);
         obj_hashtable<expr> bs;
         for (unsigned i = 0; i < safe.assumptions_size(); ++i) {
