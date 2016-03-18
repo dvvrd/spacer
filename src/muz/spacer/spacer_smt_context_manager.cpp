@@ -26,13 +26,6 @@ Revision History:
 
 namespace spacer {
 
-    smt_context::smt_context(smt_context_manager& p, ast_manager& m, app* pred):
-        m_pred(pred, m),
-        m_parent(p),
-        m_in_delay_scope(false),
-        m_pushed(false)
-    {}
-
     smt_context::scoped::scoped(smt_context& ctx): m_ctx(ctx) {
         SASSERT(!m_ctx.m_in_delay_scope);
         SASSERT(!m_ctx.m_pushed);
@@ -46,12 +39,19 @@ namespace spacer {
     }
 
 
-    _smt_context::_smt_context(smt::kernel & ctx, smt_context_manager& p, app* pred):
-      smt_context(p, ctx.m(), pred),  m (ctx.m ()), m_context(ctx),
-      m_virtual (!m.is_true (pred)), m_assertions(m), m_head(0)
+    smt_context::smt_context(smt::kernel & ctx, smt_context_manager& p, app* pred):
+      m_pred(pred, m),
+      m_parent(p),
+      m_in_delay_scope(false),
+      m_pushed(false),
+      m (ctx.m ()),
+      m_context(ctx),
+      m_virtual (!m.is_true (pred)),
+      m_assertions(m),
+      m_head(0)
     {}
 
-    _smt_context::~_smt_context ()
+    smt_context::~smt_context ()
     {
       ast_manager &m = m_context.m();
       /// turn off any constraints that dependent on this context
@@ -65,7 +65,7 @@ namespace spacer {
       }
     }
   
-  void _smt_context::internalize_assertions ()
+  void smt_context::internalize_assertions ()
   {
     SASSERT (!m_pushed);
     for (unsigned sz = m_assertions.size (); m_head < sz; ++m_head)
@@ -77,7 +77,7 @@ namespace spacer {
     
   }
   
-  void _smt_context::push()
+  void smt_context::push()
   {
     SASSERT (!m_pushed);
     internalize_assertions ();
@@ -85,7 +85,7 @@ namespace spacer {
     m_pushed = true;
   }
 
-  void _smt_context::assert_expr (expr* e)
+  void smt_context::assert_expr (expr* e)
   {
     if (m.is_true(e)) return;
     if (m_in_delay_scope && !m_pushed) push ();
@@ -96,7 +96,7 @@ namespace spacer {
       m_assertions.push_back (e);
   }
 
-    lbool _smt_context::check (expr_ref_vector& assumptions)
+    lbool smt_context::check (expr_ref_vector& assumptions)
     {
       internalize_assertions ();
       if (m_virtual) assumptions.push_back(m_pred);
@@ -105,11 +105,11 @@ namespace spacer {
       return result;
     }
 
-    void _smt_context::get_model(model_ref& model) {
+    void smt_context::get_model(model_ref& model) {
         m_context.get_model(model);
     }
 
-    proof* _smt_context::get_proof() {
+    proof* smt_context::get_proof() {
         return m_context.get_proof();
     }
 
@@ -143,7 +143,7 @@ namespace spacer {
             pred = m.mk_const(symbol(name.str().c_str()), m.mk_bool_sort());    
             ctx = m_contexts[(m_num_contexts-1)%m_max_num_contexts];
         }        
-        return  alloc(_smt_context, *ctx, *this, pred);   
+        return  alloc(smt_context, *ctx, *this, pred);   
     }
 
     void smt_context_manager::collect_statistics(statistics& st) const {
