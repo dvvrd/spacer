@@ -242,7 +242,8 @@ namespace spacer {
         m_pm(pm),
         m_name(name),
         m_try_minimize_core(p.pdr_try_minimize_core()),
-        m_ctx(pm.mk_fresh()),
+        //m_ctx(pm.mk_fresh()),
+        m_ctx(NULL),
         m_pos_level_atoms(m),
         m_neg_level_atoms(m),
         m_proxies(m),
@@ -253,7 +254,12 @@ namespace spacer {
         m_in_level(false),
         m_validate_theory_core (validate_theory_core)
     {
-        m_ctx->assert_expr(m_pm.get_background());
+      m_contexts[0] = pm.mk_fresh ();
+      m_contexts[1] = pm.mk_fresh2 ();
+      m_ctx = m_contexts[0].get ();
+      
+      for (unsigned i = 0; i < 2; ++i)
+        m_contexts[i]->assert_expr (m_pm.get_background ());
     }
 
     void prop_solver::add_level() {
@@ -294,7 +300,8 @@ namespace spacer {
 
     void prop_solver::add_formula(expr * form) {
         SASSERT(!m_in_level);
-        m_ctx->assert_expr(form);
+        m_contexts[0]->assert_expr (form);
+        m_contexts[1]->assert_expr (form);
         IF_VERBOSE(21, verbose_stream() << "$ asserted " << mk_pp(form, m) << "\n";);
         TRACE("spacer", tout << "add_formula: " << mk_pp(form, m) << "\n";);
     }
@@ -581,8 +588,10 @@ namespace spacer {
 
     lbool prop_solver::check_assumptions (const expr_ref_vector & hard_atoms,
                                           expr_ref_vector& soft_atoms,
-                                          unsigned num_bg, expr * const * bg) 
+                                          unsigned num_bg, expr * const * bg,
+                                          unsigned solver_id) 
     {
+        m_ctx = m_contexts [solver_id == 0 ? 0 : 0 /* 1 */].get ();
         spacer::smt_context::scoped _scoped(*m_ctx);
         safe_assumptions safe(*this, hard_atoms, soft_atoms);
         for (unsigned i = 0; i < num_bg; ++i) m_ctx->assert_expr (bg [i]);

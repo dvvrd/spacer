@@ -77,7 +77,7 @@ namespace spacer {
         pm(pm), m(pm.get_manager()),
         ctx(ctx), m_head(head, m), 
         m_sig(m), m_solver(pm, ctx.get_params(), head->get_name(), ctx.get_params ().validate_theory_core ()),
-        m_reach_ctx (pm.mk_fresh ()),
+        m_reach_ctx (pm.mk_fresh3 ()),
         m_frames (*this), 
         m_reach_facts (), m_rf_init_sz (0),
         m_transition(m), m_initial_state(m), m_extend_lit (m),
@@ -599,7 +599,7 @@ namespace spacer {
 
     expr_ref_vector post(m), aux(m);
     post.push_back (n.post ());
-    lbool res = m_solver.check_assumptions (post, aux);
+    lbool res = m_solver.check_assumptions (post, aux, 0, NULL, 0);
     if (res == l_false) uses_level = m_solver.uses_level ();
     return res == l_false;
   }
@@ -675,7 +675,7 @@ namespace spacer {
         // result is either sat (with some reach assumps) or
         // unsat (even with no reach assumps)
         expr *bg = m_extend_lit.get ();
-        lbool is_sat = m_solver.check_assumptions (post, reach_assumps, 1, &bg);
+        lbool is_sat = m_solver.check_assumptions (post, reach_assumps, 1, &bg, 0);
 
         TRACE ("spacer",
                 if (!reach_assumps.empty ()) {
@@ -725,7 +725,7 @@ namespace spacer {
         m_solver.set_core(core);
         m_solver.set_model(0);
         expr * bg = m_extend_lit.get ();
-        lbool r = m_solver.check_assumptions (conj, aux, 1, &bg);
+        lbool r = m_solver.check_assumptions (conj, aux, 1, &bg, 1);
         if (r == l_false) {
             solver_level = m_solver.uses_level ();
             CTRACE ("spacer", level < m_solver.uses_level (), 
@@ -749,7 +749,7 @@ namespace spacer {
         m_solver.set_model (0);
         expr_ref_vector aux (m);
         conj.push_back (m_extend_lit);
-        lbool res = m_solver.check_assumptions (state, aux, conj.size (), conj.c_ptr ());
+        lbool res = m_solver.check_assumptions (state, aux, conj.size (), conj.c_ptr (), 1);
         if (res == l_false) {
             state.reset();
             state.append(core);
