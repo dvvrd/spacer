@@ -9,6 +9,7 @@ z3_add_component(model
     model_pp.cpp
     model_smt2_pp.cpp
     model_v2_pp.cpp
+    model_evaluator_array.cpp
   COMPONENT_DEPENDENCIES
     rewriter
   PYG_FILES

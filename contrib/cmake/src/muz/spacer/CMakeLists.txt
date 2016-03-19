@@ -1,0 +1,21 @@
+z3_add_component(spacer
+  SOURCES
+  old_mev.cpp
+  spacer_context.cpp
+  spacer_dl_interface.cpp
+  spacer_farkas_learner.cpp
+  spacer_generalizers.cpp
+  spacer_manager.cpp
+  spacer_marshal.cpp
+  spacer_prop_solver.cpp
+  spacer_smt_context_manager.cpp
+  spacer_sym_mux.cpp
+  spacer_util.cpp
+  COMPONENT_DEPENDENCIES
+  arith_tactics
+  core_tactics
+  muz
+  qe
+  smt_tactic
+  transforms
+  )

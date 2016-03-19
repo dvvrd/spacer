@@ -12,5 +12,6 @@ z3_add_component(fp
     muz
     pdr
     rel
+    spacer
     tab
 )

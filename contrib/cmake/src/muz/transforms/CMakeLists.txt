@@ -1,6 +1,7 @@
 z3_add_component(transforms
   SOURCES
     dl_mk_array_blast.cpp
+    dl_mk_array_blast_full.cpp
     dl_mk_backwards.cpp
     dl_mk_bit_blast.cpp
     dl_mk_coalesce.cpp
