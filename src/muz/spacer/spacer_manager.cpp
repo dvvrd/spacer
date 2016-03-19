@@ -173,6 +173,8 @@ namespace spacer {
         m_mux(m, get_state_suffixes()),
         m_background(m.mk_true(), m),
         m_contexts(fparams, max_num_contexts, m),
+        m_contexts2(fparams, max_num_contexts, m),
+        m_contexts3(fparams, max_num_contexts, m),
         m_next_unique_num(0)
     {        
     }

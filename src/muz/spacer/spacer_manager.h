@@ -85,6 +85,8 @@ namespace spacer {
         expr_ref              m_background;
         decl_vector           m_o0_preds;
         spacer::smt_context_manager   m_contexts;
+        spacer::smt_context_manager   m_contexts2;
+        spacer::smt_context_manager   m_contexts3;
         
         /** whenever we need an unique number, we get this one and increase */
         unsigned m_next_unique_num;
@@ -301,6 +303,10 @@ namespace spacer {
         unsigned get_unique_num() { return m_next_unique_num++; }
         
         spacer::smt_context* mk_fresh() {  return m_contexts.mk_fresh();   }
+        spacer::smt_context* mk_fresh2() {return m_contexts2.mk_fresh ();}
+        spacer::smt_context* mk_fresh3() {return m_contexts3.mk_fresh ();}
+      
+      
         
         void collect_statistics(statistics& st) const { m_contexts.collect_statistics(st); }
 
