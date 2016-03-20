@@ -26,7 +26,7 @@ Revision History:
 #include "expr_substitution.h"
 #include "expr_map.h"
 #include "th_rewriter.h"
-#include "qe_util.h"
+#include "qe_vartest.h"
 #include "qe.h"
 
 class tactic;

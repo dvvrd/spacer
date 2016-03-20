@@ -37,6 +37,7 @@ Revision History:
 #include "cooperate.h"
 #include "datatype_decl_plugin.h"
 
+#include "qe_vartest.h"
 
 namespace eq {
     class der {

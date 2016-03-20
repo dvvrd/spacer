@@ -21,7 +21,7 @@ Revision History:
 --*/
 
 #include "qe_project.h"
-#include "qe_util.h"
+#include "qe_vartest.h"
 #include "qe.h"
 #include "arith_decl_plugin.h"
 #include "ast_pp.h"
@@ -1053,7 +1053,7 @@ namespace qe {
             }
             vars.reset();
             vars.append(new_vars);
-            return qe::mk_and(result);
+            return mk_and(result);
         }
 
         void operator()(model& mdl, app_ref_vector& vars, expr_ref& fml) {

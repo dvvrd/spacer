@@ -7,7 +7,7 @@
 #include "api_ast_map.h"
 #include "api_ast_vector.h"
 
-#include "qe_util.h"
+#include "qe_vartest.h"
 #include "qe_lite.h"
 #include "spacer_util.h"
 
@@ -111,7 +111,7 @@ extern "C"
     spacer::compute_implicant_literals (mev, facts, lits);
     
     expr_ref result (mk_c(c)->m ());
-    result = qe::mk_and (lits);
+    result = mk_and (lits);
     mk_c(c)->save_ast_trail (result.get ());
     
     return of_expr (result.get ());
