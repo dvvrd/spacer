@@ -3,7 +3,7 @@ Copyright (c) 2013 Microsoft Corporation
 
 Module Name:
 
-    qe_util.h
+    qe_vartest.h
 
 Abstract:
 
@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef QE_UTIL_H_
-#define QE_UTIL_H_
+#ifndef QE_VARTEST_H_
+#define QE_VARTEST_H_
 
 #include "ast.h"
 #include "uint_set.h"
