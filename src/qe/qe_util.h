@@ -22,14 +22,6 @@ Revision History:
 #include "ast.h"
 #include "uint_set.h"
 
-namespace qe {
-
-    expr_ref mk_and(expr_ref_vector const& fmls);
-
-    expr_ref mk_or(expr_ref_vector const& fmls);
-
-}
-
 class is_variable_proc {
 public:
     virtual bool operator()(expr* e) const = 0;
