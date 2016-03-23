@@ -30,11 +30,157 @@ Revision History:
 #include "expr_substitution.h"
 #include "expr_replacer.h"
 #include "model_pp.h"
-#include "qe_array.h"
+// #include "qe_array.h"
 #include "expr_safe_replace.h"
 #include "model_evaluator.h"
 #include "qe_lite.h"
 #include "model_evaluator_array.h"
+
+namespace
+{
+bool is_partial_eq (app* a);
+
+/**
+ * \brief utility class for partial equalities
+ *
+ * A partial equality (a ==I b), for two arrays a,b and a finite set of indices I holds
+ *   iff (Forall i. i \not\in I => a[i] == b[i]); in other words, it is a
+ *   restricted form of the extensionality axiom
+ *
+ * using this class, we denote (a =I b) as f(a,b,i0,i1,...)
+ *   where f is an uninterpreted predicate with name PARTIAL_EQ and
+ *   I = {i0,i1,...}
+ */
+class peq {
+    ast_manager&        m;
+    expr_ref            m_lhs;
+    expr_ref            m_rhs;
+    unsigned            m_num_indices;
+    expr_ref_vector     m_diff_indices;
+    func_decl_ref       m_decl;     // the partial equality declaration
+    app_ref             m_peq;      // partial equality application
+    app_ref             m_eq;       // equivalent std equality using def. of partial eq
+    array_util          m_arr_u;
+    ast_eq_proc         m_eq_proc;  // for checking if two asts are equal
+
+public:
+    static const char* PARTIAL_EQ;
+
+    peq (app* p, ast_manager& m);
+
+    peq (expr* lhs, expr* rhs, unsigned num_indices, expr * const * diff_indices, ast_manager& m);
+
+    void lhs (expr_ref& result);
+
+    void rhs (expr_ref& result);
+
+    void get_diff_indices (expr_ref_vector& result);
+
+    void mk_peq (app_ref& result);
+
+    void mk_eq (app_ref_vector& aux_consts, app_ref& result, bool stores_on_rhs = true);
+};
+                    
+const char* peq::PARTIAL_EQ = "partial_eq";
+
+peq::peq (app* p, ast_manager& m):
+    m (m),
+    m_lhs (p->get_arg (0), m),
+    m_rhs (p->get_arg (1), m),
+    m_num_indices (p->get_num_args ()-2),
+    m_diff_indices (m),
+    m_decl (p->get_decl (), m),
+    m_peq (p, m),
+    m_eq (m),
+    m_arr_u (m)
+{
+    SASSERT (is_partial_eq (p));
+    SASSERT (m_arr_u.is_array (m_lhs) &&
+             m_arr_u.is_array (m_rhs) &&
+             m_eq_proc (m.get_sort (m_lhs), m.get_sort (m_rhs)));
+    for (unsigned i = 2; i < p->get_num_args (); i++) {
+        m_diff_indices.push_back (p->get_arg (i));
+    }
+}
+
+peq::peq (expr* lhs, expr* rhs, unsigned num_indices, expr * const * diff_indices, ast_manager& m):
+    m (m),
+    m_lhs (lhs, m),
+    m_rhs (rhs, m),
+    m_num_indices (num_indices),
+    m_diff_indices (m),
+    m_decl (m),
+    m_peq (m),
+    m_eq (m),
+    m_arr_u (m)
+{
+    SASSERT (m_arr_u.is_array (lhs) &&
+             m_arr_u.is_array (rhs) &&
+             m_eq_proc (m.get_sort (lhs), m.get_sort (rhs)));
+    ptr_vector<sort> sorts;
+    sorts.push_back (m.get_sort (m_lhs));
+    sorts.push_back (m.get_sort (m_rhs));
+    for (unsigned i = 0; i < num_indices; i++) {
+        sorts.push_back (m.get_sort (diff_indices [i]));
+        m_diff_indices.push_back (diff_indices [i]);
+    }
+    m_decl = m.mk_func_decl (symbol (PARTIAL_EQ), sorts.size (), sorts.c_ptr (), m.mk_bool_sort ());
+}
+
+void peq::lhs (expr_ref& result) { result = m_lhs; }
+
+void peq::rhs (expr_ref& result) { result = m_rhs; }
+
+void peq::get_diff_indices (expr_ref_vector& result) {
+    for (unsigned i = 0; i < m_diff_indices.size (); i++) {
+        result.push_back (m_diff_indices.get (i));
+    }
+}
+
+void peq::mk_peq (app_ref& result) {
+    if (!m_peq) {
+        ptr_vector<expr> args;
+        args.push_back (m_lhs);
+        args.push_back (m_rhs);
+        for (unsigned i = 0; i < m_num_indices; i++) {
+            args.push_back (m_diff_indices.get (i));
+        }
+        m_peq = m.mk_app (m_decl, args.size (), args.c_ptr ());
+    }
+    result = m_peq;
+}
+
+void peq::mk_eq (app_ref_vector& aux_consts, app_ref& result, bool stores_on_rhs) {
+    if (!m_eq) {
+        expr_ref lhs (m_lhs, m), rhs (m_rhs, m);
+        if (!stores_on_rhs) {
+            std::swap (lhs, rhs);
+        }
+        // lhs = (...(store (store rhs i0 v0) i1 v1)...)
+        sort* val_sort = get_array_range (m.get_sort (lhs));
+        expr_ref_vector::iterator end = m_diff_indices.end ();
+        for (expr_ref_vector::iterator it = m_diff_indices.begin ();
+                it != end; it++) {
+            app* val = m.mk_fresh_const ("diff", val_sort);
+            ptr_vector<expr> store_args;
+            store_args.push_back (rhs);
+            store_args.push_back (*it);
+            store_args.push_back (val);
+            rhs = m_arr_u.mk_store (store_args.size (), store_args.c_ptr ());
+            aux_consts.push_back (val);
+        }
+        m_eq = m.mk_eq (lhs, rhs);
+    }
+    result = m_eq;
+}
+
+
+bool is_partial_eq (app* a) {
+    return a->get_decl ()->get_name () == peq::PARTIAL_EQ;
+}
+
+}
+
 
 namespace qe {
 
