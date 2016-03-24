@@ -308,9 +308,19 @@ namespace spacer {
       
       
         
-        void collect_statistics(statistics& st) const { m_contexts.collect_statistics(st); }
+        void collect_statistics(statistics& st) const
+        {
+          m_contexts.collect_statistics(st);
+          m_contexts2.collect_statistics(st);
+          m_contexts3.collect_statistics(st);
+        }
 
-        void reset_statistics() { m_contexts.reset_statistics(); }
+        void reset_statistics()
+        {
+          m_contexts.reset_statistics();
+          m_contexts2.reset_statistics();
+          m_contexts3.reset_statistics();
+        }
     };
 }
 
