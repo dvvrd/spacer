@@ -52,6 +52,7 @@ Notes:
 #include "bv_decl_plugin.h"
 
 #include "old_mev.h"
+#include "qe_mbp.h"
 
 namespace spacer {
 
@@ -1113,7 +1114,7 @@ namespace spacer {
      * then, MBP for Booleans (substitute), reals (based on LW), ints (based on Cooper), and arrays
      */
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, 
-                     const model_ref& M, bool reduce_all_selects) {
+                     const model_ref& M, bool reduce_all_selects, bool use_native_mbp) {
         th_rewriter rw (m);
         TRACE ("spacer_mbp",
                 tout << "Before projection:\n";
@@ -1219,6 +1220,17 @@ namespace spacer {
                     tout << mk_pp (arith_vars.get (i), m) << "\n";
                     }
                   );
+            if (use_native_mbp)
+            {
+              qe::mbp mbp (m);
+              expr_ref_vector fmls(m);
+              flatten_and (fml, fmls);
+              
+              mbp (true, arith_vars, *M.get (), fmls);
+              fml = mk_and (fmls);
+              SASSERT (arith_vars.empty ());
+            }
+            else
             {
                 scoped_no_proof _sp (m);
                 qe::arith_project (*M.get (), arith_vars, fml);

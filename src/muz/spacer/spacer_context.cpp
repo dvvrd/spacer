@@ -1407,6 +1407,7 @@ namespace spacer {
     expr_ref_vector summaries (m);
     app_ref_vector vars (m);
     
+    bool use_native_mbp = get_context ().use_native_mbp ();
     // -- find first may premise
     while (m_active < m_premises.size () && m_premises[m_active].is_must ())
     {
@@ -1426,7 +1427,7 @@ namespace spacer {
       timeit _timer1 (is_trace_enabled("spacer_timeit"), 
                       "create_next_child::qproject1", 
                       verbose_stream ());
-      qe_project (m, vars, m_trans, mev.get_model (), true);
+      qe_project (m, vars, m_trans, mev.get_model (), true, use_native_mbp);
       //qe::reduce_array_selects (*mev.get_model (), m_trans);
     }
     
@@ -1451,7 +1452,7 @@ namespace spacer {
       timeit _timer2 (is_trace_enabled("spacer_timeit"),
                       "create_next_child::qproject2", 
                       verbose_stream ());
-      qe_project (m, vars, post, mev.get_model (), true);
+      qe_project (m, vars, post, mev.get_model (), true, use_native_mbp);
       //qe::reduce_array_selects (*mev.get_model (), post);
     }
     
@@ -1468,6 +1469,8 @@ namespace spacer {
   model_node *derivation::create_next_child ()
   {
     if (m_active + 1 >= m_premises.size ()) return NULL;
+    
+    bool use_native_mbp = get_context ().use_native_mbp ();
     
     // update the summary of the active node to some must summary
     
@@ -1531,7 +1534,8 @@ namespace spacer {
       for (unsigned i = 0, sz = pt.head ()->get_arity (); i < sz; ++i)
         vars.push_back (m.mk_const (pm.o2n (pt.sig (i), 0)));
       
-      if (!vars.empty ()) qe_project (m, vars, m_trans, mev.get_model (), true);
+      if (!vars.empty ())
+        qe_project (m, vars, m_trans, mev.get_model (), true, use_native_mbp);
     }
     
     
@@ -1600,7 +1604,8 @@ namespace spacer {
           m_search(),
           m_last_result(l_undef),
           m_inductive_lvl(0),
-          m_expanded_lvl(0)
+          m_expanded_lvl(0),
+          m_use_native_mbp (params.spacer_native_mbp ())
     {
     }
 
@@ -2851,7 +2856,7 @@ namespace spacer {
           timeit _timer1 (is_trace_enabled("spacer_timeit"), 
                           "mk_reach_fact::qe_project", 
                           verbose_stream ());
-          qe_project (m, vars, res, mev.get_model ());
+          qe_project (m, vars, res, mev.get_model (), false, m_use_native_mbp);
         }
         
 
@@ -2924,7 +2929,7 @@ namespace spacer {
         vars.append(aux_vars.size(), aux_vars.c_ptr());
 
         expr_ref phi1 = m_pm.mk_and (Phi);
-        qe_project (m, vars, phi1, mev.get_model (), true);
+        qe_project (m, vars, phi1, mev.get_model (), true, m_use_native_mbp);
         //qe::reduce_array_selects (*mev.get_model (), phi1);
         SASSERT (vars.empty ());
 

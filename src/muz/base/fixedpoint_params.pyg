@@ -170,6 +170,7 @@ def_module_params('fixedpoint',
                           ('spacer.reach_dnf', BOOL, True, "Restrict reachability facts to DNF"),
                           ('bmc.linear_unrolling_depth', UINT, UINT_MAX, "Maximal level to explore"),
                           ('spacer.split_farkas_literals', BOOL, False, "Split Farkas literals"),
+                          ('spacer.native_mbp', BOOL, False, "Use native mbp of Z3"),
                           ))
 
 

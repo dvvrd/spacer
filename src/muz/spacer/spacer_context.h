@@ -304,7 +304,7 @@ namespace spacer {
         pred_transformer(context& ctx, manager& pm, func_decl* head);
         ~pred_transformer();
 
-      
+        inline bool use_native_mbp ();
         reach_fact *get_reach_fact (expr *v)
         {
           for (unsigned i = 0, sz = m_reach_facts.size (); i < sz; ++i)
@@ -613,7 +613,9 @@ namespace spacer {
     model_node& get_parent () const { return m_parent; }
     ast_manager &get_ast_manager () const {return m_parent.get_ast_manager ();}
     manager &get_manager () const {return m_parent.get_manager ();}
+    context &get_context() const {return m_parent.get_context();}
     
+      
   };
 
   
@@ -706,7 +708,8 @@ namespace spacer {
         stats                m_stats;
         model_converter_ref  m_mc;
         proof_converter_ref  m_pc;
-        
+        bool                 m_use_native_mbp;
+      
         // Functions used by search.
         lbool solve_core (unsigned from_lvl = 0);
         bool check_reachability ();        
@@ -748,8 +751,7 @@ namespace spacer {
 
         unsigned get_cex_depth ();
 
-    public:       
-        
+    public:
         /**
            Initial values of predicates are stored in corresponding relations in dctx.
            
@@ -764,6 +766,8 @@ namespace spacer {
         
         smt_params&       get_fparams() const { return m_fparams; }
         fixedpoint_params const& get_params() const { return m_params; }
+        bool use_native_mbp () {return m_use_native_mbp;}
+      
         ast_manager&      get_ast_manager() const { return m; }
         manager&          get_manager() { return m_pm; }
         decl2rel const&   get_pred_transformers() const { return m_rels; }
@@ -827,7 +831,8 @@ namespace spacer {
         expr_ref get_constraints (unsigned lvl);
         void add_constraints (unsigned lvl, expr_ref c);
     };    
-
+  
+    inline bool pred_transformer::use_native_mbp () {return ctx.use_native_mbp ();}
 };
 
 #endif

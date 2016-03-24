@@ -231,7 +231,7 @@ namespace spacer {
      * 4. for any remaining arith variables, substitute using M
      */
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, 
-                     const model_ref& M, bool reduce_all_selects=false);
+                     const model_ref& M, bool reduce_all_selects=false, bool native_mbp=false);
 
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
 
