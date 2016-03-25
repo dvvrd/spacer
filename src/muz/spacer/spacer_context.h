@@ -268,6 +268,8 @@ namespace spacer {
         bool                         m_all_init;        // true if the pt has no uninterpreted body in any rule
         ptr_vector<func_decl>        m_predicates;
         stats                        m_stats;
+        stopwatch                    m_initialize_watch;
+      
       
         /// Auxiliary variables to represent different disjunctive
         /// cases of must summaries. Stored over 'n' (a.k.a. new)
@@ -697,7 +699,7 @@ namespace spacer {
         stopwatch m_propagate_watch;
         stopwatch m_reach_watch;
         stopwatch m_create_children_watch;
-       
+        stopwatch m_init_rules_watch;
        
         smt_params&    m_fparams;
         fixedpoint_params const&    m_params;

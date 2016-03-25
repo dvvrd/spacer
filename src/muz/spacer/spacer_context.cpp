@@ -115,13 +115,16 @@ namespace spacer {
     void pred_transformer::collect_statistics(statistics& st) const {
         m_solver.collect_statistics(st);
         st.update("SPACER num propagations", m_stats.m_num_propagations);
-        st.update("SPACER num properties", m_frames.lemma_size ()); 
+        st.update("SPACER num properties", m_frames.lemma_size ());
+
+        st.update ("time.spacer.init_rules.pt.init", m_initialize_watch.get_seconds ());
     }
 
     void pred_transformer::reset_statistics() {
         m_solver.reset_statistics();
         //m_reachable.reset_statistics();
         m_stats.reset();
+        m_initialize_watch.reset ();
     }
     
     void pred_transformer::init_sig() {
@@ -881,6 +884,8 @@ namespace spacer {
         ptr_vector<datalog::rule const>& rules,
         expr_ref_vector&     transitions) 
     {
+        scoped_watch _t_(m_initialize_watch);
+      
         // Predicates that are variable representatives. Other predicates at 
         // positions the variables occur are made equivalent with these.
         expr_ref_vector conj(m);
@@ -1627,6 +1632,7 @@ namespace spacer {
     }
 
     void context::init_rules(datalog::rule_set& rules, decl2rel& rels) {
+        scoped_watch _t_(m_init_rules_watch);
         m_context = &rules.get_context();
         // Allocate collection of predicate transformers
         datalog::rule_set::decl2rules::iterator dit = rules.begin_grouped_rules(), dend = rules.end_grouped_rules();
@@ -3007,6 +3013,7 @@ namespace spacer {
         st.update("SPACER inductive level", m_inductive_lvl);
         st.update("SPACER cex depth", m_stats.m_cex_depth);
 
+        st.update ("time.spacer.init_rules", m_init_rules_watch.get_seconds ());
         st.update ("time.spacer.solve", m_solve_watch.get_seconds ());
         st.update ("time.spacer.solve.propagate", m_propagate_watch.get_seconds ());
         st.update ("time.spacer.solve.reach", m_reach_watch.get_seconds ());
@@ -3040,6 +3047,7 @@ namespace spacer {
             m_core_generalizers[i]->reset_statistics();
         }
 
+        m_init_rules_watch.reset ();
         m_solve_watch.reset ();
         m_propagate_watch.reset ();
         m_reach_watch.reset ();
