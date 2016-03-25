@@ -69,7 +69,7 @@ class blast_term_ite_tactic : public tactic {
                     args1[i] = t;
                     ++m_num_fresh;
                     e1 = m.mk_app(f, num_args, args1.c_ptr());
-                    if (t == e) {
+                    if (m.are_equal(t,e)) {
                         result = e1;
                         return BR_REWRITE1;
                     }
