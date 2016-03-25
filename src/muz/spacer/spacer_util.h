@@ -31,6 +31,8 @@ Revision History:
 #include "array_decl_plugin.h"
 #include "bv_decl_plugin.h"
 
+#include "stopwatch.h"
+
 class model;
 class model_core;
 
@@ -51,7 +53,6 @@ namespace spacer {
     return lvl -1;
   }
   
-  
     struct pp_level {
         unsigned m_level;
         pp_level(unsigned l): m_level(l) {}        
@@ -67,6 +68,18 @@ namespace spacer {
     }
 
 
+  struct scoped_watch
+  {
+    stopwatch &m_sw;
+    scoped_watch (stopwatch &sw, bool reset=false): m_sw(sw) 
+    {
+      if (reset) m_sw.reset ();
+      m_sw.start ();
+    }
+    ~scoped_watch () {m_sw.stop ();}
+  };
+    
+    
     /**
      * Return the ceiling of base 2 logarithm of a number, 
      * or zero if the nmber is zero.

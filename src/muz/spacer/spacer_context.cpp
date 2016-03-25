@@ -114,7 +114,6 @@ namespace spacer {
 
     void pred_transformer::collect_statistics(statistics& st) const {
         m_solver.collect_statistics(st);
-        //m_reachable.collect_statistics(st);
         st.update("SPACER num propagations", m_stats.m_num_propagations);
         st.update("SPACER num properties", m_frames.lemma_size ()); 
     }
@@ -2376,6 +2375,7 @@ namespace spacer {
     ///this is where everything starts
     lbool context::solve_core (unsigned from_lvl) 
     {
+      scoped_watch _w_(m_solve_watch);
       //if there is no query predicate, abort
       if (!m_rels.find(m_query_pred, m_query)) return l_false;
 
@@ -2415,6 +2415,8 @@ namespace spacer {
     //
     bool context::check_reachability () 
     {
+      scoped_watch _w_(m_reach_watch);
+      
       timeit _timer (get_verbosity_level () >= 1, 
                      "spacer::context::check_reachability", 
                      verbose_stream ());
@@ -2728,6 +2730,7 @@ namespace spacer {
 
   bool context::propagate(unsigned min_prop_lvl, 
                           unsigned max_prop_lvl, unsigned full_prop_lvl) {    
+    scoped_watch _w_(m_propagate_watch);
     
     if (min_prop_lvl == infty_level ()) return false;
     
@@ -2887,6 +2890,7 @@ namespace spacer {
                                   model_evaluator &mev,
                                   const vector<bool> &reach_pred_used) {
  
+        scoped_watch _w_ (m_create_children_watch);
         pred_transformer& pt = n.pt();
         expr* T   = pt.get_transition(r);
         expr* phi = n.post();
@@ -3002,6 +3006,12 @@ namespace spacer {
         st.update("SPACER max depth", m_stats.m_max_depth);
         st.update("SPACER inductive level", m_inductive_lvl);
         st.update("SPACER cex depth", m_stats.m_cex_depth);
+
+        st.update ("time.spacer.solve", m_solve_watch.get_seconds ());
+        st.update ("time.spacer.solve.propagate", m_propagate_watch.get_seconds ());
+        st.update ("time.spacer.solve.reach", m_reach_watch.get_seconds ());
+        st.update ("time.spacer.solve.reach.children",
+                   m_create_children_watch.get_seconds ());
         m_pm.collect_statistics(st);
 
         for (unsigned i = 0; i < m_core_generalizers.size(); ++i) {
@@ -3030,6 +3040,10 @@ namespace spacer {
             m_core_generalizers[i]->reset_statistics();
         }
 
+        m_solve_watch.reset ();
+        m_propagate_watch.reset ();
+        m_reach_watch.reset ();
+        m_create_children_watch.reset ();
     }
 
 

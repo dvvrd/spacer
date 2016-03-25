@@ -692,6 +692,13 @@ namespace spacer {
             void reset() { memset(this, 0, sizeof(*this)); }
         };
         
+        // stat watches
+        stopwatch m_solve_watch;
+        stopwatch m_propagate_watch;
+        stopwatch m_reach_watch;
+        stopwatch m_create_children_watch;
+       
+       
         smt_params&    m_fparams;
         fixedpoint_params const&    m_params;
         ast_manager&         m;

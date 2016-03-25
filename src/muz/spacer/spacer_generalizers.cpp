@@ -35,6 +35,8 @@ namespace spacer {
     // drop literals one by one from the core and check if the core is still inductive.
     //    
     void core_bool_inductive_generalizer::operator()(model_node& n, expr_ref_vector& core, unsigned& uses_level) {
+        m_st.count++;
+        scoped_watch _w_(m_st.watch);
         if (core.size() <= 1) {
             return;
         }
@@ -61,6 +63,12 @@ namespace spacer {
         IF_VERBOSE(2, verbose_stream() << "old size: " << old_core_size << " new size: " << core.size() << "\n";);
         TRACE("spacer", tout << "old size: " << old_core_size << " new size: " << core.size() << "\n";);
     }
+  void core_bool_inductive_generalizer::collect_statistics (statistics &st) const
+  {
+    st.update ("bool inductive gen time", m_st.watch.get_seconds ());
+    st.update ("bool inductive gen", m_st.count);
+  }
+  
 
 
     void core_multi_generalizer::operator()(model_node& n, expr_ref_vector& core, 

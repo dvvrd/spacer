@@ -26,11 +26,25 @@ Revision History:
 namespace spacer {
 
     class core_bool_inductive_generalizer : public core_generalizer {
+
+        struct stats
+        {
+          unsigned count;
+          stopwatch watch;
+          stats () {reset ();}
+          void reset () {count=0; watch.reset ();}
+        };
+          
         unsigned m_failure_limit;
+        stats m_st;
+      
     public:
-        core_bool_inductive_generalizer(context& ctx, unsigned failure_limit) : core_generalizer(ctx), m_failure_limit(failure_limit) {}
+      core_bool_inductive_generalizer(context& ctx, unsigned failure_limit) : core_generalizer(ctx), m_failure_limit(failure_limit) {}
         virtual ~core_bool_inductive_generalizer() {}
         virtual void operator()(model_node& n, expr_ref_vector& core, unsigned& uses_level);
+      
+      virtual void collect_statistics(statistics& st) const;
+      virtual void reset_statistics () {m_st.reset ();}
     };
 
     template <typename T>
