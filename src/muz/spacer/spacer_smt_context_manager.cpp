@@ -24,6 +24,9 @@ Revision History:
 #include <sstream>
 #include "smt_params.h"
 
+#include "ast_pp_util.h"
+#include "smt_context.h"
+#include "spacer_util.h"
 namespace spacer {
 
     smt_context::scoped::scoped(smt_context& ctx): m_ctx(ctx) {
@@ -124,12 +127,55 @@ namespace spacer {
     
     lbool smt_context::check (expr_ref_vector& assumptions)
     {
+      m_parent.m_stats.m_num_smt_checks++;
+      scoped_watch _t_ (m_parent.m_check_watch);
+      
       if (!m_pushed) internalize_assertions ();
       if (m_virtual) assumptions.push_back(m_pred);
       lbool result = m_context.check (assumptions.size(), assumptions.c_ptr());
       if (m_virtual) assumptions.pop_back();
       return result;
     }
+
+    void smt_context::display(std::ostream &out, expr_ref_vector &assumptions)
+    {
+      // smt_params p;
+      
+      // XXX these two in default setting are important and support one another
+      // p.m_arith_bound_prop = BP_NONE;
+      // p.m_arith_eager_eq_axioms = false;
+      // XXX these make little difference
+      // p.m_arith_auto_config_simplex = true;
+      // p.m_arith_propagate_eqs = false;
+
+      // smt::kernel kernel(m, p /*m_parent.m_fparams*/);
+      ast_pp_util pp(m);
+      expr_ref_vector asserts(m);
+      
+      smt::context &smt_context = m_context.get_context ();
+      for (unsigned i = 0, sz = smt_context.get_num_asserted_formulas (); i < sz; ++i)
+      {
+        asserts.push_back (smt_context.get_asserted_formula (i));
+        pp.collect (asserts.back ());
+
+        // kernel.assert_expr (asserts.back ());
+      }
+      pp.collect (assumptions.size (), assumptions.c_ptr ());
+      pp.display_decls (out);
+      pp.display_asserts (out, asserts);
+      out << "(check-sat ";
+      for (unsigned i = 0, sz = assumptions.size (); i < sz; ++i)
+        out << mk_pp(assumptions.get (i), m) << " ";
+      out << ")\n";
+
+      // verbose_stream () << "Start re-check\n";
+      // stopwatch sw;
+      // sw.start ();
+      // kernel.check (assumptions.size (), assumptions.c_ptr ());
+      // sw.stop ();
+      // verbose_stream () << "Re-check took: " << sw.get_seconds () << "s\n";
+    }
+  
 
     void smt_context::get_model(model_ref& model) {
         m_context.get_model(model);

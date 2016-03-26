@@ -58,7 +58,7 @@ namespace spacer {
     void pop() { m_context.pop(1); m_pushed = false; }
     unsigned get_unsat_core_size() { return m_context.get_unsat_core_size(); }
     expr* get_unsat_core_expr(unsigned i) { return m_context.get_unsat_core_expr(i); }
-    
+    void display(std::ostream &out, expr_ref_vector &assumptions);
     bool is_aux_predicate (expr *p) 
     {return is_app(p) && to_app (p) == m_pred.get ();}
       
