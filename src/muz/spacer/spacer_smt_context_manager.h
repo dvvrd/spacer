@@ -74,6 +74,7 @@ namespace spacer {
       
       struct stats {
         unsigned m_num_smt_checks;
+        unsigned m_num_sat_smt_checks;
         stats() { reset(); }
         void reset() { memset(this, 0, sizeof(*this)); }
       };
@@ -87,6 +88,8 @@ namespace spacer {
 
         stats     m_stats;
         stopwatch m_check_watch;
+        stopwatch m_check_sat_watch;
+      
     public:
         smt_context_manager(smt_params& fp, unsigned max_num_contexts, ast_manager& m);
         ~smt_context_manager();

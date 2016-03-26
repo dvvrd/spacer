@@ -132,7 +132,15 @@ namespace spacer {
       
       if (!m_pushed) internalize_assertions ();
       if (m_virtual) assumptions.push_back(m_pred);
+      stopwatch sw;
+      sw.start ();
       lbool result = m_context.check (assumptions.size(), assumptions.c_ptr());
+      sw.stop ();
+      if (result == l_true)
+      {
+        m_parent.m_check_sat_watch.add (sw);
+        m_parent.m_stats.m_num_sat_smt_checks++;
+      }
       if (m_virtual) assumptions.pop_back();
       return result;
     }
@@ -223,7 +231,10 @@ namespace spacer {
             m_contexts[i]->collect_statistics(st);
         }
         st.update ("time.spacer.solve.smt.total", m_check_watch.get_seconds ());
+        st.update ("time.spacer.solve.smt.total.sat", m_check_sat_watch.get_seconds ());
         st.update ("spacer.smt_context_manager.checks", m_stats.m_num_smt_checks);
+        st.update ("spacer.smt_context_manager.checks.sat", m_stats.m_num_sat_smt_checks);
+        
     }
 
     void smt_context_manager::reset_statistics() {
@@ -232,6 +243,7 @@ namespace spacer {
         }
         m_stats.reset ();
         m_check_watch.reset ();
+        m_check_sat_watch.reset ();
     }
 
 
