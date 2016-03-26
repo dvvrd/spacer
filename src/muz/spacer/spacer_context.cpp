@@ -118,6 +118,8 @@ namespace spacer {
         st.update("SPACER num properties", m_frames.lemma_size ());
 
         st.update ("time.spacer.init_rules.pt.init", m_initialize_watch.get_seconds ());
+        st.update ("time.spacer.solve.pt.must_reachable",
+                   m_must_reachable_watch.get_seconds ());
     }
 
     void pred_transformer::reset_statistics() {
@@ -125,6 +127,7 @@ namespace spacer {
         //m_reachable.reset_statistics();
         m_stats.reset();
         m_initialize_watch.reset ();
+        m_must_reachable_watch.reset ();
     }
     
     void pred_transformer::init_sig() {
@@ -149,6 +152,7 @@ namespace spacer {
     }
 
     bool pred_transformer::is_must_reachable (expr* state, model_ref* model) {
+        scoped_watch _t_(m_must_reachable_watch);
         SASSERT (state);
         // XXX This seems to mis-handle the case when state is
         // reachable using the init rule of the current transformer
@@ -959,16 +963,18 @@ namespace spacer {
                                           ptr_vector<app>& aux_vars, bool is_init) {
         expr_free_vars fv;
         fv(e);
+        
         while (vars.size() < fv.size()) {
             vars.push_back(0);
         }
         for (unsigned i = 0; i < fv.size(); ++i) {
             if (fv[i] && !vars[i].get()) {
                 vars[i] = m.mk_fresh_const("aux", fv[i]);
-                vars [i] = m.mk_const (pm.get_n_pred (vars.get (i)->get_decl ()));
+                vars[i] = m.mk_const (pm.get_n_pred (vars.get (i)->get_decl ()));
                 aux_vars.push_back(vars[i].get());
             }
         }
+        
     }
 
     // create names for variables used in relations.

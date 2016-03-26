@@ -269,6 +269,8 @@ namespace spacer {
         ptr_vector<func_decl>        m_predicates;
         stats                        m_stats;
         stopwatch                    m_initialize_watch;
+        stopwatch                    m_must_reachable_watch;
+      
       
       
         /// Auxiliary variables to represent different disjunctive
