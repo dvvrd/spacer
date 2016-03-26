@@ -906,23 +906,25 @@ namespace spacer {
             }
             init_atom(pts, rule.get_tail(i), var_reprs, conj, i);
         }                  
-        for (unsigned i = ut_size; i < t_size; ++i) {
-          ground_free_vars(rule.get_tail(i), var_reprs, aux_vars, ut_size == 0);
-        }
-        SASSERT(check_filled(var_reprs));
-        expr_ref_vector tail(m);
-        for (unsigned i = ut_size; i < t_size; ++i) {
+        // -- substitute free variables
+        expr_ref fml(m);
+        {
+          expr_ref_vector tail(m);
+          for (unsigned i = ut_size; i < t_size; ++i) 
             tail.push_back(rule.get_tail(i));
-        }        
-        flatten_and(tail);
-        for (unsigned i = 0; i < tail.size(); ++i) {
-            expr_ref tmp(m);
-            var_subst(m, false)(tail[i].get(), var_reprs.size(), (expr*const*)var_reprs.c_ptr(), tmp);
-            conj.push_back(tmp);
-            TRACE("spacer", tout << mk_pp(tail[i].get(), m) << "\n" << mk_pp(tmp, m) << "\n";);
-            SASSERT(is_ground(tmp));
-        }         
-        expr_ref fml = pm.mk_and(conj);
+          fml = mk_and (tail);
+          
+          ground_free_vars (fml, var_reprs, aux_vars, ut_size == 0);
+          SASSERT(check_filled(var_reprs));
+          
+          expr_ref tmp(m);
+          var_subst (m, false)(fml,
+                               var_reprs.size (), (expr*const*)var_reprs.c_ptr(), tmp);
+          flatten_and (tmp, conj);
+          fml = mk_and(conj);
+          conj.reset ();
+        }
+        
         th_rewriter rw(m);
         rw(fml);
         if (ctx.get_params ().spacer_blast_term_ite () || ctx.is_dl() || ctx.is_utvpi()) {
