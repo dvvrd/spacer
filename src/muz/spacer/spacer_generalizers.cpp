@@ -65,7 +65,7 @@ namespace spacer {
     }
   void core_bool_inductive_generalizer::collect_statistics (statistics &st) const
   {
-    st.update ("bool inductive gen time", m_st.watch.get_seconds ());
+    st.update ("time.spacer.solve.reach.gen.bool_ind", m_st.watch.get_seconds ());
     st.update ("bool inductive gen", m_st.count);
   }
   
