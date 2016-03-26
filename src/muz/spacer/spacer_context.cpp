@@ -1984,10 +1984,13 @@ namespace spacer {
         }
         if (m_params.pdr_farkas() && !classify.is_bool()) {
             m.toggle_proof_mode(PGM_FINE);
-            m_fparams.m_arith_bound_prop = BP_NONE;
-            m_fparams.m_arith_auto_config_simplex = true;
-            m_fparams.m_arith_propagate_eqs = false;
-            m_fparams.m_arith_eager_eq_axioms = false;
+            if (!m_params.spacer_eq_prop ())
+            {
+              m_fparams.m_arith_bound_prop = BP_NONE;
+              m_fparams.m_arith_auto_config_simplex = true;
+              m_fparams.m_arith_propagate_eqs = false;
+              m_fparams.m_arith_eager_eq_axioms = false;
+            }
             if (m_params.pdr_utvpi()) {
                 if (classify.is_dl()) {
                     m_fparams.m_arith_mode = AS_DIFF_LOGIC;
