@@ -71,8 +71,19 @@ namespace spacer {
     for (unsigned sz = m_assertions.size (); m_head < sz; ++m_head)
     {
       expr_ref f(m);
-      f = m.mk_implies (m_pred, m_assertions.get (m_head));
+#if 1
+      f = m.mk_implies (m_pred, (m_assertions.get (m_head)));
       m_context.assert_expr (f);
+#else      
+      expr_ref_vector v(m);
+      v.push_back (m_assertions.get (m_head));
+      flatten_and (v);
+      for (unsigned i = 0, vsz = v.size (); i < vsz; ++i)
+      {
+        f = m.mk_implies (m_pred, v.get (i));
+        m_context.assert_expr (f);
+      }
+#endif
     }
     
   }
@@ -93,7 +104,7 @@ namespace spacer {
     if (m_pushed)
       m_context.assert_expr (e);
     else
-      m_assertions.push_back (e);
+      flatten_and (e, m_assertions);
   }
 
   void smt_context::assert_lemma (expr *t)
