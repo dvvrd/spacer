@@ -132,7 +132,7 @@ namespace spacer {
         m_fparams(fp), 
         m(m), 
         m_max_num_contexts(max_num_contexts),
-        m_num_contexts(0) {}
+        m_num_contexts(0) { m_stats.reset ();}
     
     
     smt_context_manager::~smt_context_manager() {
@@ -165,12 +165,16 @@ namespace spacer {
         for (unsigned i = 0; i < m_contexts.size(); ++i) {
             m_contexts[i]->collect_statistics(st);
         }
+        st.update ("time.spacer.solve.smt.total", m_check_watch.get_seconds ());
+        st.update ("spacer.smt_context_manager.checks", m_stats.m_num_smt_checks);
     }
 
     void smt_context_manager::reset_statistics() {
         for (unsigned i = 0; i < m_contexts.size(); ++i) {
             m_contexts[i]->reset_statistics();
         }
+        m_stats.reset ();
+        m_check_watch.reset ();
     }
 
 

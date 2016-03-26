@@ -71,17 +71,30 @@ namespace spacer {
   };
 
     class smt_context_manager {
+      
+      struct stats {
+        unsigned m_num_smt_checks;
+        stats() { reset(); }
+        void reset() { memset(this, 0, sizeof(*this)); }
+      };
+          
         smt_params&        m_fparams;
         ast_manager&             m;
         unsigned                 m_max_num_contexts;
         ptr_vector<smt::kernel>  m_contexts;
         unsigned                 m_num_contexts;
+        
+
+        stats     m_stats;
+        stopwatch m_check_watch;
     public:
         smt_context_manager(smt_params& fp, unsigned max_num_contexts, ast_manager& m);
         ~smt_context_manager();
         smt_context* mk_fresh();                
         void collect_statistics(statistics& st) const;
         void reset_statistics();
+
+      friend class smt_context;
     };
 
 };
