@@ -99,6 +99,16 @@ namespace spacer {
     m_pushed = true;
   }
 
+  void smt_context::get_unsat_core (ptr_vector<expr> &r)
+  {
+    for (unsigned i = 0, sz = get_unsat_core_size (); i < sz; ++i)
+    {
+      expr *core = get_unsat_core_expr (i);
+      if (is_aux_predicate (core)) continue;
+      r.push_back (core);
+    }
+  }
+
   void smt_context::assert_expr (expr* e)
   {
     if (m.is_true(e)) return;

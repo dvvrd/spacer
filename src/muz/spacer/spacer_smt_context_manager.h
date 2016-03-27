@@ -56,6 +56,7 @@ namespace spacer {
     proof* get_proof();
     void push() ;
     void pop() { m_context.pop(1); m_pushed = false; }
+    void get_unsat_core (ptr_vector<expr> &r);
     unsigned get_unsat_core_size() { return m_context.get_unsat_core_size(); }
     expr* get_unsat_core_expr(unsigned i) { return m_context.get_unsat_core_expr(i); }
     void display(std::ostream &out, expr_ref_vector &assumptions);
