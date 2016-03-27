@@ -37,48 +37,9 @@ Revision History:
 
 namespace spacer {
 
-    farkas_learner::farkas_learner(smt_params& params, ast_manager& outer_mgr) 
-        : m_proof_params(get_proof_params(params)), 
-          m_pr(PGM_FINE),
-          m_split_literals (false),
-          p2o(m_pr, outer_mgr),
-          o2p(outer_mgr, m_pr)
-    {
-        reg_decl_plugins(m_pr);
-        m_ctx = alloc(smt::kernel, m_pr, m_proof_params);
-    }
-
-    smt_params farkas_learner::get_proof_params(smt_params& orig_params) {
-        smt_params res(orig_params);
-        res.m_arith_bound_prop = BP_NONE;
-        // temp hack to fix the build
-        // res.m_conflict_resolution_strategy = CR_ALL_DECIDED;
-        res.m_arith_auto_config_simplex = true;
-        res.m_arith_propagate_eqs = false;
-        res.m_arith_eager_eq_axioms = false;
-        res.m_arith_eq_bounds = false;
-        return res;
-    }
-
-    class farkas_learner::equality_expander_cfg : public default_rewriter_cfg
-    {
-        ast_manager& m;
-        arith_util   m_ar;
-    public:
-        equality_expander_cfg(ast_manager& m) : m(m), m_ar(m) {}
-
-        bool get_subst(expr * s, expr * & t, proof * & t_pr) {
-            expr * x, *y;
-            if (m.is_eq(s, x, y) && (m_ar.is_int(x) || m_ar.is_real(x))) {
-                t = m.mk_and(m_ar.mk_ge(x, y), m_ar.mk_le(x, y));
-                return true;
-            }
-            else {
-                return false;
-            }
-        }
-    };
-
+    farkas_learner::farkas_learner(smt_params& params) :
+      m_split_literals (false) {}
+  
     class collect_pure_proc {
         func_decl_set& m_symbs;
     public:
@@ -94,77 +55,7 @@ namespace spacer {
     };
 
 
-    bool farkas_learner::get_lemma_guesses(expr * A_ext, expr * B_ext, expr_ref_vector& lemmas)
-    {
-        expr_ref A(o2p(A_ext), m_pr);
-        expr_ref B(o2p(B_ext), m_pr);
-        proof_ref pr(m_pr);
-        expr_ref tmp(m_pr);
-        expr_ref_vector ilemmas(m_pr);
-        equality_expander_cfg ee_rwr_cfg(m_pr);
-        rewriter_tpl<equality_expander_cfg> ee_rwr(m_pr, false, ee_rwr_cfg);
-
-        lemmas.reset();
-
-        ee_rwr(A, A);
-        ee_rwr(B, B);
-
-        expr_set bs;
-        expr_ref_vector blist(m_pr);
-        flatten_and(B, blist);
-        for (unsigned i = 0; i < blist.size(); ++i) {
-            bs.insert(blist[i].get());
-        }
-
-
-        if (!m_ctx) {
-            m_ctx = alloc(smt::kernel, m_pr, m_proof_params);
-        }
-
-        m_ctx->push();
-        m_ctx->assert_expr(A);
-        expr_set::iterator it = bs.begin(), end = bs.end();
-        for (; it != end; ++it) {
-            m_ctx->assert_expr(*it);
-        }
-        lbool res = m_ctx->check();
-        bool is_unsat = res == l_false;
-        if (is_unsat) {
-            pr = m_ctx->get_proof();
-            get_lemmas(m_ctx->get_proof(), bs, ilemmas);
-            for (unsigned i = 0; i < ilemmas.size(); ++i) {
-                lemmas.push_back(p2o(ilemmas[i].get()));
-            }
-        }
-        m_ctx->pop(1);
-
-        IF_VERBOSE(3, {
-                for (unsigned i = 0; i < ilemmas.size(); ++i) {
-                    verbose_stream() << "B': " << mk_pp(ilemmas[i].get(), m_pr) << "\n";
-                }
-            });
-
-        TRACE("farkas_learner",
-              tout << (is_unsat?"unsat":"sat") << "\n";
-              tout << "A: " << mk_pp(A_ext, m_ctx->m()) << "\n";
-              tout << "B: " << mk_pp(B_ext, m_ctx->m()) << "\n";
-              for (unsigned i = 0; i < lemmas.size(); ++i) {
-                  tout << "B': " << mk_pp(ilemmas[i].get(), m_pr) << "\n";
-              });
-        DEBUG_CODE(
-            if (is_unsat) {
-                m_ctx->push();
-                m_ctx->assert_expr(A);
-                for (unsigned i = 0; i < ilemmas.size(); ++i) {
-                    m_ctx->assert_expr(ilemmas[i].get());
-                }
-                lbool res2 = m_ctx->check();
-                SASSERT(l_false == res2);
-                m_ctx->pop(1);
-            }
-            );
-        return is_unsat;
-    }
+    
 
     //
     // Perform simple subsumption check of lemmas.
@@ -211,19 +102,6 @@ namespace spacer {
         }
         res = res_c.get();
     }
-
-    class farkas_learner::constant_replacer_cfg : public default_rewriter_cfg
-    {
-        const obj_map<expr, expr *>& m_translation;
-    public:
-        constant_replacer_cfg(const obj_map<expr, expr *>& translation)
-            : m_translation(translation)
-        { }
-
-        bool get_subst(expr * s, expr * & t, proof * & t_pr) {
-            return m_translation.find(s, t);
-        }
-    };
 
     // every uninterpreted symbol is in symbs
     class is_pure_expr_proc {
@@ -598,70 +476,6 @@ namespace spacer {
             d->get_parameter(0).is_symbol(sym) && sym == "arith" &&
             d->get_parameter(1).is_symbol(sym) && sym == "farkas" &&
             d->get_num_parameters() >= m.get_num_parents(to_app(e)) + 2;
-    };
-
-
-    void farkas_learner::test()  {
-        smt_params params;
-        enable_trace("farkas_learner");
-               
-        bool res;
-        ast_manager m;
-        reg_decl_plugins(m);        
-        arith_util a(m);
-        spacer::farkas_learner fl(params, m);
-        expr_ref_vector lemmas(m);
-        
-        sort_ref int_s(a.mk_int(), m);
-        expr_ref x(m.mk_const(symbol("x"), int_s), m);
-        expr_ref y(m.mk_const(symbol("y"), int_s), m);
-        expr_ref z(m.mk_const(symbol("z"), int_s), m);    
-        expr_ref u(m.mk_const(symbol("u"), int_s), m);  
-        expr_ref v(m.mk_const(symbol("v"), int_s), m);
-
-        // A: x > y >= z
-        // B: x < z
-        // Farkas: x <= z
-        expr_ref A(m.mk_and(a.mk_gt(x,y), a.mk_ge(y,z)),m);        
-        expr_ref B(a.mk_gt(z,x),m);        
-        res = fl.get_lemma_guesses(A, B, lemmas);        
-        std::cout << "\nres: " << res << "\nlemmas: " << pp_cube(lemmas, m) << "\n";
-
-        // A: x > y >= z + 2
-        // B: x = 1, z = 8
-        // Farkas: x <= z + 2
-        expr_ref one(a.mk_numeral(rational(1), true), m);
-        expr_ref two(a.mk_numeral(rational(2), true), m);
-        expr_ref eight(a.mk_numeral(rational(8), true), m);
-        A = m.mk_and(a.mk_gt(x,y),a.mk_ge(y,a.mk_add(z,two)));
-        B = m.mk_and(m.mk_eq(x,one), m.mk_eq(z, eight));
-        res = fl.get_lemma_guesses(A, B, lemmas);        
-        std::cout << "\nres: " << res << "\nlemmas: " << pp_cube(lemmas, m) << "\n";
-
-        // A: x > y >= z \/ x >= u > z
-        // B: z > x + 1
-        // Farkas: z >= x
-        A = m.mk_or(m.mk_and(a.mk_gt(x,y),a.mk_ge(y,z)),m.mk_and(a.mk_ge(x,u),a.mk_gt(u,z)));
-        B = a.mk_gt(z, a.mk_add(x,one));
-        res = fl.get_lemma_guesses(A, B, lemmas);        
-        std::cout << "\nres: " << res << "\nlemmas: " << pp_cube(lemmas, m) << "\n";
-
-        // A: (x > y >= z \/ x >= u > z \/ u > v)
-        // B: z > x + 1 & not (u > v)
-        // Farkas: z >= x & not (u > v)
-        A = m.mk_or(m.mk_and(a.mk_gt(x,y),a.mk_ge(y,z)),m.mk_and(a.mk_ge(x,u),a.mk_gt(u,z)), a.mk_gt(u, v));
-        B = m.mk_and(a.mk_gt(z, a.mk_add(x,one)), m.mk_not(a.mk_gt(u, v)));
-        res = fl.get_lemma_guesses(A, B, lemmas);        
-        std::cout << "\nres: " << res << "\nlemmas: " << pp_cube(lemmas, m) << "\n";
-        
     }
-
-    void farkas_learner::collect_statistics(statistics& st) const {
-        if (m_ctx) {
-            m_ctx->collect_statistics(st);
-        }
-    }
-
-
-};
+}
 

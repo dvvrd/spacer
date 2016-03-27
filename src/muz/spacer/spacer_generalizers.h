@@ -78,15 +78,6 @@ namespace spacer {
         virtual void operator()(model_node& n, expr_ref_vector& core, unsigned& uses_level);
     };
 
-    class core_farkas_generalizer : public core_generalizer {
-        farkas_learner m_farkas_learner;
-    public:
-        core_farkas_generalizer(context& ctx, ast_manager& m, smt_params& p);
-        virtual ~core_farkas_generalizer() {}
-        virtual void operator()(model_node& n, expr_ref_vector& core, unsigned& uses_level);  
-        virtual void collect_statistics(statistics& st) const;
-    };
-
     class core_multi_generalizer : public core_generalizer {
         core_bool_inductive_generalizer m_gen;
     public:

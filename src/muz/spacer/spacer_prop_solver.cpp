@@ -93,6 +93,7 @@ namespace spacer {
             m_assumptions.append(conjs);
         }
 
+        // used in expand_literals
         expr* apply_accessor(
             ptr_vector<func_decl> const& acc,
             unsigned j,
@@ -461,7 +462,7 @@ namespace spacer {
         proof_ref pr(m);
         pr = m_ctx->get_proof();
         IF_VERBOSE(21, verbose_stream() << mk_ismt2_pp(pr, m) << "\n";);
-        farkas_learner fl(m_fparams, m);
+        farkas_learner fl(m_fparams);
         fl.set_split_literals (m_split_literals);
         expr_ref_vector lemmas(m);
         obj_hashtable<expr> bs;

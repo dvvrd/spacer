@@ -108,55 +108,6 @@ namespace spacer {
         }
     }
 
-    // ------------------------
-    // core_farkas_generalizer 
-
-    // 
-    // for each disjunct of core:
-    //     weaken predecessor.
-    //    
-
-    core_farkas_generalizer::core_farkas_generalizer(context& ctx, ast_manager& m, smt_params& p):
-        core_generalizer(ctx), 
-        m_farkas_learner(p, m) 
-    {}
-    
-    void core_farkas_generalizer::operator()(model_node& n, expr_ref_vector& core, 
-                                             unsigned& uses_level) {
-        ast_manager& m  = n.pt().get_ast_manager();
-        manager& pm = n.pt().get_manager();
-        if (core.empty()) return;
-        expr_ref A(m), B(pm.mk_and(core)), C(m);
-        expr_ref_vector Bs(m);
-        pm.get_or(B, Bs);
-        A = n.pt().get_propagation_formula(m_ctx.get_pred_transformers(), n.level());
-
-        bool change = false;
-        for (unsigned i = 0; i < Bs.size(); ++i) {
-            expr_ref_vector lemmas(m);
-            C = Bs[i].get();
-            if (m_farkas_learner.get_lemma_guesses(A, B, lemmas)) {
-                TRACE("spacer", 
-                      tout << "Old core:\n" << mk_pp(B, m) << "\n";
-                      tout << "New core:\n" << mk_pp(pm.mk_and(lemmas), m) << "\n";);            
-                Bs[i] = pm.mk_and(lemmas);
-                change = true;
-            }
-        }
-        if (change) {
-            C = pm.mk_or(Bs);
-            TRACE("spacer", tout << "prop:\n" << mk_pp(A,m) << "\ngen:" << mk_pp(B, m) << "\nto: " << mk_pp(C, m) << "\n";);
-            core.reset();
-            flatten_and(C, core);    
-            uses_level = n.level ();
-        }    
-    }
-
-    void core_farkas_generalizer::collect_statistics(statistics& st) const {
-        m_farkas_learner.collect_statistics(st);
-    }
-
-
     // ---------------------------------
     // core_arith_inductive_generalizer 
     // NB. this is trying out some ideas for generalization in

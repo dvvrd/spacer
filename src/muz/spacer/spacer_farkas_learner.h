@@ -32,37 +32,11 @@ Revision History:
 namespace spacer {
 
 class farkas_learner {
-    class farkas_collector;
-    class constant_replacer_cfg;
-    class equality_expander_cfg;
-
     typedef obj_hashtable<expr> expr_set;
 
-    smt_params               m_proof_params;
-    ast_manager              m_pr;
     bool m_split_literals;
-    scoped_ptr<smt::kernel>  m_ctx;
-
-  
-
-    static smt_params get_proof_params(smt_params& orig_params);
-
-    //
-    // all ast objects passed to private functions have m_proof_mgs as their ast_manager
-    //
-
-    ast_translation p2o;       /** Translate expression from inner ast_manager to outer one */
-    ast_translation o2p;       /** Translate expression from outer ast_manager to inner one */
-
-
-    /** All ast opbjects here are in the m_proof_mgs */
-    void get_lemma_guesses_internal(proof * p, expr* A, expr * B, expr_ref_vector& lemmas);
-
-    bool farkas2lemma(proof * fstep, expr* A, expr * B, expr_ref& res);
 
     void combine_constraints(unsigned cnt, app * const * constrs, rational const * coeffs, expr_ref& res);
-
-    bool try_ensure_lemma_in_language(expr_ref& lemma, expr* A, const func_decl_set& lang);
 
     bool is_farkas_lemma(ast_manager& m, expr* e);
    
@@ -70,23 +44,8 @@ class farkas_learner {
 
     bool is_pure_expr(func_decl_set const& symbs, expr* e, ast_manager& m) const;
 
-    static void test();
-
 public:
-    farkas_learner(smt_params& params, ast_manager& m);
-
-    /**
-       All ast objects have the ast_manager which was passed as 
-       an argument to the constructor (i.e. m_outer_mgr)
-       
-       B is a conjunction of literals.
-       A && B is unsat, equivalently A => ~B is valid
-       Find a weakened B' such that
-       A && B' is unsat and B' uses vocabulary (and constants) in common with A.
-       return lemmas to weaken B.     
-    */
-
-    bool get_lemma_guesses(expr * A, expr * B, expr_ref_vector& lemmas);
+    farkas_learner(smt_params& params);
 
     /**
         Traverse a proof and retrieve lemmas using the vocabulary from bs.
@@ -98,7 +57,9 @@ public:
      */
     void simplify_lemmas(expr_ref_vector& lemmas);
 
-    void collect_statistics(statistics& st) const;
+    void collect_statistics(statistics& st) const {} 
+    void reset_statistics () {}
+  
 
     /** \brief see smt::farkas_util::set_split_literals */
     void set_split_literals (bool v) {m_split_literals = v;}
