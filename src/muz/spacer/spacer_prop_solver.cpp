@@ -462,7 +462,7 @@ namespace spacer {
         proof_ref pr(m);
         pr = m_ctx->get_proof();
         IF_VERBOSE(21, verbose_stream() << mk_ismt2_pp(pr, m) << "\n";);
-        farkas_learner fl(m_fparams);
+        farkas_learner fl;
         fl.set_split_literals (m_split_literals);
         expr_ref_vector lemmas(m);
         obj_hashtable<expr> bs;

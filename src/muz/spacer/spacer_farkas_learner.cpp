@@ -37,9 +37,6 @@ Revision History:
 
 namespace spacer {
 
-    farkas_learner::farkas_learner(smt_params& params) :
-      m_split_literals (false) {}
-  
     class collect_pure_proc {
         func_decl_set& m_symbs;
     public:

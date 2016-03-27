@@ -31,7 +31,7 @@ Revision History:
 #include "spacer_manager.h"
 #include "spacer_prop_solver.h"
 #include "fixedpoint_params.hpp"
-
+#include "smt_params.h"
 
 namespace datalog {
     class rule_set;

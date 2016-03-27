@@ -20,14 +20,7 @@ Revision History:
 #ifndef _SPACER_FARKAS_LEARNER_H_
 #define _SPACER_FARKAS_LEARNER_H_
 
-#include "arith_decl_plugin.h"
-#include "ast_translation.h"
-#include "bv_decl_plugin.h"
-#include "smt_kernel.h"
-#include "bool_rewriter.h"
-#include "spacer_util.h"
-#include "smt_params.h"
-#include "tactic.h"
+#include "ast.h"
 
 namespace spacer {
 
@@ -45,7 +38,7 @@ class farkas_learner {
     bool is_pure_expr(func_decl_set const& symbs, expr* e, ast_manager& m) const;
 
 public:
-    farkas_learner(smt_params& params);
+    farkas_learner(): m_split_literals (false) {}
 
     /**
         Traverse a proof and retrieve lemmas using the vocabulary from bs.

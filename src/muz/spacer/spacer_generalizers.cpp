@@ -23,7 +23,7 @@ Revision History:
 #include "spacer_generalizers.h"
 #include "expr_abstract.h"
 #include "var_subst.h"
-
+#include "for_each_expr.h"
 
 namespace spacer {
 
