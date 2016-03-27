@@ -321,6 +321,7 @@ namespace spacer {
     {
         flet<bool> _model(m_fparams.m_model, m_model != 0);
         expr_ref_vector expr_atoms(m);
+        ptr_vector<expr> core;
 
         expr_atoms.append (hard_atoms);
         if (m_in_level) {
@@ -330,6 +331,7 @@ namespace spacer {
         expr_atoms.append (soft_atoms);
 
         lbool result = m_ctx->check(expr_atoms);
+        if (result == l_false) m_ctx->get_unsat_core (core);
 
         TRACE("spacer", 
                tout << mk_pp(m_pm.mk_and(expr_atoms), m) << "\n";
@@ -343,59 +345,45 @@ namespace spacer {
         }
 
         if (result == l_false && !soft_atoms.empty ()) {
-            TRACE ("spacer", tout << "unsat using soft atoms\n";);
             TRACE ("spacer",
-                    tout << "Core:\n";
-                    for (unsigned i = 0; i < m_ctx->get_unsat_core_size(); ++i) {
-                        tout << mk_pp (m_ctx->get_unsat_core_expr (i), m) << "\n";
-                    }
-                  );
+                   tout << "unsat using soft atoms\n";
+                   ptr_vector<expr> core;
+                   m_ctx->get_unsat_core (core);
+                   tout << "Core:\n";
+                   for (unsigned i = 0, sz = core.size (); i < sz; ++i) {
+                     tout << mk_pp (core[i], m) << "\n";
+                   }
+                   tout << "soft atoms in core:\n";
+                   for (unsigned i = num_non_soft; i < expr_atoms.size (); i++) {
+                     if (core.contains (expr_atoms.get (i)))
+                       tout << mk_pp (expr_atoms.get (i), m) << "\n";
+                   }
+                   );
 
             expr_ref atom_bkp (m);
-            ast_eq_proc eq_proc;
-
-            TRACE ("spacer",
-                    tout << "soft atoms in core:\n";
-                    for (unsigned i = num_non_soft; i < expr_atoms.size (); i++) {
-                        bool found = false;
-                        for (unsigned j = 0; j < m_ctx->get_unsat_core_size(); j++) {
-                            if (eq_proc (expr_atoms.get (i), m_ctx->get_unsat_core_expr (j))) {
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (found) {
-                            tout << mk_pp (expr_atoms.get (i), m) << "\n";
-                        }
-                    }
-                  );
-
+            
             // try to get a model with as many soft_atoms as possible,
             while (expr_atoms.size () > num_non_soft) {
                 // remove the first atom in core
-                unsigned core_size = m_ctx->get_unsat_core_size();
                 unsigned num_atoms = expr_atoms.size ();
                 bool found = false;
+                
+                // find a soft assumption in core
                 for (unsigned i = num_non_soft; i < num_atoms; i++) {
-                    for (unsigned j = 0; j < core_size; j++) {
-                        if (eq_proc (expr_atoms.get (i), m_ctx->get_unsat_core_expr (j))) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (found) {
-                        atom_bkp = expr_atoms.get (i);
-                        expr_atoms[i] = expr_atoms.back ();
-                        expr_atoms.pop_back ();
-                        TRACE ("spacer",
-                                tout << "removing soft atom: " << mk_pp (atom_bkp,m) << "\n";
-                              );
-                        break;
-                    }
+                  if (core.contains (expr_atoms.get (i)))
+                  {
+                    found = true;
+                    atom_bkp = expr_atoms.get (i);
+                    expr_atoms[i] = expr_atoms.back ();
+                    expr_atoms.pop_back ();
+                    TRACE ("spacer",
+                           tout << "removing soft atom: " << mk_pp (atom_bkp,m) << "\n";
+                           );
+                    break;
+                  }
                 }
                 if (!found) {
-                    // no soft atom in core
-                    // drop all soft atoms
+                    // no soft atom in core, drop all soft atoms
                     expr_atoms.resize (num_non_soft);
                     break;
                 }
@@ -417,6 +405,8 @@ namespace spacer {
                 }
 
                 SASSERT (result == l_false);
+                core.reset ();
+                m_ctx->get_unsat_core (core);
             }
 
             // update soft_atoms
@@ -424,28 +414,26 @@ namespace spacer {
             for (unsigned i = num_non_soft; i < expr_atoms.size (); i++) {
                 soft_atoms.push_back (expr_atoms.get (i));
             }
-            TRACE ("spacer", tout << "result: " << result << "\n";);
-            TRACE ("spacer", tout << "subset of soft atoms\n";);
             TRACE ("spacer",
-                    for (unsigned j = 0; j < soft_atoms.size (); ++j) {
-                        tout << mk_pp (soft_atoms.get (j), m) << "\n";
-                    }
-                  );
+                   tout << "result: " << result << "\n";
+                   tout << "subset of soft atoms\n";
+                   for (unsigned j = 0; j < soft_atoms.size (); ++j) 
+                     tout << mk_pp (soft_atoms.get (j), m) << "\n";
+                   );
         }
 
         SASSERT (result != l_false || soft_atoms.empty ());
 
-        if (result == l_false) { 
-            unsigned core_size = m_ctx->get_unsat_core_size(); 
+        if (result == l_false) {
+            unsigned core_size = core.size ();
             m_uses_level = infty_level ();
             
             for (unsigned i = 0; i < core_size; ++i) {
-              expr* core = m_ctx->get_unsat_core_expr (i);
-              if (m_level_atoms_set.contains (core))
+              if (m_level_atoms_set.contains (core[i]))
               {
                 unsigned sz = std::min (m_uses_level, m_neg_level_atoms.size ());
                 for (unsigned j = 0; j < sz; ++j)
-                  if (m_neg_level_atoms [j].get () == core)
+                  if (m_neg_level_atoms [j].get () == core[i])
                   {
                     m_uses_level = j;
                     break;
@@ -458,15 +446,14 @@ namespace spacer {
         if (result == l_false && m_core && m.proofs_enabled() && !m_subset_based_core) {
             TRACE ("spacer", tout << "theory core\n";);
             extract_theory_core(safe);
-            // save the unsat core
-            unsigned core_size = m_ctx->get_unsat_core_size ();
+            // duplicate core 
             expr_ref_vector unsat_core (m);
-            for (unsigned i = 0; i < core_size; ++i) {
-                unsat_core.push_back (m_ctx->get_unsat_core_expr (i));
-            }
+            for (unsigned i = 0, sz = core.size (); i < sz; ++i)
+              unsat_core.push_back (core[i]);
+            
             if (m_validate_theory_core && !validate_theory_core ()) {
                 TRACE ("spacer", tout << "theory core unsound; using subset core\n";);
-                extract_subset_core (safe, unsat_core.c_ptr (), core_size);
+                extract_subset_core (safe, unsat_core.c_ptr (), unsat_core.size ());
             }
         }
         else if (result == l_false && m_core) {
@@ -505,11 +492,22 @@ namespace spacer {
         return (result == l_false);
     }
 
-    void prop_solver::extract_subset_core(safe_assumptions& safe, expr* const* unsat_core, unsigned unsat_core_size) {
-        unsigned core_size = unsat_core ? unsat_core_size : m_ctx->get_unsat_core_size(); 
+    void prop_solver::extract_subset_core(safe_assumptions& safe,
+                                          expr* const* unsat_core,
+                                          unsigned unsat_core_size) {
+        ptr_vector<expr> core;
+        unsigned core_size;
+        if (unsat_core)
+          core_size = unsat_core_size;
+        else {
+          m_ctx->get_unsat_core (core);
+          core_size = core.size ();
+        }
+        
         m_core->reset();
+        
         for (unsigned i = 0; i < core_size; ++i) {
-            expr * core_expr = unsat_core ? unsat_core[i] : m_ctx->get_unsat_core_expr(i);
+            expr * core_expr = unsat_core ? unsat_core[i] : core[i];
             SASSERT(is_app(core_expr));
 
             if (m_level_atoms_set.contains(core_expr)) {
@@ -526,7 +524,7 @@ namespace spacer {
         TRACE("spacer", 
             tout << "core_exprs: ";
                 for (unsigned i = 0; i < core_size; ++i) {
-                tout << mk_pp(unsat_core ? unsat_core[i] : m_ctx->get_unsat_core_expr(i), m) << " ";
+                tout << mk_pp(unsat_core ? unsat_core[i] : core[i], m) << " ";
             }
             tout << "\n";
             tout << "core: " << mk_pp(m_pm.mk_and(*m_core), m) << "\n";              
