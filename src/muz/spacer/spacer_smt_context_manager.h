@@ -39,6 +39,7 @@ namespace spacer {
     ast_manager &m;
     smt::kernel & m_context;
     bool m_virtual;
+    expr_ref_vector m_assumptions;
     expr_ref_vector m_assertions;
     unsigned m_head;
       
@@ -58,7 +59,7 @@ namespace spacer {
     ~smt_context();
     void assert_expr(expr* e);
     void assert_lemma (expr *t);
-    lbool check(expr_ref_vector& assumptions);
+    lbool check_sat (unsigned num_assumptions, expr *const *assumptions);
     void get_model(model_ref& model);
     proof* get_proof();
     void push() ;

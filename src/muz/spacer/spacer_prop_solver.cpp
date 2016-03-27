@@ -322,8 +322,7 @@ namespace spacer {
     unsigned hard_sz = hard.size ();
     hard.append (soft);
     
-    // lbool res = m_ctx.check_sat (hard.size (), hard.c_ptr ());
-    lbool res = m_ctx->check (hard);
+    lbool res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
     if (res != l_false || soft.empty ()) return res;
     
     soft.reset ();
@@ -350,7 +349,7 @@ namespace spacer {
         return l_false;
       }
       
-      res = m_ctx->check (hard);
+      res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
       if (res == l_true) break;
       if (res == l_undef)
       {

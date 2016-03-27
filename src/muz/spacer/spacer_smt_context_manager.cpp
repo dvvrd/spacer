@@ -42,10 +42,11 @@ namespace spacer {
       m (ctx.m ()),
       m_context(ctx),
       m_virtual (!m.is_true (pred)),
+      m_assumptions(m),
       m_assertions(m),
       m_head(0),
       m_flat (m)
-    {}
+    { if (m_virtual) m_assumptions.push_back (pred); }
 
     smt_context::~smt_context ()
     {
@@ -140,23 +141,41 @@ namespace spacer {
   }
   
     
-    lbool smt_context::check (expr_ref_vector& assumptions)
+  namespace
+  {
+    struct scoped_append
+    {
+      expr_ref_vector &m_vec;
+      unsigned m_sz;
+      scoped_append (expr_ref_vector &vec,
+                     unsigned num,
+                     expr * const *extra) : 
+        m_vec (vec)
+      {
+        m_sz = m_vec.size ();
+        m_vec.append (num, extra);
+      }
+      ~scoped_append ()
+      {m_vec.shrink (m_sz);} 
+    };
+  }
+  
+  lbool smt_context::check_sat (unsigned num_assumptions, expr *const *assumptions)
     {
       m_parent.m_stats.m_num_smt_checks++;
       scoped_watch _t_ (m_parent.m_check_watch);
+      scoped_append _a_(m_assumptions, num_assumptions, assumptions);
       
       internalize_assertions ();
-      if (m_virtual) assumptions.push_back(m_pred);
       stopwatch sw;
       sw.start ();
-      lbool result = m_context.check (assumptions.size(), assumptions.c_ptr());
+      lbool result = m_context.check (m_assumptions.size(), m_assumptions.c_ptr());
       sw.stop ();
       if (result == l_true)
       {
         m_parent.m_check_sat_watch.add (sw);
         m_parent.m_stats.m_num_sat_smt_checks++;
       }
-      if (m_virtual) assumptions.pop_back();
       return result;
     }
 

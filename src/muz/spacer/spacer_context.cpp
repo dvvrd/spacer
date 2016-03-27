@@ -161,8 +161,7 @@ namespace spacer {
         m_reach_ctx->push ();
         m_reach_ctx->assert_expr (state);
         m_reach_ctx->assert_expr (m.mk_not (m_reach_case_vars.back ()));
-        expr_ref_vector assumptions (m);
-        lbool res = m_reach_ctx->check (assumptions);
+        lbool res = m_reach_ctx->check_sat (0, NULL);
         if (model) m_reach_ctx->get_model (*model);
         m_reach_ctx->pop ();
         return (res == l_true);
