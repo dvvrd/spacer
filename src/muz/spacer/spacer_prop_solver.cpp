@@ -321,10 +321,12 @@ namespace spacer {
   {
     unsigned hard_sz = hard.size ();
     hard.append (soft);
-
+    
     // lbool res = m_ctx.check_sat (hard.size (), hard.c_ptr ());
     lbool res = m_ctx->check (hard);
     if (res != l_false || soft.empty ()) return res;
+    
+    soft.reset ();
     
     expr_ref saved (m);
     ptr_vector<expr> core;
@@ -363,7 +365,6 @@ namespace spacer {
     if (res != l_false)
     {
       // update soft
-      soft.reset ();
       for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
         soft.push_back (hard.get (i));
     }
@@ -437,9 +438,6 @@ namespace spacer {
             SASSERT(is_app(core_expr));
 
             if (m_level_atoms_set.contains(core_expr)) {
-                continue;
-            }
-            if (m_ctx->is_aux_predicate(core_expr)) {
                 continue;
             }
             m_core->push_back(to_app(core_expr));
