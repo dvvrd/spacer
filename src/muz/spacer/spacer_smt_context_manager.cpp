@@ -29,17 +29,9 @@ Revision History:
 #include "spacer_util.h"
 namespace spacer {
 
-    smt_context::scoped::scoped(smt_context& ctx): m_ctx(ctx) {
-        SASSERT(!m_ctx.m_in_delay_scope);
-        SASSERT(!m_ctx.m_pushed);
-        m_ctx.m_in_delay_scope = true;
-    }
-
-    smt_context::scoped::~scoped() {
-        SASSERT(m_ctx.m_in_delay_scope);
-        if (m_ctx.m_pushed) m_ctx.pop(); 
-        m_ctx.m_in_delay_scope = false;        
-    }
+    smt_context::scoped::scoped(smt_context& ctx): m_ctx(ctx)
+    {m_ctx.push ();}
+    smt_context::scoped::~scoped() {m_ctx.pop ();}
 
 
     smt_context::smt_context(smt::kernel & ctx, smt_context_manager& p, app* pred):
@@ -51,11 +43,14 @@ namespace spacer {
       m_context(ctx),
       m_virtual (!m.is_true (pred)),
       m_assertions(m),
-      m_head(0)
+      m_head(0),
+      m_flat (m)
     {}
 
     smt_context::~smt_context ()
     {
+      if (m_pushed) pop ();
+      
       ast_manager &m = m_context.m();
       /// turn off any constraints that dependent on this context
       if (m_virtual)
@@ -70,35 +65,40 @@ namespace spacer {
   
   void smt_context::internalize_assertions ()
   {
-    SASSERT (!m_pushed);
+    SASSERT (!m_pushed || m_head == m_assertions.size ());
     for (unsigned sz = m_assertions.size (); m_head < sz; ++m_head)
     {
       expr_ref f(m);
-#if 1
       f = m.mk_implies (m_pred, (m_assertions.get (m_head)));
       m_context.assert_expr (f);
-#else      
-      expr_ref_vector v(m);
-      v.push_back (m_assertions.get (m_head));
-      flatten_and (v);
-      for (unsigned i = 0, vsz = v.size (); i < vsz; ++i)
-      {
-        f = m.mk_implies (m_pred, v.get (i));
-        m_context.assert_expr (f);
-      }
-#endif
     }
     
   }
   
-  void smt_context::push()
+  void smt_context::push_core ()
   {
     SASSERT (!m_pushed);
+    SASSERT (m_in_delay_scope);
     internalize_assertions ();
-    m_context.push();
+    m_context.push ();
     m_pushed = true;
+    m_in_delay_scope = false;
+  }
+  
+  void smt_context::push()
+  {
+    SASSERT (!m_pushed && !m_in_delay_scope);
+    m_in_delay_scope = true;
   }
 
+  void smt_context::pop ()
+  {
+    SASSERT (m_pushed || m_in_delay_scope);
+    if (m_pushed) m_context.pop (1);
+    m_pushed = false;
+    m_in_delay_scope = false;
+  }
+  
   void smt_context::get_unsat_core (ptr_vector<expr> &r)
   {
     for (unsigned i = 0, sz = get_unsat_core_size (); i < sz; ++i)
@@ -112,12 +112,17 @@ namespace spacer {
   void smt_context::assert_expr (expr* e)
   {
     if (m.is_true(e)) return;
-    if (m_in_delay_scope && !m_pushed) push ();
+    if (m_in_delay_scope && !m_pushed) push_core ();
         
     if (m_pushed)
       m_context.assert_expr (e);
     else
-      flatten_and (e, m_assertions);
+    {
+      m_flat.push_back (e);
+      flatten_and (m_flat);
+      m_assertions.append (m_flat);
+      m_flat.reset ();
+    }
   }
 
   void smt_context::assert_lemma (expr *t)
@@ -140,7 +145,7 @@ namespace spacer {
       m_parent.m_stats.m_num_smt_checks++;
       scoped_watch _t_ (m_parent.m_check_watch);
       
-      if (!m_pushed) internalize_assertions ();
+      internalize_assertions ();
       if (m_virtual) assumptions.push_back(m_pred);
       stopwatch sw;
       sw.start ();
