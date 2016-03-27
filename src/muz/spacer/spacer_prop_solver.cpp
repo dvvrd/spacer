@@ -313,6 +313,63 @@ namespace spacer {
     }
 
 
+  /// Poor man's maxsat. No guarantees of maximum solution
+  /// Runs maxsat loop on m_ctx Returns l_false if hard is unsat,
+  /// otherwise reduces soft such that hard & soft is sat.
+  lbool prop_solver::maxsmt (expr_ref_vector &hard, expr_ref_vector &soft)
+  {
+    unsigned hard_sz = hard.size ();
+    hard.append (soft);
+
+    // lbool res = m_ctx.check_sat (hard.size (), hard.c_ptr ());
+    lbool res = m_ctx->check (hard);
+    if (res != l_false || soft.empty ()) return res;
+    
+    expr_ref saved (m);
+    ptr_vector<expr> core;
+    m_ctx->get_unsat_core (core);
+    
+    while (hard.size () > hard_sz)
+    {
+      bool found = false;
+      for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
+        if (core.contains (hard.get (i)))
+          {
+            found = true;
+            saved = hard.get (i);
+            hard[i] = hard.back ();
+            hard.pop_back ();
+            break;
+          }
+      if (!found)
+      {
+        hard.resize (hard_sz);
+        return l_false;
+      }
+      
+      res = m_ctx->check (hard);
+      if (res == l_true) break;
+      if (res == l_undef)
+      {
+        hard.push_back (saved);
+        break;
+      }
+      SASSERT (res == l_false);
+      core.reset ();
+      m_ctx->get_unsat_core (core);
+    }
+
+    if (res != l_false)
+    {
+      // update soft
+      soft.reset ();
+      for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
+        soft.push_back (hard.get (i));
+    }
+    hard.resize (hard_sz);
+    return res;
+  }
+  
     lbool prop_solver::check_safe_assumptions(
         safe_assumptions& safe,
         const expr_ref_vector& hard_atoms,
@@ -320,110 +377,20 @@ namespace spacer {
     {
         flet<bool> _model(m_fparams.m_model, m_model != 0);
         expr_ref_vector expr_atoms(m);
-        ptr_vector<expr> core;
 
         expr_atoms.append (hard_atoms);
-        if (m_in_level) {
+        if (m_in_level) 
             push_level_atoms(m_current_level, expr_atoms);
-        }
-        unsigned num_non_soft = expr_atoms.size ();
-        expr_atoms.append (soft_atoms);
-
-        lbool result = m_ctx->check(expr_atoms);
-        if (result == l_false) m_ctx->get_unsat_core (core);
-
-        TRACE("spacer", 
-               tout << mk_pp(m_pm.mk_and(expr_atoms), m) << "\n";
-               tout << "num non soft atoms: " << num_non_soft << "\n";
-               tout << result << "\n";
-             );
-
-        if (result == l_true && m_model) {
-            m_ctx->get_model(*m_model);
-            TRACE("spacer_verbose", model_pp(tout, **m_model); );
-        }
-
-        if (result == l_false && !soft_atoms.empty ()) {
-            TRACE ("spacer",
-                   tout << "unsat using soft atoms\n";
-                   ptr_vector<expr> core;
-                   m_ctx->get_unsat_core (core);
-                   tout << "Core:\n";
-                   for (unsigned i = 0, sz = core.size (); i < sz; ++i) {
-                     tout << mk_pp (core[i], m) << "\n";
-                   }
-                   tout << "soft atoms in core:\n";
-                   for (unsigned i = num_non_soft; i < expr_atoms.size (); i++) {
-                     if (core.contains (expr_atoms.get (i)))
-                       tout << mk_pp (expr_atoms.get (i), m) << "\n";
-                   }
-                   );
-
-            expr_ref atom_bkp (m);
-            
-            // try to get a model with as many soft_atoms as possible,
-            while (expr_atoms.size () > num_non_soft) {
-                // remove the first atom in core
-                unsigned num_atoms = expr_atoms.size ();
-                bool found = false;
-                
-                // find a soft assumption in core
-                for (unsigned i = num_non_soft; i < num_atoms; i++) {
-                  if (core.contains (expr_atoms.get (i)))
-                  {
-                    found = true;
-                    atom_bkp = expr_atoms.get (i);
-                    expr_atoms[i] = expr_atoms.back ();
-                    expr_atoms.pop_back ();
-                    TRACE ("spacer",
-                           tout << "removing soft atom: " << mk_pp (atom_bkp,m) << "\n";
-                           );
-                    break;
-                  }
-                }
-                if (!found) {
-                    // no soft atom in core, drop all soft atoms
-                    expr_atoms.resize (num_non_soft);
-                    break;
-                }
-
-                // check sat with remaining assumptions
-                result = m_ctx->check(expr_atoms);
-
-                if (result == l_true) {
-                    if (m_model) {
-                        m_ctx->get_model(*m_model);
-                        TRACE("spacer_verbose", model_pp(tout, **m_model); );
-                    }
-                    break;
-                }
-
-                if (result == l_undef) {
-                    expr_atoms.push_back (atom_bkp);
-                    break;
-                }
-
-                SASSERT (result == l_false);
-                core.reset ();
-                m_ctx->get_unsat_core (core);
-            }
-
-            // update soft_atoms
-            soft_atoms.reset ();
-            for (unsigned i = num_non_soft; i < expr_atoms.size (); i++) {
-                soft_atoms.push_back (expr_atoms.get (i));
-            }
-            TRACE ("spacer",
-                   tout << "result: " << result << "\n";
-                   tout << "subset of soft atoms\n";
-                   for (unsigned j = 0; j < soft_atoms.size (); ++j) 
-                     tout << mk_pp (soft_atoms.get (j), m) << "\n";
-                   );
-        }
+        lbool result = maxsmt (expr_atoms, soft_atoms);
+        if (result == l_true && m_model) m_ctx->get_model (*m_model);
 
         SASSERT (result != l_false || soft_atoms.empty ());
 
+        /// compute level used in the core
+        // XXX this is a poor approximation because the core will get minimized further
         if (result == l_false) {
+            ptr_vector<expr> core;
+            m_ctx->get_unsat_core (core);
             unsigned core_size = core.size ();
             m_uses_level = infty_level ();
             
@@ -445,45 +412,15 @@ namespace spacer {
         if (result == l_false && m_core && m.proofs_enabled() && !m_subset_based_core) {
             TRACE ("spacer", tout << "theory core\n";);
             extract_theory_core(safe);
-            // duplicate core 
-            expr_ref_vector unsat_core (m);
-            for (unsigned i = 0, sz = core.size (); i < sz; ++i)
-              unsat_core.push_back (core[i]);
         }
         else if (result == l_false && m_core) {
             TRACE ("spacer", tout << "subset core\n";);
             extract_subset_core(safe);    
-            SASSERT(expr_atoms.size() >= m_core->size());
         }
         m_core = 0;
         m_model = 0;
         m_subset_based_core = false;
         return result;
-    }
-
-    bool prop_solver::validate_theory_core () {
-        expr_ref_vector atoms (m);
-        if (!m_core->empty ()) {
-            expr_ref_vector _aux (m);
-            safe_assumptions safe (*this, *m_core, _aux);
-            atoms.append (safe.hard_atoms ());
-        }
-        if (m_in_level) {
-            push_level_atoms (m_current_level, atoms);
-        }
-
-        TRACE ("spacer",
-                tout << "Check theory core\n";
-                tout << mk_pp(m_pm.mk_and(atoms), m) << "\n";
-              );
-
-        lbool result = m_ctx->check (atoms);
-
-        TRACE ("spacer",
-                tout << result << "\n";
-              );
-
-        return (result == l_false);
     }
 
     void prop_solver::extract_subset_core(safe_assumptions& safe) {

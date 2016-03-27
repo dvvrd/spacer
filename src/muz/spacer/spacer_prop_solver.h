@@ -67,10 +67,6 @@ namespace spacer {
 
         class safe_assumptions;
 
-        // validate if theory core is actually inconsistent with the context
-        // for integers, farkas core need not be sound
-        bool validate_theory_core ();
-
         void extract_theory_core(safe_assumptions& assumptions);
 
         void extract_subset_core(safe_assumptions& assumptions);
@@ -80,6 +76,8 @@ namespace spacer {
             expr_ref_vector const& hard_atoms,
             expr_ref_vector& soft_atoms);
         
+        lbool maxsmt (expr_ref_vector &hard, expr_ref_vector &soft);
+      
         
     public:
         prop_solver(spacer::manager& pm, fixedpoint_params const& p, symbol const& name);
