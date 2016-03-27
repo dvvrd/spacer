@@ -56,7 +56,6 @@ namespace pdr {
         func_decl_set       m_aux_symbols;      
         bool                m_in_level;         
         unsigned            m_current_level;    // set when m_in_level
-        bool                m_validate_theory_core;//flag for validating theory cores
         
         /** Add level atoms activating certain level into a vector */
         void push_level_atoms(unsigned level, expr_ref_vector & tgt) const;
@@ -79,7 +78,7 @@ namespace pdr {
         
         
     public:
-        prop_solver(pdr::manager& pm, bool try_minimize_core, symbol const& name, bool validate_theory_core);
+        prop_solver(pdr::manager& pm, bool try_minimize_core, symbol const& name);
         
         /** return true is s is a symbol introduced by prop_solver */
         bool is_aux_symbol(func_decl * s) const { 

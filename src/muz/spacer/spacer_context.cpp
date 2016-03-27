@@ -76,7 +76,7 @@ namespace spacer {
     pred_transformer::pred_transformer(context& ctx, manager& pm, func_decl* head): 
         pm(pm), m(pm.get_manager()),
         ctx(ctx), m_head(head, m), 
-        m_sig(m), m_solver(pm, ctx.get_params(), head->get_name(), ctx.get_params ().validate_theory_core ()),
+        m_sig(m), m_solver(pm, ctx.get_params(), head->get_name()),
         m_reach_ctx (pm.mk_fresh3 ()),
         m_frames (*this), 
         m_reach_facts (), m_rf_init_sz (0),

@@ -235,7 +235,7 @@ namespace spacer {
     };
 
 
-    prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name, bool validate_theory_core) :
+    prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name) :
         m_fparams(pm.get_fparams()),
         m_split_literals(p.spacer_split_farkas_literals ()),
         m(pm.get_manager()),
@@ -251,8 +251,7 @@ namespace spacer {
         m_subset_based_core(false),
         m_uses_level(infty_level ()),
         m_delta_level(false),
-        m_in_level(false),
-        m_validate_theory_core (validate_theory_core)
+        m_in_level(false)
     {
       m_contexts[0] = pm.mk_fresh ();
       m_contexts[1] = pm.mk_fresh2 ();
@@ -450,11 +449,6 @@ namespace spacer {
             expr_ref_vector unsat_core (m);
             for (unsigned i = 0, sz = core.size (); i < sz; ++i)
               unsat_core.push_back (core[i]);
-            
-            if (m_validate_theory_core && !validate_theory_core ()) {
-                TRACE ("spacer", tout << "theory core unsound; using subset core\n";);
-                extract_subset_core (safe, unsat_core.c_ptr (), unsat_core.size ());
-            }
         }
         else if (result == l_false && m_core) {
             TRACE ("spacer", tout << "subset core\n";);
@@ -492,22 +486,16 @@ namespace spacer {
         return (result == l_false);
     }
 
-    void prop_solver::extract_subset_core(safe_assumptions& safe,
-                                          expr* const* unsat_core,
-                                          unsigned unsat_core_size) {
+    void prop_solver::extract_subset_core(safe_assumptions& safe) {
         ptr_vector<expr> core;
         unsigned core_size;
-        if (unsat_core)
-          core_size = unsat_core_size;
-        else {
-          m_ctx->get_unsat_core (core);
-          core_size = core.size ();
-        }
+        m_ctx->get_unsat_core (core);
+        core_size = core.size ();
         
         m_core->reset();
         
         for (unsigned i = 0; i < core_size; ++i) {
-            expr * core_expr = unsat_core ? unsat_core[i] : core[i];
+            expr * core_expr = core[i];
             SASSERT(is_app(core_expr));
 
             if (m_level_atoms_set.contains(core_expr)) {
@@ -524,7 +512,7 @@ namespace spacer {
         TRACE("spacer", 
             tout << "core_exprs: ";
                 for (unsigned i = 0; i < core_size; ++i) {
-                tout << mk_pp(unsat_core ? unsat_core[i] : core[i], m) << " ";
+                tout << mk_pp(core[i], m) << " ";
             }
             tout << "\n";
             tout << "core: " << mk_pp(m_pm.mk_and(*m_core), m) << "\n";              

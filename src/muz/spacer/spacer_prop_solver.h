@@ -59,7 +59,6 @@ namespace spacer {
         bool                m_delta_level;
         bool                m_in_level;         
         unsigned            m_current_level;    // set when m_in_level
-        bool                m_validate_theory_core;// flag for validating theory cores
         
         /** Add level atoms activating certain level into a vector */
         void push_level_atoms(unsigned level, expr_ref_vector & tgt) const;
@@ -74,7 +73,7 @@ namespace spacer {
 
         void extract_theory_core(safe_assumptions& assumptions);
 
-        void extract_subset_core(safe_assumptions& assumptions, expr* const* unsat_core = 0, unsigned unsat_core_size = 0);
+        void extract_subset_core(safe_assumptions& assumptions);
         
         lbool check_safe_assumptions(
             safe_assumptions& assumptions,
@@ -83,7 +82,7 @@ namespace spacer {
         
         
     public:
-        prop_solver(spacer::manager& pm, fixedpoint_params const& p, symbol const& name, bool validate_theory_core);
+        prop_solver(spacer::manager& pm, fixedpoint_params const& p, symbol const& name);
         
         
         void set_core(expr_ref_vector* core) { m_core = core; }

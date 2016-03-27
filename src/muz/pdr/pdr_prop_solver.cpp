@@ -226,7 +226,7 @@ namespace pdr {
     };
 
 
-    prop_solver::prop_solver(manager& pm, bool try_minimize_core, symbol const& name, bool validate_theory_core) :
+    prop_solver::prop_solver(manager& pm, bool try_minimize_core, symbol const& name) :
         m_fparams(pm.get_fparams()),
         m(pm.get_manager()),
         m_pm(pm),
@@ -242,8 +242,7 @@ namespace pdr {
         m_subset_based_core(false),
         m_use_farkas(false),
         m_in_level(false),
-        m_current_level(0),
-        m_validate_theory_core (validate_theory_core)
+        m_current_level(0)
     {
         m_ctx->assert_expr(m_pm.get_background());
     }
@@ -346,10 +345,6 @@ namespace pdr {
             expr_ref_vector unsat_core (m);
             for (unsigned i = 0; i < core_size; ++i) {
                 unsat_core.push_back (m_ctx->get_unsat_core_expr (i));
-            }
-            if (m_validate_theory_core && !validate_theory_core ()) {
-                TRACE ("pdr", tout << "theory core unsound; using subset core\n";);
-                extract_subset_core (safe, unsat_core.c_ptr (), core_size);
             }
         }
         else if (result == l_false && m_core) {
