@@ -43,8 +43,8 @@ namespace spacer {
         manager&            m_pm;
         symbol              m_name;
         bool                m_try_minimize_core;
-        scoped_ptr<spacer::smt_context> m_contexts[2];
-        spacer::smt_context *m_ctx;
+        scoped_ptr<solver>  m_contexts[2];
+        solver *            m_ctx;
         decl_vector         m_level_preds;      
         app_ref_vector      m_pos_level_atoms;  // atoms used to identify level
         app_ref_vector      m_neg_level_atoms;  // 

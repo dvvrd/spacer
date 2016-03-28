@@ -43,6 +43,8 @@ Notes:
 
 
 #include <sstream>
+#include <iomanip>
+
 #include "dl_util.h"
 #include "rewriter.h"
 #include "rewriter_def.h"
@@ -163,7 +165,7 @@ namespace spacer {
         m_reach_ctx->assert_expr (m.mk_not (m_reach_case_vars.back ()));
         lbool res = m_reach_ctx->check_sat (0, NULL);
         if (model) m_reach_ctx->get_model (*model);
-        m_reach_ctx->pop ();
+        m_reach_ctx->pop (1);
         return (res == l_true);
     }
 

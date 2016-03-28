@@ -21,60 +21,13 @@ Revision History:
 #define _SPACER_SMT_CONTEXT_MANAGER_H_
 
 #include "smt_kernel.h"
-#include "sat_solver.h"
 #include "func_decl_dependencies.h"
 #include "dl_util.h"
+#include "spacer_virtual_solver.h"
+#include "stopwatch.h"
 
 namespace spacer {
     
-    class smt_context_manager;
-
-  class smt_context {
-  protected:
-    app_ref              m_pred;
-    smt_context_manager& m_parent;
-    bool          m_in_delay_scope;
-    bool          m_pushed;
-      
-    ast_manager &m;
-    smt::kernel & m_context;
-    bool m_virtual;
-    expr_ref_vector m_assumptions;
-    expr_ref_vector m_assertions;
-    unsigned m_head;
-      
-    expr_ref_vector m_flat;
-    
-    void internalize_assertions ();
-      
-    void reset (void);
-    unsigned get_unsat_core_size() { return m_context.get_unsat_core_size(); }
-    expr* get_unsat_core_expr(unsigned i) { return m_context.get_unsat_core_expr(i); }
-    bool is_aux_predicate (expr *p) 
-    {return is_app(p) && to_app (p) == m_pred.get ();}
-    void push_core ();
-    
-  public:
-    smt_context(smt::kernel & ctx, smt_context_manager& p, app* pred); 
-    ~smt_context();
-    void assert_expr(expr* e);
-    void assert_lemma (expr *t);
-    lbool check_sat (unsigned num_assumptions, expr *const *assumptions);
-    void get_model(model_ref& model);
-    proof* get_proof();
-    void push() ;
-    void pop() ;
-    void get_unsat_core (ptr_vector<expr> &r);
-    void display(std::ostream &out, expr_ref_vector &assumptions);
-      
-    class scoped {
-      smt_context& m_ctx;
-    public:
-      scoped(smt_context& ctx);
-      ~scoped();
-    };
-  };
-
     class smt_context_manager {
       
       struct stats {
@@ -84,10 +37,10 @@ namespace spacer {
         void reset() { memset(this, 0, sizeof(*this)); }
       };
           
-        smt_params&        m_fparams;
+        smt_params&              m_fparams;
         ast_manager&             m;
         unsigned                 m_max_num_contexts;
-        ptr_vector<smt::kernel>  m_contexts;
+        ptr_vector<virtual_solver_factory> m_solvers;
         unsigned                 m_num_contexts;
         
 
@@ -98,7 +51,7 @@ namespace spacer {
     public:
         smt_context_manager(smt_params& fp, unsigned max_num_contexts, ast_manager& m);
         ~smt_context_manager();
-        smt_context* mk_fresh();                
+        virtual_solver* mk_fresh();                
         void collect_statistics(statistics& st) const;
         void reset_statistics();
 

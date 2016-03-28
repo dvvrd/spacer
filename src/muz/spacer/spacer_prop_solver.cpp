@@ -513,7 +513,7 @@ namespace spacer {
                                           unsigned solver_id) 
     {
         m_ctx = m_contexts [solver_id == 0 ? 0 : 0 /* 1 */].get ();
-        spacer::smt_context::scoped _scoped(*m_ctx);
+        solver::scoped_push _s_(*m_ctx);
         safe_assumptions safe(*this, hard_atoms, soft_atoms);
         for (unsigned i = 0; i < num_bg; ++i) m_ctx->assert_expr (bg [i]);
         

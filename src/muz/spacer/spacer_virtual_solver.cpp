@@ -1,6 +1,6 @@
 #include "spacer_virtual_solver.h"
 #include "ast_util.h"
-
+#include "spacer_util.h"
 namespace spacer
 {
   virtual_solver::virtual_solver (virtual_solver_factory &factory,
@@ -40,8 +40,20 @@ namespace spacer
   lbool virtual_solver::check_sat_core (unsigned num_assumptions,
                                         expr *const * assumptions)
   {
+    scoped_watch _t_(m_factory.m_check_watch);
+    m_factory.m_stats.m_num_smt_checks++;
+    
+    stopwatch sw;
+    sw.start ();
     internalize_assertions ();
     lbool res = m_context.check (num_assumptions, assumptions);
+    if (res == l_true)
+    {
+      sw.stop ();
+      m_factory.m_check_sat_watch.add (sw);
+      m_factory.m_stats.m_num_sat_smt_checks++;
+    }
+    
     set_status (res);
     return res;
   }
@@ -117,9 +129,12 @@ namespace spacer
     return 0;
   }
 
-  virtual_solver_factory::virtual_solver_factory (ast_manager &mgr, params_ref const &p) :
-    m_params (p), m(mgr), m_context (m, m_params), m_num_solvers(0)
-  {m_params.updt_params (p);}
+  virtual_solver_factory::virtual_solver_factory (ast_manager &mgr, smt_params &fparams) :
+    m_params (fparams), m(mgr), m_context (m, m_params), m_num_solvers(0)
+  {
+    // m_params.updt_params (p);
+    m_stats.reset ();
+  }
   
   virtual_solver* virtual_solver_factory::mk_solver ()
   {
@@ -129,6 +144,23 @@ namespace spacer
     pred = m.mk_const (symbol (name.str ().c_str ()), m.mk_bool_sort ());
     return alloc (virtual_solver, *this, m_context, pred);
   }
+
+  void virtual_solver_factory::collect_statistics (statistics &st) const
+  {
+    m_context.collect_statistics (st);
+    st.update ("time.virtual_solver.smt.total", m_check_watch.get_seconds ());
+    st.update ("time.virtual_solver.smt.total.sat", m_check_sat_watch.get_seconds ());
+    st.update ("virtual_solver.checks", m_stats.m_num_smt_checks);
+    st.update ("virtual_solver.checks.sat", m_stats.m_num_sat_smt_checks);
+  }
+  void virtual_solver_factory::reset_statistics ()
+  {
+    m_context.reset_statistics ();
+    m_stats.reset ();
+    m_check_sat_watch.reset ();
+    m_check_watch.reset ();
+  }
+  
   
 
 

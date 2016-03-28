@@ -302,9 +302,9 @@ namespace spacer {
         
         unsigned get_unique_num() { return m_next_unique_num++; }
         
-        spacer::smt_context* mk_fresh() {  return m_contexts.mk_fresh();   }
-        spacer::smt_context* mk_fresh2() {return m_contexts2.mk_fresh ();}
-        spacer::smt_context* mk_fresh3() {return m_contexts3.mk_fresh ();}
+        solver* mk_fresh() {return m_contexts.mk_fresh();}
+        solver* mk_fresh2() {return m_contexts2.mk_fresh ();}
+        solver* mk_fresh3() {return m_contexts3.mk_fresh ();}
       
       
         

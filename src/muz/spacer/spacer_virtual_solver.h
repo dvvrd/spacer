@@ -44,7 +44,7 @@ Notes:
 #include"solver_na2as.h"
 #include"smt_kernel.h"
 #include"smt_params.h"
-
+#include"stopwatch.h"
 namespace spacer
 {
   class virtual_solver_factory;
@@ -112,19 +112,31 @@ namespace spacer
   /// multi-solver abstraction on top of a single smt::kernel
   class virtual_solver_factory
   {
+    friend class virtual_solver;
   private:
-    smt_params m_params;
+    smt_params  &m_params;
     ast_manager &m;
     smt::kernel m_context;
     /// number of solvers created by this factory so-far
     unsigned m_num_solvers;
+    
+    struct stats {
+      unsigned m_num_smt_checks;
+      unsigned m_num_sat_smt_checks;
+      stats() { reset(); }
+      void reset() { memset(this, 0, sizeof(*this)); }
+    };
+    
+    stats m_stats;
+    stopwatch m_check_watch;
+    stopwatch m_check_sat_watch;
+
+    
   public:
-    virtual_solver_factory (ast_manager &mgr, params_ref const &p);
+    virtual_solver_factory (ast_manager &mgr, smt_params &fparams);
     virtual_solver* mk_solver ();
-    void collect_statistics (statistics &st) const
-    {m_context.collect_statistics (st);}
-    void reset_statistics ()
-    {m_context.reset_statistics ();}
+    void collect_statistics (statistics &st) const;
+    void reset_statistics ();
     void reset () 
     {
       m_context.reset ();
