@@ -34,227 +34,30 @@ Revision History:
 #include "expr_replacer.h"
 #include "fixedpoint_params.hpp"
 
-//
-// Auxiliary structure to introduce propositional names for assumptions that are not
-// propositional. It is to work with the smt::context's restriction
-// that assumptions be propositional literals.
-//
-
 namespace spacer {
-
-    class prop_solver::safe_assumptions {
-        prop_solver&        s;
-        ast_manager&        m;
-        expr_ref_vector     m_hard_atoms;
-        expr_ref_vector     m_soft_atoms;
-        expr_ref_vector     m_assumptions;
-        obj_map<app,expr *> m_proxies2expr;
-        obj_map<expr, app*> m_expr2proxies;
-        unsigned            m_num_proxies;
-
-        app * mk_proxy(expr* literal) {
-            app* res;
-            SASSERT(!is_var(literal)); //it doesn't make sense to introduce names to variables
-            if (m_expr2proxies.find(literal, res)) {
-                return res;
-            }
-            SASSERT(s.m_proxies.size() >= m_num_proxies);
-            if (m_num_proxies == s.m_proxies.size()) {
-                std::stringstream name;
-                name << "spacer_proxy_" << s.m_proxies.size();
-                res = m.mk_const(symbol(name.str().c_str()), m.mk_bool_sort());
-                s.m_proxies.push_back(res);
-            }
-            else {
-                res = s.m_proxies[m_num_proxies].get();
-            }
-            ++m_num_proxies;
-            m_expr2proxies.insert(literal, res);
-            m_proxies2expr.insert(res, literal);
-            expr_ref implies(m.mk_or(m.mk_not(res), literal), m);
-            s.m_ctx->assert_expr(implies);
-            m_assumptions.push_back(implies);
-            TRACE("spacer_verbose", tout << "name asserted " << mk_pp(implies, m) << "\n";);    
-            return res;
-        }
-
-        void mk_safe(expr_ref_vector& conjs) {
-            flatten_and(conjs);
-            expand_literals(conjs);
-            for (unsigned i = 0; i < conjs.size(); ++i) {
-                expr * lit = conjs[i].get();
-                expr * lit_core = lit;
-                m.is_not(lit, lit_core);
-                SASSERT(!m.is_true(lit));
-                if (!is_uninterp(lit_core) || to_app(lit_core)->get_num_args() != 0) {
-                    conjs[i] = mk_proxy(lit);
-                }
-            }
-            m_assumptions.append(conjs);
-        }
-
-        // used in expand_literals
-        expr* apply_accessor(
-            ptr_vector<func_decl> const& acc,
-            unsigned j,
-            func_decl* f,
-            expr* c) {
-            if (is_app(c) && to_app(c)->get_decl() == f) {
-                return to_app(c)->get_arg(j);
-            }
-            else {
-                return m.mk_app(acc[j], c);
-            }
-        }
-
-        void expand_literals(expr_ref_vector& conjs) {
-            arith_util arith(m);
-            datatype_util dt(m);
-            bv_util       bv(m);
-            expr* e1, *e2, *c, *val;
-            rational r;
-            unsigned bv_size;
-
-            TRACE("expand_literals", 
-                  tout << "begin expand\n";
-                  for (unsigned i = 0; i < conjs.size(); ++i) {
-                      tout << mk_pp(conjs[i].get(), m) << "\n";
-                  });
-
-            for (unsigned i = 0; i < conjs.size(); ++i) {
-                expr* e = conjs[i].get();
-                if (m.is_eq(e, e1, e2) && arith.is_int_real(e1)) {
-                    conjs[i] = arith.mk_le(e1,e2);
-                    if (i+1 == conjs.size()) {
-                        conjs.push_back(arith.mk_ge(e1, e2));
-                    }
-                    else {
-                        conjs.push_back(conjs[i+1].get());
-                        conjs[i+1] = arith.mk_ge(e1, e2);
-                    }
-                    ++i;
-                }
-                else if ((m.is_eq(e, c, val) && is_app(val) && dt.is_constructor(to_app(val))) ||
-                         (m.is_eq(e, val, c) && is_app(val) && dt.is_constructor(to_app(val)))){
-                    func_decl* f = to_app(val)->get_decl();
-                    func_decl* r = dt.get_constructor_recognizer(f);
-                    conjs[i] = m.mk_app(r, c);
-                    ptr_vector<func_decl> const& acc = *dt.get_constructor_accessors(f);
-                    for (unsigned j = 0; j < acc.size(); ++j) {
-                        conjs.push_back(m.mk_eq(apply_accessor(acc, j, f, c), to_app(val)->get_arg(j)));
-                    }
-                }
-                else if ((m.is_eq(e, c, val) && bv.is_numeral(val, r, bv_size)) ||
-                         (m.is_eq(e, val, c) && bv.is_numeral(val, r, bv_size))) {
-                    rational two(2);
-                    for (unsigned j = 0; j < bv_size; ++j) {
-                        parameter p(j);
-                        //expr* e = m.mk_app(bv.get_family_id(), OP_BIT2BOOL, 1, &p, 1, &c);
-                        expr* e = m.mk_eq(m.mk_app(bv.get_family_id(), OP_BIT1), bv.mk_extract(j, j, c));
-                        if ((r % two).is_zero()) {
-                            e = m.mk_not(e);
-                        }
-                        r = div(r, two);
-                        if (j == 0) {
-                            conjs[i] = e;
-                        }
-                        else {
-                            conjs.push_back(e);
-                        }
-                    }
-                }
-            }
-            TRACE("expand_literals", 
-                  tout << "end expand\n";
-                  for (unsigned i = 0; i < conjs.size(); ++i) {
-                      tout << mk_pp(conjs[i].get(), m) << "\n";
-                  });
-        }
-
-    public:
-        safe_assumptions(prop_solver& s,
-                         expr_ref_vector const& hard_assumptions,
-                         expr_ref_vector& soft_assumptions):
-            s(s), m(s.m), m_hard_atoms(hard_assumptions), m_soft_atoms (soft_assumptions),
-            m_assumptions(m), m_num_proxies(0) {
-              mk_safe(m_hard_atoms);
-              mk_safe(m_soft_atoms);
-        }
-        
-        ~safe_assumptions() {
-        }    
-        
-        expr_ref_vector const& hard_atoms() const { return m_hard_atoms; }
-
-        expr_ref_vector& soft_atoms() { return m_soft_atoms; }
-        
-        unsigned assumptions_size() const { return m_assumptions.size(); }
-        
-        expr* assumptions(unsigned i) const { return m_assumptions[i]; }
-
-        void undo_proxies(expr_ref_vector& es) {
-            expr_ref e(m);
-            expr* r;
-            for (unsigned i = 0; i < es.size(); ++i) {
-                e = es[i].get();
-                if (is_app(e) && m_proxies2expr.find(to_app(e), r)) {
-                    es[i] = r;
-                }
-            }
-        }
-        
-        void elim_proxies(expr_ref_vector& es) {
-            expr_substitution sub(m, false, m.proofs_enabled());
-            proof_ref pr(m);
-            if (m.proofs_enabled()) {
-                pr = m.mk_asserted(m.mk_true());
-            }
-            obj_map<app,expr*>::iterator it = m_proxies2expr.begin(), end = m_proxies2expr.end();
-            for (; it != end; ++it) {
-                sub.insert(it->m_key, m.mk_true(), pr);
-            }
-            //scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
-            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer (m);
-            rep->set_substitution(&sub);
-            replace_proxies(*rep, es);
-        }
-    private:
-
-        void replace_proxies(expr_replacer& rep, expr_ref_vector& es) {
-            expr_ref e(m);
-            for (unsigned i = 0; i < es.size(); ++i) {
-                e = es[i].get();
-                rep(e);
-                es[i] = e;
-                if (m.is_true(e)) {
-                    es[i] = es.back();
-                    es.pop_back();
-                    --i;
-                }
-            }        
-        }
-    };
-
 
     prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name) :
         m_fparams(pm.get_fparams()),
-        m_split_literals(p.spacer_split_farkas_literals ()),
         m(pm.get_manager()),
         m_pm(pm),
         m_name(name),
         m_ctx(NULL),
         m_pos_level_atoms(m),
         m_neg_level_atoms(m),
-        m_proxies(m),
         m_core(0),
         m_subset_based_core(false),
         m_uses_level(infty_level ()),
         m_delta_level(false),
         m_in_level(false)
     {
-      m_contexts[0] = pm.mk_fresh ();
-      m_contexts[1] = pm.mk_fresh2 ();
-      m_ctx = m_contexts[0].get ();
+      
+      m_solvers[0] = pm.mk_fresh ();
+      m_solvers[1] = pm.mk_fresh2 ();
+      
+      m_contexts[0] = alloc(spacer::itp_solver, *(m_solvers[0]),
+                            p.spacer_split_farkas_literals ());
+      m_contexts[1] = alloc(spacer::itp_solver, *(m_solvers[1]),
+                            p.spacer_split_farkas_literals ());
       
       for (unsigned i = 0; i < 2; ++i)
         m_contexts[i]->assert_expr (m_pm.get_background ());
@@ -320,6 +123,9 @@ namespace spacer {
     unsigned hard_sz = hard.size ();
     hard.append (soft);
     
+    // replace expressions by assumption literals
+    itp_solver::scoped_mk_proxy _p_(*m_ctx, hard);
+    
     lbool res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
     if (res != l_false || soft.empty ()) return res;
     
@@ -369,8 +175,7 @@ namespace spacer {
     return res;
   }
   
-    lbool prop_solver::check_safe_assumptions(
-        safe_assumptions& safe,
+    lbool prop_solver::internal_check_assumptions(
         const expr_ref_vector& hard_atoms,
         expr_ref_vector& soft_atoms)
     {
@@ -410,11 +215,12 @@ namespace spacer {
 
         if (result == l_false && m_core && m.proofs_enabled() && !m_subset_based_core) {
             TRACE ("spacer", tout << "theory core\n";);
-            extract_theory_core(safe);
+            m_core->reset ();
+            m_ctx->get_itp_core (*m_core);
         }
         else if (result == l_false && m_core) {
-            TRACE ("spacer", tout << "subset core\n";);
-            extract_subset_core(safe);    
+          m_core->reset ();
+          m_ctx->get_unsat_core (*m_core);
         }
         m_core = 0;
         m_model = 0;
@@ -422,88 +228,7 @@ namespace spacer {
         return result;
     }
 
-    void prop_solver::extract_subset_core(safe_assumptions& safe) {
-        ptr_vector<expr> core;
-        unsigned core_size;
-        m_ctx->get_unsat_core (core);
-        core_size = core.size ();
-        
-        m_core->reset();
-        
-        for (unsigned i = 0; i < core_size; ++i) {
-            expr * core_expr = core[i];
-            SASSERT(is_app(core_expr));
 
-            if (m_level_atoms_set.contains(core_expr)) {
-                continue;
-            }
-            m_core->push_back(to_app(core_expr));
-        }        
-
-        safe.undo_proxies(*m_core);
-
-        TRACE("spacer", 
-            tout << "core_exprs: ";
-                for (unsigned i = 0; i < core_size; ++i) {
-                tout << mk_pp(core[i], m) << " ";
-            }
-            tout << "\n";
-            tout << "core: " << mk_pp(m_pm.mk_and(*m_core), m) << "\n";              
-        );
-    }
-
-
-    void prop_solver::extract_theory_core(safe_assumptions& safe) {
-        proof_ref pr(m);
-        pr = m_ctx->get_proof();
-        IF_VERBOSE(21, verbose_stream() << mk_ismt2_pp(pr, m) << "\n";);
-        farkas_learner fl;
-        fl.set_split_literals (m_split_literals);
-        expr_ref_vector lemmas(m);
-        obj_hashtable<expr> bs;
-        for (unsigned i = 0; i < safe.assumptions_size(); ++i) {
-            bs.insert(safe.assumptions(i));
-        }
-        fl.get_lemmas(pr, bs, lemmas);
-        safe.elim_proxies(lemmas);
-        fl.simplify_lemmas(lemmas); // redundant?
-
-        bool outside_of_logic =
-            (m_fparams.m_arith_mode == AS_DIFF_LOGIC &&
-             !is_difference_logic(m, lemmas.size(), lemmas.c_ptr())) ||
-            (m_fparams.m_arith_mode == AS_UTVPI &&
-             !is_utvpi_logic(m, lemmas.size(), lemmas.c_ptr()));
-
-        if (outside_of_logic) {
-            IF_VERBOSE(2, 
-                       verbose_stream() << "not diff\n";
-                       for (unsigned i = 0; i < lemmas.size(); ++i) {
-                           verbose_stream() << mk_pp(lemmas[i].get(), m) << "\n";
-                       });
-            TRACE ("spacer", 
-                       tout << "not diff\n";
-                       for (unsigned i = 0; i < lemmas.size(); ++i) {
-                           tout << mk_pp(lemmas[i].get(), m) << "\n";
-                       });
-            extract_subset_core(safe);
-        }        
-        else {
-
-            IF_VERBOSE(2, 
-                       verbose_stream() << "Lemmas\n";            
-                       for (unsigned i = 0; i < lemmas.size(); ++i) {
-                           verbose_stream() << mk_pp(lemmas[i].get(), m) << "\n";
-                       });
-            TRACE ("spacer", 
-                       tout << "Lemmas\n";            
-                       for (unsigned i = 0; i < lemmas.size(); ++i) {
-                           tout << mk_pp(lemmas[i].get(), m) << "\n";
-                       });
-
-            m_core->reset();
-            m_core->append(lemmas);
-        }
-    }
 
     lbool prop_solver::check_assumptions (const expr_ref_vector & hard_atoms,
                                           expr_ref_vector& soft_atoms,
@@ -512,17 +237,11 @@ namespace spacer {
     {
         m_ctx = m_contexts [solver_id == 0 ? 0 : 0 /* 1 */].get ();
         solver::scoped_push _s_(*m_ctx);
-        safe_assumptions safe(*this, hard_atoms, soft_atoms);
+        // safe_assumptions safe(*this, hard_atoms, soft_atoms);
         for (unsigned i = 0; i < num_bg; ++i) m_ctx->assert_expr (bg [i]);
         
-        lbool res = check_safe_assumptions(safe, safe.hard_atoms(), safe.soft_atoms());
+        lbool res = internal_check_assumptions (hard_atoms, soft_atoms);
 
-        //
-        // we don't have to undo model naming, as from the model 
-        // we extract the values for state variables directly
-        //
-        soft_atoms.reset ();
-        soft_atoms.append (safe.soft_atoms ());
         return res;
     }
 

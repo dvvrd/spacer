@@ -30,6 +30,7 @@ Revision History:
 #include "vector.h"
 #include "spacer_manager.h"
 #include "spacer_smt_context_manager.h"
+#include "spacer_itp_solver.h"
 
 struct fixedpoint_params;
 
@@ -38,17 +39,16 @@ namespace spacer {
     
     private:
         smt_params&         m_fparams;        
-        bool                m_split_literals;
         ast_manager&        m;
         manager&            m_pm;
         symbol              m_name;
-        scoped_ptr<solver>  m_contexts[2];
-        solver *            m_ctx;
+        scoped_ptr<solver>  m_solvers[2];
+        scoped_ptr<itp_solver>  m_contexts[2];
+        itp_solver *            m_ctx;
         decl_vector         m_level_preds;      
         app_ref_vector      m_pos_level_atoms;  // atoms used to identify level
         app_ref_vector      m_neg_level_atoms;  // 
         obj_hashtable<expr> m_level_atoms_set;
-        app_ref_vector      m_proxies;          // predicates for assumptions
         expr_ref_vector*    m_core; 
         model_ref*          m_model;
         bool                m_subset_based_core;
@@ -64,16 +64,8 @@ namespace spacer {
         
         void ensure_level(unsigned lvl);
 
-        class safe_assumptions;
-
-        void extract_theory_core(safe_assumptions& assumptions);
-
-        void extract_subset_core(safe_assumptions& assumptions);
-        
-        lbool check_safe_assumptions(
-            safe_assumptions& assumptions,
-            expr_ref_vector const& hard_atoms,
-            expr_ref_vector& soft_atoms);
+        lbool internal_check_assumptions(expr_ref_vector const& hard_atoms,
+                                         expr_ref_vector& soft_atoms);
         
         lbool maxsmt (expr_ref_vector &hard, expr_ref_vector &soft);
       
