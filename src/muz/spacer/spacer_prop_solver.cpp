@@ -96,7 +96,8 @@ namespace spacer {
             bool active = m_delta_level ? i == level : i>=level;
             app * lev_atom =
               active ? m_neg_level_atoms.get (i) : m_pos_level_atoms.get (i);
-            m_ctx->assert_expr (lev_atom);
+            //m_ctx->assert_expr (lev_atom);
+            m_ctx->push_bg (lev_atom);
         }
     }
 
@@ -239,10 +240,16 @@ namespace spacer {
     {
         m_ctx = m_contexts [solver_id == 0 ? 0 : 0 /* 1 */].get ();
         solver::scoped_push _s_(*m_ctx);
+        unsigned old_bg_size = m_ctx->get_num_bg ();
+        
         // safe_assumptions safe(*this, hard_atoms, soft_atoms);
         for (unsigned i = 0; i < num_bg; ++i) m_ctx->assert_expr (bg [i]);
         
         lbool res = internal_check_assumptions (hard_atoms, soft_atoms);
+
+        // clear all bg assumptions
+        SASSERT (old_bg_size <= m_ctx->get_num_bg ());
+        m_ctx->pop_bg (m_ctx->get_num_bg () - old_bg_size);
 
         return res;
     }
