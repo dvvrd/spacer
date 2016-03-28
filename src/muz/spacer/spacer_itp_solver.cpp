@@ -100,19 +100,41 @@ namespace spacer
       v[i] = mk_proxy (v.get (i));
   }
   
+  void itp_solver::push_bg (expr *e)
+  {
+    if (m_assumptions.size () > m_first_assumption)
+      m_assumptions.shrink (m_first_assumption);
+    m_assumptions.push_back (e);
+    m_first_assumption = m_assumptions.size ();
+  }
+
+  void itp_solver::pop_bg (unsigned n)
+  {
+    if (n == 0) return;
+    
+    if (m_assumptions.size () > m_first_assumption)
+      m_assumptions.shrink (m_first_assumption);
+    m_first_assumption = m_first_assumption > n ? m_first_assumption - n : 0;
+    m_assumptions.shrink (m_first_assumption);
+  }
+
+  unsigned itp_solver::get_num_bg () {return m_first_assumption;}
+  
   lbool itp_solver::check_sat (unsigned num_assumptions, expr * const *assumptions)
   {
-    m_assumptions.reset ();
+    if (m_assumptions.size () > m_first_assumption)
+      m_assumptions.shrink (m_first_assumption);
+    
     m_assumptions.append (num_assumptions, assumptions);
-    spacer::expand_literals(m, m_assumptions);
+    spacer::expand_literals (m, m_assumptions);
     mk_proxies (m_assumptions);
     
     lbool res;
     res = m_solver.check_sat (m_assumptions.size (), m_assumptions.c_ptr ());
     set_status (res);
-    
     return res;
   }
+  
   
   app* itp_solver::def_manager::mk_proxy (expr *v)
   {
@@ -159,19 +181,34 @@ namespace spacer
   void itp_solver::get_unsat_core (ptr_vector<expr> &r)
   {
     m_solver.get_unsat_core (r);
-    undo_proxies (r);
+    undo_proxies_in_core (r);
   }
-  void itp_solver::undo_proxies (ptr_vector<expr> &r)
+  void itp_solver::undo_proxies_in_core (ptr_vector<expr> &r)
   {
     app_ref e(m);
+    expr_fast_mark1 bg;
+    for (unsigned i = 0; i < m_first_assumption; ++i)
+      bg.mark (m_assumptions.get (i));
+    
     // expand proxies
+    unsigned j = 0;
     for (unsigned i = 0, sz = r.size (); i < sz; ++i)
+    {
       if (is_proxy (r[i], e))
       {
         SASSERT (m.is_implies (e));
-        r[i] = e->get_arg (1);
+        r[j] = e->get_arg (1);
+        j++;
       }
+      else if (!bg.is_marked (r[i]))
+      {
+        if (i != j) r[j] = r[i];
+        j++;
+      }
+    }
+    r.shrink (j);
   }
+  
   void itp_solver::undo_proxies (expr_ref_vector &r)
   {
     app_ref e(m);
@@ -206,7 +243,7 @@ namespace spacer
     
     // B side of the interpolant
     obj_hashtable<expr> B;
-    for (unsigned i = 0, sz = m_assumptions.size (); i < sz; ++i)
+    for (unsigned i = m_first_assumption, sz = m_assumptions.size (); i < sz; ++i)
     {
       expr *a = m_assumptions.get (i);
       app_ref def(m);

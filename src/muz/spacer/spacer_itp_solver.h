@@ -72,12 +72,13 @@ namespace spacer
     vector<def_manager> m_defs;
     def_manager m_base_defs;
     expr_ref_vector m_assumptions;
+    unsigned m_first_assumption;
     
     expr_substitution m_elim_proxies_sub;
     bool m_split_literals;
     
     bool is_proxy (expr *e, app_ref &def);
-    void undo_proxies (ptr_vector<expr> &v);
+    void undo_proxies_in_core (ptr_vector<expr> &v);
     app* mk_proxy (expr *v);
     app* fresh_proxy ();
     void elim_proxies (expr_ref_vector &v);
@@ -89,6 +90,7 @@ namespace spacer
       m_num_proxies(0),
       m_base_defs (*this),
       m_assumptions (m),
+      m_first_assumption (0),
       m_elim_proxies_sub(m, false, true),
       m_split_literals(split_literals)
     {
@@ -103,6 +105,10 @@ namespace spacer
     void mk_proxies (expr_ref_vector &v);
     void undo_proxies (expr_ref_vector &v);
 
+    void push_bg (expr *e);
+    void pop_bg (unsigned n);
+    unsigned get_num_bg ();
+    
     /* solver interface */
     
     virtual solver* translate (ast_manager &m, params_ref const &p)
