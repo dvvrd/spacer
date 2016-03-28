@@ -59,8 +59,7 @@ namespace spacer {
         bool                m_in_level;         
         unsigned            m_current_level;    // set when m_in_level
         
-        /** Add level atoms activating certain level into a vector */
-        void push_level_atoms(unsigned level, expr_ref_vector & tgt) const;
+        void assert_level_atoms(unsigned level);
         
         void ensure_level(unsigned lvl);
 

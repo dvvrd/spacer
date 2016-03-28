@@ -90,12 +90,13 @@ namespace spacer {
         return m_level_preds.size();
     }
 
-    void prop_solver::push_level_atoms(unsigned level, expr_ref_vector& tgt) const {
+    void prop_solver::assert_level_atoms(unsigned level) {
         unsigned lev_cnt = level_cnt();
         for (unsigned i=0; i<lev_cnt; i++) {
             bool active = m_delta_level ? i == level : i>=level;
-            app * lev_atom = active ? m_neg_level_atoms[i] : m_pos_level_atoms[i];
-            tgt.push_back(lev_atom);
+            app * lev_atom =
+              active ? m_neg_level_atoms.get (i) : m_pos_level_atoms.get (i);
+            m_ctx->assert_expr (lev_atom);
         }
     }
 
@@ -183,8 +184,7 @@ namespace spacer {
         expr_ref_vector expr_atoms(m);
 
         expr_atoms.append (hard_atoms);
-        if (m_in_level) 
-            push_level_atoms(m_current_level, expr_atoms);
+        if (m_in_level) assert_level_atoms(m_current_level);
         lbool result = maxsmt (expr_atoms, soft_atoms);
         if (result == l_true && m_model) m_ctx->get_model (*m_model);
 
@@ -198,6 +198,8 @@ namespace spacer {
             unsigned core_size = core.size ();
             m_uses_level = infty_level ();
             
+            /// XXX level literals are not assumptions and will not be part of the core
+            m_uses_level = m_current_level;
             for (unsigned i = 0; i < core_size; ++i) {
               if (m_level_atoms_set.contains (core[i]))
               {
