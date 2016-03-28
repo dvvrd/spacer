@@ -42,7 +42,6 @@ namespace spacer {
         ast_manager&        m;
         manager&            m_pm;
         symbol              m_name;
-        bool                m_try_minimize_core;
         scoped_ptr<solver>  m_contexts[2];
         solver *            m_ctx;
         decl_vector         m_level_preds;      
