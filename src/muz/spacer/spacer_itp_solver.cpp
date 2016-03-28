@@ -172,6 +172,17 @@ namespace spacer
         r[i] = e->get_arg (1);
       }
   }
+  void itp_solver::undo_proxies (expr_ref_vector &r)
+  {
+    app_ref e(m);
+    // expand proxies
+    for (unsigned i = 0, sz = r.size (); i < sz; ++i)
+      if (is_proxy (r.get (i), e))
+      {
+        SASSERT (m.is_implies (e));
+        r[i] = e->get_arg (1);
+      }
+  }
 
   void itp_solver::get_unsat_core (expr_ref_vector &_core)
   {

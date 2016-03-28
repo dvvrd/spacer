@@ -77,7 +77,6 @@ namespace spacer
     bool m_split_literals;
     
     bool is_proxy (expr *e, app_ref &def);
-    void mk_proxies (expr_ref_vector &v);
     void undo_proxies (ptr_vector<expr> &v);
     app* mk_proxy (expr *v);
     app* fresh_proxy ();
@@ -101,6 +100,8 @@ namespace spacer
     virtual void get_unsat_core (expr_ref_vector &core);
     virtual void get_itp_core (expr_ref_vector &core);
     void set_split_literals (bool v) {m_split_literals = v;}
+    void mk_proxies (expr_ref_vector &v);
+    void undo_proxies (expr_ref_vector &v);
 
     /* solver interface */
     
@@ -153,7 +154,16 @@ namespace spacer
     virtual ast_manager &get_manager () {return m;}
 
     
-    
+    class scoped_mk_proxy
+    {
+      itp_solver &m_s;
+      expr_ref_vector &m_v;
+    public:
+      scoped_mk_proxy (itp_solver &s, expr_ref_vector &v) : m_s(s), m_v(v) 
+      {m_s.mk_proxies (m_v);}
+      ~scoped_mk_proxy ()
+      {m_s.undo_proxies (m_v);}
+    };
   };
 }
 #endif
