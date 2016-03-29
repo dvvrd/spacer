@@ -195,12 +195,10 @@ namespace spacer {
         // XXX this is a poor approximation because the core will get minimized further
         if (result == l_false) {
             ptr_vector<expr> core;
-            m_ctx->get_unsat_core (core);
+            m_ctx->get_full_unsat_core (core);
             unsigned core_size = core.size ();
             m_uses_level = infty_level ();
             
-            /// XXX level literals are not assumptions and will not be part of the core
-            m_uses_level = m_current_level;
             for (unsigned i = 0; i < core_size; ++i) {
               if (m_level_atoms_set.contains (core[i]))
               {

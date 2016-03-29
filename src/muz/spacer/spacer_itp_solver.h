@@ -109,6 +109,9 @@ namespace spacer
     void pop_bg (unsigned n);
     unsigned get_num_bg ();
     
+    void get_full_unsat_core (ptr_vector<expr> &core)
+    {m_solver.get_unsat_core (core);} 
+    
     /* solver interface */
     
     virtual solver* translate (ast_manager &m, params_ref const &p)
