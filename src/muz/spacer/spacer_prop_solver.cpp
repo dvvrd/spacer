@@ -101,7 +101,7 @@ namespace spacer {
         }
     }
 
-    void prop_solver::add_formula(expr * form) {
+    void prop_solver::assert_expr(expr * form) {
         SASSERT(!m_in_level);
         m_contexts[0]->assert_expr (form);
         m_contexts[1]->assert_expr (form);
@@ -109,11 +109,11 @@ namespace spacer {
         TRACE("spacer", tout << "add_formula: " << mk_pp(form, m) << "\n";);
     }
 
-    void prop_solver::add_level_formula(expr * form, unsigned level) {
+    void prop_solver::assert_expr(expr * form, unsigned level) {
         ensure_level(level);
         app * lev_atom = m_pos_level_atoms[level].get();
         app_ref lform(m.mk_or(form, lev_atom), m);
-        add_formula(lform.get());
+        assert_expr (lform);
     }
 
 

@@ -363,11 +363,11 @@ namespace spacer {
           << " " << head ()->get_name () 
           << " " << mk_pp (lemma, m) << "\n";);
     
-    if (is_infty_level (lvl)) m_solver.add_formula (lemma);
+    if (is_infty_level (lvl)) m_solver.assert_expr (lemma);
     else 
     {
       ensure_level (lvl);
-      m_solver.add_level_formula (lemma, lvl);
+      m_solver.assert_expr (lemma, lvl);
     }
     
     for (unsigned i = 0, sz = m_use.size (); i < sz; ++i)
@@ -396,9 +396,9 @@ namespace spacer {
       TRACE("spacer_detail", tout << "child property: " 
             << mk_pp(fmls.get (i), m) << "\n";);
       if (is_infty_level(lvl)) 
-        m_solver.add_formula(fmls.get (i));
+        m_solver.assert_expr (fmls.get (i));
       else 
-        m_solver.add_level_formula(fmls.get (i), lvl);
+        m_solver.assert_expr (fmls.get (i), lvl);
     }
   }
 
@@ -801,8 +801,8 @@ namespace spacer {
         rw(m_transition);
         rw(m_initial_state);
         
-        m_solver.add_formula(m_transition);
-        m_solver.add_level_formula(m_initial_state, 0);
+        m_solver.assert_expr (m_transition);
+        m_solver.assert_expr (m_initial_state, 0);
         TRACE("spacer", 
               tout << "Initial state: " << mk_pp(m_initial_state, m) << "\n";
               tout << "Transition:    " << mk_pp(m_transition,  m) << "\n";);
@@ -1327,7 +1327,7 @@ namespace spacer {
     v = m.mk_const (pm.get_n_pred (v->get_decl ()));
     
     // -- extend the initial condition
-    m_solver.add_formula (m.mk_or (m_extend_lit, e, v));
+    m_solver.assert_expr (m.mk_or (m_extend_lit, e, v));
 
     // -- remember the new extend literal
     m_extend_lit = m.mk_not (v);

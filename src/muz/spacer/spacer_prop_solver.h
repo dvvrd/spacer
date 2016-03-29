@@ -116,8 +116,8 @@ namespace spacer {
         {m_ps.set_subset_based_core (m_subset_based_core);}
       };
       
-        void add_formula(expr * form);
-        void add_level_formula(expr * form, unsigned level);
+        void assert_expr (expr * form);
+        void assert_expr (expr * form, unsigned level);
                 
         /**
          * check assumptions with a background formula
