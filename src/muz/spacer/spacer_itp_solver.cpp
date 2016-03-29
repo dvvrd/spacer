@@ -243,7 +243,8 @@ namespace spacer
   {
     
     // B side of the interpolant
-    obj_hashtable<expr> B;
+    typedef obj_hashtable<expr> expr_set;
+    expr_set B;
     for (unsigned i = m_first_assumption, sz = m_assumptions.size (); i < sz; ++i)
     {
       expr *a = m_assumptions.get (i);
