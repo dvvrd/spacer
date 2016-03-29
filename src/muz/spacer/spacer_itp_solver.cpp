@@ -86,18 +86,21 @@ namespace spacer
   
   app* itp_solver::mk_proxy (expr *v)
   {
-    expr *e = v;
-    m.is_not (e, e);
-    if (is_uninterp_const (e)) return to_app(v);
+    {
+      expr *e = v;
+      m.is_not (v, e);
+      if (is_uninterp_const (e)) return to_app(v);
+    }
     
     def_manager &def = m_defs.size () > 0 ? m_defs.back () : m_base_defs;
-    return def.mk_proxy (e);
+    return def.mk_proxy (v);
   }
   
   void itp_solver::mk_proxies (expr_ref_vector &v)
   {
+    spacer::expand_literals (m, v);
     for (unsigned i = 0, sz = v.size (); i < sz; ++i)
-      v[i] = mk_proxy (v.get (i));
+        v[i] = mk_proxy (v.get (i));
   }
   
   void itp_solver::push_bg (expr *e)
@@ -124,9 +127,7 @@ namespace spacer
   {
     if (m_assumptions.size () > m_first_assumption)
       m_assumptions.shrink (m_first_assumption);
-    
     m_assumptions.append (num_assumptions, assumptions);
-    spacer::expand_literals (m, m_assumptions);
     mk_proxies (m_assumptions);
     
     lbool res;
