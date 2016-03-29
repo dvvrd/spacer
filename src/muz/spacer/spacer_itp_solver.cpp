@@ -146,7 +146,7 @@ namespace spacer
     app_ref proxy(m);
     app_ref def(m);
     proxy = m_parent.fresh_proxy ();
-    def = m.mk_implies (proxy, v);
+    def = m.mk_or (m.mk_not (proxy), v);
     m_defs.push_back (def);
     m_expr2proxy.insert (v, proxy);
     m_proxy2def.insert (proxy, def);
@@ -197,7 +197,7 @@ namespace spacer
     {
       if (is_proxy (r[i], e))
       {
-        SASSERT (m.is_implies (e));
+        SASSERT (m.is_or (e));
         r[j] = e->get_arg (1);
         j++;
       }
