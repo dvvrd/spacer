@@ -26,7 +26,9 @@ namespace spacer
 
   virtual_solver::~virtual_solver ()
   {
-    if (m_pushed) pop (this->get_scope_level ());
+    SASSERT (!m_pushed || get_scope_level () > 0);
+    if (m_pushed) pop (get_scope_level ());
+    
     if (m_virtual) 
     {
       m_pred = m.mk_not (m_pred);
@@ -40,6 +42,7 @@ namespace spacer
   lbool virtual_solver::check_sat_core (unsigned num_assumptions,
                                         expr *const * assumptions)
   {
+    SASSERT (!m_pushed || get_scope_level () > 0);
     scoped_watch _t_(m_factory.m_check_watch);
     m_factory.m_stats.m_num_smt_checks++;
     
@@ -60,6 +63,16 @@ namespace spacer
   
   void virtual_solver::push_core ()
   {
+    SASSERT (!m_pushed || get_scope_level () > 0);
+    if (m_in_delay_scope)
+    {
+      // second push
+      internalize_assertions ();
+      m_context.push ();
+      m_pushed = true;
+      m_in_delay_scope = false;
+    }
+    
     if (!m_pushed) m_in_delay_scope = true;
     else 
     {
@@ -70,9 +83,15 @@ namespace spacer
   }
   void virtual_solver::pop_core (unsigned n)
   {
-    if (m_pushed) m_context.pop (n);
-    m_pushed = m_context.get_scope_level () > 0;
-    m_in_delay_scope = !m_pushed && get_scope_level () - n > 0;
+    SASSERT (!m_pushed || get_scope_level () > 0);
+    if (m_pushed)
+    {
+      SASSERT (!m_in_delay_scope);
+      m_context.pop (n);
+      m_pushed = get_scope_level () - n > 0;
+    }
+    else
+      m_in_delay_scope = get_scope_level () - n > 0;
   }
   
   void virtual_solver::get_unsat_core (ptr_vector<expr> &r)
@@ -87,6 +106,7 @@ namespace spacer
   
   void virtual_solver::assert_expr (expr *e)
   {
+    SASSERT (!m_pushed || get_scope_level () > 0);
     if (m.is_true(e)) return;
     if (m_in_delay_scope)
     {
@@ -142,6 +162,7 @@ namespace spacer
     name << "#solver" << m_num_solvers++;
     app_ref pred(m);
     pred = m.mk_const (symbol (name.str ().c_str ()), m.mk_bool_sort ());
+    SASSERT (m_context.get_scope_level () == 0);
     return alloc (virtual_solver, *this, m_context, pred);
   }
 
