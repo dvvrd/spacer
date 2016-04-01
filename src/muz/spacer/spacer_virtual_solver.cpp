@@ -1,6 +1,10 @@
 #include "spacer_virtual_solver.h"
 #include "ast_util.h"
 #include "spacer_util.h"
+#include "bool_rewriter.h"
+
+#include "proof_checker.h"
+
 namespace spacer
 {
   virtual_solver::virtual_solver (virtual_solver_factory &factory,
@@ -15,7 +19,8 @@ namespace spacer
     m_head (0),
     m_flat (m),
     m_pushed (false),
-    m_in_delay_scope (false)
+    m_in_delay_scope (false),
+    m_proof(m)
   {
     // -- insert m_pred->true background assumption this will not
     // -- change m_context, but will add m_pred to
@@ -36,6 +41,193 @@ namespace spacer
     }
   }
   
+  namespace
+  {
+    static bool matches_fact (expr_ref_vector &args, expr* &match)
+    {
+      ast_manager &m = args.get_manager ();
+      expr *fact = args.back ();
+      for (unsigned i = 0, sz = args.size () - 1; i < sz; ++i)
+      {
+        expr *arg = args.get (i);
+        if (m.is_proof (arg) &&
+            m.has_fact (to_app (arg)) &&
+            m.get_fact (to_app (arg)) == fact)
+        {
+          match = arg;
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    
+    class elim_aux_assertions
+    {
+      app_ref m_aux;
+    public:
+      elim_aux_assertions (app_ref aux) : m_aux (aux) {}
+
+      void mk_or_core (expr_ref_vector &args, expr_ref &res)
+      {
+        ast_manager &m = args.get_manager ();
+        unsigned j = 0;
+        for (unsigned i = 0, sz = args.size (); i < sz; ++i)
+        {
+          if (m.is_false (args.get (i))) continue;
+          if (i != j) args [j] = args.get (i);
+          ++j;
+        }
+        res = m.mk_or (j, args.c_ptr ());
+      }
+      
+      void mk_app (func_decl *decl, expr_ref_vector &args, expr_ref &res)
+      {
+        ast_manager &m = args.get_manager ();
+        bool_rewriter brwr (m);
+
+        if (decl->get_family_id () == m.get_basic_family_id () &&
+            decl->get_decl_kind () == OP_OR)
+          mk_or_core (args, res);
+        else
+          brwr.mk_app (decl, args.size (), args.c_ptr (), res);
+      }
+      
+      void operator() (ast_manager &m, proof *pr, proof_ref &res)
+      {
+        obj_map<app, app*> cache;
+        bool_rewriter brwr (m);
+        
+        // for reference counting of new proofs
+        app_ref_vector pinned(m);
+        
+        ptr_vector<app> todo;
+        todo.push_back (pr);
+
+        expr_ref not_aux(m);
+        not_aux = m.mk_not (m_aux);
+        
+        expr_ref_vector args(m);
+
+        while (!todo.empty ())
+        {
+          app *p, *r;
+          expr *a;
+          
+          p = todo.back ();
+          if (cache.find (pr, r))
+          {
+            todo.pop_back ();
+            continue;
+          }
+
+          SASSERT (!todo.empty () || pr == p);
+          bool dirty = false;
+          unsigned todo_sz = todo.size ();
+          args.reset ();
+          for (unsigned i = 0, sz = p->get_num_args (); i < sz; ++i)
+          {
+            expr* arg = p->get_arg (i);
+            if (arg == m_aux.get ())
+            {
+              dirty = true;
+              args.push_back (m.mk_true ());
+            }
+            else if (arg == not_aux.get ())
+            {
+              dirty = true;
+              args.push_back (m.mk_false ());
+            }
+            // skip (asserted m_aux)
+            else if (m.is_asserted (arg, a) && a == m_aux.get ())
+            {
+              dirty = true;
+            }
+            // skip (hypothesis m_aux)
+            else if (m.is_hypothesis (arg, a) && a == m_aux.get ())
+            {
+              dirty = true;
+            }
+            else if (is_app (arg) && cache.find (to_app (arg), r))
+            {
+              dirty |= (arg != r);
+              args.push_back (r);
+            }
+            else if (is_app (arg))
+              todo.push_back (to_app (arg));
+            else
+              // -- not an app
+              args.push_back (arg);
+            
+          }
+          if (todo_sz < todo.size ()) 
+          {
+            // -- process parents
+            args.reset ();
+            continue;
+          }
+
+          // ready to re-create
+          app_ref newp(m);
+          if (!dirty) newp = p;
+          else if (m.is_unit_resolution (p))
+          {
+            if (args.size () == 2)
+              // unit resolution with m_aux that got collapsed to nothing
+              newp = to_app (args.get (0));
+            else
+            {
+              ptr_vector<proof> parents;
+              for (unsigned i = 0, sz = args.size () - 1; i < sz; ++i)
+                parents.push_back (to_app (args.get (i)));
+              SASSERT (parents.size () == args.size () - 1);
+              newp = m.mk_unit_resolution
+                (parents.size (), parents.c_ptr (), args.back ());
+              pinned.push_back (newp);
+            }
+          }
+          else if (matches_fact (args, a))
+          {
+            newp = to_app(a);
+          }
+          else
+          {
+            expr_ref papp (m);
+            mk_app (p->get_decl (), args, papp);
+            newp = to_app (papp.get ());
+            pinned.push_back (newp);
+          }
+          cache.insert (p, newp);
+          todo.pop_back ();
+        }
+        
+        proof *r;
+        VERIFY (cache.find (pr,r));
+        
+        DEBUG_CODE(
+                   proof_checker pc(m);
+                   expr_ref_vector side(m);
+                   SASSERT(pc.check(r, side));
+                   );
+        
+        res = r ;
+      }
+    };
+  }
+  
+  proof *virtual_solver::get_proof ()
+  {
+    scoped_watch _t_(m_factory.m_proof_watch);
+    
+    if (!m_proof.get ())
+    {
+      elim_aux_assertions pc (m_pred);
+      m_proof = m_context.get_proof ();
+      pc (m, m_proof.get (), m_proof);
+    }
+    return m_proof.get ();
+  }
+  
   bool virtual_solver::is_aux_predicate (expr *p)
   {return is_app (p) && to_app (p) == m_pred.get ();}
   
@@ -43,6 +235,7 @@ namespace spacer
                                         expr *const * assumptions)
   {
     SASSERT (!m_pushed || get_scope_level () > 0);
+    m_proof.reset ();
     scoped_watch _t_(m_factory.m_check_watch);
     m_factory.m_stats.m_num_smt_checks++;
     
@@ -159,7 +352,7 @@ namespace spacer
   virtual_solver* virtual_solver_factory::mk_solver ()
   {
     std::stringstream name;
-    name << "#solver" << m_num_solvers++;
+    name << "vsolver#" << m_num_solvers++;
     app_ref pred(m);
     pred = m.mk_const (symbol (name.str ().c_str ()), m.mk_bool_sort ());
     SASSERT (m_context.get_scope_level () == 0);
@@ -171,6 +364,7 @@ namespace spacer
     m_context.collect_statistics (st);
     st.update ("time.virtual_solver.smt.total", m_check_watch.get_seconds ());
     st.update ("time.virtual_solver.smt.total.sat", m_check_sat_watch.get_seconds ());
+    st.update ("time.virtual_solver.proof", m_proof_watch.get_seconds ());
     st.update ("virtual_solver.checks", m_stats.m_num_smt_checks);
     st.update ("virtual_solver.checks.sat", m_stats.m_num_sat_smt_checks);
   }
@@ -180,6 +374,7 @@ namespace spacer
     m_stats.reset ();
     m_check_sat_watch.reset ();
     m_check_watch.reset ();
+    m_proof_watch.reset ();
   }
   
   

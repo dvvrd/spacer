@@ -66,6 +66,8 @@ namespace spacer
 
     bool m_pushed;
     bool m_in_delay_scope;
+
+    proof_ref m_proof;
     
     virtual_solver (virtual_solver_factory &factory, smt::kernel &context, app* pred);
     
@@ -89,7 +91,7 @@ namespace spacer
     virtual void assert_expr (expr *e);
     virtual void collect_statistics (statistics &st) const {}
     virtual void get_model (model_ref &m) {m_context.get_model (m);} 
-    virtual proof *get_proof () {return m_context.get_proof ();}
+    virtual proof* get_proof ();
     virtual std::string reason_unknown () const 
     {return m_context.last_failure_as_string ();}
     virtual void set_reason_unknown(char const *msg)
@@ -130,6 +132,7 @@ namespace spacer
     stats m_stats;
     stopwatch m_check_watch;
     stopwatch m_check_sat_watch;
+    stopwatch m_proof_watch;
 
     
   public:
