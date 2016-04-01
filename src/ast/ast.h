@@ -2075,6 +2075,7 @@ public:
 
     bool is_undef_proof(expr const * e) const { return e == m_undef_proof; }
     bool is_asserted(expr const * e) const { return is_app_of(e, m_basic_family_id, PR_ASSERTED); }
+  bool is_hypothesis (expr const *e) const {return is_app_of (e, m_basic_family_id, PR_HYPOTHESIS);}
     bool is_goal(expr const * e) const { return is_app_of(e, m_basic_family_id, PR_GOAL); }
     bool is_modus_ponens(expr const * e) const { return is_app_of(e, m_basic_family_id, PR_MODUS_PONENS); }
     bool is_reflexivity(expr const * e) const { return is_app_of(e, m_basic_family_id, PR_REFLEXIVITY); }
@@ -2105,6 +2106,7 @@ public:
     bool is_skolemize(expr const * e) const { return is_app_of(e, m_basic_family_id, PR_SKOLEMIZE); }
 
     MATCH_UNARY(is_asserted);
+    MATCH_UNARY(is_hypothesis);
     MATCH_UNARY(is_lemma);
 
     bool has_fact(proof const * p) const {
