@@ -96,11 +96,17 @@ namespace spacer
     return def.mk_proxy (v);
   }
   
-  void itp_solver::mk_proxies (expr_ref_vector &v)
+  bool itp_solver::mk_proxies (expr_ref_vector &v, unsigned from)
   {
+    bool dirty = false;
     spacer::expand_literals (m, v);
-    for (unsigned i = 0, sz = v.size (); i < sz; ++i)
-        v[i] = mk_proxy (v.get (i));
+    for (unsigned i = from, sz = v.size (); i < sz; ++i)
+    {
+      app *p = mk_proxy (v.get (i));
+      dirty |= (v.get (i) == p);
+      v[i] = p;
+    }
+    return dirty;
   }
   
   void itp_solver::push_bg (expr *e)
@@ -125,10 +131,17 @@ namespace spacer
   
   lbool itp_solver::check_sat (unsigned num_assumptions, expr * const *assumptions)
   {
+    // -- remove any old assumptions
     if (m_assumptions.size () > m_first_assumption)
       m_assumptions.shrink (m_first_assumption);
-    m_assumptions.append (num_assumptions, assumptions);
+    
+    // -- replace theory literals in background assumptions with proxies
     mk_proxies (m_assumptions);
+    // -- in case mk_proxies added new literals, they are all background
+    m_first_assumption = m_assumptions.size ();
+    
+    m_assumptions.append (num_assumptions, assumptions);
+    m_is_proxied = mk_proxies (m_assumptions, m_first_assumption);
     
     lbool res;
     res = m_solver.check_sat (m_assumptions.size (), m_assumptions.c_ptr ());
@@ -179,10 +192,10 @@ namespace spacer
     return false;
   }
   
-  void itp_solver::get_unsat_core (ptr_vector<expr> &r)
+  void itp_solver::get_unsat_core (ptr_vector<expr> &core)
   {
-    m_solver.get_unsat_core (r);
-    undo_proxies_in_core (r);
+    m_solver.get_unsat_core (core);
+    undo_proxies_in_core (core);
   }
   void itp_solver::undo_proxies_in_core (ptr_vector<expr> &r)
   {
@@ -195,17 +208,17 @@ namespace spacer
     unsigned j = 0;
     for (unsigned i = 0, sz = r.size (); i < sz; ++i)
     {
-      if (is_proxy (r[i], e))
+      // skip background assumptions
+      if (bg.is_marked (r[i])) continue;
+      
+      // -- undo proxies, but only if they were introduced in check_sat
+      if (m_is_proxied && is_proxy (r[i], e))
       {
         SASSERT (m.is_or (e));
         r[j] = e->get_arg (1);
-        j++;
       }
-      else if (!bg.is_marked (r[i]))
-      {
-        if (i != j) r[j] = r[i];
-        j++;
-      }
+      else if (i != j) r[j] = r[i];
+      j++;
     }
     r.shrink (j);
   }
@@ -217,7 +230,7 @@ namespace spacer
     for (unsigned i = 0, sz = r.size (); i < sz; ++i)
       if (is_proxy (r.get (i), e))
       {
-        SASSERT (m.is_implies (e));
+        SASSERT (m.is_or (e));
         r[i] = e->get_arg (1);
       }
   }

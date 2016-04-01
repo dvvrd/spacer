@@ -73,6 +73,7 @@ namespace spacer
     def_manager m_base_defs;
     expr_ref_vector m_assumptions;
     unsigned m_first_assumption;
+    bool m_is_proxied;
     
     expr_substitution m_elim_proxies_sub;
     bool m_split_literals;
@@ -91,6 +92,7 @@ namespace spacer
       m_base_defs (*this),
       m_assumptions (m),
       m_first_assumption (0),
+      m_is_proxied (false),
       m_elim_proxies_sub(m, false, true),
       m_split_literals(split_literals)
     {
@@ -102,7 +104,7 @@ namespace spacer
     virtual void get_unsat_core (expr_ref_vector &core);
     virtual void get_itp_core (expr_ref_vector &core);
     void set_split_literals (bool v) {m_split_literals = v;}
-    void mk_proxies (expr_ref_vector &v);
+    bool mk_proxies (expr_ref_vector &v, unsigned from=0);
     void undo_proxies (expr_ref_vector &v);
 
     void push_bg (expr *e);
