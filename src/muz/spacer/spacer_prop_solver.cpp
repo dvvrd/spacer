@@ -223,32 +223,52 @@ namespace spacer {
           m_core->reset ();
           m_ctx->get_unsat_core (*m_core);
         }
-        m_core = 0;
-        m_model = 0;
-        m_subset_based_core = false;
         return result;
     }
 
 
 
-    lbool prop_solver::check_assumptions (const expr_ref_vector & hard_atoms,
-                                          expr_ref_vector& soft_atoms,
+    lbool prop_solver::check_assumptions (const expr_ref_vector & _hard,
+                                          expr_ref_vector& soft,
                                           unsigned num_bg, expr * const * bg,
                                           unsigned solver_id) 
     {
+        // -- true == use push_bg to assert background assumptions
+        // -- false == use assert_expr to assert background assumption
+        // -- the use_push_bg==false simulates the old behavior
+        bool use_push_bg = false;
+      
+        // current clients expect that flattening of HARD  is
+        // done implicitly during check_assumptions
+        expr_ref_vector hard (m);
+        hard.append (_hard.size (), _hard.c_ptr ());
+        flatten_and (hard);
+      
         m_ctx = m_contexts [solver_id == 0 ? 0 : 0 /* 1 */].get ();
+        // can be disabled if use_push_bg == true
         solver::scoped_push _s_(*m_ctx);
-        unsigned old_bg_size = m_ctx->get_num_bg ();
+        itp_solver::scoped_bg _b_(*m_ctx);
         
-        // safe_assumptions safe(*this, hard_atoms, soft_atoms);
-        for (unsigned i = 0; i < num_bg; ++i) m_ctx->assert_expr (bg [i]);
+        for (unsigned i = 0; i < num_bg; ++i)
+          if (use_push_bg) m_ctx->push_bg (bg [i]);
+          else m_ctx->assert_expr (bg[i]);
         
-        lbool res = internal_check_assumptions (hard_atoms, soft_atoms);
+        lbool res = internal_check_assumptions (hard, soft);
 
-        // clear all bg assumptions
-        SASSERT (old_bg_size <= m_ctx->get_num_bg ());
-        m_ctx->pop_bg (m_ctx->get_num_bg () - old_bg_size);
-
+        TRACE ("psolve_verbose",
+               tout << "sat: " << mk_pp (mk_and (hard), m) << "\n"
+               << mk_pp (mk_and (soft), m) << "\n";
+               for (unsigned i = 0; i < num_bg; ++i)
+                 tout << "bg" << i << ": " << mk_pp(bg[i], m) << "\n";
+               tout << "res: " << res << "\n";);
+        
+        CTRACE("psolve", m_core,
+               tout << "core is: " << mk_pp (mk_and (*m_core), m) << "\n";);
+        
+        // -- reset all parameters
+        m_core = 0;
+        m_model = 0;
+        m_subset_based_core = false;
         return res;
     }
 

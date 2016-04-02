@@ -175,6 +175,18 @@ namespace spacer
       ~scoped_mk_proxy ()
       {m_s.undo_proxies (m_v);}
     };
+
+    class scoped_bg
+    {
+      itp_solver &m_s;
+      unsigned m_bg_sz;
+    public:
+      scoped_bg (itp_solver &s) : m_s(s), m_bg_sz (m_s.get_num_bg ()) {}
+      ~scoped_bg () 
+      {if (m_s.get_num_bg () > m_bg_sz) m_s.pop_bg (m_s.get_num_bg () - m_bg_sz);}
+    };
+    
+      
   };
 }
 #endif
