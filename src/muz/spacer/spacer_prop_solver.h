@@ -1,9 +1,30 @@
-/*++
-Copyright (c) 2011 Microsoft Corporation
+/** 
+Spacer
+Copyright (c) 2015 Carnegie Mellon University.
+All Rights Reserved.
+
+THIS SOFTWARE IS PROVIDED "AS IS," WITH NO WARRANTIES
+WHATSOEVER. CARNEGIE MELLON UNIVERSITY EXPRESSLY DISCLAIMS TO THE
+FULLEST EXTENT PERMITTEDBY LAW ALL EXPRESS, IMPLIED, AND STATUTORY
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NON-INFRINGEMENT OF PROPRIETARY RIGHTS.
+
+Released under a modified MIT license, please see SPACER_LICENSE.txt
+for full terms.  DM-0002483
+
+Spacer includes and/or makes use of the following Third-Party Software
+subject to its own license:
+
+Z3
+Copyright (c) Microsoft Corporation
+All rights reserved.
+
+Released under the MIT License (LICENSE.txt)
 
 Module Name:
 
-    prop_solver.h
+    spacer_prop_solver.h
 
 Abstract:
 
@@ -11,7 +32,7 @@ Abstract:
 
 Author:
 
-    Krystof Hoder (t-khoder) 2011-8-17.
+    Arie Gurfinkel
 
 Revision History:
 
@@ -35,6 +56,7 @@ Revision History:
 struct fixedpoint_params;
 
 namespace spacer {
+
     class prop_solver {
     
     private:
@@ -108,28 +130,28 @@ namespace spacer {
             ~scoped_level() { m_lev = false; }
         };
       
-      class scoped_subset_core
-      {
-        prop_solver &m_ps;
-        bool m_subset_based_core;
+        class scoped_subset_core
+        {
+            prop_solver &m_ps;
+            bool m_subset_based_core;
         
-      public: 
-        scoped_subset_core (prop_solver &ps, bool subset_core) : 
-          m_ps(ps), m_subset_based_core (ps.m_subset_based_core)
-        {m_ps.set_subset_based_core (subset_core);}
+        public: 
+            scoped_subset_core (prop_solver &ps, bool subset_core) : 
+                m_ps(ps), m_subset_based_core (ps.m_subset_based_core)
+            {m_ps.set_subset_based_core (subset_core);}
         
-        ~scoped_subset_core () 
-        {m_ps.set_subset_based_core (m_subset_based_core);}
-      };
+            ~scoped_subset_core () 
+            {m_ps.set_subset_based_core (m_subset_based_core);}
+        };
       
-      class scoped_delta_level : public scoped_level
-      {
-        bool &m_delta;
-      public:
-        scoped_delta_level (prop_solver &ps, unsigned lvl) : 
-          scoped_level (ps, lvl), m_delta (ps.m_delta_level) {m_delta = true;}
-        ~scoped_delta_level() {m_delta = false;}
-      };
+        class scoped_delta_level : public scoped_level
+        {
+            bool &m_delta;
+        public:
+            scoped_delta_level (prop_solver &ps, unsigned lvl) : 
+                scoped_level (ps, lvl), m_delta (ps.m_delta_level) {m_delta = true;}
+            ~scoped_delta_level() {m_delta = false;}
+        };
 
         
     };

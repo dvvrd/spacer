@@ -1,5 +1,26 @@
-/*++
-Copyright (c) 2011 Microsoft Corporation
+/** 
+Spacer
+Copyright (c) 2015 Carnegie Mellon University.
+All Rights Reserved.
+
+THIS SOFTWARE IS PROVIDED "AS IS," WITH NO WARRANTIES
+WHATSOEVER. CARNEGIE MELLON UNIVERSITY EXPRESSLY DISCLAIMS TO THE
+FULLEST EXTENT PERMITTEDBY LAW ALL EXPRESS, IMPLIED, AND STATUTORY
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NON-INFRINGEMENT OF PROPRIETARY RIGHTS.
+
+Released under a modified MIT license, please see SPACER_LICENSE.txt
+for full terms.  DM-0002483
+
+Spacer includes and/or makes use of the following Third-Party Software
+subject to its own license:
+
+Z3
+Copyright (c) Microsoft Corporation
+All rights reserved.
+
+Released under the MIT License (LICENSE.txt)
 
 Module Name:
 
@@ -7,11 +28,14 @@ Module Name:
 
 Abstract:
 
-    SMT solver abstraction for SPACER.
+    SAT solver abstraction for SPACER.
 
 Author:
 
+    Arie Gurfinkel
+    Anvesh Komuravelli
 
+Revision History:
 
 --*/
 
@@ -31,7 +55,7 @@ Author:
 #include "fixedpoint_params.hpp"
 
 namespace spacer {
-
+    
     prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name) :
         m_fparams(pm.get_fparams()),
         m(pm.get_manager()),
@@ -47,16 +71,16 @@ namespace spacer {
         m_in_level(false)
     {
       
-      m_solvers[0] = pm.mk_fresh ();
-      m_solvers[1] = pm.mk_fresh2 ();
+        m_solvers[0] = pm.mk_fresh ();
+        m_solvers[1] = pm.mk_fresh2 ();
       
-      m_contexts[0] = alloc(spacer::itp_solver, *(m_solvers[0]),
-                            p.spacer_split_farkas_literals ());
-      m_contexts[1] = alloc(spacer::itp_solver, *(m_solvers[1]),
-                            p.spacer_split_farkas_literals ());
+        m_contexts[0] = alloc(spacer::itp_solver, *(m_solvers[0]),
+                              p.spacer_split_farkas_literals ());
+        m_contexts[1] = alloc(spacer::itp_solver, *(m_solvers[1]),
+                              p.spacer_split_farkas_literals ());
       
-      for (unsigned i = 0; i < 2; ++i)
-        m_contexts[i]->assert_expr (m_pm.get_background ());
+        for (unsigned i = 0; i < 2; ++i)
+            m_contexts[i]->assert_expr (m_pm.get_background ());
     }
 
     void prop_solver::add_level() {
@@ -91,7 +115,7 @@ namespace spacer {
         for (unsigned i=0; i<lev_cnt; i++) {
             bool active = m_delta_level ? i == level : i>=level;
             app * lev_atom =
-              active ? m_neg_level_atoms.get (i) : m_pos_level_atoms.get (i);
+                active ? m_neg_level_atoms.get (i) : m_pos_level_atoms.get (i);
             //m_ctx->assert_expr (lev_atom);
             m_ctx->push_bg (lev_atom);
         }
@@ -113,69 +137,69 @@ namespace spacer {
     }
 
 
-  /// Poor man's maxsat. No guarantees of maximum solution
-  /// Runs maxsat loop on m_ctx Returns l_false if hard is unsat,
-  /// otherwise reduces soft such that hard & soft is sat.
-  lbool prop_solver::maxsmt (expr_ref_vector &hard, expr_ref_vector &soft)
-  {
-    unsigned hard_sz = hard.size ();
-    hard.append (soft);
-    
-    // replace expressions by assumption literals
-    itp_solver::scoped_mk_proxy _p_(*m_ctx, hard);
-    
-    lbool res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
-    if (res != l_false || soft.empty ()) return res;
-    
-    soft.reset ();
-    
-    expr_ref saved (m);
-    ptr_vector<expr> core;
-    m_ctx->get_unsat_core (core);
-    
-    while (hard.size () > hard_sz)
+    /// Poor man's maxsat. No guarantees of maximum solution
+    /// Runs maxsat loop on m_ctx Returns l_false if hard is unsat,
+    /// otherwise reduces soft such that hard & soft is sat.
+    lbool prop_solver::maxsmt (expr_ref_vector &hard, expr_ref_vector &soft)
     {
-      bool found = false;
-      for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
-        if (core.contains (hard.get (i)))
-          {
-            found = true;
-            saved = hard.get (i);
-            hard[i] = hard.back ();
-            hard.pop_back ();
-            break;
-          }
-      if (!found)
-      {
-        hard.resize (hard_sz);
-        return l_false;
-      }
+        unsigned hard_sz = hard.size ();
+        hard.append (soft);
+    
+        // replace expressions by assumption literals
+        itp_solver::scoped_mk_proxy _p_(*m_ctx, hard);
+    
+        lbool res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
+        if (res != l_false || soft.empty ()) return res;
+    
+        soft.reset ();
+    
+        expr_ref saved (m);
+        ptr_vector<expr> core;
+        m_ctx->get_unsat_core (core);
+    
+        while (hard.size () > hard_sz)
+        {
+            bool found = false;
+            for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
+                if (core.contains (hard.get (i)))
+                {
+                    found = true;
+                    saved = hard.get (i);
+                    hard[i] = hard.back ();
+                    hard.pop_back ();
+                    break;
+                }
+            if (!found)
+            {
+                hard.resize (hard_sz);
+                return l_false;
+            }
       
-      res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
-      if (res == l_true) break;
-      if (res == l_undef)
-      {
-        hard.push_back (saved);
-        break;
-      }
-      SASSERT (res == l_false);
-      core.reset ();
-      m_ctx->get_unsat_core (core);
-    }
+            res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
+            if (res == l_true) break;
+            if (res == l_undef)
+            {
+                hard.push_back (saved);
+                break;
+            }
+            SASSERT (res == l_false);
+            core.reset ();
+            m_ctx->get_unsat_core (core);
+        }
 
-    if (res != l_false)
-    {
-      // update soft
-      for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
-        soft.push_back (hard.get (i));
+        if (res != l_false)
+        {
+            // update soft
+            for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
+                soft.push_back (hard.get (i));
+        }
+        hard.resize (hard_sz);
+        return res;
     }
-    hard.resize (hard_sz);
-    return res;
-  }
   
     lbool prop_solver::internal_check_assumptions(
-        expr_ref_vector& hard_atoms,
-        expr_ref_vector& soft_atoms)
+                                                  expr_ref_vector& hard_atoms,
+                                                  expr_ref_vector& soft_atoms)
     {
         flet<bool> _model(m_fparams.m_model, m_model != 0);
 
@@ -194,17 +218,17 @@ namespace spacer {
             m_uses_level = infty_level ();
             
             for (unsigned i = 0; i < core_size; ++i) {
-              if (m_level_atoms_set.contains (core[i]))
-              {
-                unsigned sz = std::min (m_uses_level, m_neg_level_atoms.size ());
-                for (unsigned j = 0; j < sz; ++j)
-                  if (m_neg_level_atoms [j].get () == core[i])
-                  {
-                    m_uses_level = j;
-                    break;
-                  }
-                SASSERT (!is_infty_level (m_uses_level));
-              }
+                if (m_level_atoms_set.contains (core[i]))
+                {
+                    unsigned sz = std::min (m_uses_level, m_neg_level_atoms.size ());
+                    for (unsigned j = 0; j < sz; ++j)
+                        if (m_neg_level_atoms [j].get () == core[i])
+                        {
+                            m_uses_level = j;
+                            break;
+                        }
+                    SASSERT (!is_infty_level (m_uses_level));
+                }
             }
         }
 
@@ -214,8 +238,8 @@ namespace spacer {
             m_ctx->get_itp_core (*m_core);
         }
         else if (result == l_false && m_core) {
-          m_core->reset ();
-          m_ctx->get_unsat_core (*m_core);
+            m_core->reset ();
+            m_ctx->get_unsat_core (*m_core);
         }
         return result;
     }
@@ -230,7 +254,7 @@ namespace spacer {
         // -- true == use push_bg to assert background assumptions
         // -- false == use assert_expr to assert background assumption
         // -- the use_push_bg==false simulates the old behavior
-        bool use_push_bg = false;
+        bool use_push_bg = true;
       
         // current clients expect that flattening of HARD  is
         // done implicitly during check_assumptions
@@ -240,12 +264,12 @@ namespace spacer {
       
         m_ctx = m_contexts [solver_id == 0 ? 0 : 0 /* 1 */].get ();
         // can be disabled if use_push_bg == true
-        solver::scoped_push _s_(*m_ctx);
+        // solver::scoped_push _s_(*m_ctx);
         itp_solver::scoped_bg _b_(*m_ctx);
         
         for (unsigned i = 0; i < num_bg; ++i)
-          if (use_push_bg) m_ctx->push_bg (bg [i]);
-          else m_ctx->assert_expr (bg[i]);
+            if (use_push_bg) m_ctx->push_bg (bg [i]);
+            else m_ctx->assert_expr (bg[i]);
         
         lbool res = internal_check_assumptions (hard, soft);
 
@@ -253,7 +277,7 @@ namespace spacer {
                tout << "sat: " << mk_pp (mk_and (hard), m) << "\n"
                << mk_pp (mk_and (soft), m) << "\n";
                for (unsigned i = 0; i < num_bg; ++i)
-                 tout << "bg" << i << ": " << mk_pp(bg[i], m) << "\n";
+                   tout << "bg" << i << ": " << mk_pp(bg[i], m) << "\n";
                tout << "res: " << res << "\n";);
         
         CTRACE("psolve", m_core,
