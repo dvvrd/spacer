@@ -3,7 +3,7 @@ Copyright (c) 2011 Microsoft Corporation
 
 Module Name:
 
-    prop_solver.cpp
+    spacer_prop_solver.cpp
 
 Abstract:
 
@@ -11,11 +11,7 @@ Abstract:
 
 Author:
 
-    Krystof Hoder (t-khoder) 2011-8-17.
 
-Revision History:
-
-    Modified by Anvesh Komuravelli
 
 --*/
 
@@ -178,15 +174,13 @@ namespace spacer {
   }
   
     lbool prop_solver::internal_check_assumptions(
-        const expr_ref_vector& hard_atoms,
+        expr_ref_vector& hard_atoms,
         expr_ref_vector& soft_atoms)
     {
         flet<bool> _model(m_fparams.m_model, m_model != 0);
-        expr_ref_vector expr_atoms(m);
 
-        expr_atoms.append (hard_atoms);
         if (m_in_level) assert_level_atoms(m_current_level);
-        lbool result = maxsmt (expr_atoms, soft_atoms);
+        lbool result = maxsmt (hard_atoms, soft_atoms);
         if (result == l_true && m_model) m_ctx->get_model (*m_model);
 
         SASSERT (result != l_false || soft_atoms.empty ());

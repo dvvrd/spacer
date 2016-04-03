@@ -63,8 +63,8 @@ namespace spacer {
         
         void ensure_level(unsigned lvl);
 
-        lbool internal_check_assumptions(expr_ref_vector const& hard_atoms,
-                                         expr_ref_vector& soft_atoms);
+        lbool internal_check_assumptions(expr_ref_vector &hard,
+                                         expr_ref_vector &soft);
         
         lbool maxsmt (expr_ref_vector &hard, expr_ref_vector &soft);
       
@@ -83,6 +83,22 @@ namespace spacer {
         void add_level();
         unsigned level_cnt() const;
         
+        
+        void assert_expr (expr * form);
+        void assert_expr (expr * form, unsigned level);
+                
+        /**
+         * check assumptions with a background formula
+         */
+        lbool check_assumptions (const expr_ref_vector & hard, 
+                                 expr_ref_vector & soft, 
+                                 unsigned num_bg = 0,
+                                 expr * const *bg = NULL,
+                                 unsigned solver_id = 0);
+        
+        void collect_statistics(statistics& st) const;
+        void reset_statistics();
+      
         class scoped_level {
             bool& m_lev;
         public:
@@ -92,16 +108,6 @@ namespace spacer {
             ~scoped_level() { m_lev = false; }
         };
       
-      class scoped_delta_level : public scoped_level
-      {
-        bool &m_delta;
-      public:
-        scoped_delta_level (prop_solver &ps, unsigned lvl) : 
-          scoped_level (ps, lvl), m_delta (ps.m_delta_level) {m_delta = true;}
-        ~scoped_delta_level() {m_delta = false;}
-      };
-        
-        
       class scoped_subset_core
       {
         prop_solver &m_ps;
@@ -116,21 +122,15 @@ namespace spacer {
         {m_ps.set_subset_based_core (m_subset_based_core);}
       };
       
-        void assert_expr (expr * form);
-        void assert_expr (expr * form, unsigned level);
-                
-        /**
-         * check assumptions with a background formula
-         */
-        lbool check_assumptions (const expr_ref_vector & hard_atoms, 
-                                 expr_ref_vector & soft_atoms, 
-                                 unsigned num_bg = 0,
-                                 expr * const *bg = NULL,
-                                 unsigned solver_id = 0);
-        
-        void collect_statistics(statistics& st) const;
+      class scoped_delta_level : public scoped_level
+      {
+        bool &m_delta;
+      public:
+        scoped_delta_level (prop_solver &ps, unsigned lvl) : 
+          scoped_level (ps, lvl), m_delta (ps.m_delta_level) {m_delta = true;}
+        ~scoped_delta_level() {m_delta = false;}
+      };
 
-        void reset_statistics();
         
     };
 }
