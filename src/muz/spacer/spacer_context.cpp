@@ -2956,9 +2956,9 @@ namespace spacer {
         SASSERT (vars.empty ());
 
         TRACE ("spacer",
-                tout << "Literals\n";
+                tout << "Implicant\n";
                 tout << mk_pp (m_pm.mk_and (Phi), m) << "\n";
-                tout << "Reduced\n" << mk_pp (phi1, m) << "\n";
+                tout << "Projected Implicant\n" << mk_pp (phi1, m) << "\n";
               );
 
         // expand literals. Ideally, we do not want to split aliasing
