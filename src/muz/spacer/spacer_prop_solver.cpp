@@ -142,11 +142,10 @@ namespace spacer {
     /// otherwise reduces soft such that hard & soft is sat.
     lbool prop_solver::maxsmt (expr_ref_vector &hard, expr_ref_vector &soft)
     {
-        unsigned hard_sz = hard.size ();
-        hard.append (soft);
-    
         // replace expressions by assumption literals
         itp_solver::scoped_mk_proxy _p_(*m_ctx, hard);
+        unsigned hard_sz = hard.size ();
+        hard.append (soft);
     
         lbool res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
         if (res != l_false || soft.empty ()) return res;
