@@ -1252,6 +1252,8 @@ namespace spacer {
                     tout << "After substituting remaining arith vars:\n";
                     tout << mk_pp (fml, m) << "\n";
                   );
+            // an extra round of simplification because subst_vars is not simplifying
+            rw(fml);
         }
 
         DEBUG_CODE (
@@ -1286,7 +1288,7 @@ namespace spacer {
         rational r;
         unsigned bv_size;
 
-        TRACE("spacer", 
+        TRACE("spacer_expand", 
                 tout << "begin expand\n";
                 for (unsigned i = 0; i < conjs.size(); ++i) {
                     tout << mk_pp(conjs[i].get(), m) << "\n";
@@ -1335,7 +1337,7 @@ namespace spacer {
                 }
             }
         }
-        TRACE("spacer", 
+        TRACE("spacer_expand", 
                 tout << "end expand\n";
                 for (unsigned i = 0; i < conjs.size(); ++i) {
                     tout << mk_pp(conjs[i].get(), m) << "\n";
