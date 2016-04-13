@@ -13,6 +13,7 @@ z3_add_component(spacer
   spacer_util.cpp
   spacer_itp_solver.cpp
   spacer_virtual_solver.cpp
+  spacer_old_project.cpp
   COMPONENT_DEPENDENCIES
   arith_tactics
   core_tactics
