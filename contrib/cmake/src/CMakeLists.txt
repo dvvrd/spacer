@@ -14,6 +14,7 @@ set(Z3_API_HEADER_FILES_TO_SCAN
   z3_optimization.h
   z3_interp.h
   z3_fpa.h
+  z3_spacer.h
 )
 set(Z3_FULL_PATH_API_HEADER_FILES_TO_SCAN "")
 foreach (header_file ${Z3_API_HEADER_FILES_TO_SCAN})
@@ -91,6 +92,7 @@ add_subdirectory(muz/tab)
 add_subdirectory(muz/bmc)
 add_subdirectory(muz/ddnf)
 add_subdirectory(muz/duality)
+add_subdirectory(muz/spacer)
 add_subdirectory(muz/fp)
 add_subdirectory(tactic/nlsat_smt)
 add_subdirectory(tactic/ufbv)

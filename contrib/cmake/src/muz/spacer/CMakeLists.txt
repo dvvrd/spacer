@@ -11,6 +11,8 @@ z3_add_component(spacer
   spacer_smt_context_manager.cpp
   spacer_sym_mux.cpp
   spacer_util.cpp
+  spacer_itp_solver.cpp
+  spacer_virtual_solver.cpp
   COMPONENT_DEPENDENCIES
   arith_tactics
   core_tactics

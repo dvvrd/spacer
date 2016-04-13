@@ -20,7 +20,6 @@ z3_add_component(qe
     qsat.cpp
     vsubst_tactic.cpp
     #
-    qe_array.cpp
     qe_array_plugin.cpp
     qe_project.cpp
   COMPONENT_DEPENDENCIES
