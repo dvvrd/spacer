@@ -1471,11 +1471,20 @@ namespace spacer {
     
     get_manager ().formula_o2n (post.get (), post, m_premises [m_active].get_oidx ());
     
+    /* The level and depth are taken from the parent, not the sibling.
+       The reasoning is that the sibling has not been checked before,
+       and lower level is a better starting point. */
     model_node *n = alloc (model_node, &m_parent, 
                            m_premises[m_active].pt (), 
                            prev_level (m_parent.level ()),
                            m_parent.depth ());
     n->set_post (post);
+    IF_VERBOSE (1, verbose_stream ()
+                << "\n\tcreate_child: " << n->pt ().head ()->get_name () 
+                << " (" << n->level () << ", " << n->depth () << ") "
+                << (n->use_farkas_generalizer () ? "FAR " : "SUB ")
+                << n->post ()->get_id ();
+                verbose_stream().flush (););
     return n;
   }
   
