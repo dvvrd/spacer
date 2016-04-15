@@ -2624,7 +2624,8 @@ namespace spacer {
         IF_VERBOSE(1, verbose_stream () << (next ? " X " : " T ")
                    << std::fixed << std::setprecision(2) 
                    << watch.get_seconds () << "\n";);
-        return next ? false : true;
+        
+        return next ? is_reachable(*next) : true;
     }
 
     //this processes a goal and creates sub-goal
