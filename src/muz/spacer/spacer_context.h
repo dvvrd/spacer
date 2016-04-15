@@ -416,6 +416,7 @@ namespace spacer {
    * A node in the search tree.
    */
   class model_node {
+      friend class context;
     unsigned m_ref_count;
     /// parent node
     model_node_ref          m_parent;
@@ -700,6 +701,7 @@ namespace spacer {
         stopwatch m_solve_watch;
         stopwatch m_propagate_watch;
         stopwatch m_reach_watch;
+        stopwatch m_is_reach_watch;
         stopwatch m_create_children_watch;
         stopwatch m_init_rules_watch;
        
@@ -726,6 +728,7 @@ namespace spacer {
         bool check_reachability ();        
         bool propagate(unsigned min_prop_lvl, unsigned max_prop_lvl, 
                        unsigned full_prop_lvl);
+        bool is_reachable(model_node &n);
         lbool expand_node(model_node& n);
         lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 
                            unsigned& uses_level, bool& is_concrete, 

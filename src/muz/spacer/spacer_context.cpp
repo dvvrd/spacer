@@ -2459,8 +2459,7 @@ namespace spacer {
             node = last_reachable;
             last_reachable = NULL;
             if (m_search.is_root (*node)) return true;
-            if (expand_node (*node->parent ()) == l_true)
-            {
+            if (is_reachable (*node->parent())) {
               last_reachable = node->parent ();
               last_reachable->close ();
             }
@@ -2543,6 +2542,89 @@ namespace spacer {
         
         UNREACHABLE();
         return false;
+    }
+
+    /// check whether node n is concretely reachable
+    bool context::is_reachable (model_node &n) {
+        scoped_watch _w_(m_is_reach_watch);
+        SASSERT (n.is_open ());
+        TRACE ("spacer", 
+               tout << "is-reachable: " << n.pt().head()->get_name() 
+               << " level: " << n.level() 
+               << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
+               << mk_pp(n.post(), m) << "\n";);
+        
+        stopwatch watch;
+        IF_VERBOSE (1, verbose_stream () << "is-reachable: " << n.pt ().head ()->get_name () 
+                    << " (" << n.level () << ", " 
+                    << (n.depth () - m_search.min_depth ()) << ") "
+                    << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
+                    << n.post ()->get_id ();
+                    verbose_stream().flush ();
+                    watch.start (););
+      
+        // used in case n is unreachable
+        unsigned uses_level = infty_level ();
+        model_ref model;
+      
+        // used in case n is reachable
+        bool is_concrete;
+        const datalog::rule * r = NULL;
+        // denotes which predecessor's (along r) reach facts are used
+        vector<bool> reach_pred_used; 
+        unsigned num_reuse_reach = 0;
+        
+        
+        unsigned saved = n.level ();
+        n.m_level = infty_level ();
+        lbool res = n.pt().is_reachable(n, NULL, &model,
+                                        uses_level, is_concrete, r, 
+                                        reach_pred_used, num_reuse_reach);
+        n.m_level = saved;
+
+        if (res != l_true || !is_concrete) {
+            IF_VERBOSE(1, verbose_stream () << " F "
+                       << std::fixed << std::setprecision(2) 
+                       << watch.get_seconds () << "\n";);
+            return false;
+        }
+        
+        SASSERT(res == l_true);
+        SASSERT(is_concrete);
+        
+        model_evaluator mev (m, model);
+        // -- update must summary
+        if (r && r->get_uninterpreted_tail_size () > 0) {
+            reach_fact* rf = mk_reach_fact (n, mev, *r);
+            n.pt ().add_reach_fact (*rf);
+        }
+
+        // if n has a derivation, create a new child and report l_undef
+        // otherwise if n has no derivation or no new children, report l_true
+        model_node *next = NULL;
+        if (n.has_derivation ())
+        {
+            next = n.get_derivation ().create_next_child ();
+            if (next) 
+            { 
+                // move derivation over to the next obligation
+                next->set_derivation(n.detach_derivation ());
+              
+                // remove the current node from the queue if it is at the top
+                if (m_search.top() == &n) m_search.pop();
+              
+                m_search.push(*next);
+            }
+        }
+          
+        // -- close n, it is reachable
+        // -- don't worry about remove n from the obligation queue
+        n.close ();
+          
+        IF_VERBOSE(1, verbose_stream () << (next ? " X " : " T ")
+                   << std::fixed << std::setprecision(2) 
+                   << watch.get_seconds () << "\n";);
+        return next ? false : true;
     }
 
     //this processes a goal and creates sub-goal
@@ -3029,6 +3111,7 @@ namespace spacer {
         st.update ("time.spacer.solve", m_solve_watch.get_seconds ());
         st.update ("time.spacer.solve.propagate", m_propagate_watch.get_seconds ());
         st.update ("time.spacer.solve.reach", m_reach_watch.get_seconds ());
+        st.update ("time.spacer.solve.reach.is-reach", m_is_reach_watch.get_seconds ());
         st.update ("time.spacer.solve.reach.children",
                    m_create_children_watch.get_seconds ());
         m_pm.collect_statistics(st);
@@ -3063,6 +3146,7 @@ namespace spacer {
         m_solve_watch.reset ();
         m_propagate_watch.reset ();
         m_reach_watch.reset ();
+        m_is_reach_watch.reset ();
         m_create_children_watch.reset ();
     }
 
