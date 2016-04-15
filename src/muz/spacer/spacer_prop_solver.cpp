@@ -270,17 +270,18 @@ namespace spacer {
             if (use_push_bg) m_ctx->push_bg (bg [i]);
             else m_ctx->assert_expr (bg[i]);
         
+        unsigned soft_sz = soft.size ();
         lbool res = internal_check_assumptions (hard, soft);
-
         TRACE ("psolve_verbose",
                tout << "sat: " << mk_pp (mk_and (hard), m) << "\n"
                << mk_pp (mk_and (soft), m) << "\n";
                for (unsigned i = 0; i < num_bg; ++i)
                    tout << "bg" << i << ": " << mk_pp(bg[i], m) << "\n";
                tout << "res: " << res << "\n";);
-        
         CTRACE("psolve", m_core,
                tout << "core is: " << mk_pp (mk_and (*m_core), m) << "\n";);
+        
+        SASSERT (soft_sz >= soft.size ());
         
         // -- reset all parameters
         m_core = 0;
