@@ -293,6 +293,9 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
                     return false;
                 }
             }
+            SASSERT(vertices.size() == 2 &&
+                    vertices.contains(t1->get_id()) &&
+                    vertices.contains(t2->get_id()));
             return 
                 vertices.size() == 2 &&
                 vertices.contains(t1->get_id()) &&
@@ -409,6 +412,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             side_conditions.push_back(fact.get());
             return true;
         }
+        UNREACHABLE();
         IF_VERBOSE(0, verbose_stream() << "Expected proof of equality:\n" << mk_bounded_pp(p, m);); 
         return false;
     }
@@ -428,6 +432,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             return true;
         }
         IF_VERBOSE(0, verbose_stream() << "Expected proof of equality:\n" << mk_bounded_pp(p, m);); 
+        UNREACHABLE();
         return false;        
     }
     case PR_PULL_QUANT: {
@@ -439,6 +444,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             return true;
         }
         IF_VERBOSE(0, verbose_stream() << "Expected proof of equivalence with a quantifier:\n" << mk_bounded_pp(p, m);); 
+        UNREACHABLE();
         return false;
     }
     case PR_PULL_QUANT_STAR: {
@@ -449,6 +455,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             return true;
         }
         IF_VERBOSE(0, verbose_stream() << "Expected proof of equivalence:\n" << mk_bounded_pp(p, m);); 
+        UNREACHABLE();
         return false;
     }
     case PR_PUSH_QUANT: {
@@ -467,6 +474,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
                     // ok.
                 }
                 else {
+                    UNREACHABLE();
                     return false;
                 }                    
             }
@@ -486,6 +494,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             return true;
         }
         IF_VERBOSE(0, verbose_stream() << "does not match last rule: " << mk_pp(p, m) << "\n";);
+        UNREACHABLE();
         return false;
     }
     case PR_DER: {
@@ -500,6 +509,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             return true;
         }        
         IF_VERBOSE(0, verbose_stream() << "does not match last rule: " << mk_pp(p, m) << "\n";);
+        UNREACHABLE();
         return false;
     }
     case PR_HYPOTHESIS: {
@@ -508,6 +518,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             match_fact(p, fml)) {
             return true;
         }
+        UNREACHABLE();
         return false;
     }
     case PR_LEMMA: {
@@ -569,6 +580,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             match_or(fml.get(), terms1)) {
             for (unsigned i = 1; i < proofs.size(); ++i) {
                 if (!match_fact(proofs.get(i), fml2)) {
+                    UNREACHABLE();
                     return false;
                 }
                 bool found = false;
@@ -602,8 +614,10 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             }
             switch(terms1.size()) {
             case 0: 
+                SASSERT(m.is_false(fact.get()));
                 return m.is_false(fact.get());
             case 1: 
+                SASSERT(fact.get() == terms1[0].get());
                 return fact.get() == terms1[0].get();
             default: {
                 if (match_or(fact.get(), terms2)) {
@@ -615,6 +629,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
                         }
                         if (!found) {
                             IF_VERBOSE(0, verbose_stream() << "Premise not found:" << mk_pp(term1, m) << "\n";);
+                            UNREACHABLE();
                             return false;
                         }
                     }
@@ -624,6 +639,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
                            verbose_stream() << mk_pp(fml.get(), m) << "\n";
                            verbose_stream() << mk_pp(fact.get(), m) << "\n";);
 
+                UNREACHABLE();
                 return false;
             }
             
@@ -750,6 +766,7 @@ bool proof_checker::check1_basic(proof* p, expr_ref_vector& side_conditions) {
             if (is_quantifier(e)) {
                 q = to_quantifier(e);                
                 // TBD check that quantifier is properly instantiated
+                SASSERT(is_forall == q->is_forall());
                 return is_forall == q->is_forall();                
             }
         }
@@ -1299,7 +1316,7 @@ bool proof_checker::check_arith_literal(bool is_pos, app* lit0, rational const& 
         is_pos = !is_pos;
     }
     if (!a.is_le(lit) && !a.is_lt(lit) && !a.is_ge(lit) && !a.is_gt(lit) && !m.is_eq(lit)) {
-        IF_VERBOSE(0, verbose_stream() << mk_pp(lit, m) << "\n";);
+        IF_VERBOSE(0, verbose_stream() << "Not arith literal: " << mk_pp(lit, m) << "\n";);
         return false;
     }
     SASSERT(lit->get_num_args() == 2);
@@ -1363,7 +1380,7 @@ bool proof_checker::check_arith_literal(bool is_pos, app* lit0, rational const& 
         rw(sum);
     }
 
-    IF_VERBOSE(0, verbose_stream() << coeff << "\n" << mk_pp(lit0, m) << "\n" << mk_pp(sum, m) << "\n";);
+    IF_VERBOSE(0, verbose_stream() << "coeff,lit,sum " << coeff << "\n" << mk_pp(lit0, m) << "\n" << mk_pp(sum, m) << "\n";);
 #endif
 
     return true;
@@ -1418,6 +1435,8 @@ bool proof_checker::check_arith_proof(proof* p) {
         proof * a = m.get_parent(p, i);
         SASSERT(m.has_fact(a));
         if (!check_arith_literal(true, to_app(m.get_fact(a)), coeffs[offset++], sum, is_strict)) {
+            IF_VERBOSE(0, verbose_stream() << mk_pp(p, m) << "\n";);
+            UNREACHABLE();
             return false;
         }
     }
@@ -1428,17 +1447,20 @@ bool proof_checker::check_arith_proof(proof* p) {
         for (unsigned i = 0; i < num_args; ++i) {  
             app* lit = to_app(disj->get_arg(i));
             if (!check_arith_literal(false, lit,  coeffs[offset++], sum, is_strict)) {
+                UNREACHABLE();
                 return false;
             }
         }
     }
     else if (!m.is_false(fact)) {
         if (!check_arith_literal(false, to_app(fact),  coeffs[offset++], sum, is_strict)) {
+            UNREACHABLE();
             return false;
         }
     }
     
     if (!sum.get()) {
+        UNREACHABLE();
         return false;
     }
     
@@ -1459,6 +1481,7 @@ bool proof_checker::check_arith_proof(proof* p) {
         IF_VERBOSE(0, verbose_stream() << "Arithmetic proof check failed: " << mk_pp(sum, m) << "\n";);
         m_dump_lemmas = true;
         dump_proof(p);
+        UNREACHABLE();
         return false;
     }
     
