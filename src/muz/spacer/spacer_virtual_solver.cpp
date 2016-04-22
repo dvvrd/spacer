@@ -94,6 +94,10 @@ namespace spacer {
       
             void operator() (ast_manager &m, proof *pr, proof_ref &res)
             {
+                DEBUG_CODE(proof_checker pc(m);
+                           expr_ref_vector side(m);
+                           SASSERT(pc.check(pr, side));
+                           );
                 obj_map<app, app*> cache;
                 bool_rewriter brwr (m);
         
@@ -198,6 +202,13 @@ namespace spacer {
                     }
                     cache.insert (p, newp);
                     todo.pop_back ();
+                    CTRACE("virtual",
+                           p->get_decl_kind () == PR_TH_LEMMA &&
+                           p->get_decl()->get_parameter (0).get_symbol () == "arith" &&
+                           p->get_decl()->get_num_parameters() > 1 &&
+                           p->get_decl()->get_parameter(1).get_symbol() == "farkas",
+                           tout << "Old pf: " << mk_pp (p, m) << "\n"
+                           << "New pf: " << mk_pp(newp, m) << "\n";);
                 }
         
                 proof *r;
