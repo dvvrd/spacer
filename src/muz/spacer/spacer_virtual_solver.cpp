@@ -77,7 +77,8 @@ namespace spacer {
                     if (i != j) args [j] = args.get (i);
                     ++j;
                 }
-                res = m.mk_or (j, args.c_ptr ());
+                SASSERT (j >= 1);
+                res = j > 1 ? m.mk_or (j, args.c_ptr ()) : args.get(0);
             }
       
             void mk_app (func_decl *decl, expr_ref_vector &args, expr_ref &res)
