@@ -730,10 +730,6 @@ namespace spacer {
                        unsigned full_prop_lvl);
         bool is_reachable(model_node &n);
         lbool expand_node(model_node& n);
-        lbool expand_state(model_node& n, expr_ref_vector& core, model_ref &model, 
-                           unsigned& uses_level, bool& is_concrete, 
-                           datalog::rule const*& r, vector<bool>& reach_pred_used, 
-                           unsigned& num_reuse_reach);
         reach_fact *mk_reach_fact (model_node& n, model_evaluator &mev, 
                                    datalog::rule const& r);
         void create_children(model_node& n, datalog::rule const& r, model_evaluator &model, 

@@ -610,7 +610,13 @@ namespace spacer {
     if (res == l_false) uses_level = m_solver.uses_level ();
     return res == l_false;
   }
-  
+    
+  //
+  // check if predicate transformer has a satisfiable predecessor state.
+  // returns either a satisfiable predecessor state or 
+  // return a property that blocks state and is implied by the 
+  // predicate transformer (or some unfolding of it).
+  // 
   lbool pred_transformer::is_reachable(model_node& n, expr_ref_vector* core, 
                                        model_ref* model, unsigned& uses_level, 
                                          bool& is_concrete, datalog::rule const*& r, 
@@ -2695,8 +2701,8 @@ namespace spacer {
         return l_false;
       }
       
-      lbool res = expand_state(n, cube, model, uses_level, is_concrete, r, 
-                         reach_pred_used, num_reuse_reach);
+      lbool res = n.pt ().is_reachable (n, &cube, &model, uses_level, is_concrete, r, 
+                                        reach_pred_used, num_reuse_reach);
       checkpoint ();
       IF_VERBOSE (1, verbose_stream () << "." << std::flush;);
       switch (res) 
@@ -2829,14 +2835,6 @@ namespace spacer {
     // return a property that blocks state and is implied by the 
     // predicate transformer (or some unfolding of it).
     // 
-    lbool context::expand_state(model_node& n, expr_ref_vector& core, 
-                                model_ref& model, 
-                                unsigned& uses_level, bool& is_concrete, 
-                                datalog::rule const*& r, vector<bool>& reach_pred_used, 
-                                unsigned& num_reuse_reach) {
-      return n.pt().is_reachable(n, &core, &model, uses_level, is_concrete, 
-                                 r, reach_pred_used, num_reuse_reach);
-    }
 
   bool context::propagate(unsigned min_prop_lvl, 
                           unsigned max_prop_lvl, unsigned full_prop_lvl) {    
