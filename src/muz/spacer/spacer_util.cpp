@@ -1487,6 +1487,9 @@ namespace spacer {
         for (unsigned i = 0, sz = in.size (); i < sz; ++i)
         {
           expr * e = in.get (i);
+          // -- skip unknown literals. unknown literals are expected due
+          // -- to potential incompleteness of the underlying smt solver.
+          if (!m_mev.is_true (e) && !m_mev.is_false (e)) continue;
           SASSERT (m_mev.is_true (e) || m_mev.is_false (e));
           CTRACE ("div_bug", !m_mev.is_true (e) && !m_mev.is_false (e),
                   tout << "Unknown (expect to contain div-by-zero): "
