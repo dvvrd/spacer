@@ -2633,13 +2633,14 @@ namespace spacer {
         }
           
         // -- close n, it is reachable
-        // -- don't worry about remove n from the obligation queue
+        // -- don't worry about removing n from the obligation queue
         n.close ();
           
         IF_VERBOSE(1, verbose_stream () << (next ? " X " : " T ")
                    << std::fixed << std::setprecision(2) 
                    << watch.get_seconds () << "\n";);
         
+        // recurse on the new proof obligation
         return next ? is_reachable(*next) : true;
     }
 
@@ -2669,15 +2670,6 @@ namespace spacer {
                   verbose_stream().flush ();
                   watch.start (););
       
-
-      // check the cache
-      // DISABLED FOR NOW
-      // if (n.pt().is_must_reachable (n.post())) {
-      //     m_stats.m_num_reuse_reach++;
-      //     n.set_reachable (true);
-      // }
-        
-        
       // used in case n is unreachable
       unsigned uses_level = infty_level ();
       expr_ref_vector cube(m);
