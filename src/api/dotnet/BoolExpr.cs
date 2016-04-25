@@ -50,5 +50,22 @@ namespace Microsoft.Z3
             else
                 return new BoolExpr(ctx, Native.Z3_translate(Context.nCtx, NativeObject, ctx.nCtx));
         }
+
+        #region Operators
+        /// <summary> Disjunction of Boolean expressions </summary>
+        public static BoolExpr operator|(BoolExpr a, BoolExpr b) { return a.Context.MkOr(a, b); }
+
+        /// <summary>
+        /// Conjunction of Boolean expressions
+        /// </summary>
+        public static BoolExpr operator &(BoolExpr a, BoolExpr b) { return a.Context.MkAnd(a, b); }
+       
+        /// <summary> Xor of Boolean expressions </summary>
+        public static BoolExpr operator ^(BoolExpr a, BoolExpr b) { return a.Context.MkXor(a, b); }
+       
+        /// <summary> Negation </summary>
+        public static BoolExpr operator !(BoolExpr a) { return a.Context.MkNot(a); }
+
+        #endregion
     }
 }
