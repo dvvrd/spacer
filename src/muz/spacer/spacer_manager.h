@@ -77,7 +77,6 @@ namespace spacer {
     class manager
     {
         ast_manager&      m;
-        smt_params& m_fparams;
         
         mutable bool_rewriter m_brwr;
         
@@ -100,10 +99,9 @@ namespace spacer {
         void add_new_state(func_decl * s);
         
     public:
-        manager(smt_params& fparams, unsigned max_num_contexts, ast_manager & manager);
+        manager(unsigned max_num_contexts, ast_manager & manager);
         
         ast_manager& get_manager() const { return m; }
-        smt_params& get_fparams() const { return m_fparams; }
         bool_rewriter& get_brwr() const { return m_brwr; }
 
         expr_ref mk_and(unsigned sz, expr* const* exprs);
@@ -291,20 +289,14 @@ namespace spacer {
         
         expr* get_background() const { return m_background; }
         
-        
-        /**
-           Return true if we can show that lhs => rhs. The function can have false negatives
-           (i.e. when smt::context returns unknown), but no false positives.
-           
-           bg is background knowledge and can be null
-        */
-        bool implication_surely_holds(expr * lhs, expr * rhs, expr * bg=0);
-        
         unsigned get_unique_num() { return m_next_unique_num++; }
         
         solver* mk_fresh() {return m_contexts.mk_fresh();}
-        solver* mk_fresh2() {return m_contexts2.mk_fresh ();}
+        smt_params& fparams() { return m_contexts.fparams (); }
+        solver* mk_fresh2() {return m_contexts2.mk_fresh();}
+        smt_params &fparams2() { return m_contexts2.fparams(); }
         solver* mk_fresh3() {return m_contexts3.mk_fresh ();}
+        smt_params &fparams3() {return m_contexts3.fparams();}
       
       
         

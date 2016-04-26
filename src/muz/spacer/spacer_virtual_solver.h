@@ -97,12 +97,17 @@ namespace spacer {
         {m_context.set_reason_unknown (msg);} 
         virtual ast_manager& get_manager () {return m;}
         virtual void get_labels(svector<symbol> &r);
+        virtual void set_produce_models(bool f);
+        virtual bool get_produce_models();
+        virtual smt_params &fparams();
     
         virtual void set_progress_callback(progress_callback *callback)
         {UNREACHABLE ();}
     
         virtual solver *translate (ast_manager &m, params_ref const &p);
     
+        virtual void updt_params (params_ref const &p);
+        virtual void collect_param_descrs (param_descrs &r);
     
     protected:
         virtual lbool check_sat_core (unsigned num_assumptions, expr *const * assumptions);
@@ -115,7 +120,7 @@ namespace spacer {
     {
         friend class virtual_solver;
     private:
-        smt_params  &m_params;
+        smt_params  &m_fparams;
         ast_manager &m;
         smt::kernel m_context;
         /// number of solvers created by this factory so-far
@@ -144,6 +149,11 @@ namespace spacer {
             m_context.reset ();
             m_num_solvers = 0;
         }
+        void updt_params(params_ref const &p) { m_fparams.updt_params(p); }
+        void collect_param_descrs(param_descrs &r) { /* empty */ }
+        void set_produce_models (bool f) { m_fparams.m_model = f; }
+        bool get_produce_models () { return m_fparams.m_model; }
+        smt_params &fparams () { return m_fparams; }
     };
     
 }

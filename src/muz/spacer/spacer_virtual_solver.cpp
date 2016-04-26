@@ -352,11 +352,20 @@ namespace spacer {
         UNREACHABLE();
         return 0;
     }
+    void virtual_solver::updt_params (params_ref const &p)
+    { m_factory.updt_params (p); }
+    void virtual_solver::collect_param_descrs (param_descrs &r)
+    { m_factory.collect_param_descrs (r); }
+    void virtual_solver::set_produce_models(bool f)
+    { m_factory.set_produce_models(f); }
+    bool virtual_solver::get_produce_models()
+    {return m_factory.get_produce_models(); }
+    smt_params &virtual_solver::fparams()
+    {return m_factory.fparams();}
 
     virtual_solver_factory::virtual_solver_factory (ast_manager &mgr, smt_params &fparams) :
-        m_params (fparams), m(mgr), m_context (m, m_params), m_num_solvers(0)
+        m_fparams (fparams), m(mgr), m_context (m, m_fparams), m_num_solvers(0)
     {
-        // m_params.updt_params (p);
         m_stats.reset ();
     }
   

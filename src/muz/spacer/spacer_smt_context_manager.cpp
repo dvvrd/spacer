@@ -32,8 +32,10 @@ namespace spacer {
 
 
   
-    smt_context_manager::smt_context_manager(smt_params& fp, unsigned max_num_contexts, ast_manager& m):
-        m_fparams(fp), 
+    smt_context_manager::smt_context_manager(ast_manager &m,
+                                             unsigned max_num_contexts,
+                                             const params_ref &p) :
+        m_fparams(p), 
         m(m), 
         m_max_num_contexts(max_num_contexts),
         m_num_contexts(0) { m_stats.reset ();}

@@ -132,7 +132,7 @@ namespace spacer {
       for (unsigned j = i + 1; j < sz; ++j)
         eqs.push_back (m.mk_eq (m.mk_const (vsymbs.get (i)), m.mk_const (vsymbs.get (j))));
     
-    smt::kernel solver (m, m_ctx.get_fparams (), m_ctx.get_params ().p);
+    smt::kernel solver (m, m_ctx.get_manager().fparams2 ());
     expr_ref_vector lits (m);
     for (unsigned i = 0, core_sz = core.size (); i < core_sz; ++i)
     {

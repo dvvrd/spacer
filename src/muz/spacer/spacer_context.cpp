@@ -935,7 +935,7 @@ namespace spacer {
         
         th_rewriter rw(m);
         rw(fml);
-        if (ctx.get_params ().spacer_blast_term_ite () || ctx.is_dl() || ctx.is_utvpi()) {
+        if (ctx.get_params().spacer_blast_term_ite()) {
           blast_term_ite (fml);
           rw(fml);
          }
@@ -1618,25 +1618,20 @@ namespace spacer {
     // ----------------
     // context
 
-    context::context(
-        smt_params&     fparams,
-        fixedpoint_params const&     params,
-        ast_manager&          m
-        )
-        : m_fparams(fparams),
-          m_params(params),
-          m(m),
-          m_context(0),
-          m_pm(m_fparams, params.pdr_max_num_contexts(), m),
-          m_query_pred(m),
-          m_query(0),
-          m_search(),
-          m_last_result(l_undef),
-          m_inductive_lvl(0),
-          m_expanded_lvl(0),
-          m_use_native_mbp (params.spacer_native_mbp ())
-    {
-    }
+    context::context(fixedpoint_params const&     params,
+                     ast_manager&          m) : 
+        m_params(params),
+        m(m),
+        m_context(0),
+        m_pm(params.pdr_max_num_contexts(), m),
+        m_query_pred(m),
+        m_query(0),
+        m_search(),
+        m_last_result(l_undef),
+        m_inductive_lvl(0),
+        m_expanded_lvl(0),
+        m_use_native_mbp (params.spacer_native_mbp ())
+    {}
 
     context::~context() {
         reset_core_generalizers();
@@ -1965,7 +1960,7 @@ namespace spacer {
                         fv.reverse ();
                         tmp = m.mk_exists(fv.size(), fv.c_ptr(), names.c_ptr(), tmp);
                     }
-                    smt::kernel solver(m, get_fparams());
+                    smt::kernel solver(m, m_pm.fparams2());
                     solver.assert_expr(tmp);
                     lbool res = solver.check();
                     if (res != l_false) {
@@ -1996,37 +1991,19 @@ namespace spacer {
         reset_core_generalizers();
         classifier_proc classify(m, rules);
         bool use_mc = m_params.pdr_use_multicore_generalizer();
-        if (use_mc) {
-            m_core_generalizers.push_back(alloc(core_multi_generalizer, *this, 0));
-        }
         if (m_params.pdr_farkas() && !classify.is_bool()) {
             m.toggle_proof_mode(PGM_FINE);
+            smt_params &fparams = m_pm.fparams ();
             if (!m_params.spacer_eq_prop ())
             {
-              m_fparams.m_arith_bound_prop = BP_NONE;
-              m_fparams.m_arith_auto_config_simplex = true;
-              m_fparams.m_arith_propagate_eqs = false;
-              m_fparams.m_arith_eager_eq_axioms = false;
-            }
-            if (m_params.pdr_utvpi()) {
-                if (classify.is_dl()) {
-                    m_fparams.m_arith_mode = AS_DIFF_LOGIC;
-                    m_fparams.m_arith_expand_eqs = true;
-                } else if (classify.is_utvpi()) {
-                    IF_VERBOSE(1, verbose_stream() << "UTVPI\n";);
-                    m_fparams.m_arith_mode = AS_UTVPI;
-                    m_fparams.m_arith_expand_eqs = true;                
-                }
+              fparams.m_arith_bound_prop = BP_NONE;
+              fparams.m_arith_auto_config_simplex = true;
+              fparams.m_arith_propagate_eqs = false;
+              fparams.m_arith_eager_eq_axioms = false;
             }
         }
         if (!use_mc && m_params.pdr_use_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_bool_inductive_generalizer, *this, 0));
-        }
-        if (m_params.pdr_inductive_reachability_check()) {
-            m_core_generalizers.push_back(alloc(core_induction_generalizer, *this));
-        }
-        if (m_params.pdr_use_arith_inductive_generalizer()) {
-            m_core_generalizers.push_back(alloc(core_arith_inductive_generalizer, *this));
         }
         
         if (m_params.use_array_eq_generalizer ()) 
@@ -2320,7 +2297,7 @@ namespace spacer {
           cex.push_back (m.mk_const (preds[0]));
 
         // smt context to obtain local cexes
-        scoped_ptr<smt::kernel> cex_ctx = alloc (smt::kernel, m, get_fparams ());
+        scoped_ptr<smt::kernel> cex_ctx = alloc (smt::kernel, m, m_pm.fparams2 ());
         model_evaluator mev (m);
 
         // preorder traversal of the query derivation tree
@@ -3174,7 +3151,7 @@ namespace spacer {
     }
 
     bool context::check_invariant(unsigned lvl, func_decl* fn) {
-        smt::kernel ctx(m, m_fparams);
+        smt::kernel ctx(m, m_pm.fparams2());
         pred_transformer& pt = *m_rels.find(fn);
         expr_ref_vector conj(m);
         expr_ref inv = pt.get_formulas(next_level(lvl), false);

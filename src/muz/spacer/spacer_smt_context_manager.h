@@ -37,7 +37,7 @@ namespace spacer {
         void reset() { memset(this, 0, sizeof(*this)); }
       };
           
-        smt_params&              m_fparams;
+        smt_params               m_fparams;
         ast_manager&             m;
         unsigned                 m_max_num_contexts;
         ptr_vector<virtual_solver_factory> m_solvers;
@@ -49,13 +49,18 @@ namespace spacer {
         stopwatch m_check_sat_watch;
       
     public:
-        smt_context_manager(smt_params& fp, unsigned max_num_contexts, ast_manager& m);
+        smt_context_manager(ast_manager& m, unsigned max_num_contexts=1,
+                            const params_ref &p = params_ref::get_empty ());
+        
         ~smt_context_manager();
         virtual_solver* mk_fresh();                
+        
         void collect_statistics(statistics& st) const;
         void reset_statistics();
 
-      friend class smt_context;
+        void updt_params (params_ref const &p) { m_fparams.updt_params(p); }
+        smt_params& fparams () {return m_fparams;}
+
     };
 
 };

@@ -44,7 +44,7 @@ dl_interface::dl_interface(datalog::context& ctx) :
     m_old_rules(ctx),
     m_context(0),
     m_refs(ctx.get_manager()) {
-    m_context = alloc(spacer::context, ctx.get_fparams(), ctx.get_params(), ctx.get_manager());
+    m_context = alloc(spacer::context, ctx.get_params(), ctx.get_manager());
 }
 
 
@@ -315,7 +315,7 @@ void dl_interface::get_rules_along_trace (datalog::rule_ref_vector& rules) {
 
 void dl_interface::updt_params() {
     dealloc(m_context);
-    m_context = alloc(spacer::context, m_ctx.get_fparams(), m_ctx.get_params(), m_ctx.get_manager());
+    m_context = alloc(spacer::context, m_ctx.get_params(), m_ctx.get_manager());
 }
 
 model_ref dl_interface::get_model() {

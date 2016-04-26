@@ -57,7 +57,6 @@ Revision History:
 namespace spacer {
     
     prop_solver::prop_solver(manager& pm, fixedpoint_params const& p, symbol const& name) :
-        m_fparams(pm.get_fparams()),
         m(pm.get_manager()),
         m_pm(pm),
         m_name(name),
@@ -72,7 +71,10 @@ namespace spacer {
     {
       
         m_solvers[0] = pm.mk_fresh ();
+        m_fparams[0] = &pm.fparams ();
+        
         m_solvers[1] = pm.mk_fresh2 ();
+        m_fparams[1] = &pm.fparams2 ();
       
         m_contexts[0] = alloc(spacer::itp_solver, *(m_solvers[0]),
                               p.spacer_split_farkas_literals ());
@@ -200,8 +202,11 @@ namespace spacer {
                                                   expr_ref_vector& hard_atoms,
                                                   expr_ref_vector& soft_atoms)
     {
-        flet<bool> _model(m_fparams.m_model, m_model != 0);
-
+        // XXX Turn model generation if m_model != 0
+        SASSERT (m_ctx);
+        SASSERT (m_ctx_fparams);
+        flet<bool> _model(m_ctx_fparams->m_model, m_model != 0);
+        
         if (m_in_level) assert_level_atoms(m_current_level);
         lbool result = maxsmt (hard_atoms, soft_atoms);
         if (result == l_true && m_model) m_ctx->get_model (*m_model);
@@ -262,6 +267,8 @@ namespace spacer {
         flatten_and (hard);
       
         m_ctx = m_contexts [solver_id == 0 ? 0 : 0 /* 1 */].get ();
+        m_ctx_fparams = m_fparams [solver_id == 0 ? 0 : 0 /* 1 */];
+        
         // can be disabled if use_push_bg == true
         // solver::scoped_push _s_(*m_ctx);
         itp_solver::scoped_bg _b_(*m_ctx);

@@ -31,7 +31,6 @@ Revision History:
 #include "spacer_manager.h"
 #include "spacer_prop_solver.h"
 #include "fixedpoint_params.hpp"
-#include "smt_params.h"
 
 namespace datalog {
     class rule_set;
@@ -705,7 +704,6 @@ namespace spacer {
         stopwatch m_create_children_watch;
         stopwatch m_init_rules_watch;
        
-        smt_params&    m_fparams;
         fixedpoint_params const&    m_params;
         ast_manager&         m;
         datalog::context*    m_context;
@@ -768,13 +766,11 @@ namespace spacer {
            We check whether there is some reachable state of the relation checked_relation.
         */
         context(
-            smt_params&        fparams,
             fixedpoint_params const&  params,
             ast_manager&       m);
 
         ~context();
         
-        smt_params&       get_fparams() const { return m_fparams; }
         fixedpoint_params const& get_params() const { return m_params; }
         bool use_native_mbp () {return m_use_native_mbp;}
       
@@ -791,9 +787,6 @@ namespace spacer {
          * (for e.g. P(0,1,0,0,3)) that together form a ground derivation to query
          */
         expr_ref          get_ground_sat_answer ();
-
-        bool              is_dl() const { return m_fparams.m_arith_mode == AS_DIFF_LOGIC; }
-        bool              is_utvpi() const { return m_fparams.m_arith_mode == AS_UTVPI; }
 
         void collect_statistics(statistics& st) const;
         void reset_statistics();

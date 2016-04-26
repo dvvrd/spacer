@@ -166,15 +166,14 @@ namespace spacer {
         return res;
     }
     
-    manager::manager(smt_params& fparams, unsigned max_num_contexts, ast_manager& manager) :
+    manager::manager(unsigned max_num_contexts, ast_manager& manager) :
         m(manager),
-        m_fparams(fparams),
         m_brwr(m),
         m_mux(m, get_state_suffixes()),
         m_background(m.mk_true(), m),
-        m_contexts(fparams, max_num_contexts, m),
-        m_contexts2(fparams, max_num_contexts, m),
-        m_contexts3(fparams, max_num_contexts, m),
+        m_contexts(m, max_num_contexts),
+        m_contexts2(m, max_num_contexts),
+        m_contexts3(m, max_num_contexts),
         m_next_unique_num(0)
     {        
     }
@@ -315,16 +314,5 @@ namespace spacer {
         }
     }       
         
-    bool manager::implication_surely_holds(expr * lhs, expr * rhs, expr * bg) {
-        smt::kernel sctx(m, get_fparams());
-        if(bg) {
-            sctx.assert_expr(bg);
-        }
-        sctx.assert_expr(lhs);
-        expr_ref neg_rhs(m.mk_not(rhs),m);
-        sctx.assert_expr(neg_rhs);
-        lbool smt_res = sctx.check();
-        return smt_res==l_false;
-    }
 
 };

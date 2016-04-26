@@ -60,13 +60,14 @@ namespace spacer {
     class prop_solver {
     
     private:
-        smt_params&         m_fparams;        
         ast_manager&        m;
         manager&            m_pm;
         symbol              m_name;
+        smt_params*         m_fparams[2];
         scoped_ptr<solver>  m_solvers[2];
         scoped_ptr<itp_solver>  m_contexts[2];
         itp_solver *            m_ctx;
+        smt_params *            m_ctx_fparams;
         decl_vector         m_level_preds;      
         app_ref_vector      m_pos_level_atoms;  // atoms used to identify level
         app_ref_vector      m_neg_level_atoms;  // 
