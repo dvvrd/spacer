@@ -2454,7 +2454,11 @@ namespace spacer {
             if (m_search.is_root (*node)) return true;
             if (is_reachable (*node->parent())) {
               last_reachable = node->parent ();
+              SASSERT(last_reachable->is_closed());
               last_reachable->close ();
+            }
+            else if (!node->parent()->is_closed ()) {
+                /* bump node->parent */ 
             }
           }
           
