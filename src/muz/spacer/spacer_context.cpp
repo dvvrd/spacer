@@ -1640,12 +1640,12 @@ namespace spacer {
 
     void context::reset() {
         TRACE("spacer", tout << "\n";);
+        m_search.reset();
         decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
         for (; it != end; ++it) {
             dealloc(it->m_value);
         }
         m_rels.reset();
-        m_search.reset();
         m_query = 0;       
         m_last_result = l_undef;
         m_inductive_lvl = 0;        
