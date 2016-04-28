@@ -699,7 +699,7 @@ namespace spacer {
                 }
               );
 
-        if (is_sat == l_true) {
+        if (is_sat == l_true || is_sat == l_undef) {
             if (core) core->reset();
             if (model) {
                 r = find_rule (**model, is_concrete, reach_pred_used, num_reuse_reach);
@@ -710,7 +710,7 @@ namespace spacer {
                        tout << "\n";);
             }
             
-            return l_true;
+            return is_sat;
         }
         if (is_sat == l_false) {
             SASSERT (reach_assumps.empty ());
@@ -725,6 +725,7 @@ namespace spacer {
             uses_level = m_solver.uses_level();
             return l_false;
         }
+        UNREACHABLE();
         return l_undef;
     }
 
@@ -2794,7 +2795,9 @@ namespace spacer {
         return l_false;
       }
         //something went wrong
-      case l_undef: 
+      case l_undef: {
+          /* do stuff */
+      }
         TRACE("spacer", tout << "unknown state: " 
               << mk_pp(m_pm.mk_and(cube), m) << "\n";);
         throw unknown_exception();

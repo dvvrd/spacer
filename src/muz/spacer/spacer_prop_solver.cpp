@@ -177,18 +177,12 @@ namespace spacer {
             }
       
             res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
-            if (res == l_true) break;
-            if (res == l_undef)
-            {
-                hard.push_back (saved);
-                break;
-            }
-            SASSERT (res == l_false);
+            if (res != l_false) break;
             core.reset ();
             m_ctx->get_unsat_core (core);
         }
 
-        if (res != l_false)
+        if (res == l_true)
         {
             // update soft
             for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
@@ -209,7 +203,7 @@ namespace spacer {
         
         if (m_in_level) assert_level_atoms(m_current_level);
         lbool result = maxsmt (hard_atoms, soft_atoms);
-        if (result == l_true && m_model) m_ctx->get_model (*m_model);
+        if (result != l_false && m_model) m_ctx->get_model (*m_model);
 
         SASSERT (result != l_false || soft_atoms.empty ());
 
