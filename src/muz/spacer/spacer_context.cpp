@@ -172,7 +172,7 @@ namespace spacer {
   
   
   
-  reach_fact* pred_transformer::get_used_reach_fact (model_evaluator& mev,
+  reach_fact* pred_transformer::get_used_reach_fact (model_evaluator_util& mev,
                                                      bool all) {
     expr_ref v (m);
     
@@ -188,7 +188,7 @@ namespace spacer {
     return NULL;
   }
   
-  reach_fact *pred_transformer::get_used_origin_reach_fact (model_evaluator& mev, 
+  reach_fact *pred_transformer::get_used_origin_reach_fact (model_evaluator_util& mev, 
                                                             unsigned oidx) {
     expr_ref b(m), v(m);
     reach_fact *res = NULL;
@@ -527,7 +527,7 @@ namespace spacer {
    *
    * returns an implicant of the summary
    */
-  expr_ref pred_transformer::get_origin_summary (model_evaluator &mev, 
+  expr_ref pred_transformer::get_origin_summary (model_evaluator_util &mev, 
                                                  unsigned level, 
                                                  unsigned oidx,
                                                  bool must,
@@ -1403,14 +1403,14 @@ namespace spacer {
   
 
 
-  model_node *derivation::create_first_child (model_evaluator &mev)
+  model_node *derivation::create_first_child (model_evaluator_util &mev)
   {
     if (m_premises.empty ()) return NULL;
     m_active = 0;
     return create_next_child (mev);
   }
   
-  model_node *derivation::create_next_child (model_evaluator &mev)
+  model_node *derivation::create_next_child (model_evaluator_util &mev)
   {
     timeit _timer (is_trace_enabled("spacer_timeit"), 
                    "spacer::derivation::create_next_child", 
@@ -1518,7 +1518,7 @@ namespace spacer {
     // this is possible if m_post was weakened for some reason
     if (!pt.is_must_reachable (pm.mk_and (summaries), &model)) return NULL;
     
-    model_evaluator mev (m);
+    model_evaluator_util mev (m);
     mev.set_model (*model);
     // find must summary used
     
@@ -2292,7 +2292,7 @@ namespace spacer {
 
         // smt context to obtain local cexes
         scoped_ptr<smt::kernel> cex_ctx = alloc (smt::kernel, m, m_pm.fparams2 ());
-        model_evaluator mev (m);
+        model_evaluator_util mev (m);
 
         // preorder traversal of the query derivation tree
         for (unsigned curr = 0; curr < pts.size (); curr++) {
@@ -2336,7 +2336,7 @@ namespace spacer {
             cex_ctx->get_model (local_mdl);
             cex_ctx->pop (1);
 
-            model_evaluator mev (m);
+            model_evaluator_util mev (m);
             mev.set_model (*local_mdl);
             for (unsigned i = 0; i < child_pts.size (); i++) {
                 pred_transformer& ch_pt = *(child_pts.get (i));
@@ -2582,7 +2582,7 @@ namespace spacer {
         SASSERT(res == l_true);
         SASSERT(is_concrete);
         
-        model_evaluator mev (m);
+        model_evaluator_util mev (m);
         mev.set_model(*model);
         // -- update must summary
         if (r && r->get_uninterpreted_tail_size () > 0) {
@@ -2687,7 +2687,7 @@ namespace spacer {
         // update stats
         m_stats.m_num_reuse_reach += num_reuse_reach;
 
-        model_evaluator mev (m);
+        model_evaluator_util mev (m);
         mev.set_model (*model);
         // must-reachable
         if (is_concrete) 
@@ -2800,7 +2800,7 @@ namespace spacer {
           SASSERT(m_weak_abs);
           m_stats.m_expand_node_undef++;
           if (r && r->get_uninterpreted_tail_size() > 0) {
-              model_evaluator mev(m);
+              model_evaluator_util mev(m);
               mev.set_model(*model);
               // do not trust reach_pred_used
               for (unsigned i = 0, sz = reach_pred_used.size(); i < sz; ++i)
@@ -2902,7 +2902,7 @@ namespace spacer {
     return false;
   }
 
-  reach_fact *context::mk_reach_fact (model_node& n, model_evaluator &mev,
+  reach_fact *context::mk_reach_fact (model_node& n, model_evaluator_util &mev,
                                       const datalog::rule& r) {
     timeit _timer1 (is_trace_enabled("spacer_timeit"), 
                     "mk_reach_fact", 
@@ -2994,7 +2994,7 @@ namespace spacer {
        \brief create children states from model cube.
     */
     void context::create_children(model_node& n, datalog::rule const& r, 
-                                  model_evaluator &mev,
+                                  model_evaluator_util &mev,
                                   const vector<bool> &reach_pred_used) {
  
         scoped_watch _w_ (m_create_children_watch);

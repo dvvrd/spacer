@@ -104,7 +104,7 @@ extern "C"
     facts.push_back (to_expr (fml));
     flatten_and (facts);
     
-    spacer::model_evaluator mev (mk_c(c)->m());
+    spacer::model_evaluator_util mev (mk_c(c)->m());
     mev.set_model (*model);
     
     expr_ref_vector lits (mk_c(c)->m());

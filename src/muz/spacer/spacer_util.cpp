@@ -100,27 +100,27 @@ namespace spacer {
 
 
     /////////////////////////
-    // model_evaluator
+    // model_evaluator_util
     //
     
-    model_evaluator::model_evaluator(ast_manager& m) : 
+    model_evaluator_util::model_evaluator_util(ast_manager& m) : 
         m(m), m_arith(m),m_mev(NULL) 
     { reset (NULL); }
 
-    model_evaluator::~model_evaluator() {reset (NULL);}
+    model_evaluator_util::~model_evaluator_util() {reset (NULL);}
     
     
-    void model_evaluator::reset (model* model) {
+    void model_evaluator_util::reset (model* model) {
         if (m_mev) {
             dealloc(m_mev);
             m_mev = NULL;
         }
         m_model = model;
         if (!m_model) return;
-        m_mev = alloc(::model_evaluator, *m_model);
+        m_mev = alloc(model_evaluator, *m_model);
     }
   
-    bool model_evaluator::eval (expr *e, expr_ref &result, bool model_completion) {
+    bool model_evaluator_util::eval (expr *e, expr_ref &result, bool model_completion) {
         m_mev->set_model_completion (model_completion);
         try {
             m_mev->operator() (e, result);
@@ -132,30 +132,30 @@ namespace spacer {
         }
     }
     
-    void model_evaluator::eval_terms(const expr_ref_vector &v, bool complete) {
+    void model_evaluator_util::eval_terms(const expr_ref_vector &v, bool complete) {
         expr_ref e(m);
         expr_ref res(m);
         e = mk_and (v);
         VERIFY(eval(e, res, complete));
     }
   
-    bool model_evaluator::is_false (expr *x) {
+    bool model_evaluator_util::is_false (expr *x) {
         expr_ref res(m);
         return eval(x, res, true) && m.is_false (res);
     }
-    bool model_evaluator::is_true (expr *x) {
+    bool model_evaluator_util::is_true (expr *x) {
         expr_ref res(m);
         return eval(x, res, true) && m.is_true (res);
     }
   
-  expr_ref model_evaluator::eval(expr* e, bool model_completion) {
+  expr_ref model_evaluator_util::eval(expr* e, bool model_completion) {
       SASSERT(m_mev);
       expr_ref res(m);
       VERIFY(eval(e, res, model_completion));
       return res;
   }
 
-  void reduce_arith_disequalities (model_evaluator &mev, expr_ref_vector &fml)
+  void reduce_arith_disequalities (model_evaluator_util &mev, expr_ref_vector &fml)
   {
     expr *e, *ne, *e1, *e2;
     
@@ -517,7 +517,7 @@ namespace spacer {
     void subst_vars (ast_manager& m, app_ref_vector const& vars, 
                      model* M, expr_ref& fml) {
         expr_safe_replace sub (m);
-        model_evaluator mev (m);
+        model_evaluator_util mev (m);
         mev.set_model(*M);
         for (unsigned i = 0; i < vars.size (); i++) {
             app* v = vars.get (i);
@@ -676,7 +676,7 @@ namespace spacer {
         }
 
         DEBUG_CODE (
-            model_evaluator mev (m);
+            model_evaluator_util mev (m);
             expr_ref v(m);
             mev.set_model(*M.get());
             SASSERT (mev.eval (fml, v, false));
@@ -769,7 +769,7 @@ namespace spacer {
   {
     class implicant_picker
     {
-      model_evaluator &m_mev;
+      model_evaluator_util &m_mev;
       ast_manager &m;
       
       
@@ -972,7 +972,7 @@ namespace spacer {
       }
       
     public:
-      implicant_picker (model_evaluator &mev) : 
+      implicant_picker (model_evaluator_util &mev) : 
           m_mev (mev), m (m_mev.get_ast_manager ()) {}
       
       void operator() (expr_ref_vector &in, expr_ref_vector& out)
@@ -980,7 +980,7 @@ namespace spacer {
     };
   }
   
-  void compute_implicant_literals (model_evaluator &mev, expr_ref_vector &formula, 
+  void compute_implicant_literals (model_evaluator_util &mev, expr_ref_vector &formula, 
                                    expr_ref_vector &res)
   {
     flatten_and (formula);

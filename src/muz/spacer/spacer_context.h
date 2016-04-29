@@ -337,10 +337,10 @@ namespace spacer {
         bool is_must_reachable (expr* state, model_ref* model = 0);
         /// \brief Returns reachability fact active in the given model
         /// all determines whether initial reachability facts are included as well
-        reach_fact *get_used_reach_fact (model_evaluator& mev, bool all = true);
+        reach_fact *get_used_reach_fact (model_evaluator_util& mev, bool all = true);
         /// \brief Returns reachability fact active in the origin of the given model
-        reach_fact* get_used_origin_reach_fact (model_evaluator &mev, unsigned oidx);
-        expr_ref get_origin_summary (model_evaluator &mev, 
+        reach_fact* get_used_origin_reach_fact (model_evaluator_util &mev, unsigned oidx);
+        expr_ref get_origin_summary (model_evaluator_util &mev, 
                                      unsigned level, unsigned oidx, bool must,
                                      const ptr_vector<app> **aux);
 
@@ -599,7 +599,7 @@ namespace spacer {
 
     /// -- create next child using given model as the guide
     /// -- returns NULL if there is no next child
-    model_node* create_next_child (model_evaluator &mev);
+    model_node* create_next_child (model_evaluator_util &mev);
   public:
     derivation (model_node& parent, datalog::rule const& rule, expr *trans);
     void add_premise (pred_transformer &pt, unsigned oidx, 
@@ -608,7 +608,7 @@ namespace spacer {
     /// creates the first child. Must be called after all the premises
     /// are added. The model must be valid for the premises
     /// Returns NULL if no child exits
-    model_node *create_first_child (model_evaluator &mev);
+    model_node *create_first_child (model_evaluator_util &mev);
     
     /// Create the next child. Must summary of the currently active
     /// premise must be consistent with the transition relation
@@ -731,9 +731,9 @@ namespace spacer {
                        unsigned full_prop_lvl);
         bool is_reachable(model_node &n);
         lbool expand_node(model_node& n);
-        reach_fact *mk_reach_fact (model_node& n, model_evaluator &mev, 
+        reach_fact *mk_reach_fact (model_node& n, model_evaluator_util &mev, 
                                    datalog::rule const& r);
-        void create_children(model_node& n, datalog::rule const& r, model_evaluator &model, 
+        void create_children(model_node& n, datalog::rule const& r, model_evaluator_util &model, 
                              const vector<bool>& reach_pred_used);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;

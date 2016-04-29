@@ -100,17 +100,17 @@ namespace spacer {
   
   
     
-    class model_evaluator {
+    class model_evaluator_util {
         ast_manager&           m;
         arith_util             m_arith;
         model_ref              m_model;
-        ::model_evaluator*       m_mev;  
+        model_evaluator*       m_mev;  
         
         /// initialize with a given model. All previous state is lost. model can be NULL
         void reset (model *model);
     public:
-        model_evaluator(ast_manager& m);
-        ~model_evaluator();
+        model_evaluator_util(ast_manager& m);
+        ~model_evaluator_util();
     
         void set_model (model &model) { reset (&model); }
         model_ref &get_model () {return m_model;}
@@ -130,7 +130,7 @@ namespace spacer {
   /**
      \brief replaces arithmetic disequalities with a strict inequality true in the model
    */
-  void reduce_arith_disequalities (model_evaluator &mev, expr_ref_vector &fml);
+  void reduce_arith_disequalities (model_evaluator_util &mev, expr_ref_vector &fml);
   
     /**
        \brief replace variables that are used in many disequalities by
@@ -162,7 +162,7 @@ namespace spacer {
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, model_ref& M, expr_map& map);
 
   void expand_literals(ast_manager &m, expr_ref_vector& conjs);
-  void compute_implicant_literals (model_evaluator &mev, 
+  void compute_implicant_literals (model_evaluator_util &mev, 
                                    expr_ref_vector &formula, expr_ref_vector &res);
 }
 
