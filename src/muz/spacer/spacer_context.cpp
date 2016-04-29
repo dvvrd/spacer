@@ -2420,6 +2420,8 @@ namespace spacer {
                   };
                   );
       }
+      // communicate failure to datalog::context
+      if (m_context) m_context->set_status (datalog::BOUNDED);
       return l_undef;
     }
 
