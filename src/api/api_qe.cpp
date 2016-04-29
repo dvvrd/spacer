@@ -105,7 +105,7 @@ extern "C"
     flatten_and (facts);
     
     spacer::model_evaluator mev (mk_c(c)->m());
-    mev.reset (model);
+    mev.set_model (*model);
     
     expr_ref_vector lits (mk_c(c)->m());
     spacer::compute_implicant_literals (mev, facts, lits);

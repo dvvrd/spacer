@@ -35,6 +35,7 @@ Revision History:
 
 class model;
 class model_core;
+class model_evaluator;
 
 namespace spacer {
 
@@ -99,94 +100,32 @@ namespace spacer {
   
   
     
-  class model_evaluator {
-    ast_manager&           m;
-    arith_util             m_arith;
-    array_util             m_array;
-    obj_map<expr,rational> m_numbers;
-    expr_ref_vector        m_refs;
-    obj_map<expr, expr*>   m_values;
-    model_ref              m_model;
+    class model_evaluator {
+        ast_manager&           m;
+        arith_util             m_arith;
+        model_ref              m_model;
+        ::model_evaluator*       m_mev;  
         
-    //00 -- non-visited
-    //01 -- X
-    //10 -- false
-    //11 -- true
-    expr_mark      m1;
-    expr_mark      m2;
+        /// initialize with a given model. All previous state is lost. model can be NULL
+        void reset (model *model);
+    public:
+        model_evaluator(ast_manager& m);
+        ~model_evaluator();
     
-    /// caches the value of an expression
-    void assign_value(expr* e, expr* v);
-    
+        void set_model (model &model) { reset (&model); }
+        model_ref &get_model () {return m_model;}
+        ast_manager& get_ast_manager() const {return m;} 
       
-    void eval_arith(app* e);
-    void eval_basic(app* e);
-    void eval_eq(app* e, expr* arg1, expr* arg2);
-    void eval_array_eq(app* e, expr* arg1, expr* arg2);
-    void inherit_value(expr* e, expr* v);
-        
-    void set_x(expr* x) { SASSERT(is_unknown(x)); m2.mark(x); m_refs.push_back (x); }
-    void set_v(expr* x) { SASSERT(is_unknown(x)); m1.mark(x); m_refs.push_back (x); }
-    bool is_v (expr *x) const {return m1.is_marked (x);}
-    void set_false(expr* x) { set_v (x); }
-    void set_true(expr* x) { set_v (x); m2.mark(x); }
-    void set_bool(expr* x, bool v) { if (v) { set_true(x); } else { set_false(x); } }
-    void set_number(expr* x, const rational &v) 
-    { 
-      set_v(x); 
-      m_numbers.insert(x,v); 
-      TRACE("spacer_verbose", tout << mk_pp(x,m) << " " << v << "\n";); 
-    }
-    void set_value(expr* x, expr* v) 
-    { set_v(x); m_refs.push_back(v); m_values.insert(x, v); }
-        
-      
-    /// evaluates all sub-formulas and terms of the input in the current model.
-    /// Caches the result
-    void eval_fmls(ptr_vector<expr> const & formulas, bool model_completion = false);
+    public:
+        /// compute values of all the terms in all the formulas in the input
+        void eval_terms (const expr_ref_vector &v, bool complete=false);
+        bool is_false(expr* x);
+        bool is_true(expr* x);
 
-    bool extract_array_func_interp(expr* a, vector<expr_ref_vector>& stores, 
-                                   expr_ref& else_case);
-      
-    /// evaluates a function declaration
-    expr_ref eval(func_decl* d);
-    void eval_exprs(expr_ref_vector& es);
-        
-  public:
-    model_evaluator(ast_manager& m, model_ref model = model_ref () ) : 
-      m(m), m_arith(m), m_array(m), m_refs(m) 
-    { reset (model); }
-    
-    /// initialize with a given model. All previous state is lost. model can be NULL
-    void reset (const model_ref &model);
-    
-    model* get_model () {return m_model.get ();}
-    ast_manager& get_ast_manager() const {return m;} 
-    /// compute values of all the terms in all the formulas in the input
-    void eval_terms (const expr_ref_vector &v, bool complete=false)
-    {
-      // for (unsigned i = 0, sz = formulas.size (); i < sz; ++i)
-      //   eval_terms (formulas.get (i), complete);
-      for (unsigned i = v.size (); i > 0; --i)
-        eval_terms (v.get (i-1));
-    }
-    /// compute values of all the terms in the given formula
-    void eval_terms (expr * formula, bool complete = false);
-    
-    bool is_unknown(expr* x) const { return !m1.is_marked(x) && !m2.is_marked(x); }
-    bool is_x(expr* x)  const { return !m1.is_marked(x) && m2.is_marked(x); }
-    bool is_false(expr* x)  const { return m1.is_marked(x) && !m2.is_marked(x); }
-    bool is_true(expr* x)  const { return m1.is_marked(x) && m2.is_marked(x); }
-    const rational & get_number(expr* x) const { return m_numbers.find(x); }
-    expr* get_value(expr* x) const { return m_values.find(x); }
-            
-
-    /// evaluates an expression
-    expr_ref eval(expr* e, bool complete=true);
-    /// evaluates an expression by evaluating all of its sub-terms
-    expr_ref eval_heavy (expr* fml, bool complete=true);
-
-  };
+        bool eval (expr *e, expr_ref &result, bool model_completion);
+        /// evaluates an expression
+        expr_ref eval(expr* e, bool complete=true);
+    };
 
   /**
      \brief replaces arithmetic disequalities with a strict inequality true in the model

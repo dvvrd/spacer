@@ -33,6 +33,7 @@ Notes:
 #include "for_each_expr.h"
 #include "smt_params.h"
 #include "model.h"
+#include "model_evaluator.h"
 #include "ref_vector.h"
 #include "rewriter.h"
 #include "rewriter_def.h"
@@ -102,643 +103,57 @@ namespace spacer {
     // model_evaluator
     //
     
+    model_evaluator::model_evaluator(ast_manager& m) : 
+        m(m), m_arith(m),m_mev(NULL) 
+    { reset (NULL); }
 
-    void model_evaluator::assign_value(expr* e, expr* val) {
-        rational r;
-        if (m.is_true(val)) set_true(e);
-        else if (m.is_false(val)) set_false(e);
-        else if (m_arith.is_numeral(val, r)) set_number(e, r);
-        else if (m.is_value(val)) set_value(e, val);
-        else 
-        {
-            IF_VERBOSE(3, verbose_stream() << "Not evaluated " << mk_pp(e, m) << "\n";);
-            TRACE("spacer_verbose", tout << "Variable is not tracked: " << mk_pp(e, m) << "\n";);
-            set_x(e);
+    model_evaluator::~model_evaluator() {reset (NULL);}
+    
+    
+    void model_evaluator::reset (model* model) {
+        if (m_mev) {
+            dealloc(m_mev);
+            m_mev = NULL;
         }
-    }
-
-    void model_evaluator::reset (const model_ref& model) 
-    {
-      m1.reset();
-      m2.reset();
-      m_values.reset();
-      m_numbers.reset();
-      m_refs.reset();
-      m_model = model.get ();
-      if (!m_model) return;
-      
-      unsigned sz = model->get_num_constants();
-      for (unsigned i = 0; i < sz; i++) {
-        func_decl * d = model->get_constant(i); 
-        expr* val = model->get_const_interp(d);
-        expr* e = m.mk_const(d);
-        m_refs.push_back(e);
-        assign_value(e, val);
-      }
+        m_model = model;
+        if (!m_model) return;
+        m_mev = alloc(::model_evaluator, *m_model);
     }
   
-  void model_evaluator::eval_arith(app* e) {
-    rational r, r2;
-        
-#define ARG1 e->get_arg(0)
-#define ARG2 e->get_arg(1)     
-        
-    unsigned arity = e->get_num_args();
-    for (unsigned i = 0; i < arity; ++i) {
-      expr* arg = e->get_arg(i);
-      if (is_x (arg)) {
-        set_x(e);
-        return;
-      }
-      SASSERT(!is_unknown(arg));
-    }
-    switch(e->get_decl_kind()) {
-    case OP_NUM: 
-      VERIFY(m_arith.is_numeral(e, r));
-      set_number(e, r);
-      break;                
-    case OP_IRRATIONAL_ALGEBRAIC_NUM:  
-      set_x(e);
-      break;
-    case OP_LE:
-      set_bool(e, get_number(ARG1) <= get_number(ARG2));
-      break;
-    case OP_GE:
-      set_bool(e, get_number(ARG1) >= get_number(ARG2));
-      break;
-    case OP_LT:
-      set_bool(e, get_number(ARG1) < get_number(ARG2));
-      break;
-    case OP_GT:
-      set_bool(e, get_number(ARG1) > get_number(ARG2));
-      break;
-    case OP_ADD: 
-      r = rational::zero();
-      for (unsigned i = 0; i < arity; ++i) {
-        r += get_number(e->get_arg(i));
-      }
-      set_number(e, r);
-      break;                                    
-    case OP_SUB: 
-      r = get_number(e->get_arg(0));
-      for (unsigned i = 1; i < arity; ++i) {
-        r -= get_number(e->get_arg(i));
-      }
-      set_number(e, r);
-      break;                            
-    case OP_UMINUS: 
-      SASSERT(arity == 1);
-      set_number(e, -get_number(e->get_arg(0)));
-      break;                
-    case OP_MUL: 
-      r = rational::one();
-      for (unsigned i = 0; i < arity; ++i) {
-        r *= get_number(e->get_arg(i));
-      }
-      set_number(e, r);
-      break;                
-    case OP_DIV: 
-      SASSERT(arity == 2);
-      r = get_number(ARG2);
-      if (r.is_zero()) {
-        set_x(e);
-      }
-      else {
-        set_number(e, get_number(ARG1) / r);
-      }
-      break;                
-    case OP_IDIV: 
-      SASSERT(arity == 2);
-      r = get_number(ARG2);
-      if (r.is_zero()) {
-        set_x(e);
-      }
-      else {
-        set_number(e, div(get_number(ARG1), r));
-      }
-      break;                
-    case OP_REM: 
-      // rem(v1,v2) = if v2 >= 0 then mod(v1,v2) else -mod(v1,v2)
-      SASSERT(arity == 2);
-      r = get_number(ARG2);
-      if (r.is_zero()) {
-        set_x(e);
-      }
-      else {
-        r2 = mod(get_number(ARG1), r);
-        if (r.is_neg()) r2.neg();
-        set_number(e, r2);
-      }
-      break;
-    case OP_MOD: 
-      SASSERT(arity == 2);
-      r = get_number(ARG2);
-      if (r.is_zero()) {
-        set_x(e);
-      }
-      else {
-        set_number(e, mod(get_number(ARG1), r));
-      }
-      break;                   
-    case OP_TO_REAL: 
-      SASSERT(arity == 1);
-      set_number(e, get_number(ARG1));
-      break;                
-    case OP_TO_INT: 
-      SASSERT(arity == 1);
-      set_number(e, floor(get_number(ARG1)));
-      break;                
-    case OP_IS_INT: 
-      SASSERT(arity == 1);
-      set_bool(e, get_number(ARG1).is_int());
-      break;
-    case OP_POWER:
-      set_x(e);
-      break;
-    default:
-      IF_VERBOSE(0, verbose_stream() << "Term not handled " << mk_pp(e, m) << "\n";);
-      UNREACHABLE();
-      break;
-    }
-  }
-    
-  void model_evaluator::inherit_value(expr* e, expr* v) {
-    expr* w;
-    SASSERT(!is_unknown(v));
-    SASSERT(m.get_sort(e) == m.get_sort(v));
-    if (is_x(v)) {
-      set_x(e);
-    }
-    else if (m.is_bool(e)) {
-      SASSERT(m.is_bool(v));
-      if (is_true(v)) set_true(e);
-      else if (is_false(v)) set_false(e);
-      else {
-        TRACE("spacer", tout << "not inherited:\n" << mk_pp(e, m) << "\n" 
-              << mk_pp(v, m) << "\n";);
-        set_x(e);
-      }
-    }
-    else if (m_arith.is_int_real(e)) {
-      set_number(e, get_number(v));
-    }
-    else if (m.is_value(v)) {
-      set_value(e, v);
-    }
-    else if (m_values.find(v, w)) {
-      set_value(e, w);
-    }
-    else {
-      TRACE("spacer", tout << "not inherited:\n" << mk_pp(e, m) << "\n" 
-            << mk_pp(v, m) << "\n";);
-      set_x(e);
-    }
-  }
-
-    void model_evaluator::eval_exprs(expr_ref_vector& es) 
-    {
-        for (unsigned j = 0, sz = es.size (); j < sz; ++j) {
-            if (m_array.is_as_array(es.get (j))) 
-            {
-              expr_ref v (m);
-              v = eval (es.get (j));
-              es[j] = v;
-            }
-        }
-    }
-    
-    bool model_evaluator::extract_array_func_interp(expr* a, 
-                                                    vector<expr_ref_vector>& stores, 
-                                                    expr_ref& else_case) {
-        SASSERT(m_array.is_array(a));
-        
-        TRACE("spacer", tout << mk_pp(a, m) << "\n";);
-        while (m_array.is_store(a)) {
-            expr_ref_vector store(m);
-            store.append(to_app(a)->get_num_args()-1, to_app(a)->get_args()+1);
-            eval_exprs(store);
-            stores.push_back(store);
-            a = to_app(a)->get_arg(0);
-        }
-        
-        if (m_array.is_const(a)) {
-            else_case = to_app(a)->get_arg(0);
+    bool model_evaluator::eval (expr *e, expr_ref &result, bool model_completion) {
+        m_mev->set_model_completion (model_completion);
+        try {
+            m_mev->operator() (e, result);
             return true;
+        } catch (model_evaluator_exception &ex) {
+            (void)ex;
+            TRACE("spacer_model_evaluator", tout << ex.msg () << "\n";);
+            return false;
         }
-        
-        while (m_array.is_as_array(a)) {
-            func_decl* f = m_array.get_as_array_func_decl(to_app(a));
-            func_interp* g = m_model->get_func_interp(f);
-            unsigned sz = g->num_entries();
-            unsigned arity = f->get_arity();
-            for (unsigned i = 0; i < sz; ++i) {
-                expr_ref_vector store(m);
-                func_entry const* fe = g->get_entry(i);
-                store.append(arity, fe->get_args());
-                store.push_back(fe->get_result());
-                for (unsigned j = 0; j < store.size(); ++j) {
-                    if (!is_ground(store[j].get())) {
-                        TRACE("spacer", tout << 
-                              "could not extract array interpretation: " << mk_pp(a, m) 
-                              << "\n" << mk_pp(store[j].get(), m) << "\n";);
-                        return false;
-                    }
-                }
-                eval_exprs(store);
-                stores.push_back(store);
-            }        
-            else_case = g->get_else();
-            if (!else_case) {
-                TRACE("spacer", tout << "no else case " << mk_pp(a, m) << "\n";);
-                return false;
-            }
-            if (!is_ground(else_case)) {
-                TRACE("spacer", tout << "non-ground else case " << mk_pp(a, m) << "\n" 
-                      << mk_pp(else_case, m) << "\n";);
-                return false;
-            }
-            if (m_array.is_as_array(else_case)) {
-                else_case = eval(else_case);
-            }
-            TRACE("spacer", tout << "else case: " << mk_pp(else_case, m) << "\n";);
-            return true;
-        }
-        TRACE("spacer", tout << "no translation: " << mk_pp(a, m) << "\n";);
-        
-        return false;
     }
     
-    /**
-       best effort evaluator of extensional array equality.
-     */
-    void model_evaluator::eval_array_eq(app* e, expr* arg1, expr* arg2) {
-        TRACE("spacer", tout << "array equality: " << mk_pp(e, m) << "\n";);
-        expr_ref v1(m), v2(m);
-        m_model->eval(arg1, v1);
-        m_model->eval(arg2, v2);
-        if (v1 == v2) {
-            set_true(e);
-            return;
-        }
-        sort* s = m.get_sort(arg1);
-        sort* r = get_array_range(s);
-        // give up evaluating finite domain/range arrays
-        if (!r->is_infinite() && !r->is_very_big() && 
-            !s->is_infinite() && !s->is_very_big()) {
-            TRACE("spacer", tout << "equality is unknown: " << mk_pp(e, m) << "\n";);
-            set_x(e);
-            return;
-        }
-        vector<expr_ref_vector> store;
-        expr_ref else1(m), else2(m);
-        if (!extract_array_func_interp(v1, store, else1) ||
-            !extract_array_func_interp(v2, store, else2)) {
-            TRACE("spacer", tout << "equality is unknown: " << mk_pp(e, m) << "\n";);
-            set_x(e);
-            return;
-        }
-
-        if (else1 != else2) {
-            if (m.is_value(else1) && m.is_value(else2)) {
-                TRACE("spacer", tout 
-                      << "defaults are different: " << mk_pp(e, m) << " " 
-                      << mk_pp(else1, m) << " " << mk_pp(else2, m) << "\n";);
-                set_false(e);
-            }
-            else if (m_array.is_array(else1)) {
-                eval_array_eq(e, else1, else2);
-            }
-            else {
-                TRACE("spacer", tout << "equality is unknown: " << mk_pp(e, m) << "\n";);
-                set_x(e);
-            }
-            return;
-        }
-
-        expr_ref s1(m), s2(m), w1(m), w2(m);        
-        expr_ref_vector args1(m), args2(m);
-        args1.push_back(v1);
-        args2.push_back(v2);        
-        for (unsigned i = 0; i < store.size(); ++i) {
-            args1.resize(1);
-            args2.resize(1);
-            args1.append(store[i].size()-1, store[i].c_ptr());
-            args2.append(store[i].size()-1, store[i].c_ptr());
-            s1 = m_array.mk_select(args1.size(), args1.c_ptr());
-            s2 = m_array.mk_select(args2.size(), args2.c_ptr());
-            m_model->eval(s1, w1);
-            m_model->eval(s2, w2);
-            if (w1 == w2) {
-                continue;
-            }
-            if (m.is_value(w1) && m.is_value(w2)) {
-                TRACE("spacer", tout << "Equality evaluation: " << mk_pp(e, m) << "\n"; 
-                      tout << mk_pp(s1, m) << " |-> " << mk_pp(w1, m) << "\n";
-                      tout << mk_pp(s2, m) << " |-> " << mk_pp(w2, m) << "\n";);
-                set_false(e);
-            }
-            else if (m_array.is_array(w1)) {
-                eval_array_eq(e, w1, w2);
-                if (is_true(e)) {
-                    continue;
-                }
-            }
-            else {
-                TRACE("spacer", tout << "equality is unknown: " << mk_pp(e, m) << "\n";);
-                set_x(e);
-            }
-            return;
-        }
-        set_true(e);
+    void model_evaluator::eval_terms(const expr_ref_vector &v, bool complete) {
+        expr_ref e(m);
+        expr_ref res(m);
+        e = mk_and (v);
+        VERIFY(eval(e, res, complete));
     }
-
-    void model_evaluator::eval_eq(app* e, expr* arg1, expr* arg2) {
-        if (arg1 == arg2) {
-            set_true(e);
-        }
-        else if (m_array.is_array(arg1)) {
-            eval_array_eq(e, arg1, arg2);
-        }
-        else if (is_x(arg1) || is_x(arg2)) {
-            set_x(e);
-        }
-        else if (m.is_bool(arg1)) {
-            bool val = is_true(arg1) == is_true(arg2);
-            SASSERT(val == (is_false(arg1) == is_false(arg2)));
-            if (val) {
-                set_true(e);
-            }
-            else {
-                set_false(e);
-            }            
-        }
-        else if (m_arith.is_int_real(arg1)) {
-            set_bool(e, get_number(arg1) == get_number(arg2));
-        }
-        else {
-            expr* e1 = get_value(arg1);
-            expr* e2 = get_value(arg2);
-            if (m.is_value(e1) && m.is_value(e2)) {
-                set_bool(e, e1 == e2);
-            }
-            else if (e1 == e2) {
-                set_bool(e, true);
-            }
-            else {
-                TRACE("spacer", tout << "not value equal:\n" << mk_pp(e1, m) 
-                      << "\n" << mk_pp(e2, m) << "\n";);
-                set_x(e);
-            }
-        }
-    }
-
-    void model_evaluator::eval_basic(app* e) {
-        expr* arg1, *arg2;
-        expr *argCond, *argThen, *argElse, *arg;
-        bool has_x = false;
-        unsigned arity = e->get_num_args();
-        switch(e->get_decl_kind()) {
-        case OP_AND: 
-            for (unsigned j = 0; j < arity; ++j) {
-                expr * arg = e->get_arg(j);
-                if (is_false(arg)) {
-                    set_false(e);
-                    return;
-                }
-                else if (is_x(arg)) {
-                    has_x = true;
-                }
-                else {
-                    SASSERT(is_true(arg));
-                }
-            }
-            if (has_x) {
-                set_x(e);
-            }
-            else {
-                set_true(e);
-            }
-            break;
-        case OP_OR: 
-            for (unsigned j = 0; j < arity; ++j) {
-                expr * arg = e->get_arg(j);
-                if (is_true(arg)) {
-                    set_true(e);
-                    return;
-                }
-                else if (is_x(arg)) {
-                    has_x = true;
-                }
-                else {
-                    SASSERT(is_false(arg));
-                }
-            }
-            if (has_x) {
-                set_x(e);
-            }
-            else {
-                set_false(e);
-            }
-            break;
-        case OP_NOT: 
-            VERIFY(m.is_not(e, arg));
-            if (is_true(arg)) {
-                set_false(e);
-            }
-            else if (is_false(arg)) {
-                set_true(e);
-            }
-            else {
-                SASSERT(is_x(arg));
-                set_x(e);
-            }
-            break;
-        case OP_IMPLIES: 
-            VERIFY(m.is_implies(e, arg1, arg2));
-            if (is_false(arg1) || is_true(arg2)) {
-                set_true(e);
-            }
-            else if (arg1 == arg2) {
-                set_true(e);
-            }
-            else if (is_true(arg1) && is_false(arg2)) {
-                set_false(e);
-            }
-            else {
-                SASSERT(is_x(arg1) || is_x(arg2));
-                set_x(e);
-            }
-            break;
-        case OP_IFF: 
-            VERIFY(m.is_iff(e, arg1, arg2));
-            eval_eq(e, arg1, arg2);
-            break;
-        case OP_XOR:
-          VERIFY (m.is_xor (e, arg1, arg2));
-          eval_eq (e, arg1, arg2);
-          if (is_false (e)) set_true (e);
-          else if (is_true (e)) set_false (e);
-          break;
-        case OP_ITE: 
-            VERIFY(m.is_ite(e, argCond, argThen, argElse));
-            if (is_true(argCond)) { 
-                inherit_value(e, argThen);
-            }
-            else if (is_false(argCond)) {
-                inherit_value(e, argElse);
-            }
-            else if (argThen == argElse) {
-                inherit_value(e, argThen);
-            }
-            else if (m.is_bool(e)) {
-                SASSERT(is_x(argCond));
-                if (is_x(argThen) || is_x(argElse)) {
-                    set_x(e);
-                }
-                else if (is_true(argThen) == is_true(argElse)) {
-                    inherit_value(e, argThen);
-                }
-                else {
-                    set_x(e);
-                }
-            }
-            else {
-                set_x(e);
-            }
-            break;
-        case OP_TRUE:
-            set_true(e);
-            break;
-        case OP_FALSE:
-            set_false(e);
-            break;
-        case OP_EQ:
-            VERIFY(m.is_eq(e, arg1, arg2));
-            eval_eq(e, arg1, arg2);
-            break;
-        case OP_DISTINCT: {
-            vector<rational> values;
-            for (unsigned i = 0; i < arity; ++i) {
-                expr* arg = e->get_arg(i);
-                if (is_x(arg)) {
-                    set_x(e);
-                    return;
-                }
-                values.push_back(get_number(arg));
-            }
-            std::sort(values.begin(), values.end());
-            for (unsigned i = 0; i + 1 < values.size(); ++i) {
-                if (values[i] == values[i+1]) {
-                    set_false(e);
-                    return;
-                }
-            }
-            set_true(e);
-            break;
-        }
-        default:
-            IF_VERBOSE(0, verbose_stream() << "Term not handled " << mk_pp(e, m) << "\n";);
-            UNREACHABLE();        
-        }
-    }
-
-  void model_evaluator::eval_terms (expr * formula, bool model_completion)
-  {
-    ptr_vector<expr> todo;
-    todo.push_back (formula);
-    
-    while (!todo.empty ())
-    {
-      expr * e = todo.back ();
-      if (!is_app (e) || !is_unknown (e)) 
-      {
-        todo.pop_back ();
-        continue;
-      }
-      app * a = to_app (e);
-      
-      unsigned arity = a->get_num_args ();
-      for (unsigned i = 0; i < arity; ++i)
-        if (is_unknown (a->get_arg (i))) todo.push_back (a->get_arg (i));
-      if (todo.back () != e) continue;
-      
-      todo.pop_back ();
-      if (a->get_family_id () == m_arith.get_family_id ()) eval_arith (a);
-      else if (a->get_family_id () == m.get_basic_family_id ()) eval_basic (a);
-      else
-      {
-        expr_ref v(m);
-        m_model->eval (e, v, model_completion);
-        assign_value (e, v);
-      }
-      SASSERT (!is_unknown (e));
-    }
-  }
   
-  expr_ref model_evaluator::eval_heavy (expr* fml, bool model_completion) 
-  {
-    SASSERT (m_model);
-    
-      
-    if (is_unknown (fml)) eval_terms (fml);
-    
-    SASSERT (!is_unknown (fml));
-    
-    if (is_x (fml)) return expr_ref (fml, m);
-    
-    expr_ref res (m);
-    SASSERT (is_v (fml));
-    if (m.is_bool (fml))
-      res = is_false (fml) ? m.mk_false () : m.mk_true ();
-    else if (m_arith.is_int_real (fml))
-      res = m_arith.mk_numeral (get_number (fml), m_arith.is_int (fml));
-    else res = get_value (fml);
-    
-        
-    return res;
-  }
-
-  expr_ref model_evaluator::eval(func_decl* d) 
-  {
-    SASSERT(d->get_arity() == 0);
-    expr_ref result(m);
-    if (m_array.is_array(d->get_range())) {
-      expr_ref e(m);
-      e = m.mk_const(d);
-      result = eval(e);
+    bool model_evaluator::is_false (expr *x) {
+        expr_ref res(m);
+        return eval(x, res, true) && m.is_false (res);
     }
-    else {
-      result = m_model->get_const_interp(d);
+    bool model_evaluator::is_true (expr *x) {
+        expr_ref res(m);
+        return eval(x, res, true) && m.is_true (res);
     }
-    return result;
-  }
-
   
   expr_ref model_evaluator::eval(expr* e, bool model_completion) {
-    expr_ref result(m);
-    VERIFY(m_model->eval(e, result, model_completion));
-    if (m_array.is_array(e)) {
-      vector<expr_ref_vector> stores;
-      expr_ref_vector args(m);
-      expr_ref else_case(m);
-      if (extract_array_func_interp(result, stores, else_case)) {
-        result = m_array.mk_const_array(m.get_sort(e), else_case);
-        while (!stores.empty() && stores.back().back() == else_case) {
-          stores.pop_back();
-        }
-        for (unsigned i = stores.size(); i > 0; ) {
-          --i;
-          args.resize(1);
-          args[0] = result;
-          args.append(stores[i]);
-          result = m_array.mk_store(args.size(), args.c_ptr());
-        }
-        return result;
-      }
-    }
-    return result;
+      SASSERT(m_mev);
+      expr_ref res(m);
+      VERIFY(eval(e, res, model_completion));
+      return res;
   }
-  
 
   void reduce_arith_disequalities (model_evaluator &mev, expr_ref_vector &fml)
   {
@@ -746,13 +161,17 @@ namespace spacer {
     
     ast_manager &m = fml.get_manager ();
     arith_util arith(m);
+    expr_ref v1(m), v2(m);
+    rational n1, n2;
     for (unsigned i = 0, sz = fml.size (); i < sz; ++i)
     {
       e = fml.get (i);
-      if (m.is_not (e, ne) && m.is_eq (ne, e1, e2) && arith.is_int_real (e1))
+      if (m.is_not (e, ne) && m.is_eq (ne, e1, e2) && arith.is_int_real (e1) &&
+          mev.eval(e1, v1, true) && arith.is_numeral (v1, n1) &&
+          mev.eval (e2, v2, true) && arith.is_numeral (v2, n2))
       {
-        if (mev.get_number (e1) < mev.get_number (e2)) fml[i] = arith.mk_lt (e1, e2);
-        else if (mev.get_number (e1) > mev.get_number (e2)) fml[i] = arith.mk_lt (e2, e1);
+        if (n1 < n2) fml[i] = arith.mk_lt (e1, e2);
+        else if (n1 > n2) fml[i] = arith.mk_lt (e2, e1);
         else
         {
           fml.reset ();
@@ -1096,10 +515,10 @@ namespace spacer {
 
 
     void subst_vars (ast_manager& m, app_ref_vector const& vars, 
-                     const model_ref& M, expr_ref& fml) {
+                     model* M, expr_ref& fml) {
         expr_safe_replace sub (m);
         model_evaluator mev (m);
-        mev.reset (M);
+        mev.set_model(*M);
         for (unsigned i = 0; i < vars.size (); i++) {
             app* v = vars.get (i);
             expr_ref val (m);
@@ -1247,7 +666,7 @@ namespace spacer {
 
         // substitute any remaining arith vars
         if (!arith_vars.empty ()) {
-            subst_vars (m, arith_vars, M, fml);
+            subst_vars (m, arith_vars, M.get(), fml);
             TRACE ("spacer_mbp",
                     tout << "After substituting remaining arith vars:\n";
                     tout << mk_pp (fml, m) << "\n";
@@ -1258,9 +677,10 @@ namespace spacer {
 
         DEBUG_CODE (
             model_evaluator mev (m);
-            mev.reset (M);
-            bval = mev.eval_heavy (fml);
-            SASSERT (m.is_true (bval));
+            expr_ref v(m);
+            mev.set_model(*M.get());
+            SASSERT (mev.eval (fml, v, false));
+            SASSERT (m.is_true (v));
         );
 
         vars.reset ();
@@ -1362,12 +782,9 @@ namespace spacer {
         SASSERT (m.is_bool (e));
         SASSERT (m_mev.is_true (e) || m_mev.is_false (e));
         
-        expr_ref res (e, m);
-        if (m_mev.is_false (res))
-        {
-          res = m.mk_not (res);
-          if (m_mev.is_unknown (res)) m_mev.eval_terms (res);
-        }
+        expr_ref res (m);
+        res = e;
+        if (m_mev.is_false (res)) res = m.mk_not (res);
         out.push_back (res);
       }        
       

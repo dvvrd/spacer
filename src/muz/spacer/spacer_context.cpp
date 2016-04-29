@@ -1518,8 +1518,8 @@ namespace spacer {
     // this is possible if m_post was weakened for some reason
     if (!pt.is_must_reachable (pm.mk_and (summaries), &model)) return NULL;
     
-    model_evaluator mev (m, model);
-    
+    model_evaluator mev (m);
+    mev.set_model (*model);
     // find must summary used
     
     reach_fact *rf = pt.get_used_reach_fact (mev, true);
@@ -2336,7 +2336,8 @@ namespace spacer {
             cex_ctx->get_model (local_mdl);
             cex_ctx->pop (1);
 
-            model_evaluator mev (m, local_mdl);
+            model_evaluator mev (m);
+            mev.set_model (*local_mdl);
             for (unsigned i = 0; i < child_pts.size (); i++) {
                 pred_transformer& ch_pt = *(child_pts.get (i));
                 unsigned sig_size = ch_pt.sig_size ();
@@ -2345,12 +2346,7 @@ namespace spacer {
                 for (unsigned j = 0; j < sig_size; j++) {
                     expr_ref sig_arg (m), sig_val (m);
                     sig_arg = m.mk_const (ch_pt.get_manager ().o2o (ch_pt.sig (j), 0, i));
-                    if (m_params.use_heavy_mev ()) {
-                        sig_val = mev.eval_heavy (sig_arg);
-                    }
-                    else {
-                        sig_val = mev.eval (sig_arg);
-                    }
+                    sig_val = mev.eval (sig_arg);
                     ground_fact_conjs.push_back (m.mk_eq (sig_arg, sig_val));
                     ground_arg_vals.push_back (sig_val);
                 }
@@ -2586,7 +2582,8 @@ namespace spacer {
         SASSERT(res == l_true);
         SASSERT(is_concrete);
         
-        model_evaluator mev (m, model);
+        model_evaluator mev (m);
+        mev.set_model(*model);
         // -- update must summary
         if (r && r->get_uninterpreted_tail_size () > 0) {
             reach_fact* rf = mk_reach_fact (n, mev, *r);
@@ -2689,7 +2686,8 @@ namespace spacer {
         // update stats
         m_stats.m_num_reuse_reach += num_reuse_reach;
 
-        model_evaluator mev (m, model);
+        model_evaluator mev (m);
+        mev.set_model (*model);
         // must-reachable
         if (is_concrete) 
         {
@@ -2801,7 +2799,8 @@ namespace spacer {
           SASSERT(m_weak_abs);
           m_stats.m_expand_node_undef++;
           if (r && r->get_uninterpreted_tail_size() > 0) {
-              model_evaluator mev (m, model);
+              model_evaluator mev(m);
+              mev.set_model(*model);
               // do not trust reach_pred_used
               for (unsigned i = 0, sz = reach_pred_used.size(); i < sz; ++i)
                   reach_pred_used[i] = false;
