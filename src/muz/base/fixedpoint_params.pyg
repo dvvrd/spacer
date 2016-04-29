@@ -171,6 +171,7 @@ def_module_params('fixedpoint',
                           ('spacer.split_farkas_literals', BOOL, False, "Split Farkas literals"),
                           ('spacer.native_mbp', BOOL, False, "Use native mbp of Z3"),
                           ('spacer.eq_prop', BOOL, True, "Enable equality and bound propagation in arithmetic"),
+                          ('spacer.weak_abs', BOOL, True, "Weak abstraction"),
                           ))
 
 

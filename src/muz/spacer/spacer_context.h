@@ -435,7 +435,8 @@ namespace spacer {
     bool                    m_open;     
     /// whether to use farkas generalizer to construct a lemma blocking this node
     bool                    m_use_farkas;
-    
+
+    unsigned                m_weakness;
     /// derivation representing the position of this node in the parent's rule
     scoped_ptr<derivation>   m_derivation;
     
@@ -448,13 +449,16 @@ namespace spacer {
       m_post (m_pt.get_ast_manager ()), 
       m_new_post (m_pt.get_ast_manager ()),
       m_level (level), m_depth (depth),
-      m_open (true), m_use_farkas (true)
+      m_open (true), m_use_farkas (true), m_weakness(0)
     {if (m_parent) m_parent->add_child (*this);}
     
     ~model_node() {if (m_parent) m_parent->erase_child (*this);}
-    
 
-    void inc_level () {m_level++; m_depth++;}
+      unsigned weakness() {return m_weakness;}
+      void bump_weakness() {m_weakness++;}
+      void reset_weakness() {m_weakness=0;}
+      
+      void inc_level () {m_level++; m_depth++;reset_weakness();}
     
     void set_derivation (derivation *d) {m_derivation = d;}
     bool has_derivation () const {return (bool)m_derivation;}
@@ -693,6 +697,7 @@ namespace spacer {
             unsigned m_max_query_lvl;
             unsigned m_max_depth;
             unsigned m_cex_depth;
+            unsigned m_expand_node_undef;
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
         };
@@ -721,7 +726,8 @@ namespace spacer {
         model_converter_ref  m_mc;
         proof_converter_ref  m_pc;
         bool                 m_use_native_mbp;
-      
+        bool                 m_weak_abs;
+        
         // Functions used by search.
         lbool solve_core (unsigned from_lvl = 0);
         bool check_reachability ();        

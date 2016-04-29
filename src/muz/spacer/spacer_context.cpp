@@ -1631,7 +1631,8 @@ namespace spacer {
         m_last_result(l_undef),
         m_inductive_lvl(0),
         m_expanded_lvl(0),
-        m_use_native_mbp (params.spacer_native_mbp ())
+        m_use_native_mbp(params.spacer_native_mbp ()),
+        m_weak_abs(params.spacer_weak_abs())
     {}
 
     context::~context() {
@@ -2462,6 +2463,7 @@ namespace spacer {
             }
             else if (!node->parent()->is_closed ()) {
                 /* bump node->parent */ 
+                node->parent ()->bump_weakness();
             }
           }
           
@@ -2678,6 +2680,12 @@ namespace spacer {
         return l_false;
       }
       
+      smt_params &fparams = m_pm.fparams();
+      flet<bool> _arith_ignore_int_(fparams.m_arith_ignore_int,
+                                    m_weak_abs && n.weakness() < 1);
+      flet<bool> _array_weak_(fparams.m_array_weak,
+                              m_weak_abs && n.weakness() < 2);
+
       lbool res = n.pt ().is_reachable (n, &cube, &model, uses_level, is_concrete, r, 
                                         reach_pred_used, num_reuse_reach);
       checkpoint ();
@@ -2798,7 +2806,27 @@ namespace spacer {
       }
         //something went wrong
       case l_undef: {
-          /* do stuff */
+          SASSERT(m_weak_abs);
+          m_stats.m_expand_node_undef++;
+          if (r && r->get_uninterpreted_tail_size() > 0) {
+              model_evaluator mev (m, model);
+              // do not trust reach_pred_used
+              for (unsigned i = 0, sz = reach_pred_used.size(); i < sz; ++i)
+                  reach_pred_used[i] = false;
+              create_children(n,*r,mev,reach_pred_used);
+              IF_VERBOSE(1, verbose_stream() << " UNDEF "
+                         << std::fixed << std::setprecision(2) 
+                         << watch.get_seconds () << "\n";);
+              return l_undef;
+          }
+          else {
+              IF_VERBOSE(1, verbose_stream() << " UNDEF "
+                         << std::fixed << std::setprecision(2) 
+                         << watch.get_seconds () << "\n";);
+              n.bump_weakness();
+              return expand_node(n);
+          }
+          UNREACHABLE();
       }
         TRACE("spacer", tout << "unknown state: " 
               << mk_pp(m_pm.mk_and(cube), m) << "\n";);
@@ -3093,7 +3121,8 @@ namespace spacer {
         st.update("SPACER max depth", m_stats.m_max_depth);
         st.update("SPACER inductive level", m_inductive_lvl);
         st.update("SPACER cex depth", m_stats.m_cex_depth);
-
+        st.update("SPACER expand node undef", m_stats.m_expand_node_undef);
+        
         st.update ("time.spacer.init_rules", m_init_rules_watch.get_seconds ());
         st.update ("time.spacer.solve", m_solve_watch.get_seconds ());
         st.update ("time.spacer.solve.propagate", m_propagate_watch.get_seconds ());
