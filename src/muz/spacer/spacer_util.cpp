@@ -745,7 +745,7 @@ namespace spacer {
     expr *e, *ne, *e1, *e2;
     
     ast_manager &m = mev.get_ast_manager ();
-    arith_util &arith = mev.arith ();
+    arith_util arith(m);
     for (unsigned i = 0, sz = fml.size (); i < sz; ++i)
     {
       e = fml.get (i);
