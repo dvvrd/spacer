@@ -57,48 +57,6 @@ Notes:
 
 namespace spacer {
 
-    unsigned ceil_log2(unsigned u) {
-        if (u == 0) { return 0; }
-        unsigned pow2 = next_power_of_two(u);
-        return get_num_1bits(pow2-1);
-    }
-
-    std::string pp_cube(const ptr_vector<expr>& model, ast_manager& m) {
-        return pp_cube(model.size(), model.c_ptr(), m);
-    }
-
-    std::string pp_cube(const expr_ref_vector& model, ast_manager& m) {
-        return pp_cube(model.size(), model.c_ptr(), m);
-    }
-
-    std::string pp_cube(const app_ref_vector& model, ast_manager& m) {
-        return pp_cube(model.size(), model.c_ptr(), m);
-    }
-    
-    std::string pp_cube(const app_vector& model, ast_manager& m) {
-        return pp_cube(model.size(), model.c_ptr(), m);
-    }
-
-    std::string pp_cube(unsigned sz, app * const * lits, ast_manager& m) {
-        return pp_cube(sz, (expr * const *)(lits), m);
-    }
-
-    std::string pp_cube(unsigned sz, expr * const * lits, ast_manager& m) {
-        std::stringstream res;
-        res << "(";
-        expr * const * end = lits+sz;
-        for (expr * const * it = lits; it!=end; it++) {
-            res << mk_pp(*it, m);
-            if (it+1!=end) {
-                res << ", ";
-            }
-        }
-        res << ")";
-        return res.str();
-    }
-
-
-
     /////////////////////////
     // model_evaluator_util
     //

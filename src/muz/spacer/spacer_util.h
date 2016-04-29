@@ -81,24 +81,10 @@ namespace spacer {
   };
     
     
-    /**
-     * Return the ceiling of base 2 logarithm of a number, 
-     * or zero if the nmber is zero.
-     */
-    unsigned ceil_log2(unsigned u);
-
     typedef ptr_vector<app> app_vector;
     typedef ptr_vector<func_decl> decl_vector;
     typedef obj_hashtable<func_decl> func_decl_set;
     
-    std::string pp_cube(const ptr_vector<expr>& model, ast_manager& manager);
-    std::string pp_cube(const expr_ref_vector& model, ast_manager& manager);
-    std::string pp_cube(const ptr_vector<app>& model, ast_manager& manager);
-    std::string pp_cube(const app_ref_vector& model, ast_manager& manager);
-    std::string pp_cube(unsigned sz, app * const * lits, ast_manager& manager);
-    std::string pp_cube(unsigned sz, expr * const * lits, ast_manager& manager);
-  
-  
     
     class model_evaluator_util {
         ast_manager&           m;
