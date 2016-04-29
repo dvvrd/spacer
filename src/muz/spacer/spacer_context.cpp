@@ -178,7 +178,7 @@ namespace spacer {
     
     for (unsigned i = all ? 0 : m_rf_init_sz, sz = m_reach_case_vars.size ();
          i < sz; i++) {
-      v = mev.eval (m_reach_case_vars.get (i));
+      VERIFY (mev.eval (m_reach_case_vars.get (i), v, false));
       if (m.is_false (v)) {
         return m_reach_facts.get (i);
       }
@@ -195,7 +195,7 @@ namespace spacer {
     
     for (unsigned i = 0, sz = m_reach_case_vars.size (); i < sz; i++) {
       pm.formula_n2o (m_reach_case_vars.get (i), v, oidx);
-      b = mev.eval (v);
+      VERIFY(mev.eval (v, b, false));
       
       if (m.is_false (b)) {
         res = m_reach_facts.get (i);
@@ -2346,7 +2346,7 @@ namespace spacer {
                 for (unsigned j = 0; j < sig_size; j++) {
                     expr_ref sig_arg (m), sig_val (m);
                     sig_arg = m.mk_const (ch_pt.get_manager ().o2o (ch_pt.sig (j), 0, i));
-                    sig_val = mev.eval (sig_arg);
+                    VERIFY(mev.eval (sig_arg, sig_val, true));
                     ground_fact_conjs.push_back (m.mk_eq (sig_arg, sig_val));
                     ground_arg_vals.push_back (sig_val);
                 }

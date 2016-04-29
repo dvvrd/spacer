@@ -104,7 +104,7 @@ namespace spacer {
     //
     
     model_evaluator_util::model_evaluator_util(ast_manager& m) : 
-        m(m), m_arith(m),m_mev(NULL) 
+        m(m), m_mev(NULL) 
     { reset (NULL); }
 
     model_evaluator_util::~model_evaluator_util() {reset (NULL);}
@@ -132,11 +132,11 @@ namespace spacer {
         }
     }
     
-    void model_evaluator_util::eval_terms(const expr_ref_vector &v, bool complete) {
+    bool model_evaluator_util::eval_as_and(const expr_ref_vector &v, bool complete) {
         expr_ref e(m);
         expr_ref res(m);
         e = mk_and (v);
-        VERIFY(eval(e, res, complete));
+        return eval(e, res, complete);
     }
   
     bool model_evaluator_util::is_false (expr *x) {
@@ -148,13 +148,6 @@ namespace spacer {
         return eval(x, res, true) && m.is_true (res);
     }
   
-  expr_ref model_evaluator_util::eval(expr* e, bool model_completion) {
-      SASSERT(m_mev);
-      expr_ref res(m);
-      VERIFY(eval(e, res, model_completion));
-      return res;
-  }
-
   void reduce_arith_disequalities (model_evaluator_util &mev, expr_ref_vector &fml)
   {
     expr *e, *ne, *e1, *e2;
@@ -522,7 +515,7 @@ namespace spacer {
         for (unsigned i = 0; i < vars.size (); i++) {
             app* v = vars.get (i);
             expr_ref val (m);
-            val = mev.eval (v);
+            VERIFY(mev.eval (v, val, true));
             sub.insert (v, val);
         }
         sub (fml);
@@ -941,7 +934,7 @@ namespace spacer {
         expr_ref tmp(m);
         
         // 1. evaluate all the terms 
-        m_mev.eval_terms (in);
+        VERIFY(m_mev.eval_as_and (in));
     
         // 2. pick literals in the implicant
         pick_literals (in, out);

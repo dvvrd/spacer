@@ -102,7 +102,6 @@ namespace spacer {
     
     class model_evaluator_util {
         ast_manager&           m;
-        arith_util             m_arith;
         model_ref              m_model;
         model_evaluator*       m_mev;  
         
@@ -112,19 +111,19 @@ namespace spacer {
         model_evaluator_util(ast_manager& m);
         ~model_evaluator_util();
     
-        void set_model (model &model) { reset (&model); }
-        model_ref &get_model () {return m_model;}
+        void set_model(model &model) {reset (&model);}
+        model_ref &get_model() {return m_model;}
         ast_manager& get_ast_manager() const {return m;} 
       
     public:
         /// compute values of all the terms in all the formulas in the input
-        void eval_terms (const expr_ref_vector &v, bool complete=false);
+        bool eval_as_and(const expr_ref_vector &v, bool complete=false);
         bool is_false(expr* x);
         bool is_true(expr* x);
 
-        bool eval (expr *e, expr_ref &result, bool model_completion);
         /// evaluates an expression
-        expr_ref eval(expr* e, bool complete=true);
+        bool eval (expr *e, expr_ref &result, bool model_completion);
+        // expr_ref eval(expr* e, bool complete=true);
     };
 
   /**
