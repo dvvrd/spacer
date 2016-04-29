@@ -112,10 +112,6 @@ namespace spacer {
         // expr_ref eval(expr* e, bool complete=true);
     };
 
-  /**
-     \brief replaces arithmetic disequalities with a strict inequality true in the model
-   */
-  void reduce_arith_disequalities (model_evaluator_util &mev, expr_ref_vector &fml);
   
     /**
        \brief replace variables that are used in many disequalities by
