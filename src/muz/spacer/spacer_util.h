@@ -147,7 +147,9 @@ namespace spacer {
 
     bool extract_array_func_interp(expr* a, vector<expr_ref_vector>& stores, 
                                    expr_ref& else_case);
-
+      
+    /// evaluates a function declaration
+    expr_ref eval(func_decl* d);
     void eval_exprs(expr_ref_vector& es);
         
   public:
@@ -159,15 +161,7 @@ namespace spacer {
     void reset (const model_ref &model);
     
     model* get_model () {return m_model.get ();}
-    ast_manager& get_ast_manager() {return m;}
-    arith_util &arith () {return m_arith;}
-    
-    model_evaluator &operator= (const model_ref &model)
-    {
-      reset (model);
-      return *this;
-    }
-    
+    ast_manager& get_ast_manager() const {return m;} 
     /// compute values of all the terms in all the formulas in the input
     void eval_terms (const expr_ref_vector &v, bool complete=false)
     {
@@ -176,16 +170,6 @@ namespace spacer {
       for (unsigned i = v.size (); i > 0; --i)
         eval_terms (v.get (i-1));
     }
-    
-    /// compute values of all the terms in all the formulas in the input
-    void eval_terms (const ptr_vector<expr> &v, bool complete=false)
-    {
-      // for (unsigned i = 0, sz = f.size (); i < sz; ++i)
-      //   eval_terms (f[i], complete);
-      for (unsigned i = v.size (); i > 0; --i)
-        eval_terms (v[i], complete);
-    }
-    
     /// compute values of all the terms in the given formula
     void eval_terms (expr * formula, bool complete = false);
     
@@ -197,20 +181,10 @@ namespace spacer {
     expr* get_value(expr* x) const { return m_values.find(x); }
             
 
-    
-    /// evaluates a function declaration
-    expr_ref eval(func_decl* d);
     /// evaluates an expression
     expr_ref eval(expr* e, bool complete=true);
     /// evaluates an expression by evaluating all of its sub-terms
     expr_ref eval_heavy (expr* fml, bool complete=true);
-
-    /**
-       \brief Extracts an implicant of the conjunction of the formulas 
-
-       \pre current model satisfies the formulas
-    */
-    void pick_implicant (const expr_ref_vector& formulas, expr_ref_vector& result);
 
   };
 

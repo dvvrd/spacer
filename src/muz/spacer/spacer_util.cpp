@@ -744,7 +744,7 @@ namespace spacer {
   {
     expr *e, *ne, *e1, *e2;
     
-    ast_manager &m = mev.get_ast_manager ();
+    ast_manager &m = fml.get_manager ();
     arith_util arith(m);
     for (unsigned i = 0, sz = fml.size (); i < sz; ++i)
     {
@@ -1556,7 +1556,7 @@ namespace spacer {
       
     public:
       implicant_picker (model_evaluator &mev) : 
-        m_mev (mev), m (m_mev.get_ast_manager ()) {}
+          m_mev (mev), m (m_mev.get_ast_manager ()) {}
       
       void operator() (expr_ref_vector &in, expr_ref_vector& out)
       {pick_implicant (in, out);}
