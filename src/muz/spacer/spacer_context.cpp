@@ -2642,6 +2642,7 @@ namespace spacer {
                   << " (" << n.level () << ", " 
                   << (n.depth () - m_search.min_depth ()) << ") "
                   << (n.use_farkas_generalizer () ? "FAR " : "SUB ")
+                  << " w(" << n.weakness() << ") "
                   << n.post ()->get_id ();
                   verbose_stream().flush ();
                   watch.start (););
