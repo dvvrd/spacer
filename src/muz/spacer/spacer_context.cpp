@@ -170,15 +170,7 @@ namespace spacer {
     }
 
   
-  expr_ref pred_transformer::eval (model_evaluator &mev, expr * v)
-  {
-    expr_ref res(m);
-    if (ctx.get_params ().use_heavy_mev ()) 
-      res = mev.eval_heavy (v);
-    else 
-      res = mev.eval (v);
-    return res;
-  }
+  
   
   reach_fact* pred_transformer::get_used_reach_fact (model_evaluator& mev,
                                                      bool all) {

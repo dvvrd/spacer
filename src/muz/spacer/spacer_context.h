@@ -278,10 +278,6 @@ namespace spacer {
         /// versions of the variables
         expr_ref_vector              m_reach_case_vars; 
       
-
-      /// evaluate v in a model
-      expr_ref eval (model_evaluator &mev, expr * v);
-      
         void init_sig();
         void ensure_level(unsigned level);
         void add_lemma_core (expr *lemma, unsigned lvl);
