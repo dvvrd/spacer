@@ -733,7 +733,8 @@ namespace spacer {
         lbool expand_node(model_node& n);
         reach_fact *mk_reach_fact (model_node& n, model_evaluator_util &mev, 
                                    datalog::rule const& r);
-        void create_children(model_node& n, datalog::rule const& r, model_evaluator_util &model, 
+        bool create_children(model_node& n, datalog::rule const& r,
+                             model_evaluator_util &model, 
                              const vector<bool>& reach_pred_used);
         expr_ref mk_sat_answer() const;
         expr_ref mk_unsat_answer() const;

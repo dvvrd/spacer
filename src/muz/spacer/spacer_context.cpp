@@ -1444,7 +1444,10 @@ namespace spacer {
       //qe::reduce_array_selects (*mev.get_model (), m_trans);
     }
     
-        
+    if (!mev.is_true (m_premises[m_active].get_summary())) {
+        IF_VERBOSE(1, verbose_stream() << "Summary unexpectendly not true\n";);
+        return NULL;
+    }
     
     
     // create the post condition by compute post-image over summaries
@@ -2680,8 +2683,7 @@ namespace spacer {
                                         reach_pred_used, num_reuse_reach);
       checkpoint ();
       IF_VERBOSE (1, verbose_stream () << "." << std::flush;);
-      switch (res) 
-      {
+      switch (res) {
         //reachable but don't know if this is purely using UA
       case l_true: {
         // update stats
@@ -2721,7 +2723,7 @@ namespace spacer {
           }
           
           // -- close n, it is reachable
-          // -- don't worry about remove n from the obligation queue
+          // -- don't worry about removing n from the obligation queue
           n.close ();
           
           IF_VERBOSE(1, verbose_stream () << (next ? " X " : " T ")
@@ -2731,7 +2733,7 @@ namespace spacer {
         }
         
         // create a child of n
-        create_children (n, *r, mev, reach_pred_used);
+        VERIFY(create_children (n, *r, mev, reach_pred_used));
         IF_VERBOSE(1, verbose_stream () << " U "
                    << std::fixed << std::setprecision(2) 
                    << watch.get_seconds () << "\n";);
@@ -2796,33 +2798,32 @@ namespace spacer {
         return l_false;
       }
         //something went wrong
-      case l_undef: {
-          SASSERT(m_weak_abs);
-          m_stats.m_expand_node_undef++;
-          if (r && r->get_uninterpreted_tail_size() > 0) {
-              model_evaluator_util mev(m);
-              mev.set_model(*model);
-              // do not trust reach_pred_used
-              for (unsigned i = 0, sz = reach_pred_used.size(); i < sz; ++i)
-                  reach_pred_used[i] = false;
-              create_children(n,*r,mev,reach_pred_used);
+      case l_undef:
+          if (n.weakness() < 100 /* MAX_WEAKENSS */) {
+              bool has_new_child = false;
+              SASSERT(m_weak_abs);
+              m_stats.m_expand_node_undef++;
+              if (r && r->get_uninterpreted_tail_size() > 0) {
+                  model_evaluator_util mev(m);
+                  mev.set_model(*model);
+                  // do not trust reach_pred_used
+                  for (unsigned i = 0, sz = reach_pred_used.size(); i < sz; ++i)
+                      reach_pred_used[i] = false;
+                  has_new_child = create_children(n,*r,mev,reach_pred_used);
+              }
               IF_VERBOSE(1, verbose_stream() << " UNDEF "
                          << std::fixed << std::setprecision(2) 
                          << watch.get_seconds () << "\n";);
-              return l_undef;
-          }
-          else {
-              IF_VERBOSE(1, verbose_stream() << " UNDEF "
-                         << std::fixed << std::setprecision(2) 
-                         << watch.get_seconds () << "\n";);
+              if (has_new_child) return l_undef;
+
+              // -- failed to create a child, bump weakness and repeat
+              // -- the recursion is bounded by the levels of weakness supported
               n.bump_weakness();
               return expand_node(n);
           }
-          UNREACHABLE();
-      }
-        TRACE("spacer", tout << "unknown state: " 
-              << mk_pp(m_pm.mk_and(cube), m) << "\n";);
-        throw unknown_exception();
+          TRACE("spacer", tout << "unknown state: " 
+                << mk_pp(m_pm.mk_and(cube), m) << "\n";);
+          throw unknown_exception();
       }
       UNREACHABLE();
       throw unknown_exception();
@@ -2993,7 +2994,7 @@ namespace spacer {
     /**
        \brief create children states from model cube.
     */
-    void context::create_children(model_node& n, datalog::rule const& r, 
+    bool context::create_children(model_node& n, datalog::rule const& r, 
                                   model_evaluator_util &mev,
                                   const vector<bool> &reach_pred_used) {
  
@@ -3088,6 +3089,12 @@ namespace spacer {
         
         // create post for the first child and add to queue
         model_node* kid = deriv->create_first_child (mev);
+
+        // -- failed to create derivation, cleanup and bail out
+        if (!kid) {
+            dealloc(deriv);
+            return false;
+        }
         SASSERT (kid);
         kid->set_derivation (deriv);
         
@@ -3096,6 +3103,7 @@ namespace spacer {
         
         m_search.push (*kid);
         m_stats.m_num_queries++;
+        return true;
     }
 
 
