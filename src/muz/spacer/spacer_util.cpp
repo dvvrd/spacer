@@ -55,33 +55,6 @@ Notes:
 #include "old_mev.h"
 #include "qe_mbp.h"
 
-/**
-   \brief replaces arithmetic disequalities with a strict inequality true in the model
-*/
-static void reduce_arith_disequalities (spacer::model_evaluator_util &mev,
-                                        expr_ref_vector &fml) {
-    expr *e, *ne, *e1, *e2;
-    
-    ast_manager &m = fml.get_manager ();
-    arith_util arith(m);
-    expr_ref v1(m), v2(m);
-    rational n1, n2;
-    for (unsigned i = 0, sz = fml.size (); i < sz; ++i) {
-        e = fml.get (i);
-        if (m.is_not(e, ne) && m.is_eq(ne, e1, e2) && arith.is_int_real(e1) &&
-            mev.eval(e1, v1, true) && arith.is_numeral(v1, n1) &&
-            mev.eval(e2, v2, true) && arith.is_numeral(v2, n2)) {
-            if (n1 < n2) fml[i] = arith.mk_lt(e1, e2);
-            else if (n1 > n2) fml[i] = arith.mk_lt(e2, e1);
-            else {
-                fml.reset();
-                fml.push_back(m.mk_false ());
-                return;
-            }
-        }
-    }
-}
-
 namespace spacer {
 
     /////////////////////////
