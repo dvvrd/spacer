@@ -102,11 +102,11 @@ namespace spacer {
         ast_manager& get_ast_manager() const {return m;} 
       
     public:
-        /// compute values of all the terms in all the formulas in the input
-        bool eval_as_and(const expr_ref_vector &v, bool complete=false);
+        bool is_true (const expr_ref_vector &v);
         bool is_false(expr* x);
         bool is_true(expr* x);
 
+        bool eval (const expr_ref_vector &v, expr_ref &result, bool model_completion);
         /// evaluates an expression
         bool eval (expr *e, expr_ref &result, bool model_completion);
         // expr_ref eval(expr* e, bool complete=true);

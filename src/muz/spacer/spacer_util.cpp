@@ -90,13 +90,19 @@ namespace spacer {
         }
     }
     
-    bool model_evaluator_util::eval_as_and(const expr_ref_vector &v, bool complete) {
+    bool model_evaluator_util::eval(const expr_ref_vector &v,
+                                    expr_ref& res, bool model_completion) {
         expr_ref e(m);
-        expr_ref res(m);
         e = mk_and (v);
-        return eval(e, res, complete);
+        return eval(e, res, model_completion);
     }
   
+    
+    bool model_evaluator_util::is_true (const expr_ref_vector &v) {
+        expr_ref res(m);
+        return eval (v, res, false) && m.is_true (res);
+    }
+    
     bool model_evaluator_util::is_false (expr *x) {
         expr_ref res(m);
         return eval(x, res, false) && m.is_false (res);
