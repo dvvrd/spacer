@@ -118,6 +118,7 @@ namespace spacer {
         m_solver.collect_statistics(st);
         st.update("SPACER num propagations", m_stats.m_num_propagations);
         st.update("SPACER num properties", m_frames.lemma_size ());
+        st.update("SPACER num invariants", m_stats.m_num_invariants);
 
         st.update ("time.spacer.init_rules.pt.init", m_initialize_watch.get_seconds ());
         st.update ("time.spacer.solve.pt.must_reachable",
@@ -374,6 +375,9 @@ namespace spacer {
     flatten_and (lemma, lemmas);
     for (unsigned i = 0, sz = lemmas.size(); i < sz; ++i)
       res |= m_frames.add_lemma (lemmas.get (i), lvl);
+
+    if (res && is_infty_level (lvl)) m_stats.m_num_invariants++;
+    
     return res;
   }
   
@@ -1627,7 +1631,9 @@ namespace spacer {
         m_inductive_lvl(0),
         m_expanded_lvl(0),
         m_use_native_mbp(params.spacer_native_mbp ()),
-        m_weak_abs(params.spacer_weak_abs())
+        m_weak_abs(params.spacer_weak_abs()),
+        m_use_restarts(params.spacer_restarts()),
+        m_restart_initial_threshold(params.spacer_restart_initial_threshold())
     {}
 
     context::~context() {
@@ -2431,9 +2437,8 @@ namespace spacer {
         
         if (get_params().reset_obligation_queue ()) m_search.reset ();
         
-        unsigned initial_size = m_search.size ();
-        unsigned restart_initial = 10;
-        unsigned threshold = restart_initial;
+        unsigned initial_size = m_stats.m_num_lemmas;
+        unsigned threshold = m_restart_initial_threshold;
         unsigned luby_idx = 1;
         
         while (m_search.top ())
@@ -2489,16 +2494,19 @@ namespace spacer {
           
           SASSERT (m_search.top ());
           
-          if (false && m_search.size () - initial_size > threshold)
+          if (m_use_restarts && m_stats.m_num_lemmas - initial_size > threshold)
           {
             luby_idx++;
-            threshold = static_cast<unsigned>(get_luby(luby_idx)) * restart_initial;
+            m_stats.m_num_restarts++;
+            threshold =
+                static_cast<unsigned>(get_luby(luby_idx)) * m_restart_initial_threshold;
             IF_VERBOSE (1, verbose_stream () 
-                        << "(restarting :obligations " << m_search.size () 
+                        << "(restarting :lemmas " << m_stats.m_num_lemmas
                         << " :restart_threshold " << threshold
                         << ")\n";);
-            m_search.reset ();
-            initial_size = m_search.size ();
+            // -- clear obligation queue up to the root
+            while (!m_search.is_root(*m_search.top())) m_search.pop ();
+            initial_size = m_stats.m_num_lemmas;
           }
           
           node = m_search.top ();
@@ -2781,6 +2789,8 @@ namespace spacer {
                 << (is_infty_level(uses_level)?"(inductive)":"") 
                 <<  mk_pp (lemma, m) << "\n";);
           bool v = n.pt().add_lemma (lemma, uses_level);
+          if (v) m_stats.m_num_lemmas++;
+          
           // Optionally update the node to be the negation of the lemma
           if (v && get_params ().use_lemma_as_cti ())
           {
@@ -3122,6 +3132,8 @@ namespace spacer {
         st.update("SPACER inductive level", m_inductive_lvl);
         st.update("SPACER cex depth", m_stats.m_cex_depth);
         st.update("SPACER expand node undef", m_stats.m_expand_node_undef);
+        st.update("SPACER num lemmas", m_stats.m_num_lemmas);
+        st.update("SPACER restarts", m_stats.m_num_restarts);
         
         st.update ("time.spacer.init_rules", m_init_rules_watch.get_seconds ());
         st.update ("time.spacer.solve", m_solve_watch.get_seconds ());

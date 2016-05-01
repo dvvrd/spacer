@@ -172,6 +172,9 @@ def_module_params('fixedpoint',
                           ('spacer.native_mbp', BOOL, False, "Use native mbp of Z3"),
                           ('spacer.eq_prop', BOOL, True, "Enable equality and bound propagation in arithmetic"),
                           ('spacer.weak_abs', BOOL, True, "Weak abstraction"),
+                          ('spacer.restarts', BOOL, False, "Enable reseting obligation queue"),
+                          ('spacer.restart_initial_threshold', UINT, 10, "Intial threshold for restarts")
+                          
                           ))
 
 

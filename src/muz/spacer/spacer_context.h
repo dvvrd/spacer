@@ -104,6 +104,7 @@ namespace spacer {
 
         struct stats {
             unsigned m_num_propagations;
+            unsigned m_num_invariants;
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
         };
@@ -694,6 +695,8 @@ namespace spacer {
             unsigned m_max_depth;
             unsigned m_cex_depth;
             unsigned m_expand_node_undef;
+            unsigned m_num_lemmas;
+            unsigned m_num_restarts;
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
         };
@@ -723,6 +726,8 @@ namespace spacer {
         proof_converter_ref  m_pc;
         bool                 m_use_native_mbp;
         bool                 m_weak_abs;
+        bool                 m_use_restarts;
+        unsigned             m_restart_initial_threshold;
         
         // Functions used by search.
         lbool solve_core (unsigned from_lvl = 0);
