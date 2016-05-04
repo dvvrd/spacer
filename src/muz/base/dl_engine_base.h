@@ -79,6 +79,11 @@ namespace datalog {
         virtual unsigned get_num_levels(func_decl* pred) {
             throw default_exception(std::string("get_num_levels is not supported for ") + m_name);
         }
+
+        virtual expr_ref get_reachable(func_decl* pred) {
+              throw default_exception(std::string("operation is not supported for ") + m_name);
+        }
+        
         virtual expr_ref get_cover_delta(int level, func_decl* pred) {
             throw default_exception(std::string("operation is not supported for ") + m_name);
         }

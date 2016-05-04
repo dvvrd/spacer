@@ -70,6 +70,8 @@ Notes:
 #include "timeit.h"
 #include "luby.h"
 
+#include "expr_abstract.h"
+
 namespace spacer {
     
     // ----------------
@@ -467,15 +469,42 @@ namespace spacer {
       }
     }
 
-    expr* pred_transformer::get_reach () {
-        if (m_reach_facts.empty ()) {
-            return m.mk_false ();
-        }
-        ptr_vector<expr> v;
-        for (unsigned i = 1, sz = m_reach_facts.size (); i < sz; ++i)
-          v.push_back (m_reach_facts[i]->get ());
+    expr_ref pred_transformer::get_reachable() {
+        expr_ref res(m);
+        res = m.mk_false();
         
-        return m.mk_or (v.size (), v.c_ptr ());
+        if (!m_reach_facts.empty()) {
+            expr_substitution sub(m);
+            expr_ref c(m), v(m);
+            for (unsigned i = 0, sz = sig_size(); i < sz; ++i) {
+                c = m.mk_const(pm.o2n(sig(i), 0));
+                v = m.mk_var(i, sig(i)->get_range());
+                sub.insert(c, v);
+            }
+            scoped_ptr<expr_replacer> rep = mk_expr_simp_replacer(m);
+            rep->set_substitution(&sub);
+                
+            expr_ref_vector args(m);
+            for (unsigned i = 0, sz = m_reach_facts.size (); i < sz; ++i) {
+                reach_fact *f;
+                f = m_reach_facts.get(i);
+                expr_ref r(m);
+                r = f->get();
+                const ptr_vector<app> &aux = f->aux_vars();
+                if (!aux.empty()) {
+                    // -- existentially quantify auxiliary variables 
+                    r = mk_exists (m, aux.size(), aux.c_ptr(), r);
+                    // XXX not sure how this interacts with variable renaming later on.
+                    // XXX For now, simply dissallow existentially quantified auxiliaries
+                    NOT_IMPLEMENTED_YET();
+                }
+                (*rep)(r);
+                
+                args.push_back (r); 
+            }
+            res = mk_or(args);
+        }
+        return res;
     }
 
   expr* pred_transformer::get_last_reach_case_var () const 
@@ -1768,6 +1797,12 @@ namespace spacer {
       add_cover (infty_level(), p, property);
     }
   
+    expr_ref context::get_reachable(func_decl *p) {
+        pred_transformer* pt = 0;
+        if (!m_rels.find(p, pt)) 
+            return expr_ref(m.mk_false(), m);
+        return pt->get_reachable();
+    }
 
     class context::classifier_proc {
         ast_manager& m;

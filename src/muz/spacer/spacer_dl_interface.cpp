@@ -283,6 +283,14 @@ void dl_interface::add_invariant(func_decl* pred, expr* property) {
     m_context->add_invariant(pred, property);
 }
 
+expr_ref dl_interface::get_reachable(func_decl* pred) {
+    if (m_ctx.get_params().xform_slice()) {
+        throw default_exception("Invariants are incompatible with slicing. "
+                                "Disable slicing before using invariants");
+    }
+    return m_context->get_reachable(pred);
+}
+
 unsigned dl_interface::get_num_levels(func_decl* pred) {
     m_pred2slice.find(pred, pred);
     SASSERT(pred);

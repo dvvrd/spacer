@@ -549,6 +549,11 @@ namespace datalog {
         return m_engine->get_cover_delta(level, pred);
     }
 
+    expr_ref context::get_reachable(func_decl *pred) {
+        ensure_engine();
+        return m_engine->get_reachable(pred);
+    }
+
     void context::add_cover(int level, func_decl* pred, expr* property) {
         ensure_engine();
         m_engine->add_cover(level, pred, property);

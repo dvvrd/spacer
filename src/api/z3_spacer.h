@@ -101,6 +101,14 @@ extern "C" {
   
   
     /**
+       Retrieve reachable states of a predicate.
+       Note: this functionality is Spacer specific.
+
+       def_API('Z3_fixedpoint_get_reachable', AST, (_in(CONTEXT), _in(FIXEDPOINT), _in(FUNC_DECL)))
+     */
+    Z3_ast Z3_API Z3_fixedpoint_get_reachable(Z3_context c, Z3_fixedpoint d, Z3_func_decl pred);
+
+    /**
        \brief Project variables given a model
 
        def_API('Z3_qe_model_project', AST, (_in(CONTEXT), _in(MODEL), _in(UINT), _in_array(2, APP), _in(AST)))

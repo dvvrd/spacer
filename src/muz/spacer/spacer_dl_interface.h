@@ -71,6 +71,8 @@ namespace spacer {
         void add_cover(int level, func_decl* pred, expr* property);
       
         void add_invariant(func_decl* pred, expr* property);
+
+        expr_ref get_reachable (func_decl *pred);
       
         void updt_params();
 

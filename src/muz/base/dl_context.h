@@ -410,6 +410,10 @@ namespace datalog {
          */
         unsigned get_num_levels(func_decl* pred);
 
+        /** 
+            Retrieve reachable facts of 'pred'.
+         */
+        expr_ref get_reachable(func_decl *pred);
         /**
            Retrieve the current cover of 'pred' up to 'level' unfoldings.
            Return just the delta that is known at 'level'. To

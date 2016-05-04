@@ -122,3 +122,13 @@ Notes:
         Z3_CATCH;
     }
 
+    Z3_ast Z3_API Z3_fixedpoint_get_reachable(Z3_context c, Z3_fixedpoint d, Z3_func_decl pred) {
+        Z3_TRY;
+        LOG_Z3_fixedpoint_get_reachable(c, d, pred);
+        RESET_ERROR_CODE();
+        expr_ref r = to_fixedpoint_ref(d)->ctx().get_reachable(to_func_decl(pred));
+        mk_c(c)->save_ast_trail(r);        
+        RETURN_Z3(of_expr(r.get()));
+        Z3_CATCH_RETURN(0);
+    }
+

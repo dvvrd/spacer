@@ -328,7 +328,7 @@ namespace spacer {
         unsigned get_num_levels() { return m_frames.size (); }
         expr_ref get_cover_delta(func_decl* p_orig, int level);
         void     add_cover(unsigned level, expr* property);
-        expr* get_reach ();
+        expr_ref get_reachable ();
 
         std::ostream& display(std::ostream& strm) const;
 
@@ -831,6 +831,8 @@ namespace spacer {
         expr_ref get_cover_delta(int level, func_decl* p_orig, func_decl* p);
 
         void add_cover(int level, func_decl* pred, expr* property);
+
+        expr_ref get_reachable (func_decl* p);
 
         void add_invariant (func_decl *pred, expr* property);
 
