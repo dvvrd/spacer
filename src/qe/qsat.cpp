@@ -1162,8 +1162,7 @@ namespace qe {
             m_level(0),
             m_mode(mode),
             m_avars(m),
-            m_free_vars(m),
-            m_value(m)
+            m_free_vars(m)
         {
             reset();
         }
@@ -1283,17 +1282,15 @@ namespace qe {
         }        
 
         app*             m_objective;
-        expr_ref         m_value;
-        mbp::bound_type  m_bound;
+        opt::inf_eps     m_value;
         bool             m_was_sat;
 
-        lbool maximize(expr_ref_vector const& fmls, app* t, expr_ref& value, mbp::bound_type& bound) {
+        lbool maximize(expr_ref_vector const& fmls, app* t, model_ref& mdl, opt::inf_eps& value) {
             expr_ref_vector defs(m);
             expr_ref fml = negate_core(fmls);
             hoist(fml);
             m_objective = t;
-            m_value = 0;
-            m_bound = mbp::unbounded;
+            m_value = opt::inf_eps();
             m_was_sat = false;
             m_pred_abs.abstract_atoms(fml, defs);
             fml = m_pred_abs.mk_abstract(fml);
@@ -1302,6 +1299,7 @@ namespace qe {
             m_ex.assert_expr(fml);
             m_fa.assert_expr(m.mk_not(fml));
             lbool is_sat = check_sat();
+            mdl = m_model.get();
             switch (is_sat) {
             case l_false:
                 if (!m_was_sat) {
@@ -1319,40 +1317,23 @@ namespace qe {
                 throw tactic_exception(s.c_str()); 
             }        
             value = m_value;
-            bound = m_bound;
             return l_true;
         }
 
         void maximize(expr_ref_vector const& core, model& mdl) {
             TRACE("qe", tout << "maximize: " << core << "\n";);
             m_was_sat |= !core.empty();
-            if (core.empty()) {
-                m_ex.assert_expr(m.mk_false());
-                m_fa.assert_expr(m.mk_false());
-                return;
-            }
             expr_ref bound(m);
-            m_bound = m_mbp.maximize(core, mdl, m_objective, m_value, bound);
-            switch (m_bound) {
-            case mbp::unbounded:
-                m_ex.assert_expr(m.mk_false());
-                m_fa.assert_expr(m.mk_false());
-                break;
-            case mbp::strict:
-                m_ex.assert_expr(bound);
-                break;
-            case mbp::non_strict:
-                m_ex.assert_expr(bound);
-                break;
-            }
+            m_value = m_mbp.maximize(core, mdl, m_objective, bound);
+            m_ex.assert_expr(bound);            
         }
 
     };
 
-    lbool maximize(expr_ref_vector const& fmls, app* t, expr_ref& value, mbp::bound_type& bound, params_ref const& p) {
+    lbool maximize(expr_ref_vector const& fmls, app* t, opt::inf_eps& value, model_ref& mdl, params_ref const& p) {
         ast_manager& m = fmls.get_manager();
         qsat qs(m, p, qsat_maximize);
-        return qs.maximize(fmls, t, value, bound);
+        return qs.maximize(fmls, t, mdl, value);
     }    
 };
 
