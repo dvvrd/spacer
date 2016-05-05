@@ -6,7 +6,6 @@
 #include "reg_decl_plugins.h"
 #include "arith_rewriter.h"
 #include "ast_pp.h"
-#include "qe_util.h"
 #include "smt_context.h"
 #include "expr_abstract.h"
 #include "model_smt2_pp.h"
