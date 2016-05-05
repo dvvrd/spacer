@@ -30,7 +30,6 @@ Revision History:
 #include "expr_substitution.h"
 #include "expr_replacer.h"
 #include "model_pp.h"
-// #include "qe_array.h"
 #include "expr_safe_replace.h"
 #include "model_evaluator.h"
 #include "qe_lite.h"
