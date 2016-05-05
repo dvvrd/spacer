@@ -1380,7 +1380,7 @@ bool proof_checker::check_arith_literal(bool is_pos, app* lit0, rational const& 
         rw(sum);
     }
 
-    IF_VERBOSE(0, verbose_stream() << "coeff,lit,sum " << coeff << "\n" << mk_pp(lit0, m) << "\n" << mk_pp(sum, m) << "\n";);
+    IF_VERBOSE(2, verbose_stream() << "coeff,lit,sum " << coeff << "\n" << mk_pp(lit0, m) << "\n" << mk_pp(sum, m) << "\n";);
 #endif
 
     return true;
