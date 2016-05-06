@@ -2341,7 +2341,16 @@ namespace spacer {
             }
             cex_ctx->assert_expr (pt->transition ());
             cex_ctx->assert_expr (pt->rule2tag (r));
-            VERIFY (cex_ctx->check () == l_true);
+            lbool res = cex_ctx->check ();
+            CTRACE("cex", res == l_false,
+                   tout << "Cex fact: " << mk_pp(cex_fact, m) << "\n";
+                   for (unsigned i = 0; i < u_tail_sz; i++) 
+                       tout << "Pre" << i << " "
+                            << mk_pp(child_reach_facts[i]->get(), m) << "\n";
+                   tout << "Rule: ";
+                   get_datalog_context().get_rule_manager().display_smt2(*r, tout) << "\n";
+                   );
+            VERIFY (res == l_true);
             model_ref local_mdl;
             cex_ctx->get_model (local_mdl);
             cex_ctx->pop (1);
