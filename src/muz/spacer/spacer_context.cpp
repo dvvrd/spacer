@@ -1911,44 +1911,10 @@ namespace spacer {
 
         switch(m_last_result) {
         case l_true: {
-            TRACE ("spacer", tout << "Unsupported\n";);
-            break;
-            /*scoped_no_proof _sc(m);
-            expr_ref const& cex = get_answer ();
-            smt::kernel solver (m, get_fparams());
-            solver.assert_expr (cex);
-            lbool res = solver.check ();
-            if (res == l_true) {
-                TRACE ("spacer", tout << "Validation Succeeded\n";);
-            } else {
-                msg << "proof validation failed";
-                IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
-                throw default_exception(msg.str());
-            }*/
-            /*proof_ref pr = get_proof();
-            proof_checker checker(m);
-            expr_ref_vector side_conditions(m);
-            bool ok = checker.check(pr, side_conditions);
-            if (!ok) {
-                msg << "proof validation failed";
-                IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
-                throw default_exception(msg.str());
-            }
-            for (unsigned i = 0; i < side_conditions.size(); ++i) {
-                expr* cond = side_conditions[i].get();
-                expr_ref tmp(m);
-                tmp = m.mk_not(cond);
-                IF_VERBOSE(2, verbose_stream() << "checking side-condition:\n" << mk_pp(cond, m) << "\n";);
-                smt::kernel solver(m, get_fparams());
-                solver.assert_expr(tmp);
-                lbool res = solver.check();
-                if (res != l_false) {
-                    msg << "rule validation failed when checking: " << mk_pp(cond, m);
-                    IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
-                    throw default_exception(msg.str());
-                }                                
-            }*/
-            break;
+            expr_ref cex(m);
+            cex = get_ground_sat_answer();
+            SASSERT(cex.get());
+           break;
         }            
         case l_false: {
             expr_ref_vector refs(m);
