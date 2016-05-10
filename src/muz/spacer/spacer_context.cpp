@@ -3020,8 +3020,8 @@ namespace spacer {
  
         scoped_watch _w_ (m_create_children_watch);
         pred_transformer& pt = n.pt();
-        expr* T   = pt.get_transition(r);
-        expr* phi = n.post();
+        expr* const T   = pt.get_transition(r);
+        expr* const phi = n.post();
 
         TRACE("spacer", 
               tout << "Model:\n";
@@ -3120,6 +3120,13 @@ namespace spacer {
         
         // Optionally disable derivation optimization
         if (!get_params ().use_derivations ()) kid->reset_derivation ();
+
+        // -- deriviation is abstract if the current weak model does
+        // -- not satisfy 'T && phi'. It is possible to recover from
+        // -- that more gracefully. For now, we just remove the
+        // -- derivation completely forcing it to be recomputed
+        if (m_weak_abs && (!mev.is_true(T) || !mev.is_true(phi)))
+            kid->reset_derivation();
         
         m_search.push (*kid);
         m_stats.m_num_queries++;
