@@ -185,8 +185,11 @@ namespace spacer {
                             for (unsigned i = 0, sz = args.size () - 1; i < sz; ++i)
                                 parents.push_back (to_app (args.get (i)));
                             SASSERT (parents.size () == args.size () - 1);
-                            newp = m.mk_unit_resolution
-                                (parents.size (), parents.c_ptr (), args.back ());
+                            newp = m.mk_unit_resolution(parents.size(), parents.c_ptr());
+                            // XXX the old and new facts should be
+                            // equivalent. The test here is much
+                            // stronger. It might need to be relaxed.
+                            SASSERT(m.get_fact(newp) == args.back());
                             pinned.push_back (newp);
                         }
                     }
