@@ -40,8 +40,7 @@ namespace sat {
             if (it->is_clause()) {
                 if (it->get_clause_offset() == cls_off) {
                     // the blocked literal must be in the clause.
-                    literal l = it->get_blocked_literal();
-                    SASSERT(c.contains(l));
+                    SASSERT(c.contains(it->get_blocked_literal()));
                     return true;
                 }
             }
@@ -154,12 +153,14 @@ namespace sat {
     }
 
     bool integrity_checker::check_watches() const {
+        DEBUG_CODE(
         vector<watch_list>::const_iterator it  = s.m_watches.begin();
         vector<watch_list>::const_iterator end = s.m_watches.end();
         for (unsigned l_idx = 0; it != end; ++it, ++l_idx) {
-            literal l = ~to_literal(l_idx);
+            literal l = ~to_literal(l_idx);            
             watch_list const & wlist = *it;
-            CTRACE("sat_bug", s.was_eliminated(l.var()) && !wlist.empty(),
+            CTRACE("sat_bug", 
+                   s.was_eliminated(l.var()) && !wlist.empty(),
                    tout << "l: " << l << "\n";
                    s.display_watches(tout);
                    s.display(tout););
@@ -179,7 +180,7 @@ namespace sat {
                            tout << "\n";
                            sat::display(tout, s.m_cls_allocator, s.get_wlist(~(it2->get_literal())));
                            tout << "\n";);
-                    SASSERT(s.get_wlist(~(it2->get_literal())).contains(watched(l, it2->is_learned())));
+                        SASSERT(s.get_wlist(~(it2->get_literal())).contains(watched(l, it2->is_learned())));
                     break;
                 case watched::TERNARY:
                     SASSERT(!s.was_eliminated(it2->get_literal1().var()));
@@ -193,7 +194,7 @@ namespace sat {
                     break;
                 }
             }
-        }
+        });
         return true;
     }
 
