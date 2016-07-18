@@ -119,7 +119,6 @@ struct evaluator_cfg : public default_rewriter_cfg {
             expr * val = m_model.get_const_interp(f);
             if (val != 0) {
                 result = val;
-                expand_value(result);
                 return BR_DONE;
             }
 
@@ -259,29 +258,54 @@ struct evaluator_cfg : public default_rewriter_cfg {
 
 
     br_status mk_array_eq(expr* a, expr* b, expr_ref& result) {
-        return BR_FAILED;
+        // return BR_FAILED;
         // disabled until made more efficient
         if (a == b) {
             result = m().mk_true();
             return BR_DONE;
         }
+
+        IF_VERBOSE(2,
+                   verbose_stream() << tout << "Evaluating: "
+                   << mk_pp(a,m()) << " == " << mk_pp(b,m()) << "\n";);
+        
+        TRACE("mk_array_eq",
+              tout << "Evaluating: "
+              << a->get_id() << "==" << b->get_id() << "\n"
+              << mk_pp(a,m()) << " == " << mk_pp(b,m()) << "\n";);
+      
         vector<expr_ref_vector> stores;
         expr_ref else1(m()), else2(m());
         if (extract_array_func_interp(a, stores, else1) &&
             extract_array_func_interp(b, stores, else2)) {
             expr_ref_vector conj(m()), args1(m()), args2(m());
-            conj.push_back(m().mk_eq(else1, else2));
+            if (!m().are_equal(else1, else2)) {
+                if (m().are_distinct (else1, else2)) {
+                    result = m().mk_false();
+                    return BR_DONE;
+                }
+                conj.push_back(m().mk_eq(else1, else2));
+            }
             args1.push_back(a);
             args2.push_back(b);
             // TBD: this is too inefficient.
             for (unsigned i = 0; i < stores.size(); ++i) {
                 args1.resize(1); args1.append(stores[i].size() - 1, stores[i].c_ptr());
                 args2.resize(1); args2.append(stores[i].size() - 1, stores[i].c_ptr());
-                expr* s1 = m_ar.mk_select(args1.size(), args1.c_ptr());
-                expr* s2 = m_ar.mk_select(args2.size(), args2.c_ptr());
-                conj.push_back(m().mk_eq(s1, s2));
+                expr_ref s1(m()), s2(m());
+                s1 = m_ar.mk_select(args1.size(), args1.c_ptr());
+                s2 = m_ar.mk_select(args2.size(), args2.c_ptr());
+                
+                if (!m().are_equal(s1, s2)) {
+                    if (m().are_distinct (s1, s2)) {
+                        result = m().mk_false();
+                        return BR_DONE;
+                    }
+                    conj.push_back(m().mk_eq(s1, s2));
+                }
             }
             result = m().mk_and(conj.size(), conj.c_ptr());
+            // return BR_REWRITE3;
             return BR_REWRITE_FULL;
         }
         return BR_FAILED;
@@ -367,6 +391,10 @@ struct model_evaluator::imp : public rewriter_tpl<evaluator_cfg> {
         m_cfg(md.get_manager(), md, p) {
         set_cancel_check(false);
     }
+
+    void expand_value (expr_ref &val) {
+        m_cfg.expand_value (val);
+    }
 };
 
 model_evaluator::model_evaluator(model_core & md, params_ref const & p) {
@@ -411,6 +439,7 @@ void model_evaluator::reset(params_ref const & p) {
 void model_evaluator::operator()(expr * t, expr_ref & result) {
     TRACE("model_evaluator", tout << mk_ismt2_pp(t, m()) << "\n";);
     m_imp->operator()(t, result);
+    m_imp->expand_value(result);
 }
 
 
