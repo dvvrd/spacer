@@ -1,9 +1,12 @@
 #include "spacer_virtual_solver.h"
 #include "ast_util.h"
+#include "ast_pp_util.h"
 #include "spacer_util.h"
 #include "bool_rewriter.h"
 
 #include "proof_checker.h"
+
+#include "scoped_proof.h"
 
 namespace spacer {
     virtual_solver::virtual_solver (virtual_solver_factory &factory,
@@ -19,6 +22,8 @@ namespace spacer {
         m_flat (m),
         m_pushed (false),
         m_in_delay_scope (false),
+        m_dump_benchmarks(false),
+        m_dump_counter(0),
         m_proof(m)
     {
         // -- insert m_pred->true background assumption this will not
@@ -31,32 +36,32 @@ namespace spacer {
     virtual_solver::~virtual_solver ()
     {
         SASSERT (!m_pushed || get_scope_level () > 0);
-        if (m_pushed) pop (get_scope_level ());
-    
-        if (m_virtual) 
-        {
-            m_pred = m.mk_not (m_pred);
-            m_context.assert_expr (m_pred);
-        }
-    }
-  
-    namespace
-    {
-        static bool matches_fact (expr_ref_vector &args, expr* &match)
-        {
-            ast_manager &m = args.get_manager ();
-            expr *fact = args.back ();
-            for (unsigned i = 0, sz = args.size () - 1; i < sz; ++i)
+            if (m_pushed) pop (get_scope_level ());
+
+            if (m_virtual) 
             {
-                expr *arg = args.get (i);
-                if (m.is_proof (arg) &&
-                    m.has_fact (to_app (arg)) &&
-                    m.get_fact (to_app (arg)) == fact)
-                {
-                    match = arg;
-                    return true;
-                }
+                m_pred = m.mk_not (m_pred);
+                m_context.assert_expr (m_pred);
             }
+        }
+
+        namespace
+        {
+            static bool matches_fact (expr_ref_vector &args, expr* &match)
+            {
+                ast_manager &m = args.get_manager ();
+                expr *fact = args.back ();
+                for (unsigned i = 0, sz = args.size () - 1; i < sz; ++i)
+                {
+                    expr *arg = args.get (i);
+                    if (m.is_proof (arg) &&
+                        m.has_fact (to_app (arg)) &&
+                        m.get_fact (to_app (arg)) == fact)
+                    {
+                        match = arg;
+                        return true;
+                    }
+                }
             return false;
         }
     
@@ -257,14 +262,56 @@ namespace spacer {
         sw.start ();
         internalize_assertions ();
         lbool res = m_context.check (num_assumptions, assumptions);
+        sw.stop ();
         if (res == l_true)
         {
-            sw.stop ();
             m_factory.m_check_sat_watch.add (sw);
             m_factory.m_stats.m_num_sat_smt_checks++;
         }
-    
         set_status (res);
+        
+        if (m_dump_benchmarks && sw.get_seconds() >= 5.0) {
+            std::stringstream file_name;
+            file_name << "virt_solver";
+            if (m_virtual) file_name << "_" << m_pred->get_decl()->get_name();
+            file_name << "_" << (m_dump_counter++) << ".smt2";
+            
+            std::ofstream out(file_name.str().c_str());
+            
+            
+            out << "(set-info :status ";
+            if (res == l_true) out << "sat";
+            else if (res == l_false) out << "unsat";
+            else out << "unknown";
+            out << ")\n";
+            
+            to_smt2_benchmark(out, m_context, num_assumptions, assumptions,
+                              "virt_solver");
+            
+            out << "(exit)\n";
+            ::statistics st;
+            m_context.collect_statistics(st);
+            st.update("time", sw.get_seconds());
+            st.display_smt2(out);
+
+            out.close();
+
+            if (false) {
+                scoped_no_proof _no_proof_(m);
+                smt_params p;
+                stopwatch sw2;
+                smt::kernel kernel(m, p);
+                for (unsigned i = 0, sz = m_context.size(); i < sz; ++i) 
+                    kernel.assert_expr(m_context.get_formulas()[i]);
+                sw2.start();
+                kernel.check(num_assumptions, assumptions);
+                sw2.stop();
+                verbose_stream() << file_name.str() << " :orig "
+                                 << sw.get_seconds() << " :new " << sw2.get_seconds();
+            }
+        }
+
+        
         return res;
     }
   
@@ -366,6 +413,33 @@ namespace spacer {
     smt_params &virtual_solver::fparams()
     {return m_factory.fparams();}
 
+    void virtual_solver::to_smt2_benchmark(std::ostream &out,
+                                           smt::kernel &context,
+                                           unsigned num_assumptions,
+                                           expr * const * assumptions,
+                                           char const * name,
+                                           symbol const &logic,
+                                           char const * status,
+                                           char const * attributes) {
+        ast_pp_util pp(m);
+        expr_ref_vector asserts(m);
+      
+        
+        for (unsigned i = 0, sz = context.size(); i < sz; ++i)
+        {
+            asserts.push_back (context.get_formulas()[i]);
+            pp.collect (asserts.back());
+        }
+        pp.collect (num_assumptions, assumptions);
+        pp.display_decls (out);
+        pp.display_asserts (out, asserts);
+        out << "(check-sat ";
+        for (unsigned i = 0; i < num_assumptions; ++i)
+            out << mk_pp(assumptions[i], m) << " ";
+        out << ")\n";
+    }
+    
+    
     virtual_solver_factory::virtual_solver_factory (ast_manager &mgr, smt_params &fparams) :
         m_fparams (fparams), m(mgr), m_context (m, m_fparams), m_num_solvers(0)
     {

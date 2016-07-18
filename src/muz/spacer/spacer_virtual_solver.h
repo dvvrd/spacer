@@ -65,13 +65,23 @@ namespace spacer {
 
         bool m_pushed;
         bool m_in_delay_scope;
-
+        bool m_dump_benchmarks;
+        unsigned m_dump_counter;
+        
         proof_ref m_proof;
     
         virtual_solver (virtual_solver_factory &factory, smt::kernel &context, app* pred);
     
         bool is_aux_predicate (expr *p);
         void internalize_assertions ();
+        void to_smt2_benchmark(std::ostream &out,
+                               smt::kernel &context,
+                               unsigned num_assumptions,
+                               expr * const * assumptions,
+                               char const * name = "benchmarks",
+                               symbol const &logic = symbol::null,
+                               char const * status = "unknown",
+                               char const * attributes = "");
     
     public:
         virtual ~virtual_solver ();
@@ -82,7 +92,7 @@ namespace spacer {
         }
         virtual expr* get_assumption (unsigned idx) const
         {
-            if (m_virtual) idx--;
+            if (m_virtual) idx++;
             return solver_na2as::get_assumption (idx);
         }
 
@@ -108,6 +118,7 @@ namespace spacer {
     
         virtual void updt_params (params_ref const &p);
         virtual void collect_param_descrs (param_descrs &r);
+        
     
     protected:
         virtual lbool check_sat_core (unsigned num_assumptions, expr *const * assumptions);
