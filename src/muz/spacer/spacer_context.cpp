@@ -90,8 +90,9 @@ namespace spacer {
     {
       init_sig ();
       app_ref v(m);
-      v = m.mk_fresh_const (m_head->get_name ().str ().c_str (),
-                            m.mk_bool_sort ());
+      std::stringstream name;
+      name << m_head->get_name () << "_ext0";
+      v = m.mk_const (symbol(name.str().c_str()), m.mk_bool_sort());
       m_extend_lit = m.mk_not (m.mk_const (pm.get_n_pred (v->get_decl ())));
     }
 
@@ -879,21 +880,27 @@ namespace spacer {
             transition = m.mk_false(); 
             break;
         case 1:
-            // create a dummy tag.
-            pred = m.mk_fresh_const(head()->get_name().str().c_str(), m.mk_bool_sort());
-            rule = tr_rules[0];
-            m_tag2rule.insert(pred, rule);
-            m_rule2tag.insert(rule, pred.get());            
-            transitions [0] = m.mk_implies (pred, transitions.get (0));
-            transitions.push_back (m.mk_or (pred, m_extend_lit->get_arg (0)));
-            if (!is_init [0]) init_conds.push_back (m.mk_not (pred));
+            {
+                std::stringstream name;
+                // create a dummy tag.
+                name << head()->get_name() << "_dummy";
+                pred = m.mk_const(symbol(name.str().c_str()), m.mk_bool_sort());
+                rule = tr_rules[0];
+                m_tag2rule.insert(pred, rule);
+                m_rule2tag.insert(rule, pred.get());            
+                transitions [0] = m.mk_implies (pred, transitions.get (0));
+                transitions.push_back (m.mk_or (pred, m_extend_lit->get_arg (0)));
+                if (!is_init [0]) init_conds.push_back (m.mk_not (pred));
             
-            transition = pm.mk_and(transitions);
-            break;
+                transition = pm.mk_and(transitions);
+                break;
+            }
         default:
             disj.push_back (m_extend_lit->get_arg (0));
             for (unsigned i = 0; i < transitions.size(); ++i) {
-                pred = m.mk_fresh_const(head()->get_name().str().c_str(), m.mk_bool_sort());
+                std::stringstream name;
+                name << head()->get_name() << "_tr" << i;
+                pred = m.mk_const(symbol(name.str().c_str()), m.mk_bool_sort());
                 rule = tr_rules[i];
                 m_tag2rule.insert(pred, rule);                   
                 m_rule2tag.insert(rule, pred);                
@@ -1355,7 +1362,9 @@ namespace spacer {
   {
     // create fresh extend literal
     app_ref v(m);
-    v = m.mk_fresh_const (m_head->get_name ().str ().c_str (),
+    std::stringstream name;
+    name << m_head->get_name() << "_ext";
+    v = m.mk_fresh_const (name.str ().c_str (),
                           m.mk_bool_sort ());
     v = m.mk_const (pm.get_n_pred (v->get_decl ()));
     
