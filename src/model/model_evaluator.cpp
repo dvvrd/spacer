@@ -266,7 +266,7 @@ struct evaluator_cfg : public default_rewriter_cfg {
         }
 
         IF_VERBOSE(2,
-                   verbose_stream() << tout << "Evaluating: "
+                   verbose_stream() << "Evaluating: "
                    << mk_pp(a,m()) << " == " << mk_pp(b,m()) << "\n";);
         
         TRACE("mk_array_eq",
