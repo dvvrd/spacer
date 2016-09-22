@@ -2299,7 +2299,14 @@ namespace spacer {
 
         // initialize queues
         reach_facts.append (reach_fact->get_justifications ());
-        SASSERT (reach_facts.size () == 1);
+        if (reach_facts.size () != 1)
+        {
+          // XXX Escape if an assertion is about to fail
+          IF_VERBOSE(1, 
+                     verbose_stream () << 
+                     "Warning: counterexample is trivial or non-existent\n";);
+          return expr_ref(m.mk_true(), m);
+        }
         m_query->find_predecessors (*r, preds);
         SASSERT (preds.size () == 1);
         pts.push_back (&(get_pred_transformer (preds[0])));
