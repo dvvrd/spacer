@@ -160,6 +160,7 @@ set (libz3_public_headers
   z3_polynomial.h
   z3_rcf.h
   z3_v1.h
+  z3_spacer.h
 )
 foreach (header ${libz3_public_headers})
   set_property(TARGET libz3 APPEND PROPERTY
