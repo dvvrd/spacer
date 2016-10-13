@@ -863,7 +863,8 @@ namespace ar {
                 expr_safe_replace rep(m);
                 rep.insert(A, B);
                 expr_ref tmp(m);
-                std::cout << mk_pp(e1, m) << " = " << mk_pp(e2, m) << "\n";
+                TRACE("qe_lite",
+                      tout << mk_pp(e1, m) << " = " << mk_pp(e2, m) << "\n";);
                 for (unsigned j = 0; j < conjs.size(); ++j) {
                     if (i == j) {
                         conjs[j] = m.mk_true();
