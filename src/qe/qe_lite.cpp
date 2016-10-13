@@ -2441,7 +2441,8 @@ public:
         m_array_der.set_is_variable_proc(is_var);
         m_der(fmls);
         m_fm(fmls);
-        m_array_der(fmls);
+        // XXX AG: disalble m_array_der() since it interferes with other array handling
+        // m_array_der(fmls);
         TRACE("qe_lite", for (unsigned i = 0; i < fmls.size(); ++i) tout << mk_pp(fmls[i].get(), m) << "\n";);
     }
 
