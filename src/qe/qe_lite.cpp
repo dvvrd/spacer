@@ -829,12 +829,13 @@ namespace ar {
         }
 
         /**
-           Ex A. A[x] = t & Phi where x \not\in A, t. A \not\in t, x
+           Ex A. A[x] = t & Phi[A] where x \not\in A, t. A \not\in t, x
            =>
            Ex A. Phi[store(A,x,t)]
 
-           Perhaps also:
-           Ex A. store(A,y,z)[x] = t & Phi where x \not\in A, t, y, z, A \not\in y z, t 
+           (Not implemented)
+           Perhaps also: 
+           Ex A. store(A,y,z)[x] = t & Phi[A] where x \not\in A, t, y, z, A \not\in y z, t 
            =>
            Ex A, v . (x = y => z = t) & Phi[store(store(A,x,t),y,v)]
 
