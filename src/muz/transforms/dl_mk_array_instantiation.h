@@ -26,10 +26,12 @@ Implementation:
     case described above, we in fact have P(a) transformed into P(i, a[i], a).
 
     1) Dealing with multiple arrays -> Currently, we add one quantifier per array. An improvement of this technique would be to allow
-       the user to chose how many quantifiers per type and how many quantifiers per array.
+       the user to chose how many quantifiers per type and how many quantifiers per array. These options correspond to the parameters
+       fixedpoint.xform.instantiate_arrays.nb_per_type and fixedpoint.xform.instantiate_arrays.nb_per_array.
 
     2) Inforcing the instantiation -> We suggest an option (enforce_instantiation) to enforce this abstraction. This transforms
-       P(a) into P(i, a[i]). This enforces the solver to limit the space search at the cost of imprecise results.
+       P(a) into P(i, a[i]). This enforces the solver to limit the space search at the cost of imprecise results. This option
+       corresponds to fixedpoint.xform.instantiate_arrays.enforce
 
     3) Adding slices in the mix -> We wish to have the possibility to further restrict the search space: we want to smash cells, given a smashing rule.
        For example, in for loops j=0; j<n; j++, it might be relevant to restrict the search space and look for invariants that only depend on whether i,
@@ -38,6 +40,8 @@ Implementation:
        ite(i<j, true, false).
        Given that GetId function, P(a) /\ phi(a, ...) => P'(...) is transformed into 
        (/\_r in read_indices(phi) P(id_r, a[r], a) /\ GetId(r) = id_r) /\ phi(a, ...) => P'(...).
+       Note : when no slicing is done, GetId(i) = i.
+       This option corresponds to fixedpoint.xform.instantiate_arrays.slice_technique
 
     4) Reducing the set of r in read_indices(phi): in fact, we do not need to "instantiate" on all read indices of phi, 
        we can restrict ourselves to those "linked" to a, through equalities and stores.

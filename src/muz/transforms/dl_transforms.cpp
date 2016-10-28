@@ -29,6 +29,7 @@ Revision History:
 #include"dl_mk_array_blast.h"
 #include"dl_mk_karr_invariants.h"
 #include"dl_mk_magic_symbolic.h"
+#include"dl_mk_array_instantiation.h"
 #include"dl_mk_quantifier_abstraction.h"
 #include"dl_mk_quantifier_instantiation.h"
 #include"dl_mk_subsumption_checker.h"
@@ -45,6 +46,10 @@ namespace datalog {
         transf.reset();
         transf.register_plugin(alloc(datalog::mk_coi_filter, ctx));
         transf.register_plugin(alloc(datalog::mk_interp_tail_simplifier, ctx));
+
+        if (ctx.get_params().xform_instantiate_arrays()) {
+            transf.register_plugin(alloc(datalog::mk_array_instantiation, ctx, 38000));
+        }
 
         if (ctx.get_params().xform_quantify_arrays()) {
             transf.register_plugin(alloc(datalog::mk_quantifier_abstraction, ctx, 38000));
