@@ -69,7 +69,15 @@ namespace datalog {
         ast_manager&      m;
         context&          m_ctx;
         array_util   m_a;
+       
+       app_ref get_select(unsigned nb_indices, expr* const* args);
 
+       //Function to return the new predicate and the corresponding map for dynamic programming.
+       app_ref get_new_predicate(const expr_ref_vector& indices, const app_ref& old_predicate);
+
+       
+     protected:
+        virtual expr_ref_vector getId(const expr_ref_vector& select_args, const app_ref& old_pred);
      public:
         mk_array_instantiation(context & ctx, unsigned priority);
         rule_set * operator()(rule_set const & source);
