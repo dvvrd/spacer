@@ -23,11 +23,11 @@ Notes:
 --*/
 
 #include <sstream>
-#include "arith_simplifier_plugin.h"
+#include <algorithm>
+
+#include "ast.h"
 #include "array_decl_plugin.h"
 #include "ast_pp.h"
-#include "basic_simplifier_plugin.h"
-#include "bv_simplifier_plugin.h"
 #include "bool_rewriter.h"
 #include "dl_util.h"
 #include "for_each_expr.h"
