@@ -375,9 +375,13 @@ namespace spacer {
     bool res = false;
     
     expr_ref_vector lemmas (m);
+    expr_ref nlemma (m);
     flatten_and (lemma, lemmas);
     for (unsigned i = 0, sz = lemmas.size(); i < sz; ++i)
-      res |= m_frames.add_lemma (lemmas.get (i), lvl);
+    {
+      normalize (lemmas.get (i), nlemma);
+      res |= m_frames.add_lemma (nlemma, lvl);
+    }
 
     if (res && is_infty_level (lvl)) m_stats.m_num_invariants++;
     
