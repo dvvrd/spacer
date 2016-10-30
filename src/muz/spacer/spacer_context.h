@@ -478,7 +478,7 @@ namespace spacer {
     void set_farkas_generalizer (bool v) {m_use_farkas = v;}
     
     expr* post () const { return m_post.get (); }
-    void set_post (expr* post) { m_post = post; }
+    void set_post (expr* post) { normalize(post, m_post); }
     
     /// indicate that a new post should be set for the node
     void new_post (expr *post) {if (post != m_post) m_new_post = post;}
