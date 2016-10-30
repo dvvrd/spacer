@@ -935,6 +935,9 @@ namespace spacer {
           expr_ref_vector v(out.m());
           flatten_and (out, v);
           std::stable_sort (v.c_ptr(), v.c_ptr () + v.size (), ast_lt_proc());
+
+          simplify_bounds (v);
+          
           out = mk_and (v);
       }
   }
