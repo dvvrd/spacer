@@ -30,7 +30,6 @@ Revision History:
 #include "spacer_farkas_learner.h"
 #include "th_rewriter.h"
 #include "ast_ll_pp.h"
-#include "arith_bounds_tactic.h"
 #include "proof_utils.h"
 #include "reg_decl_plugins.h"
 #include "smt_farkas_util.h"
@@ -53,41 +52,6 @@ namespace spacer {
 
 
     
-
-    //
-    // Perform simple subsumption check of lemmas.
-    //
-    void farkas_learner::simplify_lemmas(expr_ref_vector& lemmas) {
-        ast_manager& m = lemmas.get_manager();
-        goal_ref g(alloc(goal, m, false, false, false));
-        TRACE("farkas_simplify_lemmas",            
-              for (unsigned i = 0; i < lemmas.size(); ++i) {
-                  tout << mk_pp(lemmas[i].get(), m) << "\n";
-              });
-
-        for (unsigned i = 0; i < lemmas.size(); ++i) {
-            g->assert_expr(lemmas[i].get()); 
-        }
-        expr_ref tmp(m);
-        model_converter_ref mc;
-        proof_converter_ref pc;
-        expr_dependency_ref core(m);
-        goal_ref_buffer result;
-        tactic_ref simplifier = mk_arith_bounds_tactic(m);
-        (*simplifier)(g, result, mc, pc, core);
-        lemmas.reset();
-        SASSERT(result.size() == 1);
-        goal* r = result[0];
-        for (unsigned i = 0; i < r->size(); ++i) {
-            lemmas.push_back(r->form(i));
-        }
-        TRACE("farkas_simplify_lemmas", 
-              tout << "simplified:\n";           
-              for (unsigned i = 0; i < lemmas.size(); ++i) {
-                  tout << mk_pp(lemmas[i].get(), m) << "\n";
-              });
-    }
-
 
     void farkas_learner::combine_constraints(unsigned n, app * const * lits, rational const * coeffs, expr_ref& res)
     {
@@ -426,7 +390,7 @@ namespace spacer {
         }
 
         std::for_each(hyprefs.begin(), hyprefs.end(), delete_proc<expr_set>());
-        simplify_lemmas(lemmas);
+        simplify_bounds(lemmas);
     }
 
     void farkas_learner::get_asserted(proof* p, expr_set const& bs, ast_mark& b_closed, obj_hashtable<expr>& lemma_set, expr_ref_vector& lemmas) {

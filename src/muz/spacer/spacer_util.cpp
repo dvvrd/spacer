@@ -55,6 +55,8 @@ Notes:
 #include "old_mev.h"
 #include "qe_mbp.h"
 
+#include "arith_bounds_tactic.h"
+
 namespace spacer {
 
     /////////////////////////
@@ -888,6 +890,30 @@ namespace spacer {
       ipick (formula, res);
   }
 
+  void simplify_bounds(expr_ref_vector& lemmas) {
+      ast_manager& m = lemmas.m();
+      
+      goal_ref g(alloc(goal, m, false, false, false));
+      for (unsigned i = 0; i < lemmas.size(); ++i) {
+          g->assert_expr(lemmas[i].get()); 
+      }
+      
+      expr_ref tmp(m);
+      model_converter_ref mc;
+      proof_converter_ref pc;
+      expr_dependency_ref core(m);
+      goal_ref_buffer result;
+      tactic_ref simplifier = mk_arith_bounds_tactic(m);
+      (*simplifier)(g, result, mc, pc, core);
+      SASSERT(result.size() == 1);
+      goal* r = result[0];
+      
+      lemmas.reset();
+      for (unsigned i = 0; i < r->size(); ++i) {
+          lemmas.push_back(r->form(i));
+      }
+  }
+    
   void normalize (expr *e, expr_ref &out)
   {
       params_ref params;

@@ -45,11 +45,6 @@ public:
     */
     void get_lemmas(proof* root, expr_set const& bs, expr_ref_vector& lemmas);
 
-    /**
-       \brief Simplify lemmas using subsumption.
-     */
-    void simplify_lemmas(expr_ref_vector& lemmas);
-
     void collect_statistics(statistics& st) const {} 
     void reset_statistics () {}
   
