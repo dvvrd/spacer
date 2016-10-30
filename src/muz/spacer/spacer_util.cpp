@@ -887,7 +887,31 @@ namespace spacer {
       implicant_picker ipick (mev);
       ipick (formula, res);
   }
-  
+
+  void normalize (expr *e, expr_ref &out)
+  {
+      params_ref params;
+      // arith_rewriter
+      params.set_bool ("sort_sums", true);
+      params.set_bool ("gcd_rounding", true);
+      params.set_bool ("arith_lhs", true);
+      // poly_rewriter
+      params.set_bool ("som", true);
+      params.set_bool ("flat", true);
+      
+      // apply rewriter
+      th_rewriter rw(out.m(), params);
+      rw (e, out);
+
+      // sort arguments of top-level AND
+      if (out.m().is_and (out))
+      {
+          expr_ref_vector v(out.m());
+          flatten_and (out, v);
+          std::stable_sort (v.c_ptr(), v.c_ptr () + v.size (), ast_lt_proc());
+          out = mk_and (v);
+      }
+  }
 }
 
 template class rewriter_tpl<spacer::ite_hoister_cfg>;
