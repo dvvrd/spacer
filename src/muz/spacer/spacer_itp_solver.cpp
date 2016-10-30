@@ -272,7 +272,7 @@ namespace spacer {
         core.reset ();
         farkas.get_lemmas (pr, B, core);
         elim_proxies (core);
-        farkas.simplify_lemmas (core); // XXX potentially redundant
+        simplify_bounds (core); // XXX potentially redundant
 
         IF_VERBOSE(2,
                    verbose_stream () << "Itp Core:\n"
