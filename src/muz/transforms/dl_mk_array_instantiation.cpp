@@ -40,11 +40,13 @@ namespace datalog {
   
   rule_set * mk_array_instantiation::operator()(rule_set const & source)
   {
-    /*std::cout<<"Array Instantiation called with parameters :"
+    std::cout<<"Array Instantiation called with parameters :"
              <<" enforce="<<m_ctx.get_params().xform_instantiate_arrays_enforce()
              <<" nb_quantifier="<<m_ctx.get_params().xform_instantiate_arrays_nb_quantifier()
              <<" slice_technique="<<m_ctx.get_params().xform_instantiate_arrays_slice_technique()
-             <<"\n";*/
+             <<"\n";
+    std::cout<<"Input rules = \n";
+    source.display(std::cout);
     src_set = &source;
     rule_set * result = alloc(rule_set, m_ctx);
     dst=result;
@@ -55,6 +57,8 @@ namespace datalog {
       rule & r = *source.get_rule(i);
       instantiate_rule(r, *result);
     }
+    std::cout<<"\n\nOutput rules = \n";
+    result->display(std::cout);
     return result;
   }
 
@@ -275,13 +279,15 @@ namespace datalog {
           new_args.push_back(arg_correspondance[i][chosen[i]].get());
       }
       res.push_back(create_pred(old_pred, new_args));
-      unsigned pos=0;
-      while(chosen[pos]+1>=arg_correspondance[pos].size())
+      unsigned pos=-1;
+      do
       {
         pos++;
         if(pos==chosen.size())
+        {
           return res;
-      }
+        }
+      }while(chosen[pos]+1>=arg_correspondance[pos].size());
       chosen[pos]++;
     }
   }
