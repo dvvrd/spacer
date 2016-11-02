@@ -21,6 +21,9 @@ Revision History:
 
 */
 
+#ifndef OBJ_EQUIV_CLASS_H_
+#define OBJ_EQUIV_CLASS_H_
+
 #include "../util/union_find.h"
 
 
@@ -32,17 +35,17 @@ class obj_equiv_class {
     ref_vector<OBJ, Manager> to_obj;
     svector<bool> roots;
     
-    int add_elem_impl(OBJ*o)
+    unsigned add_elem_impl(OBJ*o)
     {
-      int id = to_obj.size();
+      unsigned id = to_obj.size();
       to_int.insert(o, id);
       to_obj.push_back(o);
       roots.push_back(true);
       return id;
     }
-    int add_if_not_there(OBJ*o)
+    unsigned add_if_not_there(OBJ*o)
     {
-      int id;
+      unsigned id;
       if(!to_int.find(o))
       {
           id = add_elem_impl(o);
@@ -68,8 +71,8 @@ class obj_equiv_class {
     void merge(OBJ* a, OBJ* b) {
         unsigned v1 = add_if_not_there(a);
         unsigned v2 = add_if_not_there(b);
-        int tmp1=uf.find(v1);
-        int tmp2=uf.find(v2);
+        unsigned tmp1=uf.find(v1);
+        unsigned tmp2=uf.find(v2);
         uf.merge(tmp1, tmp2);
         
         //We assume the new root is one of the two preceding ones
@@ -92,8 +95,8 @@ class obj_equiv_class {
     
     bool are_equiv(OBJ*a, OBJ*b)
     {
-      int id1 = add_if_not_there(a);
-      int id2 = add_if_not_there(b);
+      unsigned id1 = add_if_not_there(a);
+      unsigned id2 = add_if_not_there(b);
       return uf.find(id1)==uf.find(id2);
     }
 
@@ -129,12 +132,12 @@ class obj_equiv_class {
 
     iterator begin(OBJ*o)
     {
-      int id = add_if_not_there(o);
+      unsigned id = add_if_not_there(o);
       return iterator(*this, id, true);
     }
     iterator end(OBJ*o)
     {
-      int id = add_if_not_there(o);
+      unsigned id = add_if_not_there(o);
       return iterator(*this, id, false);
     }
 
@@ -189,4 +192,6 @@ class obj_equiv_class {
 };
 
 typedef obj_equiv_class<expr, ast_manager> expr_equiv_class;
+
+#endif
 
