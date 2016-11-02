@@ -71,6 +71,7 @@ Notes:
 #include "luby.h"
 
 #include "expr_abstract.h"
+#include "obj_equiv_class.h"
 
 namespace spacer {
     
@@ -1527,7 +1528,29 @@ namespace spacer {
                            m_premises[m_active].pt (), 
                            prev_level (m_parent.level ()),
                            m_parent.depth ());
+ 
+    if(get_context().get_params().xform_transform_eqclass())
+    {
+     expr_ref_vector tmp(m);
+     tmp.push_back(post);
+     expr_equiv_class eq_classes(remove_eq_conds10(tmp));
+     for(expr_equiv_class::equiv_iterator eq_c = eq_classes.begin(); eq_c!=eq_classes.end();++eq_c)
+     {
+      unsigned nb_elem=0;
+      for(expr_equiv_class::iterator a = eq_c.begin(); a!=eq_c.end();++a)
+      {
+        nb_elem++;
+        expr_equiv_class::iterator b(a);
+        for(++b; b!=eq_c.end();++b)
+        {
+          tmp.push_back(m.mk_eq(*a, *b));
+        }
+      }
+     }
+     post=post.get_manager().mk_and(tmp.size(), tmp.c_ptr());
+    }
     n->set_post (post);
+
     IF_VERBOSE (1, verbose_stream ()
                 << "\n\tcreate_child: " << n->pt ().head ()->get_name () 
                 << " (" << n->level () << ", " << n->depth () << ") "
@@ -2019,6 +2042,12 @@ namespace spacer {
               fparams.m_arith_eager_eq_axioms = false;
             }
         }
+
+        if(get_params().xform_transform_eqclass())
+        {
+          m_core_generalizers.push_back (alloc (core_eq_generalizer, *this));
+        }
+
         if (!use_mc && m_params.pdr_use_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_bool_inductive_generalizer, *this, 0));
         }

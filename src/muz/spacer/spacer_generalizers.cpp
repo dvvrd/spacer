@@ -24,6 +24,7 @@ Revision History:
 #include "expr_abstract.h"
 #include "var_subst.h"
 #include "for_each_expr.h"
+#include "obj_equiv_class.h"
 
 namespace spacer {
 
@@ -190,5 +191,27 @@ namespace spacer {
     }
     else
     { TRACE ("core_array_eq", tout << "Not-Inductive!\n";);}
+  }
+
+  void core_eq_generalizer::operator() 
+    (model_node &n, expr_ref_vector& core, unsigned &uses_level)
+  {
+    TRACE ("core_eq", tout << "Transforming equivalence classes\n";);
+    
+    ast_manager &m = m_ctx.get_ast_manager ();
+    expr_equiv_class eq_classes(remove_eq_conds10(core));
+    for(expr_equiv_class::equiv_iterator eq_c = eq_classes.begin(); eq_c!=eq_classes.end();++eq_c)
+    {
+      unsigned nb_elem=0;
+      for(expr_equiv_class::iterator a = eq_c.begin(); a!=eq_c.end();++a)
+      {
+        nb_elem++;
+        expr_equiv_class::iterator b(a);
+        for(++b; b!=eq_c.end();++b)
+        {
+          core.push_back(m.mk_eq(*a, *b));
+        }
+      }
+    }
   }
 };

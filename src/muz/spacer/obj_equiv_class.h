@@ -25,7 +25,7 @@ Revision History:
 #define OBJ_EQUIV_CLASS_H_
 
 #include "../util/union_find.h"
-
+#include "../ast/ast_util.h"
 
 //All functions naturally add their parameters to the union_find class
 template<typename OBJ, typename Manager>
@@ -192,6 +192,42 @@ class obj_equiv_class {
 };
 
 typedef obj_equiv_class<expr, ast_manager> expr_equiv_class;
+
+inline expr_equiv_class remove_eq_conds10(expr_ref_vector& e)
+{
+  ast_manager& m = e.get_manager();
+  arith_util m_a(m);
+  expr_equiv_class eq_classes(m);
+  flatten_and(e);
+  expr_ref_vector res(m);
+  for(unsigned i=0;i<e.size();i++)
+  {
+    expr*e1, *e2;
+    if(m.is_eq(e[i].get(), e1, e2))
+    {
+      if(m_a.is_add(e1) && e2 == m_a.mk_int(0))
+      {
+        app* f = to_app(e1);
+        expr*first=f->get_arg(0);
+        expr*snd=f->get_arg(1);
+        if(m_a.is_mul(snd))
+        {
+          app*mult=to_app(snd);
+          if(m_a.is_minus_one(mult->get_arg(0)))
+          {
+            e1 = first; e2=mult->get_arg(1);
+          }
+        }
+      } 
+      eq_classes.merge(e1, e2);
+    }
+    else
+      res.push_back(e[i].get());
+  }
+  e.reset();
+  e.append(res);
+  return eq_classes;
+}
 
 #endif
 
