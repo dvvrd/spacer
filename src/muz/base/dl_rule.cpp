@@ -368,6 +368,24 @@ namespace datalog {
         }
     }                
 
+
+    expr* do_subs(expr* e, expr* new_val, expr* old_val, ast_manager& m)
+    {
+      if(e==old_val)
+        return new_val;
+      else if(!is_app(e))
+      {
+        return e;
+      }
+      app*f = to_app(e);
+      ptr_vector<expr> n_args;
+      for(unsigned i=0;i<f->get_num_args();i++)
+      {
+        n_args.push_back(do_subs(f->get_arg(i), new_val, old_val, m));
+      }
+      return m.mk_app(f->get_decl(), n_args.size(), n_args.c_ptr());
+    }
+     
     void rule_manager::hoist_compound(unsigned& num_bound, app_ref& fml, app_ref_vector& body) {
 
         expr_ref e(m);
@@ -396,7 +414,12 @@ namespace datalog {
             else {
                 var* v = m.mk_var(num_bound++, m.get_sort(b));
                 m_args.push_back(v);
+                for(unsigned i=0;i<body.size();i++)
+                {
+                  body[i] = to_app(do_subs(body[i].get(), v, b, m));
+                }
                 body.push_back(m.mk_eq(v, b));
+                
             }
         }
         fml = m.mk_app(fml->get_decl(), m_args.size(), m_args.c_ptr());
