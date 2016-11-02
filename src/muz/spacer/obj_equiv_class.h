@@ -46,7 +46,7 @@ class obj_equiv_class {
     unsigned add_if_not_there(OBJ*o)
     {
       unsigned id;
-      if(!to_int.find(o))
+      if(!to_int.find(o, id))
       {
           id = add_elem_impl(o);
       }
