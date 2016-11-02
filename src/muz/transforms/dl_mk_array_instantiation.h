@@ -102,7 +102,7 @@ namespace datalog {
        expr_ref create_head(app* old_head);//Creates the new head
        
        /*Given the old predicate, and the new arguments for the new predicate, returns the new setId arguments.
-         The default getId(P(x, y, a, b), (x, y, a[i], a[j], a, b[k], b[l], b)) (nb_quantifier=2, enforce=false)
+         By default getId(P(x, y, a, b), (x, y, a[i], a[j], a, b[k], b[l], b)) (nb_quantifier=2, enforce=false)
          returns (i,j,k,l)
          So that the final created predicate is P!inst(x, y, a[i], a[j], a, b[k], b[l], b, i, j, k, l)
        */
