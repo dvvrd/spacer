@@ -48,7 +48,7 @@ namespace datalog {
         transf.register_plugin(alloc(datalog::mk_interp_tail_simplifier, ctx));
 
         if (ctx.get_params().xform_instantiate_arrays()) {
-            transf.register_plugin(alloc(datalog::mk_array_instantiation, ctx, 38000));
+            transf.register_plugin(alloc(datalog::mk_array_instantiation, ctx, 34999));
         }
 
         if (ctx.get_params().xform_quantify_arrays()) {
