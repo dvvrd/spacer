@@ -47,11 +47,6 @@ namespace spacer {
       virtual void reset_statistics () {m_st.reset ();}
     };
 
-    template <typename T>
-    class r_map : public map<rational, T, rational::hash_proc, rational::eq_proc> {
-    };
-
-  
   class core_array_eq_generalizer : public core_generalizer 
   {
   public:
