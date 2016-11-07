@@ -574,8 +574,8 @@ namespace datalog {
             }
             for(expr_equiv_class::equiv_iterator c_eq = array_eq_classes.begin(); c_eq != array_eq_classes.end();++c_eq)
             {
-              expr* representative = *c_eq.begin();
-              for(expr_equiv_class::iterator it = c_eq.begin(); it!=c_eq.end(); ++it)
+              expr* representative = *(*c_eq).begin();
+              for(expr_equiv_class::iterator it = (*c_eq).begin(); it!=(*c_eq).end(); ++it)
               {
                 if(!is_var(*it))
                 {
@@ -583,14 +583,14 @@ namespace datalog {
                  break;
                 }
               }
-              for(expr_equiv_class::iterator it = c_eq.begin(); it!=c_eq.end(); ++it)
+              for(expr_equiv_class::iterator it = (*c_eq).begin(); it!=(*c_eq).end(); ++it)
               {
                 for(unsigned i=0;i<new_itail.size();i++)
                   new_itail[i] = replace(new_itail[i].get(), representative, *it, m);
               }
-              for(expr_equiv_class::iterator it = c_eq.begin(); it!=c_eq.end(); ++it)
+              for(expr_equiv_class::iterator it = (*c_eq).begin(); it!=(*c_eq).end(); ++it)
               {
-                new_itail.push_back(m.mk_eq(representative, *it));
+                new_itail.push_back(m.mk_eq(*it, representative));
               }
             }
             itail = m.mk_and(new_itail.size(), new_itail.c_ptr());

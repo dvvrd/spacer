@@ -73,6 +73,45 @@ Notes:
 #include "expr_abstract.h"
 #include "obj_equiv_class.h"
 
+namespace
+{
+  inline expr_equiv_class remove_eq_conds_tmp(expr_ref_vector& e)
+  {
+    ast_manager& m = e.get_manager();
+    arith_util m_a(m);
+    expr_equiv_class eq_classes(m);
+    flatten_and(e);
+    expr_ref_vector res(m);
+    for(unsigned i=0;i<e.size();i++)
+    {
+      expr*e1, *e2;
+      if(m.is_eq(e[i].get(), e1, e2))	
+      {
+        if(m_a.is_add(e1) && e2 == m_a.mk_int(0))
+        {
+          app* f = to_app(e1);
+          expr*first=f->get_arg(0);
+          expr*snd=f->get_arg(1);
+          if(m_a.is_mul(snd))
+          {
+            app*mult=to_app(snd);
+            if(m_a.is_minus_one(mult->get_arg(0)))
+            {
+              e1 = first; e2=mult->get_arg(1);
+            }
+          }
+        } 
+        eq_classes.merge(e1, e2);
+      }
+      else
+        res.push_back(e[i].get());
+    }
+    e.reset();
+    e.append(res);
+    return eq_classes;
+  }
+}
+
 namespace spacer {
     
     // ----------------
@@ -1533,15 +1572,15 @@ namespace spacer {
     {
      expr_ref_vector tmp(m);
      tmp.push_back(post);
-     expr_equiv_class eq_classes(remove_eq_conds10(tmp));
+     expr_equiv_class eq_classes(remove_eq_conds_tmp(tmp));
      for(expr_equiv_class::equiv_iterator eq_c = eq_classes.begin(); eq_c!=eq_classes.end();++eq_c)
      {
       unsigned nb_elem=0;
-      for(expr_equiv_class::iterator a = eq_c.begin(); a!=eq_c.end();++a)
-      {
+      for(expr_equiv_class::iterator a = (*eq_c).begin(); a!=(*eq_c).end();++a)
+      { 
         nb_elem++;
         expr_equiv_class::iterator b(a);
-        for(++b; b!=eq_c.end();++b)
+        for(++b; b!=(*eq_c).end();++b)
         {
           tmp.push_back(m.mk_eq(*a, *b));
         }

@@ -33,14 +33,12 @@ class obj_equiv_class {
     basic_union_find uf;
     obj_map<OBJ, unsigned> to_int;
     ref_vector<OBJ, Manager> to_obj;
-    svector<bool> roots;
     
     unsigned add_elem_impl(OBJ*o)
     {
       unsigned id = to_obj.size();
       to_int.insert(o, id);
       to_obj.push_back(o);
-      roots.push_back(true);
       return id;
     }
     unsigned add_if_not_there(OBJ*o)
@@ -74,23 +72,12 @@ class obj_equiv_class {
         unsigned tmp1=uf.find(v1);
         unsigned tmp2=uf.find(v2);
         uf.merge(tmp1, tmp2);
-        
-        //We assume the new root is one of the two preceding ones
-        if(!uf.is_root(tmp1))
-        {
-          roots[tmp1] = false;
-        }
-        else
-        {
-          roots[tmp2] = false;
-        }
     }
     
     void reset() {
         uf.reset();
         to_int.reset();
         to_obj.reset();
-        roots.reset();
     }
     
     bool are_equiv(OBJ*a, OBJ*b)
@@ -141,6 +128,17 @@ class obj_equiv_class {
       return iterator(*this, id, false);
     }
 
+    class eq_class
+    {
+      private :
+        iterator beg;
+        iterator e;
+      public :
+        eq_class(const iterator& a, const iterator& b) : beg(a), e(b) {}
+        iterator begin() {return beg;}
+        iterator end() {return e;}
+    };
+
     class equiv_iterator
     {
       friend class obj_equiv_class;
@@ -149,25 +147,18 @@ class obj_equiv_class {
         unsigned rootnb;
         equiv_iterator(const obj_equiv_class& uf, unsigned nb) : ouf(uf), rootnb(nb)
         {
-          while(rootnb!=ouf.roots.size() && ouf.roots[rootnb]!=true)
+          while(rootnb!=ouf.to_obj.size() && ouf.uf.is_root(rootnb)!=true)
             rootnb++;
         }
       public :
-        iterator begin()
-        {
-          return iterator(ouf, rootnb, true);
-        }
-        iterator end()
-        {
-          return iterator(ouf, rootnb, false);
-        }
+        eq_class operator*() {return eq_class(iterator(ouf, rootnb, true), iterator(ouf, rootnb, false));}
         equiv_iterator& operator++()
         {
           do
           {
             rootnb++;
           }
-          while(rootnb!=ouf.roots.size() && ouf.roots[rootnb]!=true);
+          while(rootnb!=ouf.to_obj.size() && ouf.uf.is_root(rootnb)!=true);
           return *this;
         }
         bool operator==(const equiv_iterator& o)
@@ -187,47 +178,12 @@ class obj_equiv_class {
     }
     equiv_iterator end()
     {
-      return equiv_iterator(*this, roots.size());
+      return equiv_iterator(*this, to_obj.size());
     }
 };
 
 typedef obj_equiv_class<expr, ast_manager> expr_equiv_class;
 
-inline expr_equiv_class remove_eq_conds10(expr_ref_vector& e)
-{
-  ast_manager& m = e.get_manager();
-  arith_util m_a(m);
-  expr_equiv_class eq_classes(m);
-  flatten_and(e);
-  expr_ref_vector res(m);
-  for(unsigned i=0;i<e.size();i++)
-  {
-    expr*e1, *e2;
-    if(m.is_eq(e[i].get(), e1, e2))
-    {
-      if(m_a.is_add(e1) && e2 == m_a.mk_int(0))
-      {
-        app* f = to_app(e1);
-        expr*first=f->get_arg(0);
-        expr*snd=f->get_arg(1);
-        if(m_a.is_mul(snd))
-        {
-          app*mult=to_app(snd);
-          if(m_a.is_minus_one(mult->get_arg(0)))
-          {
-            e1 = first; e2=mult->get_arg(1);
-          }
-        }
-      } 
-      eq_classes.merge(e1, e2);
-    }
-    else
-      res.push_back(e[i].get());
-  }
-  e.reset();
-  e.append(res);
-  return eq_classes;
-}
 
 #endif
 
