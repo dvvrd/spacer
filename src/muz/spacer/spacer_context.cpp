@@ -1575,15 +1575,19 @@ namespace spacer {
      expr_equiv_class eq_classes(remove_eq_conds_tmp(tmp));
      for(expr_equiv_class::equiv_iterator eq_c = eq_classes.begin(); eq_c!=eq_classes.end();++eq_c)
      {
-      unsigned nb_elem=0;
-      for(expr_equiv_class::iterator a = (*eq_c).begin(); a!=(*eq_c).end();++a)
-      { 
-        nb_elem++;
-        expr_equiv_class::iterator b(a);
-        for(++b; b!=(*eq_c).end();++b)
+      expr* representative = *(*eq_c).begin();
+      for(expr_equiv_class::iterator it = (*eq_c).begin(); it!=(*eq_c).end(); ++it)
+      {
+        if(!m.is_value(*it))
         {
-          tmp.push_back(m.mk_eq(*a, *b));
+          representative = *it;
+          break;
         }
+      }
+      for(expr_equiv_class::iterator it = (*eq_c).begin(); it!=(*eq_c).end(); ++it)
+      {
+        if(*it != representative)
+          tmp.push_back(m.mk_eq(*it, representative));
       }
      }
      post=post.get_manager().mk_and(tmp.size(), tmp.c_ptr());
