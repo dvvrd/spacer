@@ -123,6 +123,9 @@ namespace datalog {
             rules.replace_rules(*new_rules);
         }
         dealloc(new_rules);
+        if(!modified)
+          std::cout<<"Rules after all transformations : \n";
+        rules.display(std::cout);
         return modified;
     }
 
