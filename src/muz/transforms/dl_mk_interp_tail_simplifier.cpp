@@ -26,7 +26,7 @@ Revision History:
 #include"dl_mk_rule_inliner.h"
 #include"dl_mk_interp_tail_simplifier.h"
 #include"ast_util.h"
-#include "../spacer/obj_equiv_class.h"
+
 #include "fixedpoint_params.hpp"
 
 namespace datalog {
@@ -495,25 +495,6 @@ namespace datalog {
         return true;
     }
 
-
-    expr* replace(expr* e, expr* new_val, expr* old_val, ast_manager& m)
-    {
-      if(e==old_val)
-        return new_val;
-      else if(!is_app(e))
-      {
-        return e;
-      }
-      app*f = to_app(e);
-      ptr_vector<expr> n_args;
-      for(unsigned i=0;i<f->get_num_args();i++)
-      {
-        n_args.push_back(replace(f->get_arg(i), new_val, old_val, m));
-      }
-      return m.mk_app(f->get_decl(), n_args.size(), n_args.c_ptr());
-    }
-
-
     bool mk_interp_tail_simplifier::transform_rule(rule * r0, rule_ref & res)
     {
         rule_manager& rm = m_context.get_rule_manager();
@@ -555,45 +536,7 @@ namespace datalog {
                 m_itail_members.push_back(r->get_tail(i));
                 SASSERT(!r->is_neg_tail(i));
             }
-            //Rewrite array equalities
-            expr_equiv_class array_eq_classes(m);
-            flatten_and(m_itail_members);
-            expr_ref_vector new_itail(m);
-            array_util   m_a(m);
-            for(unsigned i=0;i<m_itail_members.size();i++)
-            {
-              expr* e1, *e2;
-              if(m.is_eq(m_itail_members[i].get(), e1, e2) && m_a.is_array(get_sort(e1)))
-              {
-                array_eq_classes.merge(e1, e2);
-              }
-              else
-              {
-                new_itail.push_back(m_itail_members[i].get());
-              }
-            }
-            for(expr_equiv_class::equiv_iterator c_eq = array_eq_classes.begin(); c_eq != array_eq_classes.end();++c_eq)
-            {
-              expr* representative = *(*c_eq).begin();
-              for(expr_equiv_class::iterator it = (*c_eq).begin(); it!=(*c_eq).end(); ++it)
-              {
-                if(!is_var(*it))
-                {
-                 representative = *it;
-                 break;
-                }
-              }
-              for(expr_equiv_class::iterator it = (*c_eq).begin(); it!=(*c_eq).end(); ++it)
-              {
-                for(unsigned i=0;i<new_itail.size();i++)
-                  new_itail[i] = replace(new_itail[i].get(), representative, *it, m);
-              }
-              for(expr_equiv_class::iterator it = (*c_eq).begin(); it!=(*c_eq).end(); ++it)
-              {
-                new_itail.push_back(m.mk_eq(*it, representative));
-              }
-            }
-            itail = m.mk_and(new_itail.size(), new_itail.c_ptr());
+            itail = m.mk_and(m_itail_members.size(), m_itail_members.c_ptr());
             modified = true;
         }
 
