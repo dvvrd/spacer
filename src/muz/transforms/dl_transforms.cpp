@@ -35,6 +35,7 @@ Revision History:
 #include"dl_mk_subsumption_checker.h"
 #include"dl_mk_scale.h"
 #include"fixedpoint_params.hpp"
+#include "dl_mk_array_eq_rewrite.h"
 
 namespace datalog {
 
@@ -50,6 +51,8 @@ namespace datalog {
         if (ctx.get_params().xform_instantiate_arrays()) {
             transf.register_plugin(alloc(datalog::mk_array_instantiation, ctx, 34999));
         }
+
+        transf.register_plugin(alloc(datalog::mk_array_eq_rewrite, ctx, 34998));
 
         if (ctx.get_params().xform_quantify_arrays()) {
             transf.register_plugin(alloc(datalog::mk_quantifier_abstraction, ctx, 38000));
