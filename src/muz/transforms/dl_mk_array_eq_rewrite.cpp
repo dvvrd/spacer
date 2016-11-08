@@ -102,8 +102,18 @@ namespace datalog {
         new_tail.push_back(m.mk_eq(*it, representative));
       }
     }
+    params_ref select_over_store;
+    select_over_store.set_bool("expand_select_store", true);
+    th_rewriter t(m, select_over_store);
+    expr_ref_vector res_conjs(m);
+    for(unsigned i=0;i<new_tail.size();i++)
+    {
+      expr_ref tmp(m);
+      t(new_tail[i].get(), tmp);
+      res_conjs.push_back(tmp);
+    }
     proof_ref pr(m);
-    src_manager->mk_rule(m.mk_implies(m.mk_and(new_tail.size(), new_tail.c_ptr()), r.get_head()), pr, dest, r.name());
+    src_manager->mk_rule(m.mk_implies(m.mk_and(res_conjs.size(), res_conjs.c_ptr()), r.get_head()), pr, dest, r.name());
   }
   
   expr* mk_array_eq_rewrite::replace(expr* e, expr* new_val, expr* old_val)
