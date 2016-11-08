@@ -34,7 +34,8 @@ namespace datalog {
         m(ctx.get_manager()),
         m_ctx(ctx),
         m_a(m),
-        eq_classes(m)
+        eq_classes(m),
+        ownership(m)
   {
   }
   
@@ -68,7 +69,8 @@ namespace datalog {
     selects.reset();
     eq_classes.reset();
     cnt = src_manager->get_counter().get_max_rule_var(r)+1;
-
+    done_selects.reset();
+    ownership.reset();
 
     expr_ref_vector phi(m);
     expr_ref_vector preds(m);
@@ -95,6 +97,12 @@ namespace datalog {
       new_tail.append(instantiate_pred(to_app(preds[i].get())));
     }
     new_tail.append(phi);
+    for(obj_map<expr, var*>::iterator it = done_selects.begin(); it!=done_selects.end(); ++it)
+    {
+      expr_ref tmp(m);
+      tmp = &it->get_key();
+      new_tail.push_back(m.mk_eq(it->get_value(), tmp));
+    }
     proof_ref pr(m);
     src_manager->mk_rule(m.mk_implies(m.mk_and(new_tail.size(), new_tail.c_ptr()), new_head), pr, dest, r.name());
   }
@@ -186,6 +194,13 @@ namespace datalog {
     expr_ref_vector new_args(m);
     new_args.append(n_args);
     new_args.append(getId(old_pred, n_args));
+    for(unsigned i=0;i<new_args.size();i++)
+    {
+      if(m_a.is_select(new_args[i].get()))
+      {
+        new_args[i] = mk_select_var(new_args[i].get());
+      } 
+    }
     sort_ref_vector new_sorts(m);
     for(unsigned i=0;i<new_args.size();i++)
       new_sorts.push_back(get_sort(new_args[i].get()));
@@ -198,6 +213,20 @@ namespace datalog {
     res=m.mk_app(fun_decl,new_args.size(), new_args.c_ptr());
     return res;
   }
+
+  var * mk_array_instantiation::mk_select_var(expr* select)
+  {
+    var*result;
+    if(!done_selects.find(select, result))
+    {
+      ownership.push_back(select);
+      result = m.mk_var(cnt, get_sort(select));
+      cnt++;
+      done_selects.insert(select, result);
+    }
+    return result;
+  }
+
   expr_ref mk_array_instantiation::rewrite_select(expr*array, expr*select)
   {
     app*s = to_app(select);

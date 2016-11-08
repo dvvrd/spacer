@@ -91,6 +91,8 @@ namespace datalog {
        obj_map<expr, ptr_vector<expr> > selects;
        expr_equiv_class eq_classes;
        unsigned cnt;//Index for new variables
+       obj_map<expr, var*> done_selects;
+       expr_ref_vector ownership;
        
        //Helper functions
        void instantiate_rule(const rule& r, rule_set & dest);//Instantiates the rule
@@ -100,7 +102,8 @@ namespace datalog {
        expr_ref_vector instantiate_pred(app*old_pred);//Returns all the instantiation of a given predicate
        expr_ref create_pred(app*old_pred, expr_ref_vector& new_args);//Creates a predicate
        expr_ref create_head(app* old_head);//Creates the new head
-       
+       var * mk_select_var(expr* select);
+
        /*Given the old predicate, and the new arguments for the new predicate, returns the new setId arguments.
          By default getId(P(x, y, a, b), (x, y, a[i], a[j], a, b[k], b[l], b)) (nb_quantifier=2, enforce=false)
          returns (i,j,k,l)
