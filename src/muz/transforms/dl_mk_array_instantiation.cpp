@@ -273,13 +273,13 @@ namespace datalog {
     
     unsigned nb_old_args=old_pred->get_num_args();
     //Stores, for each old position, the list of a new possible arguments
-    svector<expr_ref_vector> arg_correspondance;
+    vector<expr_ref_vector> arg_correspondance;
     for(unsigned i=0;i<nb_old_args;i++)
     {
-      expr*arg=old_pred->get_arg(i);
+      expr_ref arg(old_pred->get_arg(i), m);
       if(m_a.is_array(get_sort(arg)))
       {
-        svector<expr_ref_vector> arg_possibilities(m_ctx.get_params().xform_instantiate_arrays_nb_quantifier(), retrieve_all_selects(arg));
+        vector<expr_ref_vector> arg_possibilities(m_ctx.get_params().xform_instantiate_arrays_nb_quantifier(), retrieve_all_selects(arg));
         arg_correspondance.append(arg_possibilities);
         if(!m_ctx.get_params().xform_instantiate_arrays_enforce())
         {
