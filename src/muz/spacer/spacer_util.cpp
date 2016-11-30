@@ -837,8 +837,12 @@ namespace spacer {
                 } else if (m.is_false(v)) 
                     m_todo.append (a->get_num_args(), a->get_args());
             }
-            else
+            else if (m.is_true (a) || m.is_false (a)) { /* nothing */ }
+            else {
+                verbose_stream () << "Unexpected expression: "
+                                  << mk_pp(a, m) << "\n";
                 UNREACHABLE();
+            }
         }
         
         void pick_literals (expr *e, expr_ref_vector &out) {
