@@ -2018,6 +2018,7 @@ namespace spacer {
               fparams.m_arith_propagate_eqs = false;
               fparams.m_arith_eager_eq_axioms = false;
             }
+            fparams.m_random_seed = m_params.spacer_random_seed ();
         }
         if (!use_mc && m_params.pdr_use_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_bool_inductive_generalizer, *this, 0));

@@ -173,8 +173,8 @@ def_module_params('fixedpoint',
                           ('spacer.eq_prop', BOOL, True, "Enable equality and bound propagation in arithmetic"),
                           ('spacer.weak_abs', BOOL, True, "Weak abstraction"),
                           ('spacer.restarts', BOOL, False, "Enable reseting obligation queue"),
-                          ('spacer.restart_initial_threshold', UINT, 10, "Intial threshold for restarts")
-                          
+                          ('spacer.restart_initial_threshold', UINT, 10, "Intial threshold for restarts"),
+                          ('spacer.random_seed', UINT, 0, "Random seed to be used by SMT solver"),
                           ))
 
 
