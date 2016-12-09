@@ -390,6 +390,20 @@ namespace spacer {
             m_context.assert_expr (f);
         }
     }
+    void virtual_solver::refresh ()
+    {
+        SASSERT (!m_pushed);
+        m_head = 0;
+    }
+
+    void virtual_solver::reset ()
+    {
+        SASSERT (!m_pushed);
+        m_head = 0;
+        m_assertions.reset ();
+        m_factory.refresh ();
+    }
+    
     void virtual_solver::get_labels(svector<symbol> &r)
     {
         r.reset();
@@ -475,6 +489,13 @@ namespace spacer {
         m_proof_watch.reset ();
     }
   
+    void virtual_solver_factory::refresh ()
+    {
+        m_context.reset ();
+        for (unsigned i = 0, e = m_solvers.size (); i < e; ++i)
+            m_solvers [i]->refresh ();
+    }
+    
     virtual_solver_factory::~virtual_solver_factory ()
     {
         for (unsigned i = 0, e = m_solvers.size (); i < e; ++i)
