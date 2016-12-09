@@ -134,8 +134,8 @@ namespace spacer {
         smt_params  &m_fparams;
         ast_manager &m;
         smt::kernel m_context;
-        /// number of solvers created by this factory so-far
-        unsigned m_num_solvers;
+        /// solvers managed by this factory
+        ptr_vector<virtual_solver> m_solvers;
     
         struct stats {
             unsigned m_num_smt_checks;
@@ -152,14 +152,10 @@ namespace spacer {
     
     public:
         virtual_solver_factory (ast_manager &mgr, smt_params &fparams);
+        virtual ~virtual_solver_factory ();
         virtual_solver* mk_solver ();
         void collect_statistics (statistics &st) const;
         void reset_statistics ();
-        void reset () 
-        {
-            m_context.reset ();
-            m_num_solvers = 0;
-        }
         void updt_params(params_ref const &p) { m_fparams.updt_params(p); }
         void collect_param_descrs(param_descrs &r) { /* empty */ }
         void set_produce_models (bool f) { m_fparams.m_model = f; }

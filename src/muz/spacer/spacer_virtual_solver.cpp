@@ -441,7 +441,7 @@ namespace spacer {
     
     
     virtual_solver_factory::virtual_solver_factory (ast_manager &mgr, smt_params &fparams) :
-        m_fparams (fparams), m(mgr), m_context (m, m_fparams), m_num_solvers(0)
+        m_fparams (fparams), m(mgr), m_context (m, m_fparams)
     {
         m_stats.reset ();
     }
@@ -449,11 +449,12 @@ namespace spacer {
     virtual_solver* virtual_solver_factory::mk_solver ()
     {
         std::stringstream name;
-        name << "vsolver#" << m_num_solvers++;
+        name << "vsolver#" << m_solvers.size ();
         app_ref pred(m);
         pred = m.mk_const (symbol (name.str ().c_str ()), m.mk_bool_sort ());
         SASSERT (m_context.get_scope_level () == 0);
-        return alloc (virtual_solver, *this, m_context, pred);
+        m_solvers.push_back (alloc (virtual_solver, *this, m_context, pred));
+        return m_solvers.back ();
     }
 
     void virtual_solver_factory::collect_statistics (statistics &st) const
@@ -474,7 +475,11 @@ namespace spacer {
         m_proof_watch.reset ();
     }
   
-  
+    virtual_solver_factory::~virtual_solver_factory ()
+    {
+        for (unsigned i = 0, e = m_solvers.size (); i < e; ++i)
+            dealloc (m_solvers [i]);
+    }
 
 
   
