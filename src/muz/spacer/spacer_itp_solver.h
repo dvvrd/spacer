@@ -58,6 +58,8 @@ namespace spacer {
 
             bool is_proxy (app *k, app_ref &v);
             app* mk_proxy (expr *v);
+            void reset ();
+            bool is_proxy_def (expr *v);
       
         };
     
@@ -160,6 +162,7 @@ namespace spacer {
         {m_solver.get_labels (r);}
         virtual ast_manager &get_manager () {return m;}
 
+        virtual void refresh ();
     
         class scoped_mk_proxy {
             itp_solver &m_s;
