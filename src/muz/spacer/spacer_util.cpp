@@ -466,7 +466,8 @@ namespace spacer {
      * then, MBP for Booleans (substitute), reals (based on LW), ints (based on Cooper), and arrays
      */
     void qe_project (ast_manager& m, app_ref_vector& vars, expr_ref& fml, 
-                     const model_ref& M, bool reduce_all_selects, bool use_native_mbp) {
+                     const model_ref& M, bool reduce_all_selects, bool use_native_mbp,
+                     bool dont_sub) {
         th_rewriter rw (m);
         TRACE ("spacer_mbp",
                 tout << "Before projection:\n";
@@ -598,7 +599,7 @@ namespace spacer {
         }
 
         // substitute any remaining arith vars
-        if (!arith_vars.empty ()) {
+        if (!dont_sub && !arith_vars.empty ()) {
             subst_vars (m, arith_vars, M.get(), fml);
             TRACE ("spacer_mbp",
                     tout << "After substituting remaining arith vars:\n";
