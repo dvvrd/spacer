@@ -175,6 +175,7 @@ def_module_params('fixedpoint',
                           ('spacer.restarts', BOOL, False, "Enable reseting obligation queue"),
                           ('spacer.restart_initial_threshold', UINT, 10, "Intial threshold for restarts"),
                           ('spacer.random_seed', UINT, 0, "Random seed to be used by SMT solver"),
+                          ('spacer.ground_cti', BOOL, True, "Require CTI to be ground"),
                           ))
 
 

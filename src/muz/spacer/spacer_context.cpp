@@ -1467,6 +1467,7 @@ namespace spacer {
     app_ref_vector vars (m);
     
     bool use_native_mbp = get_context ().use_native_mbp ();
+    bool ground = get_context ().use_ground_cti ();
     // -- find first may premise
     while (m_active < m_premises.size () && m_premises[m_active].is_must ())
     {
@@ -1486,7 +1487,7 @@ namespace spacer {
       timeit _timer1 (is_trace_enabled("spacer_timeit"), 
                       "create_next_child::qproject1", 
                       verbose_stream ());
-      qe_project (m, vars, m_trans, mev.get_model (), true, use_native_mbp);
+      qe_project (m, vars, m_trans, mev.get_model (), true, use_native_mbp, !ground);
       //qe::reduce_array_selects (*mev.get_model (), m_trans);
     }
     
@@ -1514,7 +1515,7 @@ namespace spacer {
       timeit _timer2 (is_trace_enabled("spacer_timeit"),
                       "create_next_child::qproject2", 
                       verbose_stream ());
-      qe_project (m, vars, post, mev.get_model (), true, use_native_mbp);
+      qe_project (m, vars, post, mev.get_model (), true, use_native_mbp, !ground);
       //qe::reduce_array_selects (*mev.get_model (), post);
     }
     
@@ -1542,6 +1543,7 @@ namespace spacer {
     if (m_active + 1 >= m_premises.size ()) return NULL;
     
     bool use_native_mbp = get_context ().use_native_mbp ();
+    bool ground = get_context ().use_ground_cti ();
     
     // update the summary of the active node to some must summary
     
@@ -1606,7 +1608,8 @@ namespace spacer {
         vars.push_back (m.mk_const (pm.o2n (pt.sig (i), 0)));
       
       if (!vars.empty ())
-        qe_project (m, vars, m_trans, mev.get_model (), true, use_native_mbp);
+          qe_project (m, vars, m_trans, mev.get_model (), true, use_native_mbp,
+                      !ground);
     }
     
     
@@ -1673,6 +1676,7 @@ namespace spacer {
         m_inductive_lvl(0),
         m_expanded_lvl(0),
         m_use_native_mbp(params.spacer_native_mbp ()),
+        m_ground_cti (params.spacer_ground_cti ()),
         m_weak_abs(params.spacer_weak_abs()),
         m_use_restarts(params.spacer_restarts()),
         m_restart_initial_threshold(params.spacer_restart_initial_threshold())
@@ -3082,7 +3086,8 @@ namespace spacer {
         vars.append(aux_vars.size(), aux_vars.c_ptr());
 
         expr_ref phi1 = m_pm.mk_and (Phi);
-        qe_project (m, vars, phi1, mev.get_model (), true, m_use_native_mbp);
+        qe_project (m, vars, phi1, mev.get_model (), true,
+                    m_use_native_mbp, !m_ground_cti);
         //qe::reduce_array_selects (*mev.get_model (), phi1);
         SASSERT (vars.empty ());
 
