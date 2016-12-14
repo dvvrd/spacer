@@ -948,6 +948,36 @@ namespace spacer {
           out = mk_and (v);
       }
   }
+
+    class ground
+    {
+        ast_manager &m;
+        expr_ref_vector m_ground;
+        var_subst m_var_subst;
+
+    public:
+        ground (ast_manager &manager) : m (manager), m_ground (m), m_var_subst (m) {}
+        void operator() (expr *e, expr_ref &out)
+        {
+            expr_free_vars fv;
+            fv (e);
+            if (m_ground.size () < fv.size ())
+                m_ground.resize (fv.size ());
+            for (unsigned i = 0; i < fv.size (); ++i)
+                {
+                    SASSERT (fv[i]);
+                    m_ground [i] = m.mk_fresh_const ("sk", fv [i]);
+                }
+            m_var_subst (e, m_ground.size (), m_ground.c_ptr (), out);
+            m_ground.reset ();
+        }
+    };
+
+    void ground_expr (expr *e, expr_ref &out)
+    {
+        ground gr (out.get_manager ());
+        gr (e, out);
+    }
 }
 
 template class rewriter_tpl<spacer::ite_hoister_cfg>;
