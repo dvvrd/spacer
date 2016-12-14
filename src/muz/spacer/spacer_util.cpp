@@ -949,34 +949,20 @@ namespace spacer {
       }
   }
 
-    class ground
+    void ground_expr (expr *e, expr_ref &out, expr_ref_vector &vars)
     {
-        ast_manager &m;
-        expr_ref_vector m_ground;
-        var_subst m_var_subst;
-
-    public:
-        ground (ast_manager &manager) : m (manager), m_ground (m), m_var_subst (m) {}
-        void operator() (expr *e, expr_ref &out)
-        {
-            expr_free_vars fv;
-            fv (e);
-            if (m_ground.size () < fv.size ())
-                m_ground.resize (fv.size ());
-            for (unsigned i = 0; i < fv.size (); ++i)
-                {
-                    SASSERT (fv[i]);
-                    m_ground [i] = m.mk_fresh_const ("sk", fv [i]);
-                }
-            m_var_subst (e, m_ground.size (), m_ground.c_ptr (), out);
-            m_ground.reset ();
-        }
-    };
-
-    void ground_expr (expr *e, expr_ref &out)
-    {
-        ground gr (out.get_manager ());
-        gr (e, out);
+         expr_free_vars fv;
+         ast_manager &m = out.get_manager ();
+         fv (e);
+         if (vars.size () < fv.size ())
+             vars.resize (fv.size ());
+         for (unsigned i = 0; i < fv.size (); ++i)
+             {
+                 SASSERT (fv[i]);
+                 vars [i] = m.mk_fresh_const ("sk", fv [i]);
+             }
+         var_subst vs(m);
+         vs (e, vars.size (), vars.c_ptr (), out);
     }
 }
 
