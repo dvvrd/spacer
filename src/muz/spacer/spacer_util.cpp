@@ -618,6 +618,8 @@ namespace spacer {
         );
 
         vars.reset ();
+        if (dont_sub && !arith_vars.empty ())
+            vars.append (arith_vars);
     }
   
   
