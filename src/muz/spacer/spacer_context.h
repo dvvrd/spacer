@@ -439,6 +439,8 @@ namespace spacer {
     
     ptr_vector<model_node>  m_kids;
 
+    app_ref_vector         m_vars;  
+
   public:
     model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
       m_ref_count (0),
@@ -446,7 +448,8 @@ namespace spacer {
       m_post (m_pt.get_ast_manager ()), 
       m_new_post (m_pt.get_ast_manager ()),
       m_level (level), m_depth (depth),
-      m_open (true), m_use_farkas (true), m_weakness(0)
+      m_open (true), m_use_farkas (true), m_weakness(0),
+      m_vars (m_pt.get_ast_manager ())
     {if (m_parent) m_parent->add_child (*this);}
     
     ~model_node() {if (m_parent) m_parent->erase_child (*this);}
@@ -479,6 +482,11 @@ namespace spacer {
     
     expr* post () const { return m_post.get (); }
     void set_post (expr* post) { normalize(post, m_post); }
+      
+    void set_post (expr *post, app_ref_vector &vars)
+    { set_post (post); m_vars.append (vars);}
+    app_ref_vector &get_vars () {return m_vars;}      
+
     
     /// indicate that a new post should be set for the node
     void new_post (expr *post) {if (post != m_post) m_new_post = post;}
@@ -526,6 +534,8 @@ namespace spacer {
       --m_ref_count;
       if (m_ref_count == 0) dealloc (this);
     }
+      
+    bool is_ground () { return m_vars.empty (); }  
     
     
   };

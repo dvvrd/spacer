@@ -147,9 +147,9 @@ namespace spacer {
   void compute_implicant_literals (model_evaluator_util &mev, 
                                    expr_ref_vector &formula, expr_ref_vector &res);
   void simplify_bounds (expr_ref_vector &lemmas);
-    void normalize(expr *e, expr_ref &out);
-    /** ground expression by replacing all free variables by skolem constants */
-    void ground_expr (expr *, expr_ref &out);
+  void normalize(expr *e, expr_ref &out);
+  /** ground expression by replacing all free variables by skolem constants */
+  void ground_expr (expr *e, expr_ref &out, expr_ref_vector &vars);
 }
 
 #endif

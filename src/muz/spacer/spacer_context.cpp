@@ -1528,7 +1528,30 @@ namespace spacer {
                            m_premises[m_active].pt (), 
                            prev_level (m_parent.level ()),
                            m_parent.depth ());
-    n->set_post (post);
+
+    app_ref_vector sk_vars (m);
+    expr_ref body(m);
+    
+    if (is_quantifier (post)) {
+        body = to_quantifier (post)->get_expr ();
+        ground_expr (body.get (), body, sk_vars);
+    }
+    else
+      body = post;
+
+    if (!vars.empty ()) {
+        // XXX this is a hack!!!
+        // XXX first create variables, then ground them immediately
+        expr_ref_vector _vars (m);
+        for (unsigned i = 0, e = vars.size (); i < e; ++i)
+            _vars.push_back (vars.get (i));
+        expr_abstract (m, 0, _vars.size (), _vars.c_ptr (), body, body);
+        ground_expr (body, body, sk_vars);
+    }
+    
+    if (sk_vars.empty ()) n->set_post (body);
+    else n->set_post (body, sk_vars);
+    
     IF_VERBOSE (1, verbose_stream ()
                 << "\n\tcreate_child: " << n->pt ().head ()->get_name () 
                 << " (" << n->level () << ", " << n->depth () << ") "
@@ -3089,7 +3112,7 @@ namespace spacer {
         qe_project (m, vars, phi1, mev.get_model (), true,
                     m_use_native_mbp, !m_ground_cti);
         //qe::reduce_array_selects (*mev.get_model (), phi1);
-        SASSERT (vars.empty ());
+        SASSERT (!m_ground_cti || vars.empty ());
 
         TRACE ("spacer",
                 tout << "Implicant\n";
@@ -3109,7 +3132,13 @@ namespace spacer {
         //   phi1 = m_pm.mk_and (Phi);
         // }
         
-        
+        if (!n.is_ground ()) vars.append (n.get_vars ());
+        if (!vars.empty ())
+            phi1 = mk_exists (m, vars.size (), vars.c_ptr (), phi1);
+
+        // XXX phi1 is not ground if !n.is_ground
+        // XXX we can explicitly quantify phi1 here so that derivation
+        // XXX knows it is dealing with a quantified post-condition        
         /// create a derivation and populate it with premises
         derivation *deriv = alloc (derivation, n, r, phi1);
         for (unsigned i = 0, sz = preds.size (); i < sz; ++i)
