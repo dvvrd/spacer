@@ -949,7 +949,7 @@ namespace spacer {
       }
   }
 
-    void ground_expr (expr *e, expr_ref &out, expr_ref_vector &vars)
+    void ground_expr (expr *e, expr_ref &out, app_ref_vector &vars)
     {
          expr_free_vars fv;
          ast_manager &m = out.get_manager ();
@@ -962,7 +962,7 @@ namespace spacer {
                  vars [i] = m.mk_fresh_const ("sk", fv [i]);
              }
          var_subst vs(m);
-         vs (e, vars.size (), vars.c_ptr (), out);
+         vs (e, vars.size (), (expr**) vars.c_ptr (), out);
     }
 }
 

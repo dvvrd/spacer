@@ -149,7 +149,7 @@ namespace spacer {
   void simplify_bounds (expr_ref_vector &lemmas);
   void normalize(expr *e, expr_ref &out);
   /** ground expression by replacing all free variables by skolem constants */
-  void ground_expr (expr *e, expr_ref &out, expr_ref_vector &vars);
+  void ground_expr (expr *e, expr_ref &out, app_ref_vector &vars);
 }
 
 #endif
