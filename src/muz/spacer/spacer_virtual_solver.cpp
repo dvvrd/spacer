@@ -43,7 +43,7 @@ namespace spacer {
                 m_pred = m.mk_not (m_pred);
                 m_context.assert_expr (m_pred);
             }
-        }
+    }
 
         namespace
         {
