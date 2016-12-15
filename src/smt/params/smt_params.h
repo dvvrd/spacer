@@ -212,6 +212,15 @@ struct smt_params : public preprocessor_params,
     bool                m_dump_goal_as_smt;
     bool                m_auto_config;
 
+    // -----------------------------------
+    //
+    // Spacer hacking
+    //
+    // -----------------------------------
+    bool                m_dump_benchmarks;
+    double              m_dump_min_time;
+    bool                m_dump_recheck;
+    
     smt_params(params_ref const & p = params_ref()):
         m_display_proof(false),
         m_display_dot_proof(false),

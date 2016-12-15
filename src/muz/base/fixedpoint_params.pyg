@@ -176,6 +176,9 @@ def_module_params('fixedpoint',
                           ('spacer.restart_initial_threshold', UINT, 10, "Intial threshold for restarts"),
                           ('spacer.random_seed', UINT, 0, "Random seed to be used by SMT solver"),
                           ('spacer.ground_cti', BOOL, True, "Require CTI to be ground"),
+                          ('spacer.vs.dump_benchmarks', BOOL, False, 'dump benchmarks in virtual solver'),
+                          ('spacer.vs.dump_min_time', DOUBLE, 5.0, 'min time to dump benchmark'),
+                          ('spacer.vs.recheck', BOOL, False, 're-check locally during benchmark dumping'),
                           ))
 
 

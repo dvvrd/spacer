@@ -22,7 +22,7 @@ namespace spacer {
         m_flat (m),
         m_pushed (false),
         m_in_delay_scope (false),
-        m_dump_benchmarks(false),
+        m_dump_benchmarks(factory.fparams().m_dump_benchmarks),
         m_dump_counter(0),
         m_proof(m)
     {
@@ -270,7 +270,8 @@ namespace spacer {
         }
         set_status (res);
         
-        if (m_dump_benchmarks && sw.get_seconds() >= 5.0) {
+        if (m_dump_benchmarks &&
+            sw.get_seconds() >= m_factory.fparams().m_dump_min_time) {
             std::stringstream file_name;
             file_name << "virt_solver";
             if (m_virtual) file_name << "_" << m_pred->get_decl()->get_name();
@@ -296,7 +297,7 @@ namespace spacer {
 
             out.close();
 
-            if (false) {
+            if (m_factory.fparams().m_dump_recheck) {
                 scoped_no_proof _no_proof_(m);
                 smt_params p;
                 stopwatch sw2;
