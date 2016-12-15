@@ -2843,6 +2843,13 @@ namespace spacer {
           std::sort (core.c_ptr (), core.c_ptr () + core.size (), ast_lt_proc ());
           uses_level = cores[i].second;
           expr_ref lemma (m_pm.mk_not_and(core), m);
+          
+          if (!n.is_ground ()) {
+              app_ref_vector &n_vars = n.get_vars ();
+              SASSERT (n_vars.size () > 0);
+              lemma = mk_forall (m, n_vars.size (), n_vars.c_ptr (), lemma);
+          }
+          
           TRACE("spacer", tout << "invariant state: " 
                 << (is_infty_level(uses_level)?"(inductive)":"") 
                 <<  mk_pp (lemma, m) << "\n";);
