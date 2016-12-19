@@ -257,7 +257,7 @@ namespace spacer {
         ptr_vector<pred_transformer> m_use;     // places where 'this' is referenced.
         ptr_vector<datalog::rule>    m_rules;   // rules used to derive transformer
         prop_solver                  m_solver;  // solver context
-        scoped_ptr<solver>           m_reach_ctx; // context for reachability facts
+        solver*                      m_reach_ctx; // context for reachability facts
         frames                       m_frames;
       
         reach_fact_ref_vector        m_reach_facts; // reach facts
