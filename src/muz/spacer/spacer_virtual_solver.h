@@ -61,6 +61,7 @@ namespace spacer {
         bool m_virtual;
         expr_ref_vector m_assertions;
         unsigned m_head;
+        // temporary to flatten conjunction
         expr_ref_vector m_flat;
 
         bool m_pushed;
@@ -82,6 +83,8 @@ namespace spacer {
                                symbol const &logic = symbol::null,
                                char const * status = "unknown",
                                char const * attributes = "");
+
+        void refresh ();
     
     public:
         virtual ~virtual_solver ();
@@ -110,7 +113,8 @@ namespace spacer {
         virtual void set_produce_models(bool f);
         virtual bool get_produce_models();
         virtual smt_params &fparams();
-    
+        virtual void reset ();
+        
         virtual void set_progress_callback(progress_callback *callback)
         {UNREACHABLE ();}
     
@@ -134,8 +138,8 @@ namespace spacer {
         smt_params  &m_fparams;
         ast_manager &m;
         smt::kernel m_context;
-        /// number of solvers created by this factory so-far
-        unsigned m_num_solvers;
+        /// solvers managed by this factory
+        ptr_vector<virtual_solver> m_solvers;
     
         struct stats {
             unsigned m_num_smt_checks;
@@ -150,16 +154,13 @@ namespace spacer {
         stopwatch m_proof_watch;
 
     
+        void refresh ();
     public:
         virtual_solver_factory (ast_manager &mgr, smt_params &fparams);
+        virtual ~virtual_solver_factory ();
         virtual_solver* mk_solver ();
         void collect_statistics (statistics &st) const;
         void reset_statistics ();
-        void reset () 
-        {
-            m_context.reset ();
-            m_num_solvers = 0;
-        }
         void updt_params(params_ref const &p) { m_fparams.updt_params(p); }
         void collect_param_descrs(param_descrs &r) { /* empty */ }
         void set_produce_models (bool f) { m_fparams.m_model = f; }

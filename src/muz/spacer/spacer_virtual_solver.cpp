@@ -43,7 +43,7 @@ namespace spacer {
                 m_pred = m.mk_not (m_pred);
                 m_context.assert_expr (m_pred);
             }
-        }
+    }
 
         namespace
         {
@@ -390,6 +390,20 @@ namespace spacer {
             m_context.assert_expr (f);
         }
     }
+    void virtual_solver::refresh ()
+    {
+        SASSERT (!m_pushed);
+        m_head = 0;
+    }
+
+    void virtual_solver::reset ()
+    {
+        SASSERT (!m_pushed);
+        m_head = 0;
+        m_assertions.reset ();
+        m_factory.refresh ();
+    }
+    
     void virtual_solver::get_labels(svector<symbol> &r)
     {
         r.reset();
@@ -441,7 +455,7 @@ namespace spacer {
     
     
     virtual_solver_factory::virtual_solver_factory (ast_manager &mgr, smt_params &fparams) :
-        m_fparams (fparams), m(mgr), m_context (m, m_fparams), m_num_solvers(0)
+        m_fparams (fparams), m(mgr), m_context (m, m_fparams)
     {
         m_stats.reset ();
     }
@@ -449,11 +463,12 @@ namespace spacer {
     virtual_solver* virtual_solver_factory::mk_solver ()
     {
         std::stringstream name;
-        name << "vsolver#" << m_num_solvers++;
+        name << "vsolver#" << m_solvers.size ();
         app_ref pred(m);
         pred = m.mk_const (symbol (name.str ().c_str ()), m.mk_bool_sort ());
         SASSERT (m_context.get_scope_level () == 0);
-        return alloc (virtual_solver, *this, m_context, pred);
+        m_solvers.push_back (alloc (virtual_solver, *this, m_context, pred));
+        return m_solvers.back ();
     }
 
     void virtual_solver_factory::collect_statistics (statistics &st) const
@@ -474,7 +489,18 @@ namespace spacer {
         m_proof_watch.reset ();
     }
   
-  
+    void virtual_solver_factory::refresh ()
+    {
+        m_context.reset ();
+        for (unsigned i = 0, e = m_solvers.size (); i < e; ++i)
+            m_solvers [i]->refresh ();
+    }
+    
+    virtual_solver_factory::~virtual_solver_factory ()
+    {
+        for (unsigned i = 0, e = m_solvers.size (); i < e; ++i)
+            dealloc (m_solvers [i]);
+    }
 
 
   

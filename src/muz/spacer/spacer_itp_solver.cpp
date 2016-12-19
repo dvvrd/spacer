@@ -174,7 +174,20 @@ namespace spacer {
         def = r;
         return found;
     }
+
+    void itp_solver::def_manager::reset ()
+    {
+        m_expr2proxy.reset ();
+        m_proxy2def.reset ();
+        m_defs.reset ();
+    }
   
+    bool itp_solver::def_manager::is_proxy_def (expr *v)
+    {
+        // XXX This might not be the most robust way to check
+        return m_defs.contains (v);
+    }
+    
     bool itp_solver::is_proxy(expr *e, app_ref &def)
     {
         if (!is_uninterp_const (e)) return false;
@@ -279,6 +292,24 @@ namespace spacer {
                    << mk_pp (mk_and (core), m) << "\n";);
     }
   
+    void itp_solver::refresh ()
+    {
+        // only refresh in non-pushed state
+        SASSERT (m_defs.size () == 0);
+        expr_ref_vector assertions (m);
+        for (unsigned i = 0, e = m_solver.get_num_assertions (); i < e; ++i)
+            {
+                expr* a = m_solver.get_assertion (i);
+                if (!m_base_defs.is_proxy_def (a)) assertions.push_back (a);
+                
+            }
+        m_base_defs.reset ();
+        NOT_IMPLEMENTED_YET ();
+        // solver interface does not have a reset method. need to introduce it somewhere.
+        // m_solver.reset ();
+        for (unsigned i = 0, e = assertions.size (); i < e; ++i)
+            m_solver.assert_expr (assertions.get (i));
+    }
   
 }
 

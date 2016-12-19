@@ -64,7 +64,7 @@ namespace spacer {
         manager&            m_pm;
         symbol              m_name;
         smt_params*         m_fparams[2];
-        scoped_ptr<solver>  m_solvers[2];
+        solver*             m_solvers[2];
         scoped_ptr<itp_solver>  m_contexts[2];
         itp_solver *            m_ctx;
         smt_params *            m_ctx_fparams;
