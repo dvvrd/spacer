@@ -183,18 +183,18 @@ namespace spacer {
         };
         
         struct lemmas_lt_proc : 
-          public std::binary_function<const lemma&, const lemma &, bool>
+          public std::binary_function<const lemma*, const lemma *, bool>
         {
-          bool operator() (const lemma &a, const lemma &b)
+          bool operator() (const lemma *a, const lemma *b)
           {
-            return (a.level () < b.level ()) || 
-              (a.level () == b.level () && 
-               ast_lt_proc() (a.get (), b.get ()));
+            return (a->level () < b->level ()) ||
+              (a->level () == b->level () &&
+               ast_lt_proc() (a->get (), b->get ()));
           }
         };
 
         pred_transformer &m_pt;
-        vector<lemma> m_lemmas;
+        vector<lemma*> m_lemmas;
         unsigned m_size;
         
         bool m_sorted;
@@ -204,6 +204,11 @@ namespace spacer {
         
       public:
         frames (pred_transformer &pt) : m_pt (pt), m_size(0), m_sorted (true) {}
+        ~frames() {
+            for (unsigned i=0; i < m_lemmas.size(); i++)
+                delete m_lemmas[i];
+            m_lemmas.reset();
+        }
         void simplify_formulas ();
         
         pred_transformer& pt () {return m_pt;}
@@ -212,12 +217,12 @@ namespace spacer {
         void get_frame_lemmas (unsigned level, expr_ref_vector &out)
         {
           for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
-            if (m_lemmas[i].level () == level) out.push_back (m_lemmas[i].get ());
+            if (m_lemmas[i]->level () == level) out.push_back (m_lemmas[i]->get ());
         }
         void get_frame_geq_lemmas (unsigned level, expr_ref_vector &out)
         {
           for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
-            if (m_lemmas [i].level () >= level) out.push_back (m_lemmas[i].get ());
+            if (m_lemmas [i]->level () >= level) out.push_back (m_lemmas[i]->get ());
         }
         
         
@@ -227,7 +232,7 @@ namespace spacer {
         void inherit_frames (frames &other)
         {
           for (unsigned i = 0, sz = other.m_lemmas.size (); i < sz; ++i)
-            add_lemma (other.m_lemmas [i].get (), other.m_lemmas [i].level ());
+            add_lemma (other.m_lemmas [i]->get (), other.m_lemmas [i]->level ());
           m_sorted = false;
         }
         
@@ -253,7 +258,7 @@ namespace spacer {
         ptr_vector<datalog::rule>    m_rules;   // rules used to derive transformer
         prop_solver                  m_solver;  // solver context
         scoped_ptr<solver>           m_reach_ctx; // context for reachability facts
-        legacy_frames                m_frames;
+        frames                       m_frames;
       
         reach_fact_ref_vector        m_reach_facts; // reach facts
         /// Number of initial reachability facts

@@ -1241,37 +1241,37 @@ namespace spacer {
            << mk_pp (lemma, m_pt.get_ast_manager ()) << "\n";);
     
     for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
-      if (m_lemmas [i].get () == lemma)
+      if (m_lemmas [i]->get () == lemma)
       {
-        if (m_lemmas [i].level () >= level) 
+        if (m_lemmas [i]->level () >= level)
         {
           TRACE ("spacer", tout << "Already at a higher level: " 
-                 << pp_level (m_lemmas [i].level ()) << "\n";);
+                 << pp_level (m_lemmas [i]->level ()) << "\n";);
           
           return false;
         }
         
-        m_lemmas [i].set_level (level);
+        m_lemmas [i]->set_level (level);
         m_pt.add_lemma_core (lemma, level);
         for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas [j+1], m_lemmas[j]); ++j)
-          swap (m_lemmas [j], m_lemmas [j+1]);
+          swap (*m_lemmas [j], *m_lemmas [j+1]);
         return true;
       }
     
-    frames::lemma lem (m_pt.get_ast_manager (), lemma, level);
+    frames::lemma *lem = new frames::lemma(m_pt.get_ast_manager (), lemma, level);
     m_lemmas.push_back (lem);
     m_sorted = false;
-    m_pt.add_lemma_core (m_lemmas.back ().get (), m_lemmas.back ().level ());
+    m_pt.add_lemma_core (m_lemmas.back ()->get (), m_lemmas.back ()->level ());
     return true;
   }
   
   void pred_transformer::frames::propagate_to_infinity (unsigned level)
   {
     for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
-      if (m_lemmas[i].level () >= level && !is_infty_level (m_lemmas [i].level ())) 
+      if (m_lemmas[i]->level () >= level && !is_infty_level (m_lemmas [i]->level ()))
       {
-        m_lemmas [i].set_level (infty_level ());
-        m_pt.add_lemma_core (m_lemmas [i].get (), infty_level ());
+        m_lemmas [i]->set_level (infty_level ());
+        m_pt.add_lemma_core (m_lemmas [i]->get (), infty_level ());
         m_sorted = false;
       }
   }
@@ -1295,22 +1295,22 @@ namespace spacer {
     unsigned tgt_level = next_level (level);
     m_pt.ensure_level (tgt_level);
     
-    for (unsigned i = 0, sz = m_lemmas.size (); i < sz && m_lemmas [i].level () <= level;)
+    for (unsigned i = 0, sz = m_lemmas.size (); i < sz && m_lemmas [i]->level () <= level;)
     {
-      if (m_lemmas [i].level () < level) 
+      if (m_lemmas [i]->level () < level)
       {++i; continue;}
       
       
       unsigned solver_level;
-      expr * curr = m_lemmas [i].get ();
+      expr * curr = m_lemmas [i]->get ();
       if (m_pt.is_invariant (tgt_level, curr, solver_level))
       {
-        m_lemmas [i].set_level (solver_level);
-        m_pt.add_lemma_core (m_lemmas [i].get (), solver_level);
+        m_lemmas [i]->set_level (solver_level);
+        m_pt.add_lemma_core (m_lemmas [i]->get (), solver_level);
         
         // percolate the lemma up to its new place
         for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas[j+1], m_lemmas[j]); ++j)
-          swap (m_lemmas [j], m_lemmas[j+1]);
+          swap (*m_lemmas [j], *m_lemmas[j+1]);
         
       }
       else 
@@ -1329,10 +1329,10 @@ namespace spacer {
     sort ();
     
     tactic_ref simplifier = mk_unit_subsumption_tactic (m);
-    vector<lemma> old_lemmas (m_lemmas);
-    unsigned lemmas_size = old_lemmas.size ();
-    m_lemmas.reset ();
+    vector<lemma*> new_lemmas;
     
+    unsigned lemmas_size = m_lemmas.size ();
+
     goal_ref g (alloc (goal, m, false, false, false));
     
     unsigned j = 0;
@@ -1346,8 +1346,8 @@ namespace spacer {
       expr_dependency_ref core(m);
       goal_ref_buffer result;
       
-      for (; j < lemmas_size && old_lemmas [j].level () <= level; ++j)
-        if (old_lemmas [j].level () == level) g->assert_expr (old_lemmas [j].get ());
+      for (; j < lemmas_size && m_lemmas [j]->level () <= level; ++j)
+        if (m_lemmas [j]->level () == level) g->assert_expr (m_lemmas [j]->get ());
       
       if (g->size () <= 0) continue;
       
@@ -1356,9 +1356,14 @@ namespace spacer {
       goal *r = result [0];
       
       for (unsigned k = 0; k < r->size (); ++k) 
-        m_lemmas.push_back (lemma (m, r->form (k), level));
+        new_lemmas.push_back (new lemma (m, r->form (k), level));
       m_sorted = false;
     }
+    for (unsigned i=0; i < m_lemmas.size(); i++)
+        delete m_lemmas[i];
+    m_lemmas.reset();
+    for (unsigned i=0; i < new_lemmas.size(); i++)
+        m_lemmas.push_back(new_lemmas[i]);
   }
 
 
