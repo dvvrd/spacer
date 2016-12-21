@@ -2055,6 +2055,8 @@ namespace spacer {
             fparams.m_dump_benchmarks = m_params.spacer_vs_dump_benchmarks();
             fparams.m_dump_min_time = m_params.spacer_vs_dump_min_time();
             fparams.m_dump_recheck = m_params.spacer_vs_recheck();
+
+            fparams.m_mbqi = m_params.spacer_mbqi();
         }
         if (!use_mc && m_params.pdr_use_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_bool_inductive_generalizer, *this, 0));
