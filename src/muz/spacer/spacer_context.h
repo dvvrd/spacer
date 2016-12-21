@@ -444,7 +444,8 @@ namespace spacer {
     
     ptr_vector<model_node>  m_kids;
 
-    app_ref_vector         m_vars;  
+    app_ref_vector         m_vars;
+    app_ref_vector         m_inst_vars;
 
   public:
     model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
@@ -454,7 +455,8 @@ namespace spacer {
       m_new_post (m_pt.get_ast_manager ()),
       m_level (level), m_depth (depth),
       m_open (true), m_use_farkas (true), m_weakness(0),
-      m_vars (m_pt.get_ast_manager ())
+      m_vars (m_pt.get_ast_manager ()),
+      m_inst_vars (m_pt.get_ast_manager ())
     {if (m_parent) m_parent->add_child (*this);}
     
     ~model_node() {if (m_parent) m_parent->erase_child (*this);}
@@ -490,7 +492,10 @@ namespace spacer {
       
     void set_post (expr *post, app_ref_vector &vars)
     { set_post (post); m_vars.append (vars);}
-    app_ref_vector &get_vars () {return m_vars;}      
+    app_ref_vector &get_vars () {return m_vars;}
+
+    void set_inst_vars(app_ref_vector v) {m_inst_vars.append(v);}
+    app_ref_vector &get_inst_vars () {return m_inst_vars;}
 
     
     /// indicate that a new post should be set for the node

@@ -2858,12 +2858,23 @@ namespace spacer {
               SASSERT (n_vars.size () > 0);
               lemma = mk_forall (m, n_vars.size (), n_vars.c_ptr (), lemma);
           }
-          
-          TRACE("spacer", tout << "invariant state: " 
-                << (is_infty_level(uses_level)?"(inductive)":"") 
+
+          TRACE("spacer", tout << "invariant state: "
+                << (is_infty_level(uses_level)?"(inductive)":"")
                 <<  mk_pp (lemma, m) << "\n";);
           bool v = n.pt().add_lemma (lemma, uses_level);
           if (v) m_stats.m_num_lemmas++;
+
+          if (!n.is_ground () && n.get_inst_vars().size() > 0) {
+              expr_ref inst (m);
+              var_subst sv(m);
+              sv(to_quantifier(lemma)->get_expr(), n.get_inst_vars().size(), (expr**)n.get_inst_vars().c_ptr(), inst);
+              TRACE("spacer", tout << "(Instance) invariant state: "
+                    << (is_infty_level(uses_level)?"(inductive)":"")
+                    <<  mk_pp (inst, m) << "\n";);
+              bool v = n.pt().add_lemma (inst, uses_level);
+              if (v) m_stats.m_num_lemmas++;
+          }
           
           // Optionally update the node to be the negation of the lemma
           if (v && get_params ().use_lemma_as_cti ())
@@ -3188,6 +3199,9 @@ namespace spacer {
         }
         SASSERT (kid);
         kid->set_derivation (deriv);
+        // In case we have added a quantifier, remember the variables that
+        // appeared in the CTI - these are a valid instantiation
+        if (!vars.empty()) kid->set_inst_vars(vars);
         
         // Optionally disable derivation optimization
         if (!get_params ().use_derivations ()) kid->reset_derivation ();
