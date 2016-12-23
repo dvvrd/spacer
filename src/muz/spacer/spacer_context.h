@@ -445,7 +445,6 @@ namespace spacer {
     ptr_vector<model_node>  m_kids;
 
     app_ref_vector         m_vars;
-    app_ref_vector         m_inst_vars;
 
   public:
     model_node (model_node* parent, pred_transformer& pt, unsigned level, unsigned depth=0):
@@ -455,8 +454,7 @@ namespace spacer {
       m_new_post (m_pt.get_ast_manager ()),
       m_level (level), m_depth (depth),
       m_open (true), m_use_farkas (true), m_weakness(0),
-      m_vars (m_pt.get_ast_manager ()),
-      m_inst_vars (m_pt.get_ast_manager ())
+      m_vars (m_pt.get_ast_manager ())
     {if (m_parent) m_parent->add_child (*this);}
     
     ~model_node() {if (m_parent) m_parent->erase_child (*this);}
@@ -493,9 +491,6 @@ namespace spacer {
     void set_post (expr *post, app_ref_vector &vars)
     { set_post (post); m_vars.append (vars);}
     app_ref_vector &get_vars () {return m_vars;}
-
-    void set_inst_vars(app_ref_vector v) {m_inst_vars.append(v);}
-    app_ref_vector &get_inst_vars () {return m_inst_vars;}
 
     
     /// indicate that a new post should be set for the node
@@ -546,8 +541,6 @@ namespace spacer {
     }
       
     bool is_ground () { return m_vars.empty (); }  
-    
-    
   };
 
 
@@ -640,8 +633,6 @@ namespace spacer {
     ast_manager &get_ast_manager () const {return m_parent.get_ast_manager ();}
     manager &get_manager () const {return m_parent.get_manager ();}
     context &get_context() const {return m_parent.get_context();}
-    
-      
   };
 
   
@@ -749,7 +740,11 @@ namespace spacer {
         bool                 m_weak_abs;
         bool                 m_use_restarts;
         unsigned             m_restart_initial_threshold;
-        
+
+        // Utility: Quantified Lemmas
+        obj_map<app, app*> m_local2sk;
+        obj_map<app, app*> m_sk2local;
+
         // Functions used by search.
         lbool solve_core (unsigned from_lvl = 0);
         bool check_reachability ();        

@@ -72,6 +72,8 @@ Notes:
 
 #include "expr_abstract.h"
 
+#include "expr_safe_replace.h"
+
 namespace spacer {
     
     // ----------------
@@ -1534,28 +1536,7 @@ namespace spacer {
                            prev_level (m_parent.level ()),
                            m_parent.depth ());
 
-    app_ref_vector sk_vars (m);
-    expr_ref body(m);
-    
-    if (is_quantifier (post)) {
-        body = to_quantifier (post)->get_expr ();
-        ground_expr (body.get (), body, sk_vars);
-    }
-    else
-      body = post;
-
-    if (!vars.empty ()) {
-        // XXX this is a hack!!!
-        // XXX first create variables, then ground them immediately
-        expr_ref_vector _vars (m);
-        for (unsigned i = 0, e = vars.size (); i < e; ++i)
-            _vars.push_back (vars.get (i));
-        expr_abstract (m, 0, _vars.size (), _vars.c_ptr (), body, body);
-        ground_expr (body, body, sk_vars);
-    }
-    
-    if (sk_vars.empty ()) n->set_post (body);
-    else n->set_post (body, sk_vars);
+    n->set_post(post);
     
     IF_VERBOSE (1, verbose_stream ()
                 << "\n\tcreate_child: " << n->pt ().head ()->get_name () 
@@ -1707,7 +1688,10 @@ namespace spacer {
         m_ground_cti (params.spacer_ground_cti ()),
         m_weak_abs(params.spacer_weak_abs()),
         m_use_restarts(params.spacer_restarts()),
-        m_restart_initial_threshold(params.spacer_restart_initial_threshold())
+        m_restart_initial_threshold(params.spacer_restart_initial_threshold()),
+        m_local2sk(),
+        m_sk2local()
+
     {}
 
     context::~context() {
@@ -2866,17 +2850,6 @@ namespace spacer {
                 <<  mk_pp (lemma, m) << "\n";);
           bool v = n.pt().add_lemma (lemma, uses_level);
           if (v) m_stats.m_num_lemmas++;
-
-          if (!n.is_ground () && n.get_inst_vars().size() > 0) {
-              expr_ref inst (m);
-              var_subst sv(m);
-              sv(to_quantifier(lemma)->get_expr(), n.get_inst_vars().size(), (expr**)n.get_inst_vars().c_ptr(), inst);
-              TRACE("spacer", tout << "(Instance) invariant state: "
-                    << (is_infty_level(uses_level)?"(inductive)":"")
-                    <<  mk_pp (inst, m) << "\n";);
-              bool v = n.pt().add_lemma (inst, uses_level);
-              if (v) m_stats.m_num_lemmas++;
-          }
           
           // Optionally update the node to be the negation of the lemma
           if (v && get_params ().use_lemma_as_cti ())
@@ -3161,9 +3134,67 @@ namespace spacer {
         //   phi1 = m_pm.mk_and (Phi);
         // }
         
-        if (!n.is_ground ()) vars.append (n.get_vars ());
-        if (!vars.empty ())
-            phi1 = mk_exists (m, vars.size (), vars.c_ptr (), phi1);
+        unsigned qvars_size = vars.size();
+        // XXX FOR NOW ASSUME ONLY ONE QUANTIFIER IS ALLOWED (per var)!!!
+        // Check if the parent has a quantified variable of the same
+        // kind - can only happen when there is a loop
+        if (!n.is_ground ()) {
+            // vars to eliminate
+            app_ref_vector qe_vars(m);
+            // previously quantified vars
+            app_ref_vector& prev_vars = n.get_vars();
+            for (unsigned v=0; v < prev_vars.size(); v++) {
+                app* pv_sk = prev_vars[v].get();
+                SASSERT (m_sk2local.contains(pv_sk));
+                // Get the local var for this sk
+                app* pv = m_sk2local[pv_sk];
+                // Check if this the previously quantified local also
+                // appears in this pt. If it does, mark it for elimination
+                for (unsigned u=0; u < vars.size(); u++) {
+                    if (pv->get_decl() == vars[u].get()->get_decl()) {
+                        qe_vars.push_back(pv_sk);
+                        break;
+                    }
+                }
+                // If it is not eliminated, add it to the list of vars
+                if (!qe_vars.empty() && qe_vars.back() != pv_sk) {
+                    vars.push_back(pv_sk);
+                }
+
+            }
+            if (!qe_vars.empty()) {
+                qe_project (m, qe_vars, phi1, mev.get_model (), true,
+                            m_use_native_mbp, false);
+                SASSERT(qe_vars.empty());
+            }
+        }
+
+        // Skolemize the quantified local vars
+        if (qvars_size > 0) {
+            expr_substitution es(m);
+            expr_safe_replace ses(m);
+            app_ref sk(m);
+            for (unsigned v = 0; v < qvars_size; v++) {
+                app* l = vars[v].get();
+                SASSERT(vars[v].get()->get_decl()->get_arity() == 0);
+                if (m_local2sk.contains(l))
+                    sk = m_local2sk[l];
+                else {
+                    sk = m.mk_fresh_const("sk", l->get_decl()->get_range());
+                    m_local2sk.insert(l, sk);
+                    m_sk2local.insert(sk, l);
+                }
+                vars.set(v, sk.get());
+                es.insert(l, sk);
+                ses.insert(l, sk);
+            }
+            // XXX For some reason, this is not working...
+            // XXX Must use the safe replacer instead.
+            //scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
+            //rep->set_substitution(&es);
+            //(*rep)(phi1.get(), phi1);
+            ses(phi1.get(), phi1);
+        }
 
         // XXX phi1 is not ground if !n.is_ground
         // XXX we can explicitly quantify phi1 here so that derivation
@@ -3201,9 +3232,11 @@ namespace spacer {
         }
         SASSERT (kid);
         kid->set_derivation (deriv);
-        // In case we have added a quantifier, remember the variables that
-        // appeared in the CTI - these are a valid instantiation
-        if (!vars.empty()) kid->set_inst_vars(vars);
+        // Remember the quantified variables
+        if (!vars.empty()) {
+            app_ref_vector& qvars = kid->get_vars();
+            qvars.append(vars);
+        }
         
         // Optionally disable derivation optimization
         if (!get_params ().use_derivations ()) kid->reset_derivation ();
