@@ -365,7 +365,8 @@ namespace spacer {
     else 
     {
       ensure_level (lvl);
-      m_solver.assert_expr (lemma, lvl);
+      if (!is_forall(lemma))
+          m_solver.assert_expr (lemma, lvl);
     }
     
     for (unsigned i = 0, sz = m_use.size (); i < sz; ++i)
