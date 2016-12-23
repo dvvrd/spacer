@@ -150,6 +150,9 @@ namespace spacer {
   void normalize(expr *e, expr_ref &out);
   /** ground expression by replacing all free variables by skolem constants */
   void ground_expr (expr *e, expr_ref &out, app_ref_vector &vars);
+
+
+    void mbqi_project (model &M, app_ref_vector &vars, expr_ref &fml);
 }
 
 #endif

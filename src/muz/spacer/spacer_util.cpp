@@ -573,6 +573,14 @@ namespace spacer {
                     tout << mk_pp (arith_vars.get (i), m) << "\n";
                     }
                   );
+            
+            // XXX Does not seem to have an effect
+            // qe_lite qe(m);
+            // qe (arith_vars, fml);
+            // TRACE ("spacer_mbp",
+            //        tout << "After second qelite: " <<
+            //        mk_pp (fml, m) << "\n";);
+            
             if (use_native_mbp)
             {
               qe::mbp mbp (m);
@@ -596,6 +604,10 @@ namespace spacer {
                         tout << mk_pp (arith_vars.get (i), m) << "\n";
                     }
                   );
+        }
+
+        if (!arith_vars.empty ()) {
+            mbqi_project (*M.get(), arith_vars, fml);
         }
 
         // substitute any remaining arith vars
@@ -963,6 +975,98 @@ namespace spacer {
              }
          var_subst vs(m);
          vs (e, vars.size (), (expr**) vars.c_ptr (), out);
+    }
+    
+
+    struct index_term_finder {
+        ast_manager &m;
+        array_util m_array;
+        app_ref m_var;
+        expr_ref_vector &m_res;
+        
+        index_term_finder (ast_manager &mgr, app* v, expr_ref_vector &res) : m(mgr), m_array (m), m_var (v, m), m_res (res) {}
+        void operator() (var *n) {}
+        void operator() (quantifier *n) {}
+        void operator() (app *n)
+        {
+            expr *e1, *e2;
+            if (m_array.is_select (n) && n->get_arg (1) != m_var) {
+                m_res.push_back (n->get_arg (1));
+            }
+            else if (m.is_eq (n, e1, e2)) {
+                if (e1 == m_var) m_res.push_back (e2);
+                else if (e2 == m_var) m_res.push_back (e1);
+            }
+        }
+    };
+    
+    bool mbqi_project_var (model_evaluator_util &mev, app* var, expr_ref &fml)
+    {
+        ast_manager &m = fml.get_manager ();
+
+        expr_ref val(m);
+        mev.eval (var, val, false);
+        
+        TRACE ("mbqi_project_verbose",
+               tout << "MBQI: var: " << mk_pp (var, m) << "\n"
+               << "fml: " << mk_pp (fml, m) << "\n";);
+        expr_ref_vector terms (m);
+        index_term_finder finder (m, var, terms);
+        for_each_expr (finder, fml);
+
+        
+        TRACE ("mbqi_project_verbose",
+               tout << "terms:\n";
+               for (unsigned i = 0, e = terms.size (); i < e; ++i)
+                   tout << i << ": " << mk_pp (terms.get (i), m) << "\n";
+               );
+        
+        for (unsigned i = 0, e = terms.size (); i < e; ++i)
+        {
+            expr* term = terms.get (i);
+            expr_ref tval (m);
+            mev.eval (term, tval, false);
+            
+            TRACE ("mbqi_project_verbose",
+                   tout << "term: " << mk_pp (term, m)
+                   << " tval: " << mk_pp (tval, m)
+                   << " val: " << mk_pp (val, m) << "\n";);
+            
+            if (var != term && tval == val) {
+                TRACE ("mbqi_project",
+                       tout << "MBQI: replacing " << mk_pp (var, m) << " with " << mk_pp (term, m) << "\n";);
+                expr_safe_replace sub(m);
+                sub.insert (var, term);
+                sub (fml);
+                return true;
+            }
+        }
+        
+        TRACE ("mbqi_project",
+               tout << "MBQI: failed to eliminate " << mk_pp (var, m) << " from " << mk_pp (fml, m) << "\n";);
+
+        return false;
+    }
+    
+    void mbqi_project (model &M, app_ref_vector &vars, expr_ref &fml)
+    {
+        ast_manager &m = fml.get_manager ();
+        model_evaluator_util mev(m);
+        mev.set_model (M);
+        expr_ref tmp(m);
+        // -- evaluate to initialize mev cache
+        mev.eval (fml, tmp, false);
+        tmp.reset ();
+        
+        for (unsigned idx = 0; idx < vars.size (); ) {
+            if (mbqi_project_var (mev, vars.get (idx), fml)) {
+                vars[idx] = vars.back ();
+                vars.pop_back ();
+            }
+            else {
+                idx++;
+            }
+        }
     }
 }
 
