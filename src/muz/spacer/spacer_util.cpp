@@ -1068,6 +1068,37 @@ namespace spacer {
             }
         }
     }
+
+    bool contains_selects (expr* fml, ast_manager& m) {
+        array_util a_util(m);
+        if (!is_app (fml)) return false;
+        ast_mark done;
+        ptr_vector<app> todo;
+        todo.push_back (to_app (fml));
+        while (!todo.empty ()) {
+            app* a = todo.back ();
+            if (done.is_marked (a)) {
+                todo.pop_back ();
+                continue;
+            }
+            unsigned num_args = a->get_num_args ();
+            bool all_done = true;
+            for (unsigned i = 0; i < num_args; i++) {
+                expr* arg = a->get_arg (i);
+                if (!done.is_marked (arg) && is_app (arg)) {
+                    todo.push_back (to_app (arg));
+                    all_done = false;
+                }
+            }
+            if (!all_done) continue;
+            todo.pop_back ();
+            if (a_util.is_select (a)) {
+                return true;
+            }
+            done.mark (a, true);
+        }
+        return false;
+    }
 }
 
 template class rewriter_tpl<spacer::ite_hoister_cfg>;

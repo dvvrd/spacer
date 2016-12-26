@@ -153,6 +153,8 @@ namespace spacer {
 
 
     void mbqi_project (model &M, app_ref_vector &vars, expr_ref &fml);
+
+    bool contains_selects (expr* fml, ast_manager& m);
 }
 
 #endif
