@@ -2843,7 +2843,26 @@ namespace spacer {
           if (!n.is_ground ()) {
               app_ref_vector &n_vars = n.get_vars ();
               SASSERT (n_vars.size () > 0);
-              lemma = mk_forall (m, n_vars.size (), n_vars.c_ptr (), lemma);
+              if (contains_selects(lemma.get(), m)) {
+                  lemma = mk_forall (m, n_vars.size (), n_vars.c_ptr (), lemma);
+              }
+              else {
+                  if (lemma != m.mk_false()) {
+                      // Duplicate the vars - do not want to destroy the model_node
+                      app_ref_vector vars(n_vars);
+                      // Create the generalized cube
+                      expr_ref cube (m_pm.mk_and(core), m);
+                      // Project it to Current vars
+                      m_pm.formula_n2o(cube.get(), cube, 0);
+                      // Eliminate vars
+                      qe_project (m, vars, cube, n.model (), true,
+                                  m_use_native_mbp, false);
+                      SASSERT(vars.empty());
+                      // No free vars - create the lemma
+                      m_pm.mk_cube_into_lemma(cube.get(), lemma);
+                      m_pm.formula_o2n(lemma.get(), lemma, 0);
+                  }
+              }
           }
 
           TRACE("spacer", tout << "invariant state: "
@@ -3237,6 +3256,8 @@ namespace spacer {
         if (!vars.empty()) {
             app_ref_vector& qvars = kid->get_vars();
             qvars.append(vars);
+            model_ref& model = kid->model();
+            model = mev.get_model();
         }
         
         // Optionally disable derivation optimization
