@@ -2841,7 +2841,6 @@ namespace spacer {
           expr_ref lemma (m_pm.mk_not_and(core), m);
           
           if (!n.is_ground ()) {
-              TRACE("spacer", tout << "This lemma is NOT ground.\n";);
               app_ref_vector &n_vars = n.get_vars ();
               SASSERT (n_vars.size () > 0);
               if (contains_selects(lemma.get(), m)) {
