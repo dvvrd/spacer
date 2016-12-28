@@ -2841,13 +2841,14 @@ namespace spacer {
           expr_ref lemma (m_pm.mk_not_and(core), m);
           
           if (!n.is_ground ()) {
+              TRACE("spacer", tout << "This lemma is NOT ground.\n";);
               app_ref_vector &n_vars = n.get_vars ();
               SASSERT (n_vars.size () > 0);
               if (contains_selects(lemma.get(), m)) {
                   lemma = mk_forall (m, n_vars.size (), n_vars.c_ptr (), lemma);
               }
               else {
-                  if (lemma != m.mk_false()) {
+                  if (lemma != m.mk_true()) {
                       // Duplicate the vars - do not want to destroy the model_node
                       app_ref_vector vars(n_vars);
                       // Create the generalized cube
@@ -3177,10 +3178,9 @@ namespace spacer {
                     }
                 }
                 // If it is not eliminated, add it to the list of vars
-                if (!qe_vars.empty() && qe_vars.back() != pv_sk) {
+                if (qe_vars.empty() || qe_vars.back() != pv_sk) {
                     vars.push_back(pv_sk);
                 }
-
             }
             if (!qe_vars.empty()) {
                 qe_project (m, qe_vars, phi1, mev.get_model (), true,
@@ -3202,11 +3202,11 @@ namespace spacer {
                 else {
                     sk = m.mk_fresh_const("sk", l->get_decl()->get_range());
                     m_local2sk.insert(l, sk);
-                    m_sk2local.insert(sk, l);
+                    m_sk2local.insert(sk.get(), l);
                 }
                 vars.set(v, sk.get());
-                es.insert(l, sk);
-                ses.insert(l, sk);
+                es.insert(l, sk.get());
+                ses.insert(l, sk.get());
             }
             // XXX For some reason, this is not working...
             // XXX Must use the safe replacer instead.
