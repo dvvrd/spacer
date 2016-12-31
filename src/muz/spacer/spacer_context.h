@@ -744,6 +744,7 @@ namespace spacer {
         unsigned             m_restart_initial_threshold;
 
         // Utility: Quantified Lemmas
+        app_ref_vector m_skolems;
         obj_map<app, app*> m_local2sk;
         obj_map<app, app*> m_sk2local;
 

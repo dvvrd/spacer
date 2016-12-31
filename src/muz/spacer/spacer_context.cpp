@@ -1690,6 +1690,7 @@ namespace spacer {
         m_weak_abs(params.spacer_weak_abs()),
         m_use_restarts(params.spacer_restarts()),
         m_restart_initial_threshold(params.spacer_restart_initial_threshold()),
+        m_skolems(m),
         m_local2sk(),
         m_sk2local()
 
@@ -3190,29 +3191,23 @@ namespace spacer {
 
         // Skolemize the quantified local vars
         if (qvars_size > 0) {
-            expr_substitution es(m);
             expr_safe_replace ses(m);
-            app_ref sk(m);
+            app* sk;
             for (unsigned v = 0; v < qvars_size; v++) {
                 app* l = vars[v].get();
                 SASSERT(vars[v].get()->get_decl()->get_arity() == 0);
-                if (m_local2sk.contains(l))
-                    sk = m_local2sk[l];
-                else {
+                if (!m_local2sk.find (l, sk)) {
                     sk = m.mk_fresh_const("sk", l->get_decl()->get_range());
+                    m_skolems.push_back (sk);
                     m_local2sk.insert(l, sk);
-                    m_sk2local.insert(sk.get(), l);
+                    m_sk2local.insert(sk, l);
                 }
-                vars.set(v, sk.get());
-                es.insert(l, sk.get());
-                ses.insert(l, sk.get());
+                    
+                SASSERT (m.get_sort (sk) == m.get_sort (l));
+                vars.set(v, sk);
+                ses.insert(l, sk);
             }
-            // XXX For some reason, this is not working...
-            // XXX Must use the safe replacer instead.
-            //scoped_ptr<expr_replacer> rep = mk_default_expr_replacer(m);
-            //rep->set_substitution(&es);
-            //(*rep)(phi1.get(), phi1);
-            ses(phi1.get(), phi1);
+            ses(phi1, phi1);
         }
 
         // XXX phi1 is not ground if !n.is_ground
