@@ -179,7 +179,8 @@ def_module_params('fixedpoint',
                           ('spacer.vs.dump_benchmarks', BOOL, False, 'dump benchmarks in virtual solver'),
                           ('spacer.vs.dump_min_time', DOUBLE, 5.0, 'min time to dump benchmark'),
                           ('spacer.vs.recheck', BOOL, False, 're-check locally during benchmark dumping'),
-                          ('spacer.mbqi', BOOL, True, 'use model-based quantifier instantiation')
+                          ('spacer.mbqi', BOOL, True, 'use model-based quantifier instantiation'),
+                          ('spacer.keep_proxy', BOOL, True, 'keep proxy variables (internal parameter)'),
                           ))
 
 

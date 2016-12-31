@@ -67,7 +67,8 @@ namespace spacer {
         m_subset_based_core(false),
         m_uses_level(infty_level ()),
         m_delta_level(false),
-        m_in_level(false)
+        m_in_level(false),
+        m_use_push_bg (p.spacer_keep_proxy())
     {
       
         m_solvers[0] = pm.mk_fresh ();
@@ -118,7 +119,6 @@ namespace spacer {
             bool active = m_delta_level ? i == level : i>=level;
             app * lev_atom =
                 active ? m_neg_level_atoms.get (i) : m_pos_level_atoms.get (i);
-            //m_ctx->assert_expr (lev_atom);
             m_ctx->push_bg (lev_atom);
         }
     }
@@ -249,11 +249,6 @@ namespace spacer {
                                           unsigned num_bg, expr * const * bg,
                                           unsigned solver_id) 
     {
-        // -- true == use push_bg to assert background assumptions
-        // -- false == use assert_expr to assert background assumption
-        // -- the use_push_bg==false simulates the old behavior
-        bool use_push_bg = true;
-      
         // current clients expect that flattening of HARD  is
         // done implicitly during check_assumptions
         expr_ref_vector hard (m);
@@ -265,14 +260,17 @@ namespace spacer {
         
         // can be disabled if use_push_bg == true
         // solver::scoped_push _s_(*m_ctx);
+        if (!m_use_push_bg) m_ctx->push ();
         itp_solver::scoped_bg _b_(*m_ctx);
         
         for (unsigned i = 0; i < num_bg; ++i)
-            if (use_push_bg) m_ctx->push_bg (bg [i]);
+            if (m_use_push_bg) m_ctx->push_bg (bg [i]);
             else m_ctx->assert_expr (bg[i]);
         
         unsigned soft_sz = soft.size ();
         lbool res = internal_check_assumptions (hard, soft);
+        if (!m_use_push_bg) m_ctx->pop (1);
+        
         TRACE ("psolve_verbose",
                tout << "sat: " << mk_pp (mk_and (hard), m) << "\n"
                << mk_pp (mk_and (soft), m) << "\n";

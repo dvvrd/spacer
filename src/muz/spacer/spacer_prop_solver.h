@@ -80,6 +80,7 @@ namespace spacer {
         /// atoms explicitly asserted in m_current_level
         bool                m_delta_level;
         bool                m_in_level;         
+        bool                m_use_push_bg;
         unsigned            m_current_level;    // set when m_in_level
         
         void assert_level_atoms(unsigned level);
