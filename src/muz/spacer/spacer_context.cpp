@@ -2847,7 +2847,7 @@ namespace spacer {
                   lemma = mk_forall (m, n_vars.size (), n_vars.c_ptr (), lemma);
               }
               else {
-                  if (lemma != m.mk_true()) {
+                  if (!m.is_true (lemma)) {
                       // Duplicate the vars - do not want to destroy the model_node
                       app_ref_vector vars(n_vars);
                       // Create the generalized cube
