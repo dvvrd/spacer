@@ -2845,7 +2845,19 @@ namespace spacer {
               app_ref_vector &n_vars = n.get_vars ();
               SASSERT (n_vars.size () > 0);
               if (contains_selects(lemma.get(), m)) {
-                  lemma = mk_forall (m, n_vars.size (), n_vars.c_ptr (), lemma);
+                  symbol qid (lemma->get_id ());
+                  expr_abstract (m, 0, n_vars.size (),
+                                 (expr* const*) n_vars.c_ptr (), lemma, lemma);
+                  ptr_vector<sort> sorts;
+                  svector<symbol> names;
+                  for (unsigned i = 0, e = n_vars.size (); i < e; ++i) {
+                      sorts.push_back (m.get_sort (n_vars.get (i)));
+                      names.push_back (n_vars.get (i)->get_decl ()->get_name ());
+                  }
+                  lemma = m.mk_quantifier (true, n_vars.size (),
+                                           sorts.c_ptr (),
+                                           names.c_ptr (),
+                                           lemma, 0, qid);
               }
               else {
                   if (!m.is_true (lemma)) {
