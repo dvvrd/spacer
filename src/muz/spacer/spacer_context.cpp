@@ -1696,10 +1696,7 @@ namespace spacer {
         m_weak_abs(params.spacer_weak_abs()),
         m_use_restarts(params.spacer_restarts()),
         m_restart_initial_threshold(params.spacer_restart_initial_threshold()),
-        m_skolems(m),
-        m_local2sk(),
-        m_sk2local()
-
+        m_skolems(m)
     {}
 
     context::~context() {
@@ -2848,19 +2845,20 @@ namespace spacer {
           expr_ref lemma (m_pm.mk_not_and(core), m);
           
           if (!n.is_ground ()) {
-              app_ref_vector &n_vars = n.get_vars ();
-              SASSERT (n_vars.size () > 0);
+              app_ref_vector qvars(m);
+              n.get_qvars(m_skolems, qvars);
+              SASSERT (qvars.size () > 0);
               if (contains_selects(lemma.get(), m)) {
                   symbol qid (lemma->get_id ());
-                  expr_abstract (m, 0, n_vars.size (),
-                                 (expr* const*) n_vars.c_ptr (), lemma, lemma);
+                  expr_abstract (m, 0, qvars.size (),
+                                 (expr* const*) qvars.c_ptr (), lemma, lemma);
                   ptr_vector<sort> sorts;
                   svector<symbol> names;
-                  for (unsigned i = 0, e = n_vars.size (); i < e; ++i) {
-                      sorts.push_back (m.get_sort (n_vars.get (i)));
-                      names.push_back (n_vars.get (i)->get_decl ()->get_name ());
+                  for (unsigned i = 0, e = qvars.size (); i < e; ++i) {
+                      sorts.push_back (m.get_sort (qvars.get (i)));
+                      names.push_back (qvars.get (i)->get_decl ()->get_name ());
                   }
-                  lemma = m.mk_quantifier (true, n_vars.size (),
+                  lemma = m.mk_quantifier (true, qvars.size (),
                                            sorts.c_ptr (),
                                            names.c_ptr (),
                                            lemma, 0, qid);
@@ -2868,7 +2866,7 @@ namespace spacer {
               else {
                   if (!m.is_true (lemma)) {
                       // Duplicate the vars - do not want to destroy the model_node
-                      app_ref_vector vars(n_vars);
+                      app_ref_vector vars(qvars);
                       // Create the generalized cube
                       expr_ref cube (m_pm.mk_and(core), m);
                       // Project it to Current vars
@@ -3177,7 +3175,7 @@ namespace spacer {
         // XXX FOR NOW ASSUME ONLY ONE QUANTIFIER IS ALLOWED (per var)!!!
         // Check if the parent has a quantified variable of the same
         // kind - can only happen when there is a loop
-        if (!n.is_ground ()) {
+        /*if (!n.is_ground ()) {
             // vars to eliminate
             app_ref_vector qe_vars(m);
             // previously quantified vars
@@ -3205,24 +3203,33 @@ namespace spacer {
                             m_use_native_mbp, false);
                 SASSERT(qe_vars.empty());
             }
-        }
+        }*/
 
         // Skolemize the quantified local vars
         if (qvars_size > 0) {
+            // First abstract the cti
+            // The substitution is implicit and represented by 'vars', thus,
+            // we do not need to store it as 'vars' is already stored in
+            // model_node
+
+            // Check if we have enough skolems
+            if (qvars_size > m_skolems.size()) {
+                for (unsigned v = m_skolems.size(); v < qvars_size; v++) {
+                    app* l = vars[v].get();
+                    m_skolems.push_back(
+                        m.mk_fresh_const("sk", l->get_decl()->get_range()));
+                }
+            }
+            // The mapping is as follows:
+            // (VAR: i) <==> sk_i
+            // (VAR: i) <==> vars[i] for this specific model_node
+            // sk_i is stored in m_skolems[i]
             expr_safe_replace ses(m);
-            app* sk;
             for (unsigned v = 0; v < qvars_size; v++) {
                 app* l = vars[v].get();
                 SASSERT(vars[v].get()->get_decl()->get_arity() == 0);
-                if (!m_local2sk.find (l, sk)) {
-                    sk = m.mk_fresh_const("sk", l->get_decl()->get_range());
-                    m_skolems.push_back (sk);
-                    m_local2sk.insert(l, sk);
-                    m_sk2local.insert(sk, l);
-                }
-                    
+                app* sk = m_skolems[v].get();
                 SASSERT (m.get_sort (sk) == m.get_sort (l));
-                vars.set(v, sk);
                 ses.insert(l, sk);
             }
             ses(phi1, phi1);

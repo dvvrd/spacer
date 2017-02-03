@@ -495,6 +495,10 @@ namespace spacer {
     void set_post (expr *post, app_ref_vector &vars)
     { set_post (post); m_vars.append (vars);}
     app_ref_vector &get_vars () {return m_vars;}
+    void get_qvars(app_ref_vector& skolems, app_ref_vector& qvars) {
+        for (unsigned v=0; v < m_vars.size(); v++)
+            qvars.push_back(skolems[v].get());
+    }
     model_ref& model () {return m_model;}
 
     
@@ -748,8 +752,6 @@ namespace spacer {
 
         // Utility: Quantified Lemmas
         app_ref_vector m_skolems;
-        obj_map<app, app*> m_local2sk;
-        obj_map<app, app*> m_sk2local;
 
         // Functions used by search.
         lbool solve_core (unsigned from_lvl = 0);
