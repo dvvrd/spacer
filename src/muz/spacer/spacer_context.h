@@ -156,29 +156,32 @@ namespace spacer {
         {
           ast_manager &m;
           expr_ref m_fml;
+          vector<expr_ref_vector> m_bindings;
           unsigned m_lvl;
           
         public:
           lemma (ast_manager &manager, expr * fml, unsigned lvl) : 
-            m(manager), m_fml (fml, m), m_lvl(lvl) {}
+            m(manager), m_fml (fml, m), m_bindings(), m_lvl(lvl) {}
           
           lemma (const lemma &other) 
-            : m(other.m), m_fml (other.m_fml), m_lvl (other.m_lvl) {}
-          
-          lemma& operator= (lemma other) 
-          {swap (*this, other); return *this;}
-          
-          
+            : m(other.m), m_fml (other.m_fml), m_bindings(other.m_bindings), m_lvl (other.m_lvl) {}
+
           expr * get () const {return m_fml.get ();}
           unsigned level () const {return m_lvl;}
           void set_level (unsigned lvl) { m_lvl = lvl;}
-          
-          friend void swap (lemma &a, lemma &b)
-          {
-            using std::swap;
-            SASSERT (&a.m == &b.m);
-            swap (a.m_fml, b.m_fml);
-            swap (a.m_lvl, b.m_lvl);
+          vector<expr_ref_vector>& get_bindings() { return m_bindings; }
+          void add_binding(expr_ref_vector& binding) {m_bindings.push_back(binding);}
+          void create_instantiations(expr_ref_vector inst) {
+              SASSERT(is_quantifier(m_fml) && m_bindings.size() > 0);
+              expr_ref body(m);
+              body = to_quantifier(m_fml)->get_expr();
+              for (unsigned i=0; i < m_bindings.size(); i++) {
+                  expr_ref_vector& binding = m_bindings[i];
+                  expr_ref out(m);
+                  var_subst vs(m);
+                  vs (body, binding.size (), (expr**) binding.c_ptr (), out);
+                  inst.push_back(out);
+              }
           }
         };
         
@@ -206,7 +209,7 @@ namespace spacer {
         frames (pred_transformer &pt) : m_pt (pt), m_size(0), m_sorted (true) {}
         ~frames() {
             for (unsigned i=0; i < m_lemmas.size(); i++)
-                delete m_lemmas[i];
+                dealloc(m_lemmas[i]);
             m_lemmas.reset();
         }
         void simplify_formulas ();

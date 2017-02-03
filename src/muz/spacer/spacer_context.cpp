@@ -1256,12 +1256,15 @@ namespace spacer {
         
         m_lemmas [i]->set_level (level);
         m_pt.add_lemma_core (lemma, level);
-        for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas [j+1], m_lemmas[j]); ++j)
-          swap (*m_lemmas [j], *m_lemmas [j+1]);
+        for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas [j+1], m_lemmas[j]); ++j) {
+          frames::lemma* l = m_lemmas[j];
+          m_lemmas[j] = m_lemmas[j+1];
+          m_lemmas[j+1] = l;
+        }
         return true;
       }
     
-    frames::lemma *lem = new frames::lemma(m_pt.get_ast_manager (), lemma, level);
+    frames::lemma *lem = alloc(frames::lemma, m_pt.get_ast_manager (), lemma, level);
     m_lemmas.push_back (lem);
     m_sorted = false;
     m_pt.add_lemma_core (m_lemmas.back ()->get (), m_lemmas.back ()->level ());
@@ -1312,8 +1315,11 @@ namespace spacer {
         m_pt.add_lemma_core (m_lemmas [i]->get (), solver_level);
         
         // percolate the lemma up to its new place
-        for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas[j+1], m_lemmas[j]); ++j)
-          swap (*m_lemmas [j], *m_lemmas[j+1]);
+        for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas[j+1], m_lemmas[j]); ++j) {
+            frames::lemma* l = m_lemmas[j];
+            m_lemmas[j] = m_lemmas[j+1];
+            m_lemmas[j+1] = l;
+        }
         
       }
       else 
@@ -1359,11 +1365,11 @@ namespace spacer {
       goal *r = result [0];
       
       for (unsigned k = 0; k < r->size (); ++k) 
-        new_lemmas.push_back (new lemma (m, r->form (k), level));
+        new_lemmas.push_back (alloc(lemma, m, r->form (k), level));
       m_sorted = false;
     }
     for (unsigned i=0; i < m_lemmas.size(); i++)
-        delete m_lemmas[i];
+        dealloc(m_lemmas[i]);
     m_lemmas.reset();
     for (unsigned i=0; i < new_lemmas.size(); i++)
         m_lemmas.push_back(new_lemmas[i]);
