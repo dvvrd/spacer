@@ -171,18 +171,7 @@ namespace spacer {
           void set_level (unsigned lvl) { m_lvl = lvl;}
           vector<expr_ref_vector>& get_bindings() { return m_bindings; }
           void add_binding(expr_ref_vector& binding) {m_bindings.push_back(binding);}
-          void create_instantiations(expr_ref_vector inst) {
-              SASSERT(is_quantifier(m_fml) && m_bindings.size() > 0);
-              expr_ref body(m);
-              body = to_quantifier(m_fml)->get_expr();
-              for (unsigned i=0; i < m_bindings.size(); i++) {
-                  expr_ref_vector& binding = m_bindings[i];
-                  expr_ref out(m);
-                  var_subst vs(m);
-                  vs (body, binding.size (), (expr**) binding.c_ptr (), out);
-                  inst.push_back(out);
-              }
-          }
+          void create_instantiations(expr_ref_vector inst); 
         };
         
         struct lemmas_lt_proc : 
