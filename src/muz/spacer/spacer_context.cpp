@@ -2859,6 +2859,7 @@ namespace spacer {
           expr_ref lemma (m_pm.mk_not_and(core), m);
           
           if (!n.is_ground ()) {
+              // qvars holds the skolems that appear in the term
               app_ref_vector qvars(m);
               n.get_qvars(m_skolems, qvars);
               SASSERT (qvars.size () > 0);
@@ -2879,16 +2880,18 @@ namespace spacer {
               }
               else {
                   if (!m.is_true (lemma)) {
-                      // Duplicate the vars - do not want to destroy the model_node
-                      app_ref_vector vars(qvars);
                       // Create the generalized cube
                       expr_ref cube (m_pm.mk_and(core), m);
                       // Project it to Current vars
+                      // The 'model' that was used when creating the CTI
+                      // associated with this lemma is over Current vars.
+                      // Therefore, before using MBP we project cube to
+                      // Current vars.
                       m_pm.formula_n2o(cube.get(), cube, 0);
                       // Eliminate vars
-                      qe_project (m, vars, cube, n.model (), true,
+                      qe_project (m, qvars, cube, n.model (), true,
                                   m_use_native_mbp, false);
-                      SASSERT(vars.empty());
+                      SASSERT(qvars.empty());
                       // No free vars - create the lemma
                       m_pm.mk_cube_into_lemma(cube.get(), lemma);
                       m_pm.formula_o2n(lemma.get(), lemma, 0);
