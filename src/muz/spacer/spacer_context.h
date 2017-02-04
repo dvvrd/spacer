@@ -741,6 +741,7 @@ namespace spacer {
 
         // Utility: Quantified Lemmas
         app_ref_vector m_skolems;
+        void ensure_skolems(ptr_vector<sort>& sorts);
 
         // Functions used by search.
         lbool solve_core (unsigned from_lvl = 0);

@@ -3190,70 +3190,17 @@ namespace spacer {
         // }
         
         unsigned qvars_size = vars.size();
-        // XXX FOR NOW ASSUME ONLY ONE QUANTIFIER IS ALLOWED (per var)!!!
-        // Check if the parent has a quantified variable of the same
-        // kind - can only happen when there is a loop
-        /*if (!n.is_ground ()) {
-            // vars to eliminate
-            app_ref_vector qe_vars(m);
-            // previously quantified vars
-            app_ref_vector& prev_vars = n.get_vars();
-            for (unsigned v=0; v < prev_vars.size(); v++) {
-                app* pv_sk = prev_vars[v].get();
-                SASSERT (m_sk2local.contains(pv_sk));
-                // Get the local var for this sk
-                app* pv = m_sk2local[pv_sk];
-                // Check if this the previously quantified local also
-                // appears in this pt. If it does, mark it for elimination
-                for (unsigned u=0; u < vars.size(); u++) {
-                    if (pv->get_decl() == vars[u].get()->get_decl()) {
-                        qe_vars.push_back(pv_sk);
-                        break;
-                    }
-                }
-                // If it is not eliminated, add it to the list of vars
-                if (qe_vars.empty() || qe_vars.back() != pv_sk) {
-                    vars.push_back(pv_sk);
-                }
-            }
-            if (!qe_vars.empty()) {
-                qe_project (m, qe_vars, phi1, mev.get_model (), true,
-                            m_use_native_mbp, false);
-                SASSERT(qe_vars.empty());
-            }
-        }*/
-
         // Skolemize the quantified local vars
         if (qvars_size > 0) {
-            // First abstract the cti
             // The substitution is implicit and represented by 'vars', thus,
             // we do not need to store it as 'vars' is already stored in
             // model_node
 
-            // XXX AG: I've tried factoring this if-statement into a method
-            // XXX AG: context::ensure_skolem (unsigned sz)
-            // XXX AG: but failed because the code depends on a local variable
-            // XXX AG: `vars`. This is very confusing, especially because `vars`
-            // XXX AG: is a local set of terms and not variables. 
-            // Check if we have enough skolems
             if (qvars_size > m_skolems.size()) {
-                for (unsigned v = m_skolems.size(); v < qvars_size; v++) {
-                    app* l = vars[v].get();
-                    // XXX Consider not using mk_fresh_const() but create sk!k directly
-                    // XXX to simplify debugging
-                    //
-                    // XXX Consider other name than 'sk' since this prefix is
-                    // XXX also used by default in other context in
-                    // XXX mk_fresh_const()
-
-                    // XXX Note that mk_fresh_const() marks constant as skolem
-                    // XXX by turning m_skolem flag. This might have
-                    // XXX unintended consequences (maybe even positive ;) ) 
-
-                    // XXX I suggest to pick a new name, say 'zk'
-                    m_skolems.push_back(
-                        m.mk_fresh_const("sk", l->get_decl()->get_range()));
-                }
+                ptr_vector<sort> sorts;
+                for (unsigned i = 0, e = vars.size (); i < e; ++i)
+                    sorts.push_back (m.get_sort (vars.get (i)));
+                ensure_skolems(sorts);
             }
             // The mapping is as follows:
             // (VAR: i) <==> sk_i
@@ -3502,6 +3449,15 @@ namespace spacer {
     }
   }
   
+  void context::ensure_skolems(ptr_vector<sort>& sorts)
+  {
+      unsigned size = sorts.size();
+      for (unsigned v = m_skolems.size(); v < size; v++) {
+          std::string str = "zk!" + datalog::to_string(v);
+          m_skolems.push_back(m.mk_const(symbol(str.c_str()), sorts[v]));
+      }
+  }
+
 
   inline bool model_node_lt::operator() (const model_node *pn1, const model_node *pn2) const
   {
