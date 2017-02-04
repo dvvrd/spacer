@@ -3226,10 +3226,27 @@ namespace spacer {
             // we do not need to store it as 'vars' is already stored in
             // model_node
 
+            // XXX AG: I've tried factoring this if-statement into a method
+            // XXX AG: context::ensure_skolem (unsigned sz)
+            // XXX AG: but failed because the code depends on a local variable
+            // XXX AG: `vars`. This is very confusing, especially because `vars`
+            // XXX AG: is a local set of terms and not variables. 
             // Check if we have enough skolems
             if (qvars_size > m_skolems.size()) {
                 for (unsigned v = m_skolems.size(); v < qvars_size; v++) {
                     app* l = vars[v].get();
+                    // XXX Consider not using mk_fresh_const() but create sk!k directly
+                    // XXX to simplify debugging
+                    //
+                    // XXX Consider other name than 'sk' since this prefix is
+                    // XXX also used by default in other context in
+                    // XXX mk_fresh_const()
+
+                    // XXX Note that mk_fresh_const() marks constant as skolem
+                    // XXX by turning m_skolem flag. This might have
+                    // XXX unintended consequences (maybe even positive ;) ) 
+
+                    // XXX I suggest to pick a new name, say 'zk'
                     m_skolems.push_back(
                         m.mk_fresh_const("sk", l->get_decl()->get_range()));
                 }
