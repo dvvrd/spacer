@@ -156,12 +156,12 @@ namespace spacer {
         {
           ast_manager &m;
           expr_ref m_fml;
-          vector<expr_ref_vector> m_bindings;
+          expr_ref_vector m_bindings;
           unsigned m_lvl;
           
         public:
           lemma (ast_manager &manager, expr * fml, unsigned lvl) : 
-            m(manager), m_fml (fml, m), m_bindings(), m_lvl(lvl) {}
+            m(manager), m_fml (fml, m), m_bindings(m), m_lvl(lvl) {}
           
           lemma (const lemma &other) 
             : m(other.m), m_fml (other.m_fml), m_bindings(other.m_bindings), m_lvl (other.m_lvl) {}
@@ -169,8 +169,8 @@ namespace spacer {
           expr * get () const {return m_fml.get ();}
           unsigned level () const {return m_lvl;}
           void set_level (unsigned lvl) { m_lvl = lvl;}
-          vector<expr_ref_vector>& get_bindings() { return m_bindings; }
-          void add_binding(expr_ref_vector& binding) {m_bindings.push_back(binding);}
+          expr_ref_vector& get_bindings() { return m_bindings; }
+          void add_binding(expr_ref_vector& binding) {m_bindings.append(binding);}
           void create_instantiations(expr_ref_vector inst); 
         };
         

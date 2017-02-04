@@ -1242,11 +1242,12 @@ namespace spacer {
       SASSERT(is_quantifier(m_fml) && m_bindings.size() > 0);
       expr_ref body(m);
       body = to_quantifier(m_fml)->get_expr();
-      for (unsigned i=0; i < m_bindings.size(); i++) {
-          expr_ref_vector& binding = m_bindings[i];
+      unsigned num_decls = to_quantifier(m_fml)->get_num_decls();
+      unsigned size = m_bindings.size() / num_decls;
+      for (unsigned i=0, offset=0; i < size; i++, offset += num_decls) {
           expr_ref out(m);
           var_subst vs(m);
-          vs (body, binding.size (), (expr**) binding.c_ptr (), out);
+          vs (body, num_decls, (expr**) m_bindings.c_ptr () + offset, out);
           inst.push_back(out);
       }
   }        
