@@ -171,7 +171,7 @@ namespace spacer {
           void set_level (unsigned lvl) { m_lvl = lvl;}
           expr_ref_vector& get_bindings() { return m_bindings; }
           void add_binding(expr_ref_vector& binding) {m_bindings.append(binding);}
-          void create_instantiations(expr_ref_vector inst); 
+          void create_instantiations(expr_ref_vector& inst);
         };
         
         struct lemmas_lt_proc : 
@@ -224,11 +224,11 @@ namespace spacer {
         void inherit_frames (frames &other)
         {
           for (unsigned i = 0, sz = other.m_lemmas.size (); i < sz; ++i)
-            add_lemma (other.m_lemmas [i]->get (), other.m_lemmas [i]->level ());
+            add_lemma (other.m_lemmas [i]->get (), other.m_lemmas [i]->level (), other.m_lemmas[i]->get_bindings());
           m_sorted = false;
         }
         
-        bool add_lemma (expr * lemma, unsigned level);
+        bool add_lemma (expr * lemma, unsigned level, expr_ref_vector& binding);
         void propagate_to_infinity (unsigned level);
         bool propagate_to_next_level (unsigned level);
         
@@ -354,7 +354,11 @@ namespace spacer {
         bool propagate_to_next_level(unsigned level);
         void propagate_to_infinity(unsigned level);
         /// \brief  Add a lemma to the current context and all users
-        bool add_lemma (expr * lemma, unsigned lvl);
+        bool add_lemma (expr * lemma, unsigned lvl, expr_ref_vector& binding);
+        bool add_lemma (expr * lemma, unsigned lvl) {
+            expr_ref_vector binding(m);
+            return add_lemma(lemma, lvl, binding);
+        }
         expr* get_reach_case_var (unsigned idx) const;
       bool has_reach_facts () const { return !m_reach_facts.empty () ;}
       

@@ -373,7 +373,7 @@ namespace spacer {
       m_use [i]->add_lemma_from_child (*this, lemma, next_level (lvl));
   }
   
-  bool pred_transformer::add_lemma (expr * lemma, unsigned lvl)
+  bool pred_transformer::add_lemma (expr * lemma, unsigned lvl, expr_ref_vector& binding)
   {
     bool res = false;
     
@@ -383,7 +383,7 @@ namespace spacer {
     for (unsigned i = 0, sz = lemmas.size(); i < sz; ++i)
     {
       normalize (lemmas.get (i), nlemma);
-      res |= m_frames.add_lemma (nlemma, lvl);
+      res |= m_frames.add_lemma (nlemma, lvl, binding);
     }
 
     if (res && is_infty_level (lvl)) m_stats.m_num_invariants++;
@@ -1237,9 +1237,10 @@ namespace spacer {
     for (; it != end; ++it) add_lemma (it->m_key, it->m_value);
   }
   
-  void pred_transformer::frames::lemma::create_instantiations (expr_ref_vector inst)
+  void pred_transformer::frames::lemma::create_instantiations (expr_ref_vector& inst)
   {
-      SASSERT(is_quantifier(m_fml) && m_bindings.size() > 0);
+      if (!is_quantifier(m_fml) || m_bindings.empty())
+          return;
       expr_ref body(m);
       body = to_quantifier(m_fml)->get_expr();
       unsigned num_decls = to_quantifier(m_fml)->get_num_decls();
@@ -1252,7 +1253,7 @@ namespace spacer {
       }
   }        
   
-  bool pred_transformer::frames::add_lemma (expr * lemma, unsigned level)
+  bool pred_transformer::frames::add_lemma (expr * lemma, unsigned level, expr_ref_vector& binding)
   {
     TRACE ("spacer", tout << "add-lemma: " << pp_level (level) << " " 
            << m_pt.head ()->get_name () << " " 
@@ -1269,20 +1270,35 @@ namespace spacer {
           return false;
         }
         
+        // XXX For now, adding the binding
+        // XXX Note that it may be the case that the exact same binding
+        // XXX already exists. Need to take care of that
         m_lemmas [i]->set_level (level);
-        m_pt.add_lemma_core (lemma, level);
+        m_lemmas [i]->add_binding(binding);
+        expr_ref_vector lemmas(m_pt.get_ast_manager ());
+        m_lemmas[i]->create_instantiations(lemmas);
+        lemmas.push_back(lemma);
+        for (unsigned l=0; l < lemmas.size(); l++)
+            m_pt.add_lemma_core (lemmas[l].get(), level);
         for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas [j+1], m_lemmas[j]); ++j) {
           frames::lemma* l = m_lemmas[j];
           m_lemmas[j] = m_lemmas[j+1];
           m_lemmas[j+1] = l;
         }
+
         return true;
       }
     
     frames::lemma *lem = alloc(frames::lemma, m_pt.get_ast_manager (), lemma, level);
+    lem->add_binding(binding);
     m_lemmas.push_back (lem);
     m_sorted = false;
-    m_pt.add_lemma_core (m_lemmas.back ()->get (), m_lemmas.back ()->level ());
+    expr_ref_vector lemmas(m_pt.get_ast_manager ());
+    lem->create_instantiations(lemmas);
+    lemmas.push_back(lemma);
+    for (unsigned l=0; l < lemmas.size(); l++)
+        m_pt.add_lemma_core (lemmas[l].get(), level);
+    //m_pt.add_lemma_core (m_lemmas.back ()->get (), m_lemmas.back ()->level ());
     return true;
   }
   
@@ -2903,7 +2919,10 @@ namespace spacer {
           TRACE("spacer", tout << "invariant state: "
                 << (is_infty_level(uses_level)?"(inductive)":"")
                 <<  mk_pp (lemma, m) << "\n";);
-          bool v = n.pt().add_lemma (lemma, uses_level);
+          expr_ref_vector binding(m);
+          for (unsigned i=0; i < n.get_vars().size(); i++)
+              binding.push_back(n.get_vars().get(i));
+          bool v = n.pt().add_lemma (lemma, uses_level, binding);
           if (v) m_stats.m_num_lemmas++;
           
           // Optionally update the node to be the negation of the lemma
