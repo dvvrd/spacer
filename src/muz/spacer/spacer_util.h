@@ -156,6 +156,8 @@ namespace spacer {
 
     bool contains_selects (expr* fml, ast_manager& m);
     void get_select_indices (expr* fml, app_ref_vector& indices, ast_manager& m);
+
+    void find_decls (expr* fml, app_ref_vector& decls, std::string& prefix);
 }
 
 #endif
