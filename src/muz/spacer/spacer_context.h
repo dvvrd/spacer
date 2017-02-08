@@ -152,6 +152,7 @@ namespace spacer {
       
       class frames
       {
+      public:
         class lemma
         {
           ast_manager &m;
@@ -171,7 +172,8 @@ namespace spacer {
           void set_level (unsigned lvl) { m_lvl = lvl;}
           expr_ref_vector& get_bindings() { return m_bindings; }
           void add_binding(expr_ref_vector& binding) {m_bindings.append(binding);}
-          void create_instantiations(expr_ref_vector& inst);
+          void create_instantiations(expr_ref_vector& inst, expr* fml = NULL);
+          bool binding_exists(expr_ref_vector& binding);
         };
         
         struct lemmas_lt_proc : 
@@ -184,6 +186,7 @@ namespace spacer {
                ast_lt_proc() (a->get (), b->get ()));
           }
         };
+      private:
 
         pred_transformer &m_pt;
         vector<lemma*> m_lemmas;
@@ -278,8 +281,8 @@ namespace spacer {
       
         void init_sig();
         void ensure_level(unsigned level);
-        void add_lemma_core (expr *lemma, unsigned lvl);
-        void add_lemma_from_child (pred_transformer &child, expr *lemma, unsigned lvl);
+        void add_lemma_core (frames::lemma *lemma);
+        void add_lemma_from_child (pred_transformer &child, frames::lemma *lemma, unsigned lvl);
       
         void mk_assumptions(func_decl* head, expr* fml, expr_ref_vector& result);
 

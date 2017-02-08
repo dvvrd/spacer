@@ -351,22 +351,24 @@ namespace spacer {
   
 
   /// \brief adds a lemma to the solver and to child solvers
-  void pred_transformer::add_lemma_core (expr * lemma, unsigned lvl)
+  void pred_transformer::add_lemma_core (frames::lemma* lemma)
   {
+    unsigned lvl = lemma->level();
+    expr* l = lemma->get();
     TRACE("spacer", tout << "add-lemma-core: " << pp_level (lvl)
           << " " << head ()->get_name () 
-          << " " << mk_pp (lemma, m) << "\n";);
+          << " " << mk_pp (l, m) << "\n";);
     
     TRACE("core_array_eq", tout << "add-lemma-core: " << pp_level (lvl)
           << " " << head ()->get_name () 
-          << " " << mk_pp (lemma, m) << "\n";);
+          << " " << mk_pp (l, m) << "\n";);
     
-    if (is_infty_level (lvl)) m_solver.assert_expr (lemma);
+    if (is_infty_level (lvl)) m_solver.assert_expr (l);
     else 
     {
       ensure_level (lvl);
-      if (!is_forall(lemma))
-          m_solver.assert_expr (lemma, lvl);
+      if (!is_forall(l))
+          m_solver.assert_expr (l, lvl);
     }
     
     for (unsigned i = 0, sz = m_use.size (); i < sz; ++i)
@@ -393,19 +395,31 @@ namespace spacer {
   
 
   void pred_transformer::add_lemma_from_child (pred_transformer& child, 
-                                               expr* lemma, unsigned lvl) 
+                                               frames::lemma* lemma, unsigned lvl)
   {
     ensure_level(lvl);
     expr_ref_vector fmls(m);
-    mk_assumptions(child.head(), lemma, fmls);
+    mk_assumptions(child.head(), lemma->get(), fmls);
+
     for (unsigned i = 0; i < fmls.size(); ++i) {
-      TRACE("spacer_detail", tout << "child property: " 
-            << mk_pp(fmls.get (i), m) << "\n";);
-      if (is_infty_level(lvl)) 
-        m_solver.assert_expr (fmls.get (i));
-      else 
-        m_solver.assert_expr (fmls.get (i), lvl);
+        expr_ref_vector inst(m);
+        expr* a = to_app(fmls.get(i))->get_arg(0);
+        expr* l = to_app(fmls.get(i))->get_arg(1);
+        lemma->create_instantiations(inst, l);
+        for (unsigned j=0; j < inst.size(); j++) {
+            inst.set(j, m.mk_implies(a, inst.get(j)));
+        }
+        inst.push_back(fmls.get(i));
+        for (unsigned j = 0; j < inst.size(); ++j) {
+          TRACE("spacer_detail", tout << "child property: "
+                << mk_pp(inst.get (j), m) << "\n";);
+          if (is_infty_level(lvl))
+            m_solver.assert_expr (inst.get (j));
+          else
+            m_solver.assert_expr (inst.get (j), lvl);
+        }
     }
+
   }
 
     expr* pred_transformer::mk_fresh_reach_case_var () 
@@ -471,9 +485,10 @@ namespace spacer {
       TRACE ("spacer",
              tout << "updating reach ctx: " << mk_pp(fml, m) << "\n";);
 
+      frames::lemma lem (m, fml, infty_level());
       // update users; reach facts are independent of levels
       for (unsigned i = 0; i < m_use.size(); ++i) {
-        m_use[i]->add_lemma_from_child (*this, fml, infty_level ());
+        m_use[i]->add_lemma_from_child (*this, &lem, infty_level ());
       }
     }
 
@@ -1195,7 +1210,7 @@ namespace spacer {
       {
         m_invariants.push_back (lemma);
         m_prop2level.insert (lemma, lvl);
-        m_pt.add_lemma_core (lemma, lvl);
+        //m_pt.add_lemma_core (lemma, lvl);
         return true;
       }
       return false;
@@ -1206,7 +1221,7 @@ namespace spacer {
     {
       m_levels[lvl].push_back(lemma);
       m_prop2level.insert(lemma, lvl);
-      m_pt.add_lemma_core (lemma, lvl);
+      //m_pt.add_lemma_core (lemma, lvl);
       return true;
     }
     return false;
@@ -1237,12 +1252,14 @@ namespace spacer {
     for (; it != end; ++it) add_lemma (it->m_key, it->m_value);
   }
   
-  void pred_transformer::frames::lemma::create_instantiations (expr_ref_vector& inst)
+  void pred_transformer::frames::lemma::create_instantiations (expr_ref_vector& inst, expr* fml)
   {
       if (!is_quantifier(m_fml) || m_bindings.empty())
           return;
       expr_ref body(m);
-      body = to_quantifier(m_fml)->get_expr();
+      body = (fml == NULL) ?
+              to_quantifier(m_fml)->get_expr() :
+              to_quantifier(fml)->get_expr();
       unsigned num_decls = to_quantifier(m_fml)->get_num_decls();
       unsigned size = m_bindings.size() / num_decls;
       for (unsigned i=0, offset=0; i < size; i++, offset += num_decls) {
@@ -1252,7 +1269,25 @@ namespace spacer {
           vs (body, num_decls, (expr**) m_bindings.c_ptr () + offset, out);
           inst.push_back(out);
       }
-  }        
+  }
+
+  bool pred_transformer::frames::lemma::binding_exists (expr_ref_vector& binding)
+  {
+      if (!is_quantifier(m_fml) || m_bindings.empty())
+          return false;
+      expr_ref body(m);
+      body = to_quantifier(m_fml)->get_expr();
+      unsigned num_decls = to_quantifier(m_fml)->get_num_decls();
+      unsigned size = m_bindings.size() / num_decls;
+      for (unsigned i=0, offset=0; i < size; i++, offset += num_decls) {
+         bool eq = true;
+         for (unsigned j=0; j < binding.size() && eq; j++)
+             if (m_bindings.get(offset+j)->hash() != binding.get(j)->hash())
+                 eq = false;
+         if (eq) return true;
+      }
+      return false;
+  }
   
   bool pred_transformer::frames::add_lemma (expr * lemma, unsigned level, expr_ref_vector& binding)
   {
@@ -1261,26 +1296,18 @@ namespace spacer {
            << mk_pp (lemma, m_pt.get_ast_manager ()) << "\n";);
     
     for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
-      if (m_lemmas [i]->get () == lemma)
+      if (m_lemmas [i]->get () == lemma && binding.empty())
       {
         if (m_lemmas [i]->level () >= level)
         {
-          TRACE ("spacer", tout << "Already at a higher level: " 
+          TRACE ("spacer", tout << "Already at a higher level: "
                  << pp_level (m_lemmas [i]->level ()) << "\n";);
-          
           return false;
         }
         
-        // XXX For now, adding the binding
-        // XXX Note that it may be the case that the exact same binding
-        // XXX already exists. Need to take care of that
         m_lemmas [i]->set_level (level);
         m_lemmas [i]->add_binding(binding);
-        expr_ref_vector lemmas(m_pt.get_ast_manager ());
-        m_lemmas[i]->create_instantiations(lemmas);
-        lemmas.push_back(lemma);
-        for (unsigned l=0; l < lemmas.size(); l++)
-            m_pt.add_lemma_core (lemmas[l].get(), level);
+        m_pt.add_lemma_core (m_lemmas[i]);
         for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas [j+1], m_lemmas[j]); ++j) {
           frames::lemma* l = m_lemmas[j];
           m_lemmas[j] = m_lemmas[j+1];
@@ -1294,11 +1321,7 @@ namespace spacer {
     lem->add_binding(binding);
     m_lemmas.push_back (lem);
     m_sorted = false;
-    expr_ref_vector lemmas(m_pt.get_ast_manager ());
-    lem->create_instantiations(lemmas);
-    lemmas.push_back(lemma);
-    for (unsigned l=0; l < lemmas.size(); l++)
-        m_pt.add_lemma_core (lemmas[l].get(), level);
+    m_pt.add_lemma_core (lem);
     //m_pt.add_lemma_core (m_lemmas.back ()->get (), m_lemmas.back ()->level ());
     return true;
   }
@@ -1309,7 +1332,7 @@ namespace spacer {
       if (m_lemmas[i]->level () >= level && !is_infty_level (m_lemmas [i]->level ()))
       {
         m_lemmas [i]->set_level (infty_level ());
-        m_pt.add_lemma_core (m_lemmas [i]->get (), infty_level ());
+        m_pt.add_lemma_core (m_lemmas [i]);
         m_sorted = false;
       }
   }
