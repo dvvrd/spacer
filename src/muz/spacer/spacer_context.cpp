@@ -1247,7 +1247,8 @@ namespace spacer {
       unsigned size = m_bindings.size() / num_decls;
       for (unsigned i=0, offset=0; i < size; i++, offset += num_decls) {
           expr_ref out(m);
-          var_subst vs(m);
+          // Set the reverse order when doing the instantiation
+          var_subst vs(m, false);
           vs (body, num_decls, (expr**) m_bindings.c_ptr () + offset, out);
           inst.push_back(out);
       }
@@ -2875,22 +2876,27 @@ namespace spacer {
           uses_level = cores[i].second;
           expr_ref lemma (m_pm.mk_not_and(core), m);
           
-          if (!n.is_ground ()) {
-              // qvars holds the skolems that appear in the term
-              app_ref_vector qvars(m);
-              n.get_qvars(m_skolems, qvars);
-              SASSERT (qvars.size () > 0);
+          // qvars holds the skolems that appear in the term
+          app_ref_vector qvars(m);
+          std::string str("zk!");
+          find_decls(lemma.get(), qvars, str);
+          std::sort(qvars.c_ptr(), qvars.c_ptr() + qvars.size(), sk_lt_proc(m_skolems));
+          if (!n.is_ground () && qvars.size() > 0) {
               if (contains_selects(lemma.get(), m)) {
+                  app_ref_vector rqvars(qvars);
+                  // When abstracting, the last element of the vector
+                  // becomes VAR:0. Therefore, reversing.
+                  rqvars.reverse();
                   symbol qid (lemma->get_id ());
-                  expr_abstract (m, 0, qvars.size (),
-                                 (expr* const*) qvars.c_ptr (), lemma, lemma);
+                  expr_abstract (m, 0, rqvars.size (),
+                                 (expr* const*) rqvars.c_ptr (), lemma, lemma);
                   ptr_vector<sort> sorts;
                   svector<symbol> names;
-                  for (unsigned i = 0, e = qvars.size (); i < e; ++i) {
-                      sorts.push_back (m.get_sort (qvars.get (i)));
-                      names.push_back (qvars.get (i)->get_decl ()->get_name ());
+                  for (unsigned i = 0, e = rqvars.size (); i < e; ++i) {
+                      sorts.push_back (m.get_sort (rqvars.get (i)));
+                      names.push_back (rqvars.get (i)->get_decl ()->get_name ());
                   }
-                  lemma = m.mk_quantifier (true, qvars.size (),
+                  lemma = m.mk_quantifier (true, rqvars.size (),
                                            sorts.c_ptr (),
                                            names.c_ptr (),
                                            lemma, 0, qid);
@@ -2920,8 +2926,7 @@ namespace spacer {
                 << (is_infty_level(uses_level)?"(inductive)":"")
                 <<  mk_pp (lemma, m) << "\n";);
           expr_ref_vector binding(m);
-          for (unsigned i=0; i < n.get_vars().size(); i++)
-              binding.push_back(n.get_vars().get(i));
+          n.get_binding(qvars, m_skolems, binding);
           bool v = n.pt().add_lemma (lemma, uses_level, binding);
           if (v) m_stats.m_num_lemmas++;
           
@@ -3183,6 +3188,14 @@ namespace spacer {
         }
         ptr_vector<app>& aux_vars = pt.get_aux_vars(r);
         vars.append(aux_vars.size(), aux_vars.c_ptr());
+
+        if (!n.is_ground()) {
+            unsigned size = n.get_vars().size();
+            for (unsigned sk=0; sk < size; sk++)
+                vars.push_back(m_skolems[sk].get());
+        }
+
+        std::sort(vars.c_ptr(), vars.c_ptr() + vars.size(), sk_lt_proc(m_skolems));
 
         expr_ref phi1 = m_pm.mk_and (Phi);
         qe_project (m, vars, phi1, mev.get_model (), true,

@@ -493,6 +493,21 @@ namespace spacer {
             qvars.push_back(skolems[v].get());
     }
     model_ref& model () {return m_model;}
+    void get_binding(
+            const app_ref_vector& occur,
+            const app_ref_vector& skolems,
+            expr_ref_vector& binding) {
+        if (occur.empty()) return;
+        for (unsigned i=0, j=0; i < occur.size(); i++) {
+            while (j < skolems.size()) {
+                app* sk = skolems.get(j);
+                if (sk->hash() == occur.get(i)->hash())
+                    break;
+                j++;
+            }
+            binding.push_back(m_vars.get(j));
+        }
+    }
 
     
     /// indicate that a new post should be set for the node
@@ -863,6 +878,42 @@ namespace spacer {
       
         expr_ref get_constraints (unsigned lvl);
         void add_constraints (unsigned lvl, expr_ref c);
+
+        struct sk_lt_proc :
+          public std::binary_function<app const*, app const*, bool>
+        {
+          sk_lt_proc(app_ref_vector& skolems) : m_skolems(skolems) {}
+          bool operator() (app const *a, app const *b)
+          {
+              bool a_skolem = a->get_decl()->get_name().str().find("zk!") != std::string::npos;
+              bool b_skolem = b->get_decl()->get_name().str().find("zk!") != std::string::npos;
+              if (a_skolem || b_skolem) {
+                  if (a_skolem && !b_skolem)
+                      return true;
+                  else if (!a_skolem && b_skolem)
+                      return false;
+                  else {
+                      bool a_found = false, b_found = false;
+                      for (unsigned sk=0; sk < m_skolems.size(); sk++) {
+                          if (m_skolems.get(sk)->hash() == a->hash()) {
+                              if (b_found) return false;
+                              a_found = true;
+                          }
+                          if (m_skolems.get(sk)->hash() == b->hash()) {
+                              if (a_found) return true;
+                              b_found = true;
+                          }
+                      }
+                      SASSERT(false);
+                      return false;
+                  }
+              }
+              return a->get_id() < b->get_id();
+          }
+
+        private:
+          const app_ref_vector& m_skolems;
+        };
     };    
   
     inline bool pred_transformer::use_native_mbp () {return ctx.use_native_mbp ();}
