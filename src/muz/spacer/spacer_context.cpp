@@ -1367,7 +1367,7 @@ namespace spacer {
       if (m_pt.is_invariant (tgt_level, curr, solver_level))
       {
         m_lemmas [i]->set_level (solver_level);
-        m_pt.add_lemma_core (m_lemmas [i]->get (), solver_level);
+        m_pt.add_lemma_core (m_lemmas [i]);
         
         // percolate the lemma up to its new place
         for (unsigned j = i; (j+1) < sz && m_lt (m_lemmas[j+1], m_lemmas[j]); ++j) {
