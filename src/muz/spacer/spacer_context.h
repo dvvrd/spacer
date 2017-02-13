@@ -174,6 +174,7 @@ namespace spacer {
           void add_binding(expr_ref_vector& binding) {m_bindings.append(binding);}
           void create_instantiations(expr_ref_vector& inst, expr* fml = NULL);
           bool binding_exists(expr_ref_vector& binding);
+          bool is_forall () {return m_fml && ::is_forall (m_fml);}
         };
         
         struct lemmas_lt_proc : 
