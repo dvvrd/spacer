@@ -363,12 +363,12 @@ namespace spacer {
           << " " << head ()->get_name () 
           << " " << mk_pp (l, m) << "\n";);
     
-    if (is_infty_level (lvl)) m_solver.assert_expr (l);
-    else 
-    {
-      ensure_level (lvl);
-      if (!is_forall(l))
-          m_solver.assert_expr (l, lvl);
+    if (!lemma->is_forall ()) {
+        if (is_infty_level (lvl)) m_solver.assert_expr (l);
+        else {
+            ensure_level (lvl);
+            m_solver.assert_expr (l, lvl);
+        }
     }
     
     for (unsigned i = 0, sz = m_use.size (); i < sz; ++i)
