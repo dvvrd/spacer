@@ -759,6 +759,7 @@ namespace spacer {
         bool                 m_use_native_mbp;
         bool                 m_ground_cti;
         bool                 m_instantiate;
+        bool                 m_use_qlemmas;
         bool                 m_weak_abs;
         bool                 m_use_restarts;
         unsigned             m_restart_initial_threshold;
@@ -822,6 +823,7 @@ namespace spacer {
         bool use_native_mbp () {return m_use_native_mbp;}
         bool use_ground_cti () {return m_ground_cti;}
         bool use_instantiate () { return m_instantiate; }
+        bool use_qlemmas () {return m_use_qlemmas; }
       
         ast_manager&      get_ast_manager() const { return m; }
         manager&          get_manager() { return m_pm; }

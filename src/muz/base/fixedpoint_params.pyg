@@ -182,6 +182,7 @@ def_module_params('fixedpoint',
                           ('spacer.mbqi', BOOL, True, 'use model-based quantifier instantiation'),
                           ('spacer.keep_proxy', BOOL, True, 'keep proxy variables (internal parameter)'),
                           ('spacer.instantiate', BOOL, True, 'instantiate quantified lemmas'),
+                          ('spacer.qlemmas', BOOL, True, 'allow quantified lemmas in frames'),
                           ))
 
 

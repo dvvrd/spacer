@@ -410,7 +410,9 @@ namespace spacer {
         for (unsigned j=0; j < inst.size(); j++) {
             inst.set(j, m.mk_implies(a, inst.get(j)));
         }
-        inst.push_back(fmls.get(i));
+        if (!lemma->is_forall () || get_context().use_qlemmas ())
+            inst.push_back(fmls.get(i));
+        SASSERT (!inst.empty ());
         for (unsigned j = 0; j < inst.size(); ++j) {
           TRACE("spacer_detail", tout << "child property: "
                 << mk_pp(inst.get (j), m) << "\n";);
@@ -1750,6 +1752,7 @@ namespace spacer {
         m_use_native_mbp(params.spacer_native_mbp ()),
         m_ground_cti (params.spacer_ground_cti ()),
         m_instantiate (params.spacer_instantiate ()),
+        m_use_qlemmas (params.spacer_qlemmas ()),
         m_weak_abs(params.spacer_weak_abs()),
         m_use_restarts(params.spacer_restarts()),
         m_restart_initial_threshold(params.spacer_restart_initial_threshold()),
