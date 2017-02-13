@@ -181,6 +181,7 @@ def_module_params('fixedpoint',
                           ('spacer.vs.recheck', BOOL, False, 're-check locally during benchmark dumping'),
                           ('spacer.mbqi', BOOL, True, 'use model-based quantifier instantiation'),
                           ('spacer.keep_proxy', BOOL, True, 'keep proxy variables (internal parameter)'),
+                          ('spacer.instantiate', BOOL, True, 'instantiate quantified lemmas'),
                           ))
 
 

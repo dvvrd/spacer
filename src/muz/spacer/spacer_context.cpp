@@ -405,7 +405,8 @@ namespace spacer {
         expr_ref_vector inst(m);
         expr* a = to_app(fmls.get(i))->get_arg(0);
         expr* l = to_app(fmls.get(i))->get_arg(1);
-        lemma->create_instantiations(inst, l);
+        if (get_context().use_instantiate())
+            lemma->create_instantiations(inst, l);
         for (unsigned j=0; j < inst.size(); j++) {
             inst.set(j, m.mk_implies(a, inst.get(j)));
         }
@@ -1748,6 +1749,7 @@ namespace spacer {
         m_expanded_lvl(0),
         m_use_native_mbp(params.spacer_native_mbp ()),
         m_ground_cti (params.spacer_ground_cti ()),
+        m_instantiate (params.spacer_instantiate ()),
         m_weak_abs(params.spacer_weak_abs()),
         m_use_restarts(params.spacer_restarts()),
         m_restart_initial_threshold(params.spacer_restart_initial_threshold()),

@@ -758,6 +758,7 @@ namespace spacer {
         proof_converter_ref  m_pc;
         bool                 m_use_native_mbp;
         bool                 m_ground_cti;
+        bool                 m_instantiate;
         bool                 m_weak_abs;
         bool                 m_use_restarts;
         unsigned             m_restart_initial_threshold;
@@ -820,6 +821,7 @@ namespace spacer {
         fixedpoint_params const& get_params() const { return m_params; }
         bool use_native_mbp () {return m_use_native_mbp;}
         bool use_ground_cti () {return m_ground_cti;}
+        bool use_instantiate () { return m_instantiate; }
       
         ast_manager&      get_ast_manager() const { return m; }
         manager&          get_manager() { return m_pm; }
