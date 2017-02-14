@@ -409,6 +409,8 @@ namespace spacer {
       
       /// \brief Returns true if the obligation is already blocked by current lemmas
       bool is_blocked (model_node &n, unsigned &uses_level);
+      /// \brief Returns true if the obligation is already blocked by current quantified lemmas
+      bool is_qblocked (model_node &n);
       
     };
 

@@ -661,6 +661,23 @@ namespace spacer {
     if (res == l_false) uses_level = m_solver.uses_level ();
     return res == l_false;
   }
+
+  bool pred_transformer::is_qblocked (model_node &n)
+  {
+      // XXX Trivial implementation to get us started
+      smt::kernel solver (m, get_manager ().fparams2());
+      expr_ref_vector frame_lemmas(m);
+      m_frames.get_frame_geq_lemmas (n.level (), frame_lemmas);
+
+      // assert all lemmas
+      for (unsigned i = 0, sz = frame_lemmas.size (); i < sz; ++i)
+          solver.assert_expr (frame_lemmas.get (i));
+      // assert cti
+      solver.assert_expr (n.post ());
+      lbool res = solver.check ();
+
+      return res == l_false;
+  }
     
   //
   // check if predicate transformer has a satisfiable predecessor state.
