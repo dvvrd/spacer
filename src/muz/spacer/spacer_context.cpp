@@ -1658,7 +1658,7 @@ namespace spacer {
                            prev_level (m_parent.level ()),
                            m_parent.depth ());
  
-    if(get_context().get_params().xform_transform_eqclass())
+    if(get_context().get_params().spacer_use_eqclass())
     {
      expr_ref_vector tmp(m);
      tmp.push_back(post);
@@ -2191,7 +2191,7 @@ namespace spacer {
             fparams.m_mbqi = m_params.spacer_mbqi();
         }
 
-        if(get_params().xform_transform_eqclass())
+        if(get_params().spacer_use_eqclass())
         {
           m_core_generalizers.push_back (alloc (core_eq_generalizer, *this));
         }
