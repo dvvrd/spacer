@@ -69,10 +69,50 @@ Notes:
 
 #include "timeit.h"
 #include "luby.h"
-
-#include "expr_abstract.h"
-
 #include "expr_safe_replace.h"
+#include "expr_abstract.h"
+#include "obj_equiv_class.h"
+
+namespace
+{
+  inline expr_equiv_class remove_eq_conds_tmp(expr_ref_vector& e)
+  {
+    ast_manager& m = e.get_manager();
+    arith_util m_a(m);
+    expr_equiv_class eq_classes(m);
+    flatten_and(e);
+    expr_ref_vector res(m);
+    for(unsigned i=0;i<e.size();i++)
+    {
+      expr*e1, *e2;
+      if(m.is_eq(e[i].get(), e1, e2))	
+      {
+        if(m_a.is_add(e1) && e2 == m_a.mk_int(0))
+        {
+          app* f = to_app(e1);
+          expr*first=f->get_arg(0);
+          expr*snd=f->get_arg(1);
+          if(m_a.is_mul(snd))
+          {
+            app*mult=to_app(snd);
+            if(m_a.is_minus_one(mult->get_arg(0)))
+            {
+              e1 = first; e2=mult->get_arg(1);
+            }
+          }
+        } 
+        eq_classes.merge(e1, e2);
+      }
+      else
+        res.push_back(e[i].get());
+    }
+    e.reset();
+    e.append(res);
+    return eq_classes;
+  }
+}
+
+
 
 namespace spacer {
     
@@ -1617,9 +1657,35 @@ namespace spacer {
                            m_premises[m_active].pt (), 
                            prev_level (m_parent.level ()),
                            m_parent.depth ());
+ 
+    if(get_context().get_params().xform_transform_eqclass())
+    {
+     expr_ref_vector tmp(m);
+     tmp.push_back(post);
+     expr_equiv_class eq_classes(remove_eq_conds_tmp(tmp));
+     for(expr_equiv_class::equiv_iterator eq_c = eq_classes.begin(); eq_c!=eq_classes.end();++eq_c)
+     {
+      expr* representative = *(*eq_c).begin();
+      for(expr_equiv_class::iterator it = (*eq_c).begin(); it!=(*eq_c).end(); ++it)
+      {
+        if(!m.is_value(*it))
+        {
+          representative = *it;
+          break;
+        }
+      }
+      for(expr_equiv_class::iterator it = (*eq_c).begin(); it!=(*eq_c).end(); ++it)
+      {
+        if(*it != representative)
+          tmp.push_back(m.mk_eq(*it, representative));
+      }
+     }
+     post=post.get_manager().mk_and(tmp.size(), tmp.c_ptr());
+    }
 
     n->set_post(post);
     
+
     IF_VERBOSE (1, verbose_stream ()
                 << "\n\tcreate_child: " << n->pt ().head ()->get_name () 
                 << " (" << n->level () << ", " << n->depth () << ") "
@@ -2124,6 +2190,12 @@ namespace spacer {
 
             fparams.m_mbqi = m_params.spacer_mbqi();
         }
+
+        if(get_params().xform_transform_eqclass())
+        {
+          m_core_generalizers.push_back (alloc (core_eq_generalizer, *this));
+        }
+
         if (!use_mc && m_params.pdr_use_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_bool_inductive_generalizer, *this, 0));
         }
