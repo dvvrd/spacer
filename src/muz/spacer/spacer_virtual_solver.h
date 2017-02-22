@@ -144,6 +144,7 @@ namespace spacer {
         struct stats {
             unsigned m_num_smt_checks;
             unsigned m_num_sat_smt_checks;
+            unsigned m_num_undef_smt_checks;
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
         };
@@ -151,6 +152,7 @@ namespace spacer {
         stats m_stats;
         stopwatch m_check_watch;
         stopwatch m_check_sat_watch;
+        stopwatch m_check_undef_watch;
         stopwatch m_proof_watch;
 
     

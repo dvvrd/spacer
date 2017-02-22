@@ -261,12 +261,33 @@ namespace spacer {
         stopwatch sw;
         sw.start ();
         internalize_assertions ();
+        if (false) {
+            std::stringstream file_name;
+            file_name << "virt_solver";
+            if (m_virtual) file_name << "_" << m_pred->get_decl()->get_name();
+            file_name << "_" << (m_dump_counter++) << ".smt2";
+            
+            verbose_stream () << "Dumping SMT2 benchmark: " << file_name.str() << "\n";
+            
+            std::ofstream out(file_name.str().c_str());
+            
+            to_smt2_benchmark(out, m_context, num_assumptions, assumptions,
+                              "virt_solver");
+            
+            out << "(exit)\n";
+            out.close();
+        }
         lbool res = m_context.check (num_assumptions, assumptions);
         sw.stop ();
         if (res == l_true)
         {
             m_factory.m_check_sat_watch.add (sw);
             m_factory.m_stats.m_num_sat_smt_checks++;
+        }
+        else if (res == l_undef)
+        {
+            m_factory.m_check_undef_watch.add (sw);
+            m_factory.m_stats.m_num_undef_smt_checks++;
         }
         set_status (res);
         
@@ -477,15 +498,18 @@ namespace spacer {
         m_context.collect_statistics (st);
         st.update ("time.virtual_solver.smt.total", m_check_watch.get_seconds ());
         st.update ("time.virtual_solver.smt.total.sat", m_check_sat_watch.get_seconds ());
+        st.update ("time.virtual_solver.smt.total.undef", m_check_undef_watch.get_seconds ());
         st.update ("time.virtual_solver.proof", m_proof_watch.get_seconds ());
         st.update ("virtual_solver.checks", m_stats.m_num_smt_checks);
         st.update ("virtual_solver.checks.sat", m_stats.m_num_sat_smt_checks);
+        st.update ("virtual_solver.checks.undef", m_stats.m_num_undef_smt_checks);
     }
     void virtual_solver_factory::reset_statistics ()
     {
         m_context.reset_statistics ();
         m_stats.reset ();
         m_check_sat_watch.reset ();
+        m_check_undef_watch.reset ();
         m_check_watch.reset ();
         m_proof_watch.reset ();
     }
