@@ -932,7 +932,60 @@ namespace spacer {
           lemmas.push_back(r->form(i));
       }
   }
+
+  /// Adhoc arithmetic rewriter    
+  struct adhoc_rewriter_cfg : public default_rewriter_cfg
+  {
+      ast_manager &m;
+      arith_util m_util;
+      
+      adhoc_rewriter_cfg (ast_manager &manager) : m(manager), m_util(m) {}
+      
+      br_status reduce_app (func_decl * f, unsigned num, expr * const * args,
+                            expr_ref & result, proof_ref & result_pr)
+      {
+          expr * e;
+          br_status st = BR_FAILED;
+          switch (f->get_decl_kind ()) {
+          case OP_LE:
+              st = mk_le_core (args[0], args[1], result); break;
+          case OP_GE:
+              st = mk_ge_core (args[0], args[1], result); break;
+          case OP_NOT:
+              if (m.is_not (args[0], e)) {
+                  result = e;
+                  st = BR_DONE;
+              }
+                      
+          }
+          return st;
+      }
+      
+      br_status mk_le_core (expr *arg1, expr * arg2, expr_ref & result)
+      {
+          // t <= -1  ==> t < 0 ==> ! (t >= 0)
+          if (m_util.is_int (arg1) && m_util.is_minus_one (arg2)) {
+              result = m.mk_not (m_util.mk_ge (arg1, mk_zero ()));
+              return BR_DONE;
+          }
+          return BR_FAILED;
+      }
+      br_status mk_ge_core (expr * arg1, expr * arg2, expr_ref & result)
+      {
+          // t >= 1 ==> t > 0 ==> ! (t <= 0)
+          if (m_util.is_int (arg1) && is_one (arg2)) {
+              
+              result = m.mk_not (m_util.mk_le (arg1, mk_zero ()));
+              return BR_DONE;
+          }
+          return BR_FAILED;
+      }
+      expr * mk_zero () {return m_util.mk_numeral (rational (0), true);}
+      bool is_one (expr const * n) const
+      {rational val; return m_util.is_numeral (n, val) && val.is_one ();}
+  };
     
+    template class rewriter_tpl<adhoc_rewriter_cfg>;
   void normalize (expr *e, expr_ref &out)
   {
       params_ref params;
@@ -947,6 +1000,10 @@ namespace spacer {
       // apply rewriter
       th_rewriter rw(out.m(), params);
       rw (e, out);
+
+      adhoc_rewriter_cfg adhoc_cfg(out.m ());
+      rewriter_tpl<adhoc_rewriter_cfg> adhoc_rw (out.m (), false, adhoc_cfg);
+      adhoc_rw (out.get (), out);
 
       // sort arguments of top-level AND
       if (out.m().is_and (out))
