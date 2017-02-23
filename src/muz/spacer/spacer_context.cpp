@@ -403,6 +403,8 @@ namespace spacer {
           << " " << head ()->get_name () 
           << " " << mk_pp (l, m) << "\n";);
     
+    if (is_infty_level (lvl)) m_stats.m_num_invariants++;
+    
     if (!lemma->is_forall ()) {
         if (is_infty_level (lvl)) m_solver.assert_expr (l);
         else {
@@ -427,8 +429,6 @@ namespace spacer {
       normalize (lemmas.get (i), nlemma);
       res |= m_frames.add_lemma (nlemma, lvl, binding);
     }
-
-    if (res && is_infty_level (lvl)) m_stats.m_num_invariants++;
     
     return res;
   }
