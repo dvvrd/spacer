@@ -238,6 +238,8 @@ namespace spacer {
         else if (result == l_false && m_core) {
             m_core->reset ();
             m_ctx->get_unsat_core (*m_core);
+            // manually undo proxies because maxsmt() call above manually adds proxies
+            m_ctx->undo_proxies (*m_core);
         }
         return result;
     }
