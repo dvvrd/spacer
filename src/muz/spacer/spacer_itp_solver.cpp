@@ -102,7 +102,7 @@ namespace spacer {
         for (unsigned i = from, sz = v.size (); i < sz; ++i)
         {
             app *p = mk_proxy (v.get (i));
-            dirty |= (v.get (i) == p);
+            dirty |= (v.get (i) != p);
             v[i] = p;
         }
         return dirty;
