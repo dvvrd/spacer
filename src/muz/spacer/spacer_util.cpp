@@ -985,7 +985,6 @@ namespace spacer {
       {rational val; return m_util.is_numeral (n, val) && val.is_one ();}
   };
     
-    template class rewriter_tpl<adhoc_rewriter_cfg>;
   void normalize (expr *e, expr_ref &out)
   {
       params_ref params;
@@ -1216,7 +1215,7 @@ namespace spacer {
         return;
     }
 }
-
+template class rewriter_tpl<spacer::adhoc_rewriter_cfg>;
 template class rewriter_tpl<spacer::ite_hoister_cfg>;
 
 
