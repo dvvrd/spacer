@@ -30,9 +30,10 @@ namespace spacer {
         struct stats
         {
           unsigned count;
+          unsigned num_failures;  
           stopwatch watch;
           stats () {reset ();}
-          void reset () {count=0; watch.reset ();}
+          void reset () {count=0; num_failures=0; watch.reset ();}
         };
           
         unsigned m_failure_limit;
