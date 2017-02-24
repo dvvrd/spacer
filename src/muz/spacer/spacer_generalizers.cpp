@@ -57,6 +57,7 @@ namespace spacer {
                 core[i] = lit;
                 processed.push_back(lit);
                 ++num_failures;
+                m_st.num_failures++;
                 ++i;
             }
         }
@@ -67,6 +68,7 @@ namespace spacer {
   {
     st.update ("time.spacer.solve.reach.gen.bool_ind", m_st.watch.get_seconds ());
     st.update ("bool inductive gen", m_st.count);
+    st.update ("bool inductive gen failures", m_st.num_failures);
   }
   
   namespace
