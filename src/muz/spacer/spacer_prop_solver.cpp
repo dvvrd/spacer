@@ -147,47 +147,61 @@ namespace spacer {
         // replace expressions by assumption literals
         itp_solver::scoped_mk_proxy _p_(*m_ctx, hard);
         unsigned hard_sz = hard.size ();
+        // assume soft constraints are propositional literals (no need to proxy)
         hard.append (soft);
     
         lbool res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
+        // if hard constraints alone are unsat or there are no soft
+        // constraints, we are done
         if (res != l_false || soft.empty ()) return res;
     
+        // clear soft constraints, we will recompute them later
         soft.reset ();
     
         expr_ref saved (m);
         ptr_vector<expr> core;
         m_ctx->get_unsat_core (core);
     
+        // while there are soft constraints
         while (hard.size () > hard_sz)
         {
             bool found = false;
+            // look for a soft constraint that is in the unsat core
             for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
                 if (core.contains (hard.get (i)))
                 {
                     found = true;
+                    // AG: not sure why we are saving it
                     saved = hard.get (i);
                     hard[i] = hard.back ();
                     hard.pop_back ();
                     break;
                 }
+            // if no soft constraints in the core, return this should
+            // not happen because it implies that hard alone is unsat
+            // and that is taken care of earlier
             if (!found)
             {
                 hard.resize (hard_sz);
                 return l_false;
             }
       
+            // check that the NEW constraints became sat
             res = m_ctx->check_sat (hard.size (), hard.c_ptr ());
             if (res != l_false) break;
+            // still unsat, update the core and repeat
             core.reset ();
             m_ctx->get_unsat_core (core);
         }
 
+        // update soft with found soft constraints
         if (res == l_true)
         {
-            // update soft
             for (unsigned i = hard_sz, sz = hard.size (); i < sz; ++i)
                 soft.push_back (hard.get (i));
         }
+        // revert hard back to the right size
+        // proxies are undone on exit via scoped_mk_proxy
         hard.resize (hard_sz);
         return res;
     }
