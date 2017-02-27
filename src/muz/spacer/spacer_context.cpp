@@ -2205,7 +2205,8 @@ namespace spacer {
           m_core_generalizers.push_back (alloc (core_eq_generalizer, *this));
         }
         
-        m_core_generalizers.push_back (alloc (unsat_core_generalizer, *this));
+        // -- AG: commented out because it is causing performance issues at the moment
+        //m_core_generalizers.push_back (alloc (unsat_core_generalizer, *this));
         
         if (!use_mc && m_params.pdr_use_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_bool_inductive_generalizer, *this, 0));
