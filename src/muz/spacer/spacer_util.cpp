@@ -1027,7 +1027,8 @@ namespace spacer {
          for (unsigned i = 0; i < fv.size (); ++i)
              {
                  SASSERT (fv[i]);
-                 vars [i] = m.mk_fresh_const ("sk", fv [i]);
+                 std::string str = "zk!" + datalog::to_string(i);
+                 vars [i] = m.mk_const (symbol(str.c_str()), fv [i]);
              }
          var_subst vs(m);
          vs (e, vars.size (), (expr**) vars.c_ptr (), out);

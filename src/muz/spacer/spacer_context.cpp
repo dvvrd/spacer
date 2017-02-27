@@ -1424,7 +1424,13 @@ namespace spacer {
       
       unsigned solver_level;
       expr * curr = m_lemmas [i]->get ();
-      if (m_pt.is_invariant (tgt_level, curr, solver_level))
+      expr_ref lem(m_pt.get_ast_manager());
+      if (is_quantifier(curr)) {
+          app_ref_vector tmp(m_pt.get_ast_manager());
+          ground_expr(curr, lem, tmp);
+      }
+      else lem = curr;
+      if (m_pt.is_invariant (tgt_level, lem.get(), solver_level))
       {
         m_lemmas [i]->set_level (solver_level);
         m_pt.add_lemma_core (m_lemmas [i]);
