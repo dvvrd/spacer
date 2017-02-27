@@ -112,6 +112,37 @@ namespace spacer {
     st.update ("bool inductive gen failures", m_st.num_failures);
   }
   
+    void unsat_core_generalizer::operator()(model_node &n, expr_ref_vector &core, unsigned& uses_level) {
+        m_st.count++;
+        scoped_watch _w_(m_st.watch);
+        ast_manager &m = core.get_manager ();
+
+        expr_ref lemma(m);
+        lemma = mk_and (core);
+        lemma = mk_not (m, lemma);
+
+        unsigned old_sz = core.size ();
+        unsigned old_level = uses_level;
+        core.reset ();
+
+        bool r;
+        r = n.pt ().is_invariant (n.level(), lemma, uses_level, &core);
+        SASSERT (r);
+
+        CTRACE ("spacer", old_sz > core.size (),
+                tout << "unsat core reduced lemma from: "
+                << old_sz << " to " << core.size () << "\n";);
+        CTRACE ("spacer", old_level < uses_level,
+                tout << "unsat core moved lemma up from: "
+                << old_level << " to " << uses_level << "\n";);
+    }
+    
+    void unsat_core_generalizer::collect_statistics (statistics &st) const {
+        st.update ("time.spacer.solve.reach.gen.unsat_core", m_st.watch.get_seconds ());
+        st.update ("gen.unsat_core.cnt", m_st.count);
+        st.update ("gen.unsat_core.fail", m_st.num_failures);
+    }
+    
   namespace
   {
     class collect_array_proc 

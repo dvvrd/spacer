@@ -845,27 +845,28 @@ namespace spacer {
         if (is_quantifier(lemma)) {
             SASSERT(is_forall(lemma));
             app_ref_vector tmp(m);
-            ground_expr(lemma, glemma, tmp);
+            ground_expr(to_quantifier(lemma)->get_expr (), glemma, tmp);
             lemma = glemma.get();
         }
         
-        conj.push_back(m.mk_not(lemma));
-        flatten_and (conj);
+      conj.push_back(mk_not(m, lemma));
+      flatten_and (conj);
 
-        prop_solver::scoped_level _sl(m_solver, level);
-        m_solver.set_core(core);
-        m_solver.set_model(0);
-        expr * bg = m_extend_lit.get ();
-        lbool r = m_solver.check_assumptions (conj, aux, 1, &bg, 1);
-        if (r == l_false) {
-            solver_level = m_solver.uses_level ();
-            CTRACE ("spacer", level < m_solver.uses_level (), 
-                    tout << "Checking at level " << level 
-                    << " but only using " << m_solver.uses_level () << "\n";);
-            SASSERT (level <= solver_level);
-        }
-        return r == l_false;
-    }
+      prop_solver::scoped_level _sl(m_solver, level);
+      prop_solver::scoped_subset_core _sc (m_solver, true);
+      m_solver.set_core(core);
+      m_solver.set_model(0);
+      expr * bg = m_extend_lit.get ();
+      lbool r = m_solver.check_assumptions (conj, aux, 1, &bg, 1);
+      if (r == l_false) {
+          solver_level = m_solver.uses_level ();
+          CTRACE ("spacer", level < m_solver.uses_level (), 
+                  tout << "Checking at level " << level 
+                  << " but only using " << m_solver.uses_level () << "\n";);
+          SASSERT (level <= solver_level);
+      }
+      return r == l_false;
+  }
 
     bool pred_transformer::check_inductive(unsigned level, expr_ref_vector& state, 
                                            unsigned& uses_level) {
@@ -2203,7 +2204,9 @@ namespace spacer {
         {
           m_core_generalizers.push_back (alloc (core_eq_generalizer, *this));
         }
-
+        
+        m_core_generalizers.push_back (alloc (unsat_core_generalizer, *this));
+        
         if (!use_mc && m_params.pdr_use_inductive_generalizer()) {
             m_core_generalizers.push_back(alloc(core_bool_inductive_generalizer, *this, 0));
         }

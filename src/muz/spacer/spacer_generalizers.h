@@ -48,6 +48,26 @@ namespace spacer {
       virtual void reset_statistics () {m_st.reset ();}
     };
 
+    class unsat_core_generalizer : public core_generalizer {
+        struct stats
+        {
+            unsigned count;
+            unsigned num_failures;
+            stopwatch watch;
+            stats () { reset (); }
+            void reset () {count=0; num_failures=0; watch.reset();}
+        };
+        
+        stats m_st;
+    public:
+        unsat_core_generalizer (context &ctx) : core_generalizer(ctx) {}
+        virtual ~unsat_core_generalizer () {}
+        virtual void operator() (model_node &n, expr_ref_vector &core, unsigned& uses_level);
+
+        virtual void collect_statistics (statistics &st) const;
+        virtual void reset_statistics () {m_st.reset();}
+    };
+    
   class core_array_eq_generalizer : public core_generalizer 
   {
   public:
