@@ -838,8 +838,16 @@ namespace spacer {
     }
 
   bool pred_transformer::is_invariant(unsigned level, expr* lemma,
-                                        unsigned& solver_level, expr_ref_vector* core) {
-      expr_ref_vector conj(m), aux(m);
+                                      unsigned& solver_level, expr_ref_vector* core) {
+        expr_ref_vector conj(m), aux(m);
+
+        if (is_quantifier(lemma)) {
+            SASSERT(is_forall(lemma));
+            app_ref_vector tmp(m);
+            expr_ref glemma(m);
+            ground_expr(lemma, glemma, tmp);
+            lemma = glemma.get();
+        }
         
         conj.push_back(m.mk_not(lemma));
         flatten_and (conj);
@@ -1424,13 +1432,7 @@ namespace spacer {
       
       unsigned solver_level;
       expr * curr = m_lemmas [i]->get ();
-      expr_ref lem(m_pt.get_ast_manager());
-      if (is_quantifier(curr)) {
-          app_ref_vector tmp(m_pt.get_ast_manager());
-          ground_expr(curr, lem, tmp);
-      }
-      else lem = curr;
-      if (m_pt.is_invariant (tgt_level, lem.get(), solver_level))
+      if (m_pt.is_invariant (tgt_level, curr, solver_level))
       {
         m_lemmas [i]->set_level (solver_level);
         m_pt.add_lemma_core (m_lemmas [i]);
