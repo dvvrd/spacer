@@ -1024,12 +1024,11 @@ namespace spacer {
          fv (e);
          if (vars.size () < fv.size ())
              vars.resize (fv.size ());
-         for (unsigned i = 0; i < fv.size (); ++i)
-             {
-                 SASSERT (fv[i]);
-                 std::string str = "zk!" + datalog::to_string(i);
-                 vars [i] = m.mk_const (symbol(str.c_str()), fv [i]);
-             }
+         for (unsigned i = 0, sz = fv.size (); i < sz; ++i) {
+             SASSERT (fv[i]);
+             std::string str = "zk!" + datalog::to_string(sz - 1 - i);
+             vars [i] = m.mk_const (symbol(str.c_str()), fv [i]);
+         }
          var_subst vs(m);
          vs (e, vars.size (), (expr**) vars.c_ptr (), out);
     }
