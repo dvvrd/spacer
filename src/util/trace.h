@@ -50,6 +50,8 @@ void finalize_trace();
 
 #define TRACE(TAG, CODE) TRACE_CODE(if (is_trace_enabled(TAG)) { tout << "-------- [" << TAG << "] " << __FUNCTION__ << " " << __FILE__ << ":" << __LINE__ << " ---------\n"; CODE tout << "------------------------------------------------\n"; tout.flush(); })
 
+#define TRACE2(TAG, CODE) TRACE_CODE(if (is_trace_enabled(TAG)) { CODE tout.flush(); })
+
 #define STRACE(TAG, CODE) TRACE_CODE(if (is_trace_enabled(TAG)) { CODE tout.flush(); })
 
 #define CTRACE(TAG, COND, CODE) TRACE_CODE(if (is_trace_enabled(TAG) && (COND)) { tout << "-------- [" << TAG << "] " << __FUNCTION__ << " " << __FILE__ << ":" << __LINE__ << " ---------\n"; CODE tout << "------------------------------------------------\n"; tout.flush(); })

@@ -1363,7 +1363,16 @@ namespace spacer {
     TRACE ("spacer", tout << "add-lemma: " << pp_level (level) << " " 
            << m_pt.head ()->get_name () << " " 
            << mk_pp (lemma, m_pt.get_ast_manager ()) << "\n";);
-    
+    TRACE2 ("spacer.expand-add",
+            params_ref p;
+            p.set_uint("min_alias_size", UINT_MAX);
+            p.set_uint("max_depth", UINT_MAX);
+            expr_ref rewrittenE (m_pt.get_ast_manager ());
+            rewriteForPrettyPrinting (lemma, rewrittenE);
+            tout << "add-lemma: " << pp_level (level) << " "
+             << m_pt.head ()->get_name () << " "
+             << mk_pp (rewrittenE, m_pt.get_ast_manager (), p) << "\n\n";);
+      
     for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
       if (m_lemmas [i]->get () == lemma && binding.empty())
       {
@@ -2630,7 +2639,10 @@ namespace spacer {
         lvl = m_search.max_level ();
         m_stats.m_max_depth = std::max(m_stats.m_max_depth, lvl);
         IF_VERBOSE(1,verbose_stream() << "Entering level "<< lvl << "\n";);
-        IF_VERBOSE(1, 
+          
+          TRACE2("spacer.expand-add", tout << "\n* LEVEL " << lvl << "\n";);
+        
+          IF_VERBOSE(1,
                   if (m_params.print_statistics ()) {
                       statistics st;
                       collect_statistics (st);
@@ -2861,6 +2873,18 @@ namespace spacer {
              << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
              << mk_pp(n.post(), m) << "\n";);
       
+        TRACE2 ("spacer.expand-add",
+                params_ref p;
+                p.set_uint("min_alias_size", UINT_MAX);
+                p.set_uint("max_depth", UINT_MAX);
+                expr_ref rewrittenE (m);
+                rewriteForPrettyPrinting (n.post(), rewrittenE);
+
+               tout << "expand-node: "
+                    << "query level: " << n.level()
+                    << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
+                    << mk_pp(rewrittenE, m, p) << "\n\n";);
+        
       TRACE ("core_array_eq", 
              tout << "expand-node: " << n.pt().head()->get_name() 
              << " level: " << n.level() 

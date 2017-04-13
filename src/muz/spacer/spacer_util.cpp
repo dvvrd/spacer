@@ -987,6 +987,7 @@ namespace spacer {
     
   void normalize (expr *e, expr_ref &out)
   {
+      
       params_ref params;
       // arith_rewriter
       params.set_bool ("sort_sums", true);
@@ -1016,6 +1017,133 @@ namespace spacer {
           out = mk_and (v);
       }
   }
+    
+    // rewrite term such that the pretty printing is easier to read
+    struct adhoc_rewriter_rpp : public default_rewriter_cfg
+    {
+        ast_manager &m;
+        arith_util m_util;
+        
+        adhoc_rewriter_rpp (ast_manager &manager) : m(manager), m_util(m) {}
+        
+        br_status reduce_app (func_decl * f, unsigned num, expr * const * args,
+                              expr_ref & result, proof_ref & result_pr)
+        {
+            br_status st = BR_FAILED;
+            
+            // simplify normalized leq
+            // rewrites (<= (+ A (* -1 B)) 0) into (<= A B)
+            if (f->get_decl_kind() == OP_LE ||
+                f->get_decl_kind() == OP_LT ||
+                f->get_decl_kind() == OP_GE ||
+                f->get_decl_kind() == OP_GT)
+            {
+                expr* node1; // will be A
+                expr* node2;
+                if (is_zero(args[1]) && m_util.is_add(args[0], node1, node2))
+                {
+                    expr* node3;
+                    expr* node4; // will be B
+                    if (m_util.is_mul(node2, node3, node4))
+                    {
+                        std::cout << "term " << mk_pp(node3, m) << std::endl;
+                        if (m_util.is_minus_one(node3))
+                        {
+                            switch (f->get_decl_kind ())
+                            {
+                                case OP_LE:
+                                    result = m_util.mk_le(node1, node4); break;
+                                case OP_LT:
+                                    result = m_util.mk_lt(node1, node4); break;
+                                case OP_GE:
+                                    result = m_util.mk_ge(node1, node4); break;
+                                case OP_GT:
+                                    result = m_util.mk_gt(node1, node4); break;
+                            }
+                            st=BR_DONE;
+                        }
+                    }
+                }
+            }
+            
+            // simplify normalized leq, where right side is different from 0
+            // rewrites (<= (+ A (* -1 B)) C) into (<= A B+C)
+            else if (f->get_decl_kind() == OP_LE ||
+                f->get_decl_kind() == OP_LT ||
+                f->get_decl_kind() == OP_GE ||
+                f->get_decl_kind() == OP_GT)
+            {
+                expr* node1; // will be A
+                expr* node2;
+                if (m_util.is_add(args[0], node1, node2))
+                {
+                    expr* node3;
+                    expr* node4; // will be B
+                    if (m_util.is_mul(node2, node3, node4))
+                    {
+                        std::cout << "term " << mk_pp(node3, m) << std::endl;
+                        if (m_util.is_minus_one(node3))
+                        {
+                            expr* addition = m_util.mk_add(node4, args[1]);
+                            
+                            switch (f->get_decl_kind ())
+                            {
+                                case OP_LE:
+                                    result = m_util.mk_le(node1, addition); break;
+                                case OP_LT:
+                                    result = m_util.mk_lt(node1, addition); break;
+                                case OP_GE:
+                                    result = m_util.mk_ge(node1, addition); break;
+                                case OP_GT:
+                                    result = m_util.mk_gt(node1, addition); break;
+                            }
+                            st=BR_DONE;
+                        }
+                    }
+                }
+            }
+            
+            // simplify negation of ordering predicate
+            else if (f->get_decl_kind() == OP_NOT)
+            {
+                expr* child0 = args[0];
+                expr* child00;
+                expr* child01;
+                if (m_util.is_lt(child0, child00,child01))
+                {
+                    result = m_util.mk_ge(child00,child01);
+                    st=BR_DONE;
+                }
+                else if (m_util.is_le(child0, child00,child01))
+                {
+                    result = m_util.mk_gt(child00,child01);
+                    st=BR_DONE;
+                }
+                else if (m_util.is_gt(child0, child00,child01))
+                {
+                    result = m_util.mk_le(child00,child01);
+                    st=BR_DONE;
+                }
+                else if (m_util.is_ge(child0, child00,child01))
+                {
+                    result = m_util.mk_lt(child00,child01);
+                    st=BR_DONE;
+                }
+            }
+            
+            return st;
+        }
+
+        bool is_zero (expr const * n) const
+        {rational val; return m_util.is_numeral(n, val) && val.is_zero();}
+    };
+    
+    void rewriteForPrettyPrinting (expr *e, expr_ref &out)
+    {
+        adhoc_rewriter_rpp adhoc_rpp(out.m());
+        rewriter_tpl<adhoc_rewriter_rpp> adhoc_rw (out.m (), false, adhoc_rpp);
+        adhoc_rw (e, out);
+    }
 
     void ground_expr (expr *e, expr_ref &out, app_ref_vector &vars)
     {
@@ -1216,6 +1344,7 @@ namespace spacer {
     }
 }
 template class rewriter_tpl<spacer::adhoc_rewriter_cfg>;
+template class rewriter_tpl<spacer::adhoc_rewriter_rpp>;
 template class rewriter_tpl<spacer::ite_hoister_cfg>;
 
 
