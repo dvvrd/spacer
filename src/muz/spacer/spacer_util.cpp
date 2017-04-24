@@ -1046,7 +1046,6 @@ namespace spacer {
                     expr* node4; // will be B
                     if (m_util.is_mul(node2, node3, node4))
                     {
-                        std::cout << "term " << mk_pp(node3, m) << std::endl;
                         if (m_util.is_minus_one(node3))
                         {
                             switch (f->get_decl_kind ())
