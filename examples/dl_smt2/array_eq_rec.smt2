@@ -8,10 +8,12 @@
 (declare-var out (Array Int Int))
 
 (declare-rel B (Int (Array Int Int) (Array Int Int)))
+(declare-rel E ())
 
 (rule (B 0 in in))
 (rule (=> (B x in out) (B (+ 1 x) in out)))
-(query (and
-        (B j in out)
-        (< (select in j) 0)
-        (> (select out j) 0)))
+(rule (=> (and
+          (B j in out)
+          (< (select in j) 0)
+          (> (select out j) 0)) E))
+(query E)

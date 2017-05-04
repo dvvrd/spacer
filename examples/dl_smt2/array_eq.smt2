@@ -7,9 +7,11 @@
 (declare-var out (Array Int Int))
 
 (declare-rel B ((Array Int Int) (Array Int Int)))
+(declare-rel E ())
 
 (rule (B in in))
-(query (and
-        (B in out)
-        (< (select in j) 0)
-        (> (select out j) 0)))
+(rule (=> (and
+          (B in out)
+          (< (select in j) 0)
+          (> (select out j) 0)) E))
+(query E)
