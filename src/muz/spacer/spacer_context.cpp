@@ -1371,7 +1371,7 @@ namespace spacer {
             rewriteForPrettyPrinting (lemma, rewrittenE);
             tout << "add-lemma: " << pp_level (level) << " "
              << m_pt.head ()->get_name () << " "
-             << mk_pp (rewrittenE, m_pt.get_ast_manager (), p) << "\n\n";);
+             << mk_pp (lemma, m_pt.get_ast_manager (), p) << "\n\n";);
       
     for (unsigned i = 0, sz = m_lemmas.size (); i < sz; ++i)
       if (m_lemmas [i]->get () == lemma && binding.empty())
@@ -2883,7 +2883,18 @@ namespace spacer {
                tout << "expand-node: "
                     << "query level: " << n.level()
                     << " depth: " << (n.depth () - m_search.min_depth ()) << "\n"
-                    << mk_pp(rewrittenE, m, p) << "\n\n";);
+                    << mk_pp(n.post(), m, p) << "\n\n";);
+        TRACE2("debug_rewriter",
+               params_ref p;
+               p.set_uint("min_alias_size", UINT_MAX);
+               p.set_uint("max_depth", UINT_MAX);
+               expr_ref rewrittenE (m);
+               rewriteForPrettyPrinting (n.post(), rewrittenE);
+               
+               tout << "possible performed rewrite:\nold expression: "
+                    << mk_pp(n.post(), m, p)
+                    << "\nnew expression: "
+               << mk_pp(rewrittenE, m, p) << std::endl;);
         
       TRACE ("core_array_eq", 
              tout << "expand-node: " << n.pt().head()->get_name() 

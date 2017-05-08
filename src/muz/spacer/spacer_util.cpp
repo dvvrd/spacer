@@ -1058,7 +1058,10 @@ namespace spacer {
                                     result = m_util.mk_ge(node1, node4); break;
                                 case OP_GT:
                                     result = m_util.mk_gt(node1, node4); break;
+                                default:
+                                    SASSERT(false);
                             }
+
                             st=BR_DONE;
                         }
                     }
@@ -1080,7 +1083,6 @@ namespace spacer {
                     expr* node4; // will be B
                     if (m_util.is_mul(node2, node3, node4))
                     {
-                        std::cout << "term " << mk_pp(node3, m) << std::endl;
                         if (m_util.is_minus_one(node3))
                         {
                             expr* addition = m_util.mk_add(node4, args[1]);
