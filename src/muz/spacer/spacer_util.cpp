@@ -1052,69 +1052,48 @@ namespace spacer {
             }
             // simplify normalized leq, where right side is different from 0
             // rewrites (<= (+ A (* -1 B)) C) into (<= A B+C)
-            else if (is_le (f) || is_lt(f) || is_ge (f) || is_gt (f)) {
-                expr* node1; // will be A
-                expr* node2;
-                if (m_arith.is_add(args[0], node1, node2))
-                {
-                    expr* node3;
-                    expr* node4; // will be B
-                    if (m_arith.is_mul(node2, node3, node4))
-                    {
-                        if (m_arith.is_minus_one(node3))
-                        {
-                            expr_ref rhs(m);
-                            rhs = is_zero (args[1]) ?
-                                node4 : m_arith.mk_add (node4, args[1]);
+            else if ((is_le(f) || is_lt(f) || is_ge(f) || is_gt(f)) &&
+                     m_arith.is_add (args[0], e1, e2) && 
+                     m_arith.is_mul (e2, e3, e4) && m_arith.is_minus_one (e3)) {
+                expr_ref rhs(m);
+                rhs = is_zero (args[1]) ? e4 : m_arith.mk_add(e4, args[1]);
                             
-                            if (is_le(f)) {
-                                result = m_arith.mk_le(node1, rhs); 
-                                st = BR_DONE;
-                            }
-                            else if (is_lt (f)) {
-                                result = m_arith.mk_lt(node1, rhs);
-                                st = BR_DONE;
-                            }
-                            else if (is_ge (f)) {
-                                result = m_arith.mk_ge(node1, rhs);
-                                st = BR_DONE;
-                            }
-                            else if (is_gt (f)) {
-                                result = m_arith.mk_gt(node1, rhs);
-                                st = BR_DONE;
-                            }
-                            else
-                                UNREACHABLE ();
-                        }
-                    }
+                if (is_le(f)) {
+                    result = m_arith.mk_le(e1, rhs); 
+                    st = BR_DONE;
                 }
+                else if (is_lt (f)) {
+                    result = m_arith.mk_lt(e1, rhs);
+                    st = BR_DONE;
+                }
+                else if (is_ge (f)) {
+                    result = m_arith.mk_ge(e1, rhs);
+                    st = BR_DONE;
+                }
+                else if (is_gt (f)) {
+                    result = m_arith.mk_gt(e1, rhs);
+                    st = BR_DONE;
+                }
+                else
+                    UNREACHABLE ();
             }
-            
             // simplify negation of ordering predicate
-            else if (f->get_decl_kind() == OP_NOT)
-            {
-                expr* child0 = args[0];
-                expr* child00;
-                expr* child01;
-                if (m_arith.is_lt(child0, child00,child01))
-                {
-                    result = m_arith.mk_ge(child00,child01);
-                    st=BR_DONE;
+            else if (m.is_not (f)) {
+                if (m_arith.is_lt(args[0], e1, e2)) {
+                    result = m_arith.mk_ge(e1, e2);
+                    st = BR_DONE;
                 }
-                else if (m_arith.is_le(child0, child00,child01))
-                {
-                    result = m_arith.mk_gt(child00,child01);
-                    st=BR_DONE;
+                else if (m_arith.is_le(args[0], e1, e2)) {
+                    result = m_arith.mk_gt(e1, e2);
+                    st = BR_DONE;
                 }
-                else if (m_arith.is_gt(child0, child00,child01))
-                {
-                    result = m_arith.mk_le(child00,child01);
-                    st=BR_DONE;
+                else if (m_arith.is_gt(args[0], e1, e2)) {
+                    result = m_arith.mk_le(e1, e2);
+                    st = BR_DONE;
                 }
-                else if (m_arith.is_ge(child0, child00,child01))
-                {
-                    result = m_arith.mk_lt(child00,child01);
-                    st=BR_DONE;
+                else if (m_arith.is_ge(args[0], e1, e2)) {
+                    result = m_arith.mk_lt(e1, e2);
+                    st = BR_DONE;
                 }
             }
 
