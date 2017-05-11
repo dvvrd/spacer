@@ -1022,83 +1022,69 @@ namespace spacer {
     struct adhoc_rewriter_rpp : public default_rewriter_cfg
     {
         ast_manager &m;
-        arith_util m_util;
+        arith_util m_arith;
         
-        adhoc_rewriter_rpp (ast_manager &manager) : m(manager), m_util(m) {}
+        adhoc_rewriter_rpp (ast_manager &manager) : m(manager), m_arith(m) {}
         
+        bool is_le(func_decl const * n) const
+        { return is_decl_of(n, m_arith.get_family_id (), OP_LE); }
+        bool is_ge(func_decl const * n) const
+        { return is_decl_of(n, m_arith.get_family_id (), OP_GE); }
+        bool is_lt(func_decl const * n) const
+        { return is_decl_of(n, m_arith.get_family_id (), OP_LT); }
+        bool is_gt(func_decl const * n) const
+        { return is_decl_of(n, m_arith.get_family_id (), OP_GT); }
+        bool is_zero (expr const * n) const
+        {rational val; return m_arith.is_numeral(n, val) && val.is_zero();}
+
         br_status reduce_app (func_decl * f, unsigned num, expr * const * args,
                               expr_ref & result, proof_ref & result_pr)
         {
             br_status st = BR_FAILED;
+            expr *e1, *e2, *e3, *e4;
             
-            // simplify normalized leq
-            // rewrites (<= (+ A (* -1 B)) 0) into (<= A B)
-            if (f->get_decl_kind() == OP_LE ||
-                f->get_decl_kind() == OP_LT ||
-                f->get_decl_kind() == OP_GE ||
-                f->get_decl_kind() == OP_GT)
-            {
-                expr* node1; // will be A
-                expr* node2;
-                if (is_zero(args[1]) && m_util.is_add(args[0], node1, node2))
-                {
-                    expr* node3;
-                    expr* node4; // will be B
-                    if (m_util.is_mul(node2, node3, node4))
-                    {
-                        if (m_util.is_minus_one(node3))
-                        {
-                            switch (f->get_decl_kind ())
-                            {
-                                case OP_LE:
-                                    result = m_util.mk_le(node1, node4); break;
-                                case OP_LT:
-                                    result = m_util.mk_lt(node1, node4); break;
-                                case OP_GE:
-                                    result = m_util.mk_ge(node1, node4); break;
-                                case OP_GT:
-                                    result = m_util.mk_gt(node1, node4); break;
-                                default:
-                                    SASSERT(false);
-                            }
-
-                            st=BR_DONE;
-                        }
-                    }
-                }
+            // rewrites (= (+ A (* -1 B)) 0) into (= A B)
+            if (m.is_eq (f) && is_zero (args [1]) &&
+                m_arith.is_add (args[0], e1, e2) && 
+                m_arith.is_mul (e2, e3, e4) && m_arith.is_minus_one (e3)) {
+                result = m.mk_eq (e1, e4);
+                return BR_DONE;
             }
-            
             // simplify normalized leq, where right side is different from 0
             // rewrites (<= (+ A (* -1 B)) C) into (<= A B+C)
-            else if (f->get_decl_kind() == OP_LE ||
-                f->get_decl_kind() == OP_LT ||
-                f->get_decl_kind() == OP_GE ||
-                f->get_decl_kind() == OP_GT)
-            {
+            else if (is_le (f) || is_lt(f) || is_ge (f) || is_gt (f)) {
                 expr* node1; // will be A
                 expr* node2;
-                if (m_util.is_add(args[0], node1, node2))
+                if (m_arith.is_add(args[0], node1, node2))
                 {
                     expr* node3;
                     expr* node4; // will be B
-                    if (m_util.is_mul(node2, node3, node4))
+                    if (m_arith.is_mul(node2, node3, node4))
                     {
-                        if (m_util.is_minus_one(node3))
+                        if (m_arith.is_minus_one(node3))
                         {
-                            expr* addition = m_util.mk_add(node4, args[1]);
+                            expr_ref rhs(m);
+                            rhs = is_zero (args[1]) ?
+                                node4 : m_arith.mk_add (node4, args[1]);
                             
-                            switch (f->get_decl_kind ())
-                            {
-                                case OP_LE:
-                                    result = m_util.mk_le(node1, addition); break;
-                                case OP_LT:
-                                    result = m_util.mk_lt(node1, addition); break;
-                                case OP_GE:
-                                    result = m_util.mk_ge(node1, addition); break;
-                                case OP_GT:
-                                    result = m_util.mk_gt(node1, addition); break;
+                            if (is_le(f)) {
+                                result = m_arith.mk_le(node1, rhs); 
+                                st = BR_DONE;
                             }
-                            st=BR_DONE;
+                            else if (is_lt (f)) {
+                                result = m_arith.mk_lt(node1, rhs);
+                                st = BR_DONE;
+                            }
+                            else if (is_ge (f)) {
+                                result = m_arith.mk_ge(node1, rhs);
+                                st = BR_DONE;
+                            }
+                            else if (is_gt (f)) {
+                                result = m_arith.mk_gt(node1, rhs);
+                                st = BR_DONE;
+                            }
+                            else
+                                UNREACHABLE ();
                         }
                     }
                 }
@@ -1110,33 +1096,31 @@ namespace spacer {
                 expr* child0 = args[0];
                 expr* child00;
                 expr* child01;
-                if (m_util.is_lt(child0, child00,child01))
+                if (m_arith.is_lt(child0, child00,child01))
                 {
-                    result = m_util.mk_ge(child00,child01);
+                    result = m_arith.mk_ge(child00,child01);
                     st=BR_DONE;
                 }
-                else if (m_util.is_le(child0, child00,child01))
+                else if (m_arith.is_le(child0, child00,child01))
                 {
-                    result = m_util.mk_gt(child00,child01);
+                    result = m_arith.mk_gt(child00,child01);
                     st=BR_DONE;
                 }
-                else if (m_util.is_gt(child0, child00,child01))
+                else if (m_arith.is_gt(child0, child00,child01))
                 {
-                    result = m_util.mk_le(child00,child01);
+                    result = m_arith.mk_le(child00,child01);
                     st=BR_DONE;
                 }
-                else if (m_util.is_ge(child0, child00,child01))
+                else if (m_arith.is_ge(child0, child00,child01))
                 {
-                    result = m_util.mk_lt(child00,child01);
+                    result = m_arith.mk_lt(child00,child01);
                     st=BR_DONE;
                 }
             }
-            
+
             return st;
         }
 
-        bool is_zero (expr const * n) const
-        {rational val; return m_util.is_numeral(n, val) && val.is_zero();}
     };
     
     void rewriteForPrettyPrinting (expr *e, expr_ref &out)
