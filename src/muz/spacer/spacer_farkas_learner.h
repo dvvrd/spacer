@@ -21,6 +21,10 @@ Revision History:
 #define _SPACER_FARKAS_LEARNER_H_
 
 #include "ast.h"
+#include <vector>
+#include <stack>
+#include <unordered_set>
+#include <unordered_map>
 
 namespace spacer {
 
@@ -29,6 +33,34 @@ class farkas_learner {
 
     bool m_split_literals;
 
+    /*
+     * compute linear combination of literals 'literals' having coefficients 'coefficients' and save result in res
+     */
+    void computeLinearCombination(std::vector<rational>& coefficients,std::vector<app*>& literals, expr_ref& res);
+
+    void unsatCoreForLemma(proof* lemma,
+                           std::unordered_set<func_decl*> symbolsB,
+                           ast_mark& containsAAxioms,
+                           ast_mark& containsBAxioms,
+                           std::unordered_map<expr*,std::unordered_set<expr*> >& nodesToHypothesis,
+                           ast_manager& m,
+                           std::unordered_set<expr*>& lemmaSet,
+                           expr_ref_vector& lemmas);
+    
+    void unsatCoreForFarkasLemma(proof* farkasLemma,
+                                 ast_mark& containsAAxioms,
+                                 ast_mark& containsBAxioms,
+                                 std::unordered_map<expr*,std::unordered_set<expr*> >& nodesToHypothesis,
+                                 ast_manager& m,
+                                 std::unordered_set<expr*>& lemmaSet,
+                                 expr_ref_vector& lemmas);
+    
+    std::unordered_set<func_decl*> collectSymbolsB(expr_set const& axiomsB);
+    bool containsOnlySymbolsFromB(std::unordered_set<func_decl*>& symbolsB, expr* expr, ast_manager m);
+
+
+    
+    
     void combine_constraints(unsigned cnt, app * const * constrs, rational const * coeffs, expr_ref& res);
 
     bool is_farkas_lemma(ast_manager& m, expr* e);
@@ -44,6 +76,7 @@ public:
         Traverse a proof and retrieve lemmas using the vocabulary from bs.
     */
     void get_lemmas(proof* root, expr_set const& bs, expr_ref_vector& lemmas);
+    void get_lemmas2(proof* root, expr_set const& bs, expr_ref_vector& lemmas);
 
     void collect_statistics(statistics& st) const {} 
     void reset_statistics () {}
@@ -55,6 +88,22 @@ public:
 };
 
 
+    /*
+     * iterator, which traverses the proof in depth-first post-order.
+     */
+    class ProofIteratorPostOrder
+    {
+    public:
+        ProofIteratorPostOrder(proof* refutation, ast_manager& manager);
+        bool hasNext();
+        proof* next();
+        
+    private:
+        std::stack<proof*> todo;
+        ast_mark visited; // the proof nodes we have already visited
+        
+        ast_manager& m;
+    };
 }
 
 #endif
