@@ -98,11 +98,17 @@ namespace spacer {
         return nullptr;
     }
     
-# pragma mark - main method
     
-    void farkas_learner::get_lemmas(proof* root, expr_set const& axiomsB, expr_ref_vector& lemmas)
+# pragma mark - main methods
+    
+    void unsat_core_learner::register_plugin(std::shared_ptr<unsat_core_plugin> plugin)
     {
-        ast_manager& m = lemmas.get_manager();
+        plugins.push_back(plugin);
+    }
+    
+    void unsat_core_learner::compute_unsat_core(proof *root, expr_set& asserted_b, expr_ref_vector& unsat_core)
+    {
+        // TODO: check that everything is reset?
         
         // transform proof in order to get a proof which is better suited for unsat-core-extraction
         proof_ref pr(root, m);
@@ -111,349 +117,158 @@ namespace spacer {
         IF_VERBOSE(3, verbose_stream() << "Reduced proof:\n" << mk_ismt2_pp(pr, m) << "\n";);
         
         // compute symbols occuring in B
-        std::unordered_set<func_decl*> symbolsB = collectSymbolsB(axiomsB);
+        collect_symbols_b(asserted_b);
         
-        // traverse proof using the following datastructures and construct unsat-core
-        ast_mark containsAAxioms; // saves for each node whether its derivation contains an A-axiom and save it here
-        ast_mark containsBAxioms; // saves for each node whether its derivation contains a B-axiom and save it here
-        std::unordered_map<expr*, std::unordered_set<expr*> > nodesToHypothesis; // saves for each node the hypothesis' its derivation is depending on.
-        std::unordered_set<expr*> lemmaSet; // collects the lemmas of the unsat-core, will at the end be inserted into lemmas.
-        
+        // traverse proof
         ProofIteratorPostOrder it(root, m);
         while (it.hasNext())
         {
             proof* currentNode = it.next();
+//            verbose_stream() << mk_pp(m.get_fact(currentNode), m) << std::endl;
             
             if (m.get_num_parents(currentNode) == 0)
             {
                 switch(currentNode->get_decl_kind())
                 {
-                    /* currentNode is an axiom:
-                     * derivation contains an axiom from A/B (the node itself),
-                     * there are no hypothesis,
-                     * there is no boundary between A-proof-parts and B-proof-parts
-                     */
-                    case PR_ASSERTED:
+                    
+                    case PR_ASSERTED: // currentNode is an axiom
                     {
-                        if (axiomsB.contains(m.get_fact(currentNode)))
+                        if (asserted_b.contains(m.get_fact(currentNode)))
                         {
-                            containsBAxioms.mark(currentNode, true);
+                            b_mark.mark(currentNode, true);
                         }
                         else
                         {
-                            containsAAxioms.mark(currentNode, true);
+                            a_mark.mark(currentNode, true);
                         }
-                        
-                        std::unordered_set<expr*> currentHypothesis;
-                        nodesToHypothesis.insert(std::make_pair(currentNode, currentHypothesis));
                         break;
                     }
-                    /* currentNode is a hypothesis:
-                     * derivation of currentNode contains neither A- nor B-axioms,
-                     * derivation of currentNode contains one hypothesis (the node itself)
-                     * there is no boundary between A-proof-parts and B-proof-parts
-                     */
+                    // currentNode is a hypothesis:
                     case PR_HYPOTHESIS:
                     {
-                        std::unordered_set<expr*> currentHypothesis;
-                        currentHypothesis.insert(m.get_fact(currentNode));
-                        nodesToHypothesis.insert(std::make_pair(currentNode, currentHypothesis));
+                        h_mark.mark(currentNode, true);
                         break;
                     }
                     /*
                      * currentNode is result of skolemization
-                     * TODO: what do we need to do here?
                      */
                     case PR_DEF_AXIOM:
                     {
-                        if (!containsOnlySymbolsFromB(symbolsB, m.get_fact(currentNode), m))
+                        // TODO: what to do here? check proofChecker!
+                        // BUG: is this correct?
+                        if (only_contains_symbols_b(m.get_fact(currentNode)))
                         {
-                            containsAAxioms.mark(currentNode, true);
+                            b_mark.mark(currentNode, true);
                         }
+                        else
+                        {
+                            a_mark.mark(currentNode, true);
+                        }
+                        break;
+                    }
+                    default:
+                    {
                         break;
                     }
                 }
             }
             else
             {
-                // first, collect from parents whether derivation of currentNodes contains A-axioms, B-axioms; furthermore compute hypothesis' of derivation of currentNode
-                bool currentContainsAAxioms = false;
-                bool currentContainsBAxioms = false;
-                std::unordered_set<expr*> currentHypothesis;
+                // collect from parents whether derivation of current node contains A-axioms, B-axioms and hypothesis
+                bool need_to_mark_a = false;
+                bool need_to_mark_b = false;
+                bool need_to_mark_h = false;
+                bool need_to_mark_closed = true;
                 
                 for (unsigned i = 0; i < m.get_num_parents(currentNode); ++i)
                 {
                     SASSERT(m.is_proof(currentNode->get_arg(i)));
                     proof* premise = to_app(currentNode->get_arg(i));
                     
-                    currentContainsAAxioms = currentContainsAAxioms || containsAAxioms.is_marked(premise);
-                    currentContainsBAxioms = currentContainsBAxioms || containsBAxioms.is_marked(premise);
-                    
-                    std::unordered_set<expr*> premiseHypothesis = nodesToHypothesis[premise];
-                    
-                    // TODO: should we add the optimization to use references of sets instead so we don't need to fill up a vector with all the elements of another vector, but instead just take the other vector?
-                    currentHypothesis.insert(premiseHypothesis.begin(), premiseHypothesis.end());
+                    need_to_mark_a = need_to_mark_a || a_mark.is_marked(premise);
+                    need_to_mark_b = need_to_mark_b || b_mark.is_marked(premise);
+                    need_to_mark_h = need_to_mark_h || h_mark.is_marked(premise);
+                    need_to_mark_closed = need_to_mark_closed && closed.is_marked(premise);
                 }
                 
-                nodesToHypothesis.insert(std::make_pair(currentNode, currentHypothesis));
-                containsAAxioms.mark(currentNode, currentContainsAAxioms);
-                containsBAxioms.mark(currentNode, currentContainsBAxioms);
-                
-                SASSERT(currentNode->get_decl_kind() != PR_ASSERTED &&
-                        currentNode->get_decl_kind() != PR_HYPOTHESIS &&
-                        currentNode->get_decl_kind() != PR_DEF_AXIOM);
-                
-                // secondly, visit node
-                switch(currentNode->get_decl_kind())
+                // if current node is application of lemma, we know that all hypothesis are removed
+                if(currentNode->get_decl_kind() == PR_LEMMA)
                 {
-                    /*
-                     * TODO: (this is a corner case where hypothesis-reasoning occurs)
-                     */
-                    case PR_LEMMA:
-                    {
-                        expr* conclusion = m.get_fact(currentNode);
-                        if (!m.is_or(conclusion))
-                        {
-                            SASSERT(currentHypothesis.count(conclusion) == 1);
-                            currentHypothesis.erase(conclusion);
-                        }
-                        else
-                        {
-                            bool_rewriter rewriter(m);
-
-                            for (unsigned i = 0; i < to_app(conclusion)->get_num_args(); ++i)
-                            {
-                                expr* hypothesis = to_app(conclusion)->get_arg(i);
-                                expr_ref negatedHypothesis(m);
-                                rewriter.mk_not(hypothesis, negatedHypothesis);
-                                SASSERT(currentHypothesis.count(negatedHypothesis) == 1);
-                                currentHypothesis.erase(negatedHypothesis);
-                            }
-                        }
-                        nodesToHypothesis.insert(std::make_pair(currentNode, currentHypothesis));
-                        break;
-                    }
-                    /*
-                     * currentNode is a Farkas lemma, whose derivation contains both A-axioms and B-axioms
-                     */
-                    case PR_TH_LEMMA:
-                    {
-                        if (currentContainsAAxioms && currentContainsBAxioms)
-                        {
-                            if (is_farkas_lemma(m, currentNode))
-                            {
-                                unsatCoreForFarkasLemma(currentNode, containsAAxioms, containsBAxioms, nodesToHypothesis, m, lemmaSet, lemmas);
-                                
-                                // TODO: b_closed.mark(p, true);
-                            }
-                        }
-                        break;
-                    }
-                
-                    default:
-                    {
-                        SASSERT(!is_farkas_lemma(m, currentNode));
-                        if ((!currentHypothesis.empty() || currentContainsAAxioms) && currentContainsBAxioms)
-                        {
-                            unsatCoreForLemma(currentNode, symbolsB, containsAAxioms, containsBAxioms, nodesToHypothesis, m, lemmaSet, lemmas);
-                        }
-                    }
-                        break;
+                    need_to_mark_h = false;
                 }
-            }
-        }
-    }
-    
-    /*
-     * add all B-pure premises to lemmas (and lemmaSet)
-     */
-    void farkas_learner::unsatCoreForLemma(proof* lemma,
-                                           std::unordered_set<func_decl*> symbolsB,
-                                           ast_mark& containsAAxioms,
-                                           ast_mark& containsBAxioms,
-                                           std::unordered_map<expr*, std::unordered_set<expr*> >& nodesToHypothesis,
-                                           ast_manager& m,
-                                           std::unordered_set<expr*>& lemmaSet,
-                                           expr_ref_vector& lemmas)
-    {
-        for (unsigned i = 0; i < m.get_num_parents(lemma); ++i)
-        {
-            SASSERT(m.is_proof(lemma->get_arg(i)));
-            proof* premise = to_app(lemma->get_arg(i));
-            
-            if (!containsAAxioms.is_marked(premise) && containsBAxioms.is_marked(premise) && nodesToHypothesis[premise].empty())
-            {
-                expr* fact = m.get_fact(premise);
-                /*
-                 * workaround: if a B-pure symbol contains symbols not occuring in B, 
-                 * we don't trust it and instead go up the proof until we find B-pure 
-                 * premises which we trust.
-                 *
-                 */
-                if (containsOnlySymbolsFromB(symbolsB, fact, m))
-                {
-                    auto result = lemmaSet.insert(fact);
-                    if (result.second)
-                    {
-                        lemmas.push_back(fact);
-                    }
-                }
-                else
-                {
-                    ast_mark visited;
-                    std::stack<proof*> todo;
-                    todo.push(premise);
-                    
-                    while (!todo.empty())
-                    {
-                        proof* current = todo.top();
-                        todo.pop();
-
-                        if (!visited.is_marked(current)) //  TODO: && !b_closed.is_marked(p)
-                        {
-                            visited.mark(current, true);
-                            
-                            expr* currentFact = m.get_fact(current);
-                            SASSERT(containsOnlySymbolsFromB(symbolsB, fact, m) || m.get_num_parents(current) > 0); // we will always find a node we trust (in the worst case a B-axiom)
-                            if (containsOnlySymbolsFromB(symbolsB, currentFact, m))
-                            {
-                                auto result = lemmaSet.insert(fact);
-                                if (result.second)
-                                {
-                                    lemmas.push_back(fact);
-                                }
-                            }
-                            else
-                            {
-                                for (unsigned i = 0; i < m.get_num_parents(current); ++i)
-                                {
-                                    SASSERT(m.is_proof(current->get_arg(i)));
-                                    proof* premise = to_app(current->get_arg(i));
-                                    todo.push(premise);
-                                }
-                            }
-
-                            //TODO: b_closed.mark(p, true);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    
-    void farkas_learner::unsatCoreForFarkasLemma(proof* farkasLemma,
-                                                 ast_mark& containsAAxioms,
-                                                 ast_mark& containsBAxioms,
-                                                 std::unordered_map<expr *, std::unordered_set<expr *> >& nodesToHypothesis,
-                                                 ast_manager& m,
-                                                 std::unordered_set<expr*>& lemmaSet,
-                                                 expr_ref_vector& lemmas)
-    {
-        /*
-         * the Farkas coefficients are saved in the parameters of farkasLemma
-         * the first two parameters are "arith", "farkas", the following parameters are the Farkas coefficients
-         */
-        SASSERT(m.has_fact(farkasLemma));// TODO: what things do we know about the proof steps we get?
-        unsigned num_parents = m.get_num_parents(farkasLemma);
-        func_decl* d = farkasLemma->get_decl();
-        SASSERT(d->get_num_parameters() >= num_parents + 2);
-        SASSERT(d->get_parameter(0).get_symbol() == "arith");
-        SASSERT(d->get_parameter(1).get_symbol() == "farkas");
-        
-        std::vector<app*> literals;
-        std::vector<rational> coefficients;
-        
-        /* We need two workarounds:
-         * 1) Although we know from theory, that the Farkas coefficients are always nonnegative,
-         * the Farkas coefficients provided by arith_core are sometimes negative (must be a bug)
-         * as workaround we take the absolute value of the provided coefficients.
-         * 2) The theory lemmas should actually be seen as an axiom (i.e. a rule without premise).
-         * Since the conclusion of such a theory lemma is a disjunction, one can also add several
-         * or all of those disjuncts as negated premise instead of putting them as disjunct into the conclusion.
-         * The lemma provided by arith_core does both, so as a workaround we need to deal with all those 
-         * situations.
-         */
-        parameter const* params = d->get_parameters() + 2; // point to the first Farkas coefficient
-        for(unsigned i = 0; i < num_parents; ++i)
-        {
-            SASSERT(is_app(farkasLemma->get_arg(i)));
-            proof * premise = to_app(farkasLemma->get_arg(i));
-            
-            if(!containsAAxioms.is_marked(premise) && containsBAxioms.is_marked(premise) && nodesToHypothesis[premise].empty())
-            {
-                rational coefficient;
-                VERIFY(params[i].is_rational(coefficient));
-                literals.push_back(to_app(m.get_fact(premise)));
-                coefficients.push_back(abs(coefficient));
-            }
-        }
-        params += num_parents; // point to the first Farkas coefficient, which corresponds to a formula in the conclusion
-        
-        // if there are still parameters left, we know that the conclusion is not the empty clause, but contains negated premises (valid, since A land B land C => bot is the same as A => neg B lor neg C)
-        // the conclusion can either be a single formula or a disjunction of several formulas, we have to deal with both situations
-        if (num_parents + 2 < d->get_num_parameters())
-        {
-            unsigned num_args = 1;
-            expr* conclusion = m.get_fact(farkasLemma);
-            expr* const* args = &conclusion;
-            if (m.is_or(conclusion))
-            {
-                app* _or = to_app(conclusion);
-                num_args = _or->get_num_args();
-                args = _or->get_args();
-            }
-            SASSERT(num_parents + 2 + num_args == d->get_num_parameters());
-            
-            bool_rewriter rewriter(m);
-            for (unsigned i = 0; i < num_args; ++i)
-            {
-                expr* premise = args[i];
                 
-                expr_ref negatedPremise(m);
-                rewriter.mk_not(premise, negatedPremise);
-                SASSERT(is_app(negatedPremise));
-                literals.push_back(to_app(negatedPremise));
-                
-                rational coefficient;
-                VERIFY(params[i].is_rational(coefficient));
-                coefficients.push_back(abs(coefficient));
+                // save results
+                a_mark.mark(currentNode, need_to_mark_a);
+                b_mark.mark(currentNode, need_to_mark_b);
+                h_mark.mark(currentNode, need_to_mark_h);
+            }
+            
+            // we have now collected all necessary information, so we can visit the node
+            // if the node mixes A-reasoning and B-reasoning and contains non-closed premises
+            if (a_mark.is_marked(currentNode) && b_mark.is_marked(currentNode) && !closed.is_marked(currentNode))
+            {
+                compute_partial_core(currentNode); // then we need to compute a partial core
+                SASSERT(!(a_mark.is_marked(currentNode) && b_mark.is_marked(currentNode)) ||
+                        closed.is_marked(currentNode));
             }
         }
         
-        // now all B-pure literals and their coefficients are collected, so compute the linear combination
-        expr_ref res(m);
-        computeLinearCombination(coefficients, literals, res);
+        // give plugins chance to finalize their unsat-core-computation
+        finalize();
         
-        auto result = lemmaSet.insert(res);
-        if (result.second)
+        // move all lemmas from set into vector
+        for (auto it = unsat_core_set.begin(); it != unsat_core_set.end(); ++it)
         {
-            lemmas.push_back(res);
+            IF_VERBOSE(2, verbose_stream() << "Move lemma to unsat core vector:" << mk_pp(*it, m) << "\n";);
+            unsat_core.push_back(*it);
         }
     }
-
     
-#pragma mark - helper methods
-    
-    void farkas_learner::computeLinearCombination(std::vector<rational>& coefficients, std::vector<app*>& literals, expr_ref& res)
+    void unsat_core_learner::compute_partial_core(proof* step)
     {
-        SASSERT(literals.size() == coefficients.size());
-        
-        ast_manager& m = res.get_manager();
-        smt::farkas_util util(m);
-        util.set_split_literals (m_split_literals); // small optimization: if flag m_split_literals is set, then preserve diff constraints
-        for(unsigned i = 0; i < literals.size(); ++i)
+        for (auto it=plugins.begin(); it != plugins.end(); ++it)
         {
-            util.add(coefficients[i], literals[i]);
+            auto plugin = *it;
+            plugin->compute_partial_core(step);
         }
-        res = util.get();
     }
-
-
-    std::unordered_set<func_decl*> farkas_learner::collectSymbolsB(expr_set const& axiomsB)
+    
+    void unsat_core_learner::finalize()
     {
-        std::unordered_set<func_decl*> symbolsB;
-        for (auto it = axiomsB.begin(); it != axiomsB.end(); ++it)
+        for (auto it=plugins.begin(); it != plugins.end(); ++it)
+        {
+            auto plugin = *it;
+            plugin->finalize();
+        }
+    }
+    
+#pragma mark - getter / setter
+    
+    bool unsat_core_learner::is_a_marked(proof* p)
+    {
+        return a_mark.is_marked(p);
+    }
+    bool unsat_core_learner::is_b_marked(proof* p)
+    {
+        return b_mark.is_marked(p);
+    }
+    bool unsat_core_learner::is_h_marked(proof* p)
+    {
+        return h_mark.is_marked(p);
+    }
+    bool unsat_core_learner::is_closed(proof*p)
+    {
+        return closed.is_marked(p);
+    }
+    void unsat_core_learner::set_closed(proof* p, bool value)
+    {
+        closed.mark(p, value);
+    }
+    
+    
+    void unsat_core_learner::collect_symbols_b(expr_set axioms_b)
+    {
+        for (auto it = axioms_b.begin(); it != axioms_b.end(); ++it)
         {
             expr* possibly_app = *it;
             if (is_app(possibly_app))
@@ -461,15 +276,13 @@ namespace spacer {
                 app* app = to_app(possibly_app);
                 if (app->get_family_id() == null_family_id)
                 {
-                    symbolsB.insert(app->get_decl());
+                    symbols_b.insert(app->get_decl());
                 }
             }
         }
-        
-        return symbolsB;
     }
-
-    bool farkas_learner::containsOnlySymbolsFromB(std::unordered_set<func_decl*>& symbolsB, expr* expr, ast_manager m)
+    
+    bool unsat_core_learner::only_contains_symbols_b(expr* expr) const
     {
         if (is_app(expr))
         {
@@ -477,12 +290,12 @@ namespace spacer {
             if (app->get_family_id() == null_family_id)
             {
                 array_util util(m);
-                if (symbolsB.find(app->get_decl()) == symbolsB.end())
+                if (symbols_b.find(app->get_decl()) == symbols_b.end())
                 {
                     return false;
                 }
                 if (app->get_family_id () == util.get_family_id () &&
-                         app->is_app_of(app->get_family_id (), OP_ARRAY_EXT))
+                    app->is_app_of(app->get_family_id (), OP_ARRAY_EXT))
                 {
                     return false;
                 }
@@ -491,6 +304,199 @@ namespace spacer {
         return true;
     }
     
+    void unsat_core_learner::add_lemma_to_core(expr_ref lemma)
+    {
+        IF_VERBOSE(2, verbose_stream() << "Add lemma to unsat core:" << mk_pp(lemma, m) << "\n";);
+        unsat_core_set.insert_if_not_there(lemma);
+    }
+    
+#pragma mark - unsat_core_plugin_lemma
+
+    void unsat_core_plugin_lemma::compute_partial_core(proof* step)
+    {
+        SASSERT(learner.is_a_marked(step));
+        SASSERT(learner.is_b_marked(step));
+        
+        for (unsigned i = 0; i < learner.m.get_num_parents(step); ++i)
+        {
+            SASSERT(learner.m.is_proof(step->get_arg(i)));
+            proof* premise = to_app(step->get_arg(i));
+
+            if (learner.is_b_marked(premise) && !learner.is_closed(premise))
+            {
+                SASSERT(!learner.is_a_marked(premise));
+                add_lowest_split_to_core(premise);
+            }
+        }
+        learner.set_closed(step, true);
+    }
+    
+    void unsat_core_plugin_lemma::add_lowest_split_to_core(proof* step) const
+    {
+        std::stack<proof*> todo;
+        todo.push(step);
+        
+        while (!todo.empty())
+        {
+            proof* current = todo.top();
+            todo.pop();
+            
+            // if current step hasn't been processed,
+            if (!learner.is_closed(current))
+            {
+                learner.set_closed(current, true);
+                SASSERT(!learner.is_a_marked(current)); // by I.H. the step must be already visited
+                
+                // and the current step needs to be interpolated:
+                if (learner.is_b_marked(current))
+                {
+                    expr* fact = learner.m.get_fact(current);
+                    // if we trust the current step and we are able to use it
+                    if (learner.only_contains_symbols_b(fact) && !learner.is_h_marked(current))
+                    {
+                        // just add it to the core
+                        learner.add_lemma_to_core(expr_ref(fact, learner.m));
+                    }
+                    // otherwise recurse on premises
+                    else
+                    {
+                    
+                        for (unsigned i = 0; i < learner.m.get_num_parents(step); ++i)
+                        {
+                            SASSERT(learner.m.is_proof(step->get_arg(i)));
+                            proof* premise = to_app(step->get_arg(i));
+                            todo.push(premise);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    
+#pragma mark - unsat_core_plugin_farkas_lemma
+    void unsat_core_plugin_farkas_lemma::compute_partial_core(proof* step)
+    {
+        SASSERT(learner.is_a_marked(step));
+        SASSERT(learner.is_b_marked(step));
+        
+        func_decl* d = step->get_decl();
+        symbol sym;
+        if(!learner.is_closed(step) && // if step is not already interpolated
+           step->get_decl_kind() == PR_TH_LEMMA && // and step is a Farkas lemma
+           d->get_num_parameters() >= 2 && // the Farkas coefficients are saved in the parameters of step
+           d->get_parameter(0).is_symbol(sym) && sym == "arith" && // the first two parameters are "arith", "farkas",
+           d->get_parameter(1).is_symbol(sym) && sym == "farkas" &&
+           d->get_num_parameters() >= learner.m.get_num_parents(step) + 2) // the following parameters are the Farkas coefficients
+        {
+            SASSERT(learner.m.has_fact(step));
+            
+            bool needsToBeClosed = true;
+            
+            std::vector<app*> literals;
+            std::vector<rational> coefficients;
+            
+            /* We need two workarounds:
+             * 1) Although we know from theory, that the Farkas coefficients are always nonnegative,
+             * the Farkas coefficients provided by arith_core are sometimes negative (must be a bug)
+             * as workaround we take the absolute value of the provided coefficients.
+             * 2) The theory lemmas should actually be seen as an axiom (i.e. a rule without premise).
+             * Since the conclusion of such a theory lemma is a disjunction, one can also add several
+             * or all of those disjuncts as negated premise instead of putting them as disjunct into the conclusion.
+             * The lemma provided by arith_core does both, so as a workaround we need to deal with all those
+             * situations.
+             */
+            parameter const* params = d->get_parameters() + 2; // point to the first Farkas coefficient
+            
+            for(unsigned i = 0; i < learner.m.get_num_parents(step); ++i)
+            {
+                SASSERT(learner.m.is_proof(step->get_arg(i)));
+                proof * premise = to_app(step->get_arg(i));
+                
+                if (learner.is_b_marked(premise) && !learner.is_closed(premise))
+                {
+                    SASSERT(!learner.is_a_marked(premise));
+                    
+                    if (learner.only_contains_symbols_b(learner.m.get_fact(step)) && !learner.is_h_marked(step))
+                    {
+                        learner.set_closed(premise, true);
+                        
+                        rational coefficient;
+                        VERIFY(params[i].is_rational(coefficient));
+                        literals.push_back(to_app(learner.m.get_fact(premise)));
+                        coefficients.push_back(abs(coefficient));
+                    }
+                    else // otherwise we don't deal with the premise, so we don't need to close the current step at the end
+                    {
+                        needsToBeClosed = false;
+                    }
+                }
+            }
+            params += learner.m.get_num_parents(step); // point to the first Farkas coefficient, which corresponds to a formula in the conclusion
+            
+            // TODO: possible BUG: why do we always trust the conclusion, in contrast to the premises? i.e. why don't we need to check for
+            // learner.only_contains_symbols_b(learner.m.get_fact(step)) && !learner.is_h_marked(step)?
+            // if there are still parameters left, we know that the conclusion is not the empty clause, but contains negated premises (valid, since A land B land C => bot is the same as A => neg B lor neg C)
+            // the conclusion can either be a single formula or a disjunction of several formulas, we have to deal with both situations
+            if (learner.m.get_num_parents(step) + 2 < d->get_num_parameters())
+            {
+                unsigned num_args = 1;
+                expr* conclusion = learner.m.get_fact(step);
+                expr* const* args = &conclusion;
+                if (learner.m.is_or(conclusion))
+                {
+                    app* _or = to_app(conclusion);
+                    num_args = _or->get_num_args();
+                    args = _or->get_args();
+                }
+                SASSERT(learner.m.get_num_parents(step) + 2 + num_args == d->get_num_parameters());
+                
+                bool_rewriter rewriter(learner.m);
+                for (unsigned i = 0; i < num_args; ++i)
+                {
+                    expr* premise = args[i];
+                    
+                    expr_ref negatedPremise(learner.m);
+                    rewriter.mk_not(premise, negatedPremise);
+                    SASSERT(is_app(negatedPremise));
+                    literals.push_back(to_app(negatedPremise));
+                    
+                    rational coefficient;
+                    VERIFY(params[i].is_rational(coefficient));
+                    coefficients.push_back(abs(coefficient));
+                }
+            }
+            
+            // now all B-pure literals and their coefficients are collected, so compute the linear combination
+            expr_ref res(learner.m);
+            compute_linear_combination(coefficients, literals, res);
+
+            learner.add_lemma_to_core(res);
+            
+            if (needsToBeClosed)
+            {
+                learner.set_closed(step, true);
+            }
+        }
+    }
+
+    
+    void unsat_core_plugin_farkas_lemma::compute_linear_combination(const std::vector<rational>& coefficients, const std::vector<app*>& literals, expr_ref& res)
+    {
+        SASSERT(literals.size() == coefficients.size());
+        
+        ast_manager& m = res.get_manager();
+        smt::farkas_util util(m);
+        // TODO: util.set_split_literals (m_split_literals); // small optimization: if flag m_split_literals is set, then preserve diff constraints
+        for(unsigned i = 0; i < literals.size(); ++i)
+        {
+            util.add(coefficients[i], literals[i]);
+        }
+        res = util.get();
+    }
+
+
+
     
 #pragma mark - old code, to be deleted
     
@@ -634,7 +640,7 @@ namespace spacer {
 
 #define INSERT(_x_) if (!lemma_set.contains(_x_)) { lemma_set.insert(_x_); lemmas.push_back(_x_); }
 
-    void farkas_learner::get_lemmas2(proof* root, expr_set const& bs, expr_ref_vector& lemmas) {
+    void farkas_learner::get_lemmas(proof* root, expr_set const& bs, expr_ref_vector& lemmas) {
         ast_manager& m = lemmas.get_manager();
         bool_rewriter brwr(m);
         func_decl_set Bsymbs;
@@ -716,7 +722,7 @@ namespace spacer {
                     if (IS_B_PURE(arg)) {
                         expr* fact = m.get_fact(arg);
                         if (is_pure_expr(Bsymbs, fact, m)) {
-                            TRACE("farkas_learner", 
+                            TRACE("farkas_learner2",
                                   tout << "Add: " << mk_pp(m.get_fact(arg), m) << "\n";
                                   tout << mk_pp(arg, m) << "\n";
                                   );
@@ -788,7 +794,7 @@ namespace spacer {
                 rational coef;
                 vector<rational> coeffs;
 
-                TRACE("farkas_learner", 
+                TRACE("farkas_learner2",
                         for (unsigned i = 0; i < prem_cnt; ++i) {
                             VERIFY(params[i].is_rational(coef));
                             proof* prem = to_app(p->get_arg(i));
@@ -841,7 +847,7 @@ namespace spacer {
                 if (num_b_pures > 0) {
                     expr_ref res(m);
                     combine_constraints(coeffs.size(), lits.c_ptr(), coeffs.c_ptr(), res);
-                    TRACE("farkas_learner", tout << "Add: " << mk_pp(res, m) << "\n";);
+                    TRACE("farkas_learner2", tout << "Add: " << mk_pp(res, m) << "\n";);
                     INSERT(res);
                     b_closed.mark(p, true);
                 }
@@ -877,7 +883,7 @@ namespace spacer {
             if (p->get_decl_kind() == PR_ASSERTED &&
                 bs.contains(m.get_fact(p))) {
                 expr* fact = m.get_fact(p);
-                TRACE("farkas_learner", 
+                TRACE("farkas_learner2", 
                       tout << mk_ll_pp(p0,m) << "\n";
                       tout << "Add: " << mk_pp(p,m) << "\n";);
                 INSERT(fact);

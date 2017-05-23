@@ -277,19 +277,42 @@ namespace spacer {
             if (is_proxy (a, def)) B.insert (def.get ());
             B.insert (a);
         }
+        
         proof_ref pr(m);
         pr = get_proof ();
+        
         farkas_learner farkas;
         farkas.set_split_literals (m_split_literals);
     
         core.reset ();
         farkas.get_lemmas (pr, B, core);
+        
         elim_proxies (core);
         simplify_bounds (core); // XXX potentially redundant
-
         IF_VERBOSE(2,
                    verbose_stream () << "Itp Core:\n"
                    << mk_pp (mk_and (core), m) << "\n";);
+
+        unsat_core_learner learner(m);
+        auto plugin_lemma = std::make_shared<unsat_core_plugin_lemma>(learner);
+        auto plugin_farkas_lemma = std::make_shared<unsat_core_plugin_farkas_lemma>(learner);
+        learner.register_plugin(plugin_farkas_lemma);
+        learner.register_plugin(plugin_lemma);
+
+        expr_ref_vector core2(m); // TODO:debugging
+        learner.compute_unsat_core(pr, B, core2);
+                
+        for (auto it = core2.begin(); it != core2.end(); ++it)
+        {
+            IF_VERBOSE(2, verbose_stream() << "Lemma of unsat core:" << mk_pp(*it, m) << "\n";);
+        }
+        elim_proxies (core2);
+        simplify_bounds (core2); // XXX potentially redundant
+
+        IF_VERBOSE(2,
+                   verbose_stream () << "Itp Core2:\n"
+                   << mk_pp (mk_and (core2), m) << "\n";);
+
     }
   
     void itp_solver::refresh ()
