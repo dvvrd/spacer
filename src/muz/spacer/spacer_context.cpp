@@ -390,7 +390,7 @@ namespace spacer {
   {return m_frames.propagate_to_next_level (src_level);}
   
 
-  /// \brief adds a lemma to the solver and to child solvers
+  /// \brief adds a lema to the solver and to child solvers
   void pred_transformer::add_lemma_core (frames::lemma* lemma)
   {
     unsigned lvl = lemma->level();
