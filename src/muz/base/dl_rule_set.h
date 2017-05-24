@@ -209,6 +209,7 @@ namespace datalog {
         */
         void add_rules(const rule_set& src);
         void replace_rules(const rule_set& other);
+        void replace_rule(rule * r, rule * other);
 
         /**
            \brief This method should be invoked after all rules are added to the rule set.

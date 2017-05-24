@@ -390,6 +390,23 @@ namespace datalog {
         DEL_VECTOR(m_rules);
     }    
 
+    void rule_set::replace_rule(rule * r, rule * other) {
+        TRACE("dl", r->display(m_context, tout << "replace:"););
+        func_decl* d = r->get_decl();
+        rule_vector* rules = m_head2rules.find(d);
+#define REPLACE_VECTOR(_v)                              \
+        for (unsigned i = (_v).size(); i > 0; ) {       \
+            --i;                                        \
+            if ((_v)[i] == r) {                         \
+                (_v)[i] = other;                        \
+                break;                                  \
+            }                                           \
+        }                                               \
+
+        REPLACE_VECTOR(*rules);
+        REPLACE_VECTOR(m_rules);
+    }
+
     void rule_set::ensure_closed() {
         if (!is_closed()) {
             VERIFY(close());
