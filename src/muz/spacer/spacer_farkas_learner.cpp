@@ -103,7 +103,7 @@ namespace spacer {
     
     void unsat_core_learner::register_plugin(std::shared_ptr<unsat_core_plugin> plugin)
     {
-        plugins.push_back(plugin);
+        m_plugins.push_back(plugin);
     }
     
     void unsat_core_learner::compute_unsat_core(proof *root, expr_set& asserted_b, expr_ref_vector& unsat_core)
@@ -135,18 +135,18 @@ namespace spacer {
                     {
                         if (asserted_b.contains(m.get_fact(currentNode)))
                         {
-                            b_mark.mark(currentNode, true);
+                            m_b_mark.mark(currentNode, true);
                         }
                         else
                         {
-                            a_mark.mark(currentNode, true);
+                            m_a_mark.mark(currentNode, true);
                         }
                         break;
                     }
                     // currentNode is a hypothesis:
                     case PR_HYPOTHESIS:
                     {
-                        h_mark.mark(currentNode, true);
+                        m_h_mark.mark(currentNode, true);
                         break;
                     }
                     /*
@@ -158,11 +158,11 @@ namespace spacer {
                         // BUG: is this correct?
                         if (only_contains_symbols_b(m.get_fact(currentNode)))
                         {
-                            b_mark.mark(currentNode, true);
+                            m_b_mark.mark(currentNode, true);
                         }
                         else
                         {
-                            a_mark.mark(currentNode, true);
+                            m_a_mark.mark(currentNode, true);
                         }
                         break;
                     }
@@ -185,10 +185,10 @@ namespace spacer {
                     SASSERT(m.is_proof(currentNode->get_arg(i)));
                     proof* premise = to_app(currentNode->get_arg(i));
                     
-                    need_to_mark_a = need_to_mark_a || a_mark.is_marked(premise);
-                    need_to_mark_b = need_to_mark_b || b_mark.is_marked(premise);
-                    need_to_mark_h = need_to_mark_h || h_mark.is_marked(premise);
-                    need_to_mark_closed = need_to_mark_closed && closed.is_marked(premise);
+                    need_to_mark_a = need_to_mark_a || m_a_mark.is_marked(premise);
+                    need_to_mark_b = need_to_mark_b || m_b_mark.is_marked(premise);
+                    need_to_mark_h = need_to_mark_h || m_h_mark.is_marked(premise);
+                    need_to_mark_closed = need_to_mark_closed && m_closed.is_marked(premise);
                 }
                 
                 // if current node is application of lemma, we know that all hypothesis are removed
@@ -198,18 +198,18 @@ namespace spacer {
                 }
                 
                 // save results
-                a_mark.mark(currentNode, need_to_mark_a);
-                b_mark.mark(currentNode, need_to_mark_b);
-                h_mark.mark(currentNode, need_to_mark_h);
+                m_a_mark.mark(currentNode, need_to_mark_a);
+                m_b_mark.mark(currentNode, need_to_mark_b);
+                m_h_mark.mark(currentNode, need_to_mark_h);
             }
             
             // we have now collected all necessary information, so we can visit the node
             // if the node mixes A-reasoning and B-reasoning and contains non-closed premises
-            if (a_mark.is_marked(currentNode) && b_mark.is_marked(currentNode) && !closed.is_marked(currentNode))
+            if (m_a_mark.is_marked(currentNode) && m_b_mark.is_marked(currentNode) && !m_closed.is_marked(currentNode))
             {
                 compute_partial_core(currentNode); // then we need to compute a partial core
-                SASSERT(!(a_mark.is_marked(currentNode) && b_mark.is_marked(currentNode)) ||
-                        closed.is_marked(currentNode));
+                SASSERT(!(m_a_mark.is_marked(currentNode) && m_b_mark.is_marked(currentNode)) ||
+                        m_closed.is_marked(currentNode));
             }
         }
         
@@ -217,16 +217,16 @@ namespace spacer {
         finalize();
         
         // move all lemmas from set into vector
-        for (auto it = unsat_core_set.begin(); it != unsat_core_set.end(); ++it)
+        for (auto it = m_unsat_core_set.begin(); it != m_unsat_core_set.end(); ++it)
         {
-            IF_VERBOSE(2, verbose_stream() << "Move lemma to unsat core vector:" << mk_pp(*it, m) << "\n";);
+            IF_VERBOSE(2, verbose_stream() << "Move lemma to unsat core vector:" << mk_pp(*it, m) << " " << (*it)->get_id() << "\n";);
             unsat_core.push_back(*it);
         }
     }
     
     void unsat_core_learner::compute_partial_core(proof* step)
     {
-        for (auto it=plugins.begin(); it != plugins.end(); ++it)
+        for (auto it=m_plugins.begin(); it != m_plugins.end(); ++it)
         {
             auto plugin = *it;
             plugin->compute_partial_core(step);
@@ -235,7 +235,7 @@ namespace spacer {
     
     void unsat_core_learner::finalize()
     {
-        for (auto it=plugins.begin(); it != plugins.end(); ++it)
+        for (auto it=m_plugins.begin(); it != m_plugins.end(); ++it)
         {
             auto plugin = *it;
             plugin->finalize();
@@ -246,23 +246,23 @@ namespace spacer {
     
     bool unsat_core_learner::is_a_marked(proof* p)
     {
-        return a_mark.is_marked(p);
+        return m_a_mark.is_marked(p);
     }
     bool unsat_core_learner::is_b_marked(proof* p)
     {
-        return b_mark.is_marked(p);
+        return m_b_mark.is_marked(p);
     }
     bool unsat_core_learner::is_h_marked(proof* p)
     {
-        return h_mark.is_marked(p);
+        return m_h_mark.is_marked(p);
     }
     bool unsat_core_learner::is_closed(proof*p)
     {
-        return closed.is_marked(p);
+        return m_closed.is_marked(p);
     }
     void unsat_core_learner::set_closed(proof* p, bool value)
     {
-        closed.mark(p, value);
+        m_closed.mark(p, value);
     }
     
     
@@ -276,7 +276,7 @@ namespace spacer {
                 app* app = to_app(possibly_app);
                 if (app->get_family_id() == null_family_id)
                 {
-                    symbols_b.insert(app->get_decl());
+                    m_symbols_b.insert(app->get_decl());
                 }
             }
         }
@@ -290,7 +290,7 @@ namespace spacer {
             if (app->get_family_id() == null_family_id)
             {
                 array_util util(m);
-                if (symbols_b.find(app->get_decl()) == symbols_b.end())
+                if (m_symbols_b.find(app->get_decl()) == m_symbols_b.end())
                 {
                     return false;
                 }
@@ -306,29 +306,29 @@ namespace spacer {
     
     void unsat_core_learner::add_lemma_to_core(expr_ref lemma)
     {
-        IF_VERBOSE(2, verbose_stream() << "Add lemma to unsat core:" << mk_pp(lemma, m) << "\n";);
-        unsat_core_set.insert_if_not_there(lemma);
+        IF_VERBOSE(2, verbose_stream() << "Add lemma to unsat core:" << mk_pp(lemma, m) << " " << lemma->get_id() << "\n";);
+        m_unsat_core_set.insert_if_not_there(lemma);
     }
     
 #pragma mark - unsat_core_plugin_lemma
 
     void unsat_core_plugin_lemma::compute_partial_core(proof* step)
     {
-        SASSERT(learner.is_a_marked(step));
-        SASSERT(learner.is_b_marked(step));
+        SASSERT(m_learner.is_a_marked(step));
+        SASSERT(m_learner.is_b_marked(step));
         
-        for (unsigned i = 0; i < learner.m.get_num_parents(step); ++i)
+        for (unsigned i = 0; i < m_learner.m.get_num_parents(step); ++i)
         {
-            SASSERT(learner.m.is_proof(step->get_arg(i)));
+            SASSERT(m_learner.m.is_proof(step->get_arg(i)));
             proof* premise = to_app(step->get_arg(i));
 
-            if (learner.is_b_marked(premise) && !learner.is_closed(premise))
+            if (m_learner.is_b_marked(premise) && !m_learner.is_closed(premise))
             {
-                SASSERT(!learner.is_a_marked(premise));
+                SASSERT(!m_learner.is_a_marked(premise));
                 add_lowest_split_to_core(premise);
             }
         }
-        learner.set_closed(step, true);
+        m_learner.set_closed(step, true);
     }
     
     void unsat_core_plugin_lemma::add_lowest_split_to_core(proof* step) const
@@ -342,28 +342,28 @@ namespace spacer {
             todo.pop();
             
             // if current step hasn't been processed,
-            if (!learner.is_closed(current))
+            if (!m_learner.is_closed(current))
             {
-                learner.set_closed(current, true);
-                SASSERT(!learner.is_a_marked(current)); // by I.H. the step must be already visited
+                m_learner.set_closed(current, true);
+                SASSERT(!m_learner.is_a_marked(current)); // by I.H. the step must be already visited
                 
                 // and the current step needs to be interpolated:
-                if (learner.is_b_marked(current))
+                if (m_learner.is_b_marked(current))
                 {
-                    expr* fact = learner.m.get_fact(current);
+                    expr* fact = m_learner.m.get_fact(current);
                     // if we trust the current step and we are able to use it
-                    if (learner.only_contains_symbols_b(fact) && !learner.is_h_marked(current))
+                    if (m_learner.only_contains_symbols_b(fact) && !m_learner.is_h_marked(current))
                     {
                         // just add it to the core
-                        learner.add_lemma_to_core(expr_ref(fact, learner.m));
+                        m_learner.add_lemma_to_core(expr_ref(fact, m_learner.m));
                     }
                     // otherwise recurse on premises
                     else
                     {
                     
-                        for (unsigned i = 0; i < learner.m.get_num_parents(step); ++i)
+                        for (unsigned i = 0; i < m_learner.m.get_num_parents(step); ++i)
                         {
-                            SASSERT(learner.m.is_proof(step->get_arg(i)));
+                            SASSERT(m_learner.m.is_proof(step->get_arg(i)));
                             proof* premise = to_app(step->get_arg(i));
                             todo.push(premise);
                         }
@@ -377,19 +377,19 @@ namespace spacer {
 #pragma mark - unsat_core_plugin_farkas_lemma
     void unsat_core_plugin_farkas_lemma::compute_partial_core(proof* step)
     {
-        SASSERT(learner.is_a_marked(step));
-        SASSERT(learner.is_b_marked(step));
+        SASSERT(m_learner.is_a_marked(step));
+        SASSERT(m_learner.is_b_marked(step));
         
         func_decl* d = step->get_decl();
         symbol sym;
-        if(!learner.is_closed(step) && // if step is not already interpolated
+        if(!m_learner.is_closed(step) && // if step is not already interpolated
            step->get_decl_kind() == PR_TH_LEMMA && // and step is a Farkas lemma
            d->get_num_parameters() >= 2 && // the Farkas coefficients are saved in the parameters of step
            d->get_parameter(0).is_symbol(sym) && sym == "arith" && // the first two parameters are "arith", "farkas",
            d->get_parameter(1).is_symbol(sym) && sym == "farkas" &&
-           d->get_num_parameters() >= learner.m.get_num_parents(step) + 2) // the following parameters are the Farkas coefficients
+           d->get_num_parameters() >= m_learner.m.get_num_parents(step) + 2) // the following parameters are the Farkas coefficients
         {
-            SASSERT(learner.m.has_fact(step));
+            SASSERT(m_learner.m.has_fact(step));
             
             bool needsToBeClosed = true;
             
@@ -408,22 +408,22 @@ namespace spacer {
              */
             parameter const* params = d->get_parameters() + 2; // point to the first Farkas coefficient
             
-            for(unsigned i = 0; i < learner.m.get_num_parents(step); ++i)
+            for(unsigned i = 0; i < m_learner.m.get_num_parents(step); ++i)
             {
-                SASSERT(learner.m.is_proof(step->get_arg(i)));
+                SASSERT(m_learner.m.is_proof(step->get_arg(i)));
                 proof * premise = to_app(step->get_arg(i));
                 
-                if (learner.is_b_marked(premise) && !learner.is_closed(premise))
+                if (m_learner.is_b_marked(premise) && !m_learner.is_closed(premise))
                 {
-                    SASSERT(!learner.is_a_marked(premise));
+                    SASSERT(!m_learner.is_a_marked(premise));
                     
-                    if (learner.only_contains_symbols_b(learner.m.get_fact(step)) && !learner.is_h_marked(step))
+                    if (m_learner.only_contains_symbols_b(m_learner.m.get_fact(step)) && !m_learner.is_h_marked(step))
                     {
-                        learner.set_closed(premise, true);
+                        m_learner.set_closed(premise, true);
                         
                         rational coefficient;
                         VERIFY(params[i].is_rational(coefficient));
-                        literals.push_back(to_app(learner.m.get_fact(premise)));
+                        literals.push_back(to_app(m_learner.m.get_fact(premise)));
                         coefficients.push_back(abs(coefficient));
                     }
                     else // otherwise we don't deal with the premise, so we don't need to close the current step at the end
@@ -432,31 +432,31 @@ namespace spacer {
                     }
                 }
             }
-            params += learner.m.get_num_parents(step); // point to the first Farkas coefficient, which corresponds to a formula in the conclusion
+            params += m_learner.m.get_num_parents(step); // point to the first Farkas coefficient, which corresponds to a formula in the conclusion
             
             // TODO: possible BUG: why do we always trust the conclusion, in contrast to the premises? i.e. why don't we need to check for
             // learner.only_contains_symbols_b(learner.m.get_fact(step)) && !learner.is_h_marked(step)?
             // if there are still parameters left, we know that the conclusion is not the empty clause, but contains negated premises (valid, since A land B land C => bot is the same as A => neg B lor neg C)
             // the conclusion can either be a single formula or a disjunction of several formulas, we have to deal with both situations
-            if (learner.m.get_num_parents(step) + 2 < d->get_num_parameters())
+            if (m_learner.m.get_num_parents(step) + 2 < d->get_num_parameters())
             {
                 unsigned num_args = 1;
-                expr* conclusion = learner.m.get_fact(step);
+                expr* conclusion = m_learner.m.get_fact(step);
                 expr* const* args = &conclusion;
-                if (learner.m.is_or(conclusion))
+                if (m_learner.m.is_or(conclusion))
                 {
                     app* _or = to_app(conclusion);
                     num_args = _or->get_num_args();
                     args = _or->get_args();
                 }
-                SASSERT(learner.m.get_num_parents(step) + 2 + num_args == d->get_num_parameters());
+                SASSERT(m_learner.m.get_num_parents(step) + 2 + num_args == d->get_num_parameters());
                 
-                bool_rewriter rewriter(learner.m);
+                bool_rewriter rewriter(m_learner.m);
                 for (unsigned i = 0; i < num_args; ++i)
                 {
                     expr* premise = args[i];
                     
-                    expr_ref negatedPremise(learner.m);
+                    expr_ref negatedPremise(m_learner.m);
                     rewriter.mk_not(premise, negatedPremise);
                     SASSERT(is_app(negatedPremise));
                     literals.push_back(to_app(negatedPremise));
@@ -468,14 +468,14 @@ namespace spacer {
             }
             
             // now all B-pure literals and their coefficients are collected, so compute the linear combination
-            expr_ref res(learner.m);
+            expr_ref res(m_learner.m);
             compute_linear_combination(coefficients, literals, res);
 
-            learner.add_lemma_to_core(res);
+            m_learner.add_lemma_to_core(res);
             
             if (needsToBeClosed)
             {
-                learner.set_closed(step, true);
+                m_learner.set_closed(step, true);
             }
         }
     }

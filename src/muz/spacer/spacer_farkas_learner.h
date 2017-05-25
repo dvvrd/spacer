@@ -95,17 +95,17 @@ namespace spacer {
         void add_lemma_to_core(expr_ref lemma);
         
     private:
-        std::vector<std::shared_ptr<unsat_core_plugin> > plugins; // the registered plugins
+        std::vector<std::shared_ptr<unsat_core_plugin> > m_plugins; // the registered plugins
 
-        std::unordered_set<func_decl*> symbols_b; // symbols, which occur in any b-asserted formula
+        std::unordered_set<func_decl*> m_symbols_b; // symbols, which occur in any b-asserted formula
         void collect_symbols_b(expr_set axioms_b);
         
-        ast_mark a_mark;
-        ast_mark b_mark;
-        ast_mark h_mark;
-        ast_mark closed;
+        ast_mark m_a_mark;
+        ast_mark m_b_mark;
+        ast_mark m_h_mark;
+        ast_mark m_closed;
 
-        obj_hashtable<expr> unsat_core_set; // collects the lemmas of the unsat-core, will at the end be inserted into unsat_core.
+        obj_hashtable<expr> m_unsat_core_set; // collects the lemmas of the unsat-core, will at the end be inserted into unsat_core.
 
         /*
          * computes partial core for step by delegating computation to plugins
@@ -122,11 +122,11 @@ namespace spacer {
     class unsat_core_plugin {
         
     public:
-        unsat_core_plugin(unsat_core_learner& learner) : learner(learner){};
+        unsat_core_plugin(unsat_core_learner& learner) : m_learner(learner){};
         virtual void compute_partial_core(proof* step) = 0;
         virtual void finalize(){};
     
-        unsat_core_learner& learner;
+        unsat_core_learner& m_learner;
     };
     
     
