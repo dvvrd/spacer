@@ -216,10 +216,9 @@ namespace spacer {
         // give plugins chance to finalize their unsat-core-computation
         finalize();
         
-        // move all lemmas from set into vector
-        for (auto it = m_unsat_core_set.begin(); it != m_unsat_core_set.end(); ++it)
+        // move all lemmas into vector
+        for (auto it = m_unsat_core.begin(); it != m_unsat_core.end(); ++it)
         {
-            IF_VERBOSE(2, verbose_stream() << "Move lemma to unsat core vector:" << mk_pp(*it, m) << " " << (*it)->get_id() << "\n";);
             unsat_core.push_back(*it);
         }
     }
@@ -307,7 +306,7 @@ namespace spacer {
     void unsat_core_learner::add_lemma_to_core(expr_ref lemma)
     {
         IF_VERBOSE(2, verbose_stream() << "Add lemma to unsat core:" << mk_pp(lemma, m) << " " << lemma->get_id() << "\n";);
-        m_unsat_core_set.insert_if_not_there(lemma);
+        m_unsat_core.push_back(lemma);
     }
     
 #pragma mark - unsat_core_plugin_lemma

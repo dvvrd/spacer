@@ -52,7 +52,7 @@ namespace spacer {
         typedef obj_hashtable<expr> expr_set;
 
     public:
-        unsat_core_learner(ast_manager& m) : m(m) {};
+        unsat_core_learner(ast_manager& m) : m(m), m_unsat_core(m) {};
         ast_manager& m;
 
         /*
@@ -105,7 +105,7 @@ namespace spacer {
         ast_mark m_h_mark;
         ast_mark m_closed;
 
-        obj_hashtable<expr> m_unsat_core_set; // collects the lemmas of the unsat-core, will at the end be inserted into unsat_core.
+        expr_ref_vector m_unsat_core; // collects the lemmas of the unsat-core, will at the end be inserted into unsat_core.
 
         /*
          * computes partial core for step by delegating computation to plugins
