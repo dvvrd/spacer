@@ -41,7 +41,7 @@ namespace spacer {
         proof* next();
         
     private:
-        std::stack<proof*> todo;
+        ptr_vector<proof> todo;
         ast_mark visited; // the proof nodes we have already visited
         
         ast_manager& m;
@@ -96,7 +96,6 @@ namespace spacer {
         
     private:
         std::vector<std::shared_ptr<unsat_core_plugin> > m_plugins; // the registered plugins
-
         std::unordered_set<func_decl*> m_symbols_b; // symbols, which occur in any b-asserted formula
         void collect_symbols_b(expr_set axioms_b);
         

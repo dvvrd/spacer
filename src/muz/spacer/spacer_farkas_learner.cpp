@@ -42,7 +42,7 @@ namespace spacer {
     
     ProofIteratorPostOrder::ProofIteratorPostOrder(proof* root, ast_manager& manager) : m(manager)
     {
-        todo.push(root);
+        todo.push_back(root);
     }
     
     bool ProofIteratorPostOrder::hasNext()
@@ -57,7 +57,7 @@ namespace spacer {
     {
         while (!todo.empty())
         {
-            proof* currentNode = todo.top();
+            proof* currentNode = todo.back();
             
             // if we haven't already visited the current unit
             if (!visited.is_marked(currentNode))
@@ -75,7 +75,7 @@ namespace spacer {
                     if(!visited.is_marked(premise))
                     {
                         // add it to the stack
-                        todo.push(premise);
+                        todo.push_back(premise);
                         existsUnvisitedParent = true;
                     }
                 }
@@ -84,13 +84,13 @@ namespace spacer {
                 if (!existsUnvisitedParent)
                 {
                     visited.mark(currentNode, true);
-                    todo.pop();
+                    todo.pop_back();
                     return currentNode;
                 }
             }
             else
             {
-                todo.pop();
+                todo.pop_back();
             }
         }
         
@@ -216,6 +216,8 @@ namespace spacer {
         // give plugins chance to finalize their unsat-core-computation
         finalize();
         
+        // TODO: remove duplicates from unsat core
+
         // move all lemmas into vector
         for (auto it = m_unsat_core.begin(); it != m_unsat_core.end(); ++it)
         {
