@@ -42,6 +42,8 @@ Notes:
 #include"spacer_util.h"
 #include"spacer_farkas_learner.h"
 #include"expr_replacer.h"
+#include "spacer_unsat_core_learner.h"
+#include "spacer_unsat_core_plugin.h"
 
 namespace spacer {
     void itp_solver::push ()
@@ -290,28 +292,26 @@ namespace spacer {
         elim_proxies (core);
         simplify_bounds (core); // XXX potentially redundant
         IF_VERBOSE(2,
-                   verbose_stream () << "Itp Core:\n"
+                   verbose_stream () << "\nItp Core:\n"
                    << mk_pp (mk_and (core), m) << "\n";);
 
+        // TODO: get rid of new
         unsat_core_learner learner(m);
-        auto plugin_lemma = std::make_shared<unsat_core_plugin_lemma>(learner);
-        auto plugin_farkas_lemma = std::make_shared<unsat_core_plugin_farkas_lemma>(learner);
+        unsat_core_plugin_lemma* plugin_lemma = new unsat_core_plugin_lemma(learner);
+        unsat_core_plugin_farkas_lemma* plugin_farkas_lemma = new unsat_core_plugin_farkas_lemma(learner, m_split_literals);
         learner.register_plugin(plugin_farkas_lemma);
         learner.register_plugin(plugin_lemma);
 
-        expr_ref_vector core2(m); // TODO:debugging
+        expr_ref_vector core2(m);
         learner.compute_unsat_core(pr, B, core2);
-                
-        for (auto it = core2.begin(); it != core2.end(); ++it)
-        {
-            IF_VERBOSE(2, verbose_stream() << "Lemma of unsat core:" << mk_pp(*it, m) << "\n";);
-        }
+        
         elim_proxies (core2);
         simplify_bounds (core2); // XXX potentially redundant
 
         IF_VERBOSE(2,
                    verbose_stream () << "Itp Core2:\n"
                    << mk_pp (mk_and (core2), m) << "\n";);
+        SASSERT(mk_and(core) == mk_and(core2));// debugging
 
     }
   

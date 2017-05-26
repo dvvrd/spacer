@@ -30,6 +30,7 @@ Revision History:
 #include "arith_decl_plugin.h"
 #include "array_decl_plugin.h"
 #include "bv_decl_plugin.h"
+#include "model.h"
 
 #include "stopwatch.h"
 
