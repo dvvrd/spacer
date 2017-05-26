@@ -66,17 +66,15 @@ namespace spacer
         }
         
         // we have already iterated through all inferences
-        return nullptr;
+        return NULL;
     }
     
     
 # pragma mark - main methods
 unsat_core_learner::~unsat_core_learner()
 {
-    for (int i=0; i < m_plugins.size(); ++i)
-    {
-        m_plugins[i]->~unsat_core_plugin();
-    }
+    std::for_each(m_plugins.begin(), m_plugins.end(), delete_proc<unsat_core_plugin>());
+
 }
 
 void unsat_core_learner::register_plugin(unsat_core_plugin* plugin)
@@ -88,6 +86,7 @@ void unsat_core_learner::compute_unsat_core(proof *root, expr_set& asserted_b, e
 {
     // transform proof in order to get a proof which is better suited for unsat-core-extraction
     proof_ref pr(root, m);
+
     proof_utils::reduce_hypotheses(pr);
     proof_utils::permute_unit_resolution(pr);
     IF_VERBOSE(3, verbose_stream() << "Reduced proof:\n" << mk_ismt2_pp(pr, m) << "\n";);
@@ -191,9 +190,9 @@ void unsat_core_learner::compute_unsat_core(proof *root, expr_set& asserted_b, e
     finalize();
     
     // TODO: remove duplicates from unsat core?
-    
+
     // move all lemmas into vector
-    for (auto it = m_unsat_core.begin(); it != m_unsat_core.end(); ++it)
+    for (expr* const* it = m_unsat_core.begin(); it != m_unsat_core.end(); ++it)
     {
         unsat_core.push_back(*it);
     }
@@ -201,18 +200,18 @@ void unsat_core_learner::compute_unsat_core(proof *root, expr_set& asserted_b, e
 
 void unsat_core_learner::compute_partial_core(proof* step)
 {
-    for (auto it=m_plugins.begin(); it != m_plugins.end(); ++it)
+    for (unsat_core_plugin** it=m_plugins.begin(); it != m_plugins.end(); ++it)
     {
-        auto plugin = *it;
+        unsat_core_plugin* plugin = *it;
         plugin->compute_partial_core(step);
     }
 }
 
 void unsat_core_learner::finalize()
 {
-    for (auto it=m_plugins.begin(); it != m_plugins.end(); ++it)
+    for (unsat_core_plugin** it=m_plugins.begin(); it != m_plugins.end(); ++it)
     {
-        auto plugin = *it;
+        unsat_core_plugin* plugin = *it;
         plugin->finalize();
     }
 }
@@ -266,7 +265,7 @@ void unsat_core_learner::collect_symbols_b(expr_set axioms_b)
 {
     expr_mark visited;
     collect_pure_proc proc(m_symbols_b);
-    for (auto it = axioms_b.begin(); it != axioms_b.end(); ++it)
+    for (expr_set::iterator it = axioms_b.begin(); it != axioms_b.end(); ++it)
     {
         for_each_expr(proc, visited, *it);
     }

@@ -283,35 +283,20 @@ namespace spacer {
         proof_ref pr(m);
         pr = get_proof ();
         
-        farkas_learner farkas;
-        farkas.set_split_literals (m_split_literals);
-    
-        core.reset ();
-        farkas.get_lemmas (pr, B, core);
-        
-        elim_proxies (core);
-        simplify_bounds (core); // XXX potentially redundant
-        IF_VERBOSE(2,
-                   verbose_stream () << "\nItp Core:\n"
-                   << mk_pp (mk_and (core), m) << "\n";);
-
-        // TODO: get rid of new
         unsat_core_learner learner(m);
-        unsat_core_plugin_lemma* plugin_lemma = new unsat_core_plugin_lemma(learner);
-        unsat_core_plugin_farkas_lemma* plugin_farkas_lemma = new unsat_core_plugin_farkas_lemma(learner, m_split_literals);
+        unsat_core_plugin_lemma* plugin_lemma = alloc(unsat_core_plugin_lemma, learner);
+        unsat_core_plugin_farkas_lemma* plugin_farkas_lemma = alloc(unsat_core_plugin_farkas_lemma, learner, m_split_literals);
         learner.register_plugin(plugin_farkas_lemma);
         learner.register_plugin(plugin_lemma);
 
-        expr_ref_vector core2(m);
-        learner.compute_unsat_core(pr, B, core2);
+        learner.compute_unsat_core(pr, B, core);
         
-        elim_proxies (core2);
-        simplify_bounds (core2); // XXX potentially redundant
+        elim_proxies (core);
+        simplify_bounds (core); // XXX potentially redundant
 
         IF_VERBOSE(2,
-                   verbose_stream () << "Itp Core2:\n"
-                   << mk_pp (mk_and (core2), m) << "\n";);
-        SASSERT(mk_and(core) == mk_and(core2));// debugging
+                   verbose_stream () << "Itp Core:\n"
+                   << mk_pp (mk_and (core), m) << "\n";);
 
     }
   

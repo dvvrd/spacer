@@ -8,9 +8,6 @@
 namespace spacer
 {
     
-#pragma mark - unsat_core_plugin
-unsat_core_plugin::~unsat_core_plugin(){}
-
 #pragma mark - unsat_core_plugin_lemma
 
 void unsat_core_plugin_lemma::compute_partial_core(proof* step)

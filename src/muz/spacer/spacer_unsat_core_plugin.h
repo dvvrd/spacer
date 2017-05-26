@@ -10,7 +10,7 @@ class unsat_core_plugin {
     
 public:
     unsat_core_plugin(unsat_core_learner& learner) : m_learner(learner){};
-    virtual ~unsat_core_plugin();
+    virtual ~unsat_core_plugin(){};
     virtual void compute_partial_core(proof* step) = 0;
     virtual void finalize(){};
     
