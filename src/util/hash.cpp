@@ -83,7 +83,7 @@ unsigned string_hash(const char * str, unsigned length, unsigned init_value) {
         Z3_fallthrough;
     case 1 : 
         a+=str[0];
-        Z3_fallthrough;
+        break;
         /* case 0: nothing left to add */
     }
     mix(a,b,c);
