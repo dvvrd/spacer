@@ -89,6 +89,11 @@ public:
         return *this;
     }
 
+    ref & operator=(ref &&r) {
+        m_ptr = r.detach ();
+        return *this;
+    }
+
     void reset() {
         dec_ref();
         m_ptr = 0;
@@ -107,6 +112,12 @@ public:
     friend bool operator!=(const ref & r1, const ref & r2) {
         return r1.m_ptr != r2.m_ptr;
     }
+
+    friend void swap (ref &r1, ref &r2) {
+        T* tmp = r1.m_ptr;
+        r1.m_ptr = r2.m_ptr;
+        r2.m_ptr = tmp;
+    }
 };
 
 /**
@@ -119,6 +130,5 @@ class unmanged_ref_manager {
     static void inc_ref(T * o) { o->inc_ref(); }
     static void dec_ref(T * o) { o->dec_ref(); }
 };
-
 #endif /* REF_H_ */
 
