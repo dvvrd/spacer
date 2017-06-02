@@ -55,6 +55,7 @@ Notes:
 #include "spacer_generalizers.h"
 #include "for_each_expr.h"
 #include "dl_rule_set.h"
+#include "dl_rule_dependencies.h"
 #include "unit_subsumption_tactic.h"
 #include "model_smt2_pp.h"
 #include "dl_mk_rule_inliner.h"

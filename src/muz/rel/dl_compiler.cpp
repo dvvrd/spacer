@@ -23,6 +23,7 @@ Revision History:
 #include"dl_context.h"
 #include"rel_context.h"
 #include"dl_rule.h"
+#include"dl_rule_dependencies.h"
 #include"dl_util.h"
 #include"dl_compiler.h"
 #include"ast_pp.h"

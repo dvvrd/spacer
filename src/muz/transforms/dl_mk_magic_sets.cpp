@@ -21,6 +21,7 @@ Revision History:
 #include<sstream>
 #include"ast_pp.h"
 #include"dl_mk_magic_sets.h"
+#include"dl_rule_dependencies.h"
 
 namespace datalog {
 

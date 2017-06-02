@@ -52,6 +52,7 @@ Subsumption transformation (remove rule):
 #include "rewriter.h"
 #include "rewriter_def.h"
 #include "dl_mk_rule_inliner.h"
+#include "dl_rule_dependencies.h"
 #include "fixedpoint_params.hpp"
 
 namespace datalog {
@@ -507,7 +508,7 @@ namespace datalog {
     */
     bool mk_rule_inliner::is_oriented_rewriter(rule * r, rule_stratifier const& strat) {
         func_decl * head_pred = r->get_decl();
-        unsigned head_strat = strat.get_predicate_strat(head_pred);
+        unsigned head_strat = strat.get_strat(head_pred);
 
         unsigned head_arity = head_pred->get_arity();
 
@@ -517,7 +518,7 @@ namespace datalog {
             
             func_decl * pred = r->get_decl(ti);
 
-            unsigned pred_strat = strat.get_predicate_strat(pred);
+            unsigned pred_strat = strat.get_strat(pred);
             SASSERT(pred_strat<=head_strat);
 
             if (pred_strat==head_strat) {
