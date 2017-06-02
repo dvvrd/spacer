@@ -20,33 +20,108 @@ Revision History:
 #ifndef DL_MK_SYNCHRONIZE_H_
 #define DL_MK_SYNCHRONIZE_H_
 
+#include<set>
+#include<map>
 #include"dl_context.h"
 #include"dl_rule_set.h"
 #include"uint_set.h"
 #include"dl_rule_transformer.h"
+#include"dl_rule_dependencies.h"
 #include"dl_mk_rule_inliner.h"
+#include"smt_kernel.h"
 
 namespace datalog {
+
+    class rule_reachability_graph : public rule_dependencies_base<rule> {
+        rule_set const & m_rules;
+        rule_unifier     m_unify;
+
+        virtual void populate_one(rule * r);
+        bool check_reachability(rule & src, unsigned tail_idx, rule & dst, rule_ref & tmp);
+
+    public:
+        rule_reachability_graph(context & ctx, rule_set const & rules);
+        ~rule_reachability_graph();
+
+        void connect(rule * r1, rule * r2);
+
+        void display( std::ostream & out ) const;
+    };
+
+    class reachability_stratifier : public rule_stratifier_base<rule> {
+    private:
+        const rule_reachability_graph & m_graph;
+    public:
+        reachability_stratifier(rule_reachability_graph const & graph);
+        ~reachability_stratifier();
+
+        bool validate_mutual_recursion() const;
+        void display( std::ostream & out ) const;
+
+        bool strata_connected(item_set & src, item_set & dst) const;
+    };
+
+    class lemma {
+        ast_manager & m;
+        ptr_vector<expr> m_constraint;
+        ptr_vector<expr> m_holes;
+        svector<bool> m_hole_enabled;
+
+        expr * fresh_const(char const *prefix, unsigned idx, sort * s) const;
+        vector< ptr_vector<expr> > replace_bound_vars(bool with_consts, unsigned & delta, 
+                vector< ptr_vector<expr> > const & exprs, ptr_vector<sort> & var_sorts, svector<symbol> & var_names);
+        ptr_vector<expr> replace_vars_with_consts(unsigned & delta, unsigned num_exprs, expr * const* exprs);
+        void replace_bound_vars_in_this(bool with_consts, unsigned & delta, ptr_vector<expr> & new_constraint,
+                ptr_vector<expr> & new_holes, ptr_vector<sort> & var_sorts, svector<symbol> & var_names);
+        void fill_holes(bool replace_with_consts, unsigned num_exprs, expr * const* exprs, unsigned & delta, ptr_vector<expr> & result,
+                ptr_vector<sort> & var_sorts, svector<symbol> & var_names);
+
+    public:
+        lemma(ast_manager & m, ptr_vector<expr> const & constraint, ptr_vector<expr> const & holes);
+        lemma(ast_manager & m, ptr_vector<lemma> const & combined_lemmas);
+        lemma(ast_manager & m, lemma & source, ptr_vector<expr> const & old_characteristic_vars, obj_hashtable<expr> const & new_characteristic_vars);
+
+        expr_ref_vector operator()(obj_hashtable<rule> const & rs, ptr_vector<expr> & characteristic_vars, ptr_vector<expr> & conclusions,
+                ptr_vector<sort> & free_var_sorts, svector<symbol> & free_var_names);
+
+        void display( std::ostream & out );
+    };
 
     /**
        \brief Implements a synchronous product transformation.
     */
     class mk_synchronize : public rule_transformer::plugin {
+        typedef obj_hashtable<expr> expr_set;
         context&        m_ctx;
         ast_manager&    m;
         rule_manager&   rm;
+        smt_params  m_smt_params;
+        smt::kernel m_solver;
+        scoped_ptr<rule_reachability_graph> m_graph;
+        scoped_ptr<reachability_stratifier> m_stratifier;
+        obj_map<rule, rule*> m_rule2orig;
+        std::map<std::pair<unsigned, rule*>, std::set<rule*> *> m_orig2prod;
+        obj_map<rule, rule_vector*> m_prod2orig;
 
         bool is_recursive_app(rule & r, app * app) const;
-        void replace_applications(rule & r, rule_set & rules, ptr_vector<app> & apps, func_decl * pred);
+        rule * get_original_rule(rule * r) const;
 
         rule * rename_bound_vars_in_rule(rule * r, unsigned & var_idx);
         vector<rule_vector> rename_bound_vars(ptr_vector<func_decl> const & heads, rule_set & rules);
+        rule_ref replace_applications(rule & r, ptr_vector<app> & apps, func_decl * pred, app *& resulting_app);
+
+        lemma * mine_lemma_from_rule(rule & r, app * non_rec_apps) const;
+        obj_hashtable<expr> extract_invariant(expr_ref_vector const & constraint, ptr_vector<expr> const & characteristic_vars,
+                ptr_vector<expr> const & conclusions, ptr_vector<sort> const & free_var_sorts, svector<symbol> const & free_var_names);
+        void propagate_constraint(rule & r, app * non_rec_app, rule_set & rules);
+        void update_reachability_graph(func_decl * new_rel, ptr_vector<app> const & apps, rule * old_rule, rule * new_rule, rule_set & rules);
+        void update_reachability_graph(func_decl * new_rel, rule_set & rules);
 
         app* product_application(ptr_vector<app> const & apps, func_decl * pred);
         rule_ref product_rule(rule_vector const & rules, func_decl * pred);
 
         void merge_rules(unsigned idx, ptr_vector<func_decl> const & decls, rule_vector &buf,
-            vector<rule_vector> const & merged_rules, rule_set & all_rules, func_decl * pred);
+                vector<rule_vector> const & merged_rules, rule_set & all_rules, func_decl * pred);
         void merge_applications(rule & r, rule_set & rules);
 
     public:
