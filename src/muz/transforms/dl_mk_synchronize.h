@@ -83,6 +83,8 @@ namespace datalog {
 
         rule_ref enrich_rule(rule & r, rule_set & rules);
 
+        unsigned weight() const;
+
         void display( std::ostream & out );
     };
 
@@ -98,16 +100,16 @@ namespace datalog {
         smt::kernel m_solver;
         scoped_ptr<rule_reachability_graph> m_graph;
         scoped_ptr<reachability_stratifier> m_stratifier;
-        obj_map<rule, rule*> m_rule2orig;
+        std::map<rule*, rule*> m_rule2orig;
         std::map<std::pair<unsigned, rule*>, std::set<rule*> *> m_orig2prod;
         obj_map<rule, rule_vector*> m_prod2orig;
 
         bool is_recursive_app(rule & r, app * app) const;
-        rule * get_original_rule(rule * r) const;
+        rule * get_original_rule(rule * r);
 
         rule * rename_bound_vars_in_rule(rule * r, unsigned & var_idx);
         vector<rule_vector> rename_bound_vars(ptr_vector<func_decl> const & heads, rule_set & rules);
-        rule_ref replace_applications(rule & r, ptr_vector<app> & apps, func_decl * pred, app *& resulting_app);
+        rule_ref replace_applications(rule & r, ptr_vector<app> const & apps, func_decl * pred, app *& resulting_app);
 
         lemma * mine_lemma_from_rule(rule & r, app * non_rec_apps) const;
         obj_hashtable<expr> extract_invariant(expr_ref_vector const & constraint, ptr_vector<expr> const & assumption_vars,
@@ -118,10 +120,13 @@ namespace datalog {
         void update_reachability_graph(func_decl * new_rel, rule_set & rules);
 
         app* product_application(ptr_vector<app> const & apps, func_decl * pred);
+        rule_ref make_tautoligocal_rule(func_decl * decl, unsigned start_idx);
+        rule_ref best_product_rule(rule_vector const & rules, func_decl * pred, lemma * input_lemma);
         rule_ref product_rule(rule_vector const & rules, func_decl * pred);
 
         void merge_rules(unsigned idx, ptr_vector<func_decl> const & decls, rule_vector &buf,
-                vector<rule_vector> const & merged_rules, rule_set & all_rules, func_decl * pred);
+                vector<rule_vector> const & merged_rules, rule_set & all_rules, func_decl * pred, lemma * source_lemma);
+        rule_ref merge_applications(rule & r, rule_set & rules, ptr_vector<app> const & merged_apps, app *& resulting_app);
         void merge_applications(rule & r, rule_set & rules);
         void tautologically_extend(rule_set & rules, ptr_vector<func_decl> const & decls);
 

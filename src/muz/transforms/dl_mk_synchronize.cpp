@@ -47,10 +47,6 @@ namespace datalog {
         return symbol(ss.str().c_str());
     }
 
-    // expr * fresh_const(ast_manager & m, char const *prefix, unsigned idx, sort * s) {
-    //     return m.mk_const(concat(prefix, idx), s);
-    // }
-
     vector<ptr_vector<expr> > replace_bound_vars(ast_manager & m, bool with_consts, unsigned & delta,
             vector<ptr_vector<expr> > const & exprs, ptr_vector<sort> & var_sorts, svector<symbol> & var_names) {
         used_vars used;
@@ -99,6 +95,16 @@ namespace datalog {
         svector<symbol> tmp2;
         input.push_back(ptr_vector<expr>(num_exprs, exprs));
         return replace_bound_vars(m, true, delta, input, tmp1, tmp2)[0];
+    }
+
+    bool is_non_recursive_rule(rule & r) {
+        func_decl * f = r.get_head()->get_decl();
+        for (unsigned i = 0; i < r.get_uninterpreted_tail_size(); ++i) {
+            if (r.get_tail(i)->get_decl() == f) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // -----------------------------------
@@ -228,17 +234,7 @@ namespace datalog {
     }
 
     bool reachability_stratifier::is_non_recursive_stratum(item_set & s) const {
-        if (s.size() != 1) {
-            return false;
-        }
-        rule & r = **s.begin();
-        func_decl * f = r.get_head()->get_decl();
-        for (unsigned i = 0; i < r.get_uninterpreted_tail_size(); ++i) {
-            if (r.get_tail(i)->get_decl() == f) {
-                return false;
-            }
-        }
-        return true;
+        return s.size() == 1 && is_non_recursive_rule(**s.begin());
     }
 
     // -----------------------------------
@@ -407,6 +403,14 @@ namespace datalog {
         return result;
     }
 
+    unsigned lemma::weight() const {
+        unsigned result = m_constraint.size();
+        for (unsigned i = 0; i < m_hole_enabled.size(); ++i) {
+            if (m_hole_enabled[i]) ++result;
+        }
+        return result;
+    }
+
     void lemma::display(std::ostream & out) {
         out << "constraint:";
         for (unsigned i = 0; i < m_constraint.size(); ++i) {
@@ -465,11 +469,11 @@ namespace datalog {
         return app && r.get_head() && r.get_head()->get_decl() == app->get_decl();
     }
 
-    rule * mk_synchronize::get_original_rule(rule * r) const {
-        return m_rule2orig.contains(r) ? m_rule2orig[r] : r;
+    rule * mk_synchronize::get_original_rule(rule * r) {
+        return m_rule2orig.count(r) ? m_rule2orig[r] : r;
     }
 
-    rule_ref mk_synchronize::replace_applications(rule & r, ptr_vector<app> & apps, func_decl * pred, app *& resulting_app) {
+    rule_ref mk_synchronize::replace_applications(rule & r, ptr_vector<app> const & apps, func_decl * pred, app *& resulting_app) {
         resulting_app = product_application(apps, pred);
 
         ptr_vector<app> new_tail;
@@ -504,7 +508,8 @@ namespace datalog {
         rule_ref new_rule(rm);
         new_rule = rm.mk(r.get_head(), tail_idx + 1,
             new_tail.c_ptr(), new_tail_neg.c_ptr(), /*symbol("REPLACED APPLICATION")*/r.name(), false);
-        m_rule2orig.insert(new_rule.get(), &r);
+        // m_rule2orig.insert(new_rule.get(), &r);
+        m_rule2orig.insert(std::pair<rule*, rule*>(new_rule.get(), &r));
         return new_rule;
     }
 
@@ -524,7 +529,7 @@ namespace datalog {
         rm.substitute(new_rule, revsub.size(), revsub.c_ptr());
 
         rule * result = new_rule.steal();
-        m_rule2orig.insert(result, r);
+        m_rule2orig.insert(std::pair<rule*, rule*>(result, r));
         return result;
     }
 
@@ -832,7 +837,81 @@ namespace datalog {
         return m.mk_app(pred, args_num, args.c_ptr());
     }
 
-    rule_ref mk_synchronize::mk_synchronize::product_rule(rule_vector const & rules, func_decl * pred) {
+    rule_ref mk_synchronize::make_tautoligocal_rule(func_decl * d, unsigned start_idx) {
+        ptr_vector<expr> args;
+        args.resize(d->get_arity());
+        for (unsigned i = 0; i < d->get_arity(); ++i) {
+            sort * s = d->get_domain(i);
+            args[i] = m.mk_var(i + start_idx, s);
+        }
+        app * premise = m.mk_app(d, args.size(), args.c_ptr());
+        app * conclusion = m.mk_app(d, args.size(), args.c_ptr());
+        bool neg = false;
+        rule_ref new_rule(rm);
+        new_rule = rm.mk(conclusion, 1, &premise, &neg, symbol("TAUTO"), false);
+        return new_rule;
+    }
+
+    rule_ref mk_synchronize::best_product_rule(rule_vector const & rules, func_decl * pred, lemma * source_lemma) {
+        svector<unsigned> weights;
+        ptr_vector<lemma> lemmas;
+        if (rules.size() != 2) {
+            std::cout << "AHTUNG! 2 RULES EXPECTED IN BEST PRODUCT RULE!!!\n";
+            return rule_ref(rm);
+        }
+
+        rule * r1 = rules[0];
+        ptr_vector<sort> sorts;
+        r1->get_vars(m, sorts);
+        rule * r2 = rules[1];
+        rule * r1_tauto = make_tautoligocal_rule(r1->get_head()->get_decl(), 0).steal();
+        rule * r2_tauto = make_tautoligocal_rule(r2->get_head()->get_decl(), sorts.size()).steal();
+        svector<rule_ref> variants;
+        svector<unsigned> ws; ws.push_back(2);
+        rule_vector r12_src; r12_src.push_back(r1); r12_src.push_back(r2);
+        rule_ref r12 = product_rule(r12_src, pred);
+        variants.push_back(r12);
+        if (!is_non_recursive_rule(*r1)) {
+            rule_vector r1t2_src; r1t2_src.push_back(r1_tauto); r1t2_src.push_back(r2);
+            rule_ref r1t2 = product_rule(r1t2_src, pred);
+            variants.push_back(r1t2);
+            ws.push_back(1);
+        }
+        if (!is_non_recursive_rule(*r2)) {
+            rule_vector r12t_src; r12t_src.push_back(r1); r12t_src.push_back(r2_tauto);
+            rule_ref r12t = product_rule(r12t_src, pred);
+            variants.push_back(r12t);
+            ws.push_back(1);
+        }
+        unsigned max_w = 0; unsigned max_idx = 0;
+
+        for (unsigned i = 0; i < variants.size(); ++i) {
+            obj_hashtable<rule> stratum;
+            stratum.insert(variants[i].get());
+                ptr_vector<expr> assumption_vars, conclusions;
+                ptr_vector<sort> free_var_sorts;
+                svector<symbol> free_var_names;
+                variants[i]->display(m_ctx, std::cout);
+                expr_ref_vector e = (*source_lemma)(stratum, assumption_vars, conclusions, free_var_sorts, free_var_names);
+                free_var_names.reverse();
+                free_var_sorts.reverse();
+                obj_hashtable<expr> invariant = extract_invariant(e, assumption_vars, conclusions, free_var_sorts, free_var_names);
+                lemma * resulting_lemma = alloc(lemma, m, *source_lemma, assumption_vars, invariant);
+                unsigned lw = resulting_lemma->weight();
+                unsigned w = lw;// * ws[i];
+                std::cout << "FOR " << variants[i]->name() << " GOT LEMMA WEIGHT " << lw;// << " AND WEIGHT " << lw * ws[i];
+                if (w > max_w) {
+                    std::cout << "... AND THIS IS THE BEST WEIGHT!";
+                    max_w = w;
+                    max_idx = i;
+                }
+                std::cout << std::endl;
+        }
+        std::cout << "FINALLY GOT BEST IDX " << max_idx << " -------------------" << std::endl;
+        return variants[max_idx];
+    }
+
+    rule_ref mk_synchronize::product_rule(rule_vector const & rules, func_decl * pred) {
         unsigned n = rules.size();
 
         string_buffer<> buffer;
@@ -918,19 +997,10 @@ namespace datalog {
     }
 
     void mk_synchronize::merge_rules(unsigned idx, ptr_vector<func_decl> const & decls, rule_vector &buf,
-            vector<rule_vector> const & merged_rules, rule_set & all_rules, func_decl * pred) {
+            vector<rule_vector> const & merged_rules, rule_set & all_rules, func_decl * pred, lemma * source_lemma) {
         if (idx >= decls.size()) {
-            // //----
-            // bool all_tauto = true;
-            // for (unsigned i = 0; i < buf.size(); ++i) {
-            //     if (buf[i]->name() != "TAUTO") {
-            //         all_tauto = false;
-            //         break;
-            //     }
-            // }
-            // if (!all_tauto) {
-            //----
-            rule_ref product = product_rule(buf, pred);
+            // rule_ref product = product_rule(buf, pred);
+            rule_ref product = best_product_rule(buf, pred, source_lemma);
             m_prod2orig.insert(product.get(), alloc(rule_vector, buf));
             for (unsigned i = 0; i < buf.size(); ++i) {
                 std::pair<unsigned, rule*> key(i, get_original_rule(buf[i]));
@@ -946,13 +1016,58 @@ namespace datalog {
             }
             all_rules.add_rule(product.get());
             return;
-        }//}
+        }
 
         rule_vector const & pred_rules = merged_rules[idx];
         for (rule_vector::const_iterator it = pred_rules.begin(); it != pred_rules.end(); ++it) {
             buf[idx] = *it;
-            merge_rules(idx + 1, decls, buf, merged_rules, all_rules, pred);
+            merge_rules(idx + 1, decls, buf, merged_rules, all_rules, pred, source_lemma);
         }
+    }
+
+    rule_ref mk_synchronize::merge_applications(rule & r, rule_set & rules, ptr_vector<app> const & merged_apps, app *& resulting_app) {
+        string_buffer<> buffer;
+        ptr_vector<sort> domain;
+        ptr_vector<app>::const_iterator it = merged_apps.begin(), end = merged_apps.end();
+        for (; it != end; ++it) {
+            func_decl* decl = (*it)->get_decl();
+            buffer << decl->get_name();
+            buffer << "!!";
+            domain.append(decl->get_arity(), decl->get_domain());
+        }
+
+        // TODO: do not forget to check rules.contains(func_decl)
+        func_decl* orig = merged_apps[0]->get_decl();
+        func_decl* product_pred = m_ctx.mk_fresh_head_predicate(symbol(buffer.c_str()),
+            symbol::null, domain.size(), domain.c_ptr(), orig);
+
+        ptr_vector<func_decl> merged_decls;
+        rule_vector rules_buf;
+        unsigned n = merged_apps.size();
+        merged_decls.resize(n);
+        rules_buf.resize(n);
+        for (unsigned i = 0; i < n; ++i) {
+            merged_decls[i] = merged_apps[i]->get_decl();
+        }
+
+        vector<rule_vector> renamed_rules = rename_bound_vars(merged_decls, rules);
+
+        rule_ref result = replace_applications(r, merged_apps, product_pred, resulting_app);
+        rules.replace_rule(&r, result.get());
+
+        lemma * source_lemma = mine_lemma_from_rule(*result.get(), resulting_app); // TODO: duplicate place!
+        merge_rules(0, merged_decls, rules_buf, renamed_rules, rules, product_pred, source_lemma);
+
+        update_reachability_graph(product_pred, rules);
+        update_reachability_graph(product_pred, merged_apps, &r, result.get(), rules);
+
+        return result;
+        // propagate_constraint(*result.get(), resulting_app, rules);
+        // reset_dealloc_values(m_prod2orig);
+        // for (std::map<std::pair<unsigned, rule*>, std::set<rule*> *>::const_iterator it = m_orig2prod.begin(); it != m_orig2prod.end(); ++it) {
+        //     dealloc(it->second);
+        // }
+        // m_orig2prod.clear();    
     }
 
     void mk_synchronize::merge_applications(rule & r, rule_set & rules) {
@@ -968,47 +1083,28 @@ namespace datalog {
             return;
         }
 
-        string_buffer<> buffer;
-        ptr_vector<sort> domain;
-        ptr_vector<app>::const_iterator it = non_recursive_applications.begin(), end = non_recursive_applications.end();
-        for (; it != end; ++it) {
-            func_decl* decl = (*it)->get_decl();
-            buffer << decl->get_name();
-            buffer << "!!";
-            domain.append(decl->get_arity(), decl->get_domain());
+        // merge_applications(r, rules, non_recursive_applications);
+        app * last_merge_result = non_recursive_applications[non_recursive_applications.size() - 1];
+        rule_ref result(rm);
+        for (unsigned i = non_recursive_applications.size() - 1; i > 0; --i) {
+            app * a = non_recursive_applications[i - 1];
+            ptr_vector<app> apps;
+            apps.push_back(a);
+            apps.push_back(last_merge_result);
+            std::cout << "--------- SELECTING BEST PRODUCT OF";
+            for (unsigned i = 0; i < apps.size(); ++i) {
+                std::cout << " " << mk_pp(apps[i], m);
+            }
+            std::cout << std::endl;
+            result = merge_applications(r, rules, apps, last_merge_result);
         }
 
-        // TODO: do not forget to check rules.contains(func_decl)
-        func_decl* orig = non_recursive_applications[0]->get_decl();
-        func_decl* product_pred = m_ctx.mk_fresh_head_predicate(symbol(buffer.c_str()),
-            symbol::null, domain.size(), domain.c_ptr(), orig);
-
-        ptr_vector<func_decl> merged_decls;
-        rule_vector rules_buf;
-        unsigned n = non_recursive_applications.size();
-        merged_decls.resize(n);
-        rules_buf.resize(n);
-        for (unsigned i = 0; i < n; ++i) {
-            merged_decls[i] = non_recursive_applications[i]->get_decl();
-        }
-
-        vector<rule_vector> renamed_rules = rename_bound_vars(merged_decls, rules);
-
-        merge_rules(0, merged_decls, rules_buf, renamed_rules, rules, product_pred);
-
-        app * replacing_app;
-        rule_ref result = replace_applications(r, non_recursive_applications, product_pred, replacing_app);
-        rules.replace_rule(&r, result.get());
-
-        update_reachability_graph(product_pred, rules);
-        update_reachability_graph(product_pred, non_recursive_applications, &r, result.get(), rules);
-
-        propagate_constraint(*result.get(), replacing_app, rules);
+        propagate_constraint(*result.get(), last_merge_result, rules);
         reset_dealloc_values(m_prod2orig);
         for (std::map<std::pair<unsigned, rule*>, std::set<rule*> *>::const_iterator it = m_orig2prod.begin(); it != m_orig2prod.end(); ++it) {
             dealloc(it->second);
         }
-        m_orig2prod.clear();
+        m_orig2prod.clear();    
     }
 
     void mk_synchronize::tautologically_extend(rule_set & rules, ptr_vector<func_decl> const & decls) {
